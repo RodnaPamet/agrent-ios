@@ -110,10 +110,29 @@ Read from the server source, current as of this writing:
 | `POST /api/auth/native/exchange` | `{code, code_verifier}` → `{accessToken, refreshToken, expiresIn}` |
 | `POST /api/auth/token/refresh` | `{refreshToken}` → same shape |
 
-`LogEntry.version` and `lastMutationId` exist on the model and are being wired
-into the write path right now by the session working the offline lane. The
-model here carries `version` but does not yet send `If-Match` — that lands when
-the server contract settles.
+### Write rules, confirmed with the session that owns the write path
+
+The wire contract is **settled**; what is still moving is client-side only.
+
+- **`Idempotency-Key` on every write**, minted *before the first attempt* and
+  reused for every retry of that same write. Mint it per attempt instead and a
+  response lost after the server committed creates a **second record** —
+  traced, two rows every time, on all three create routes.
+- A replay returns the **original entry, 200/201** — not a 409.
+- **Edits must send `If-Match: <version>`**, digits only. The version
+  increment sits *inside* the If-Match guard, so an unguarded PATCH changes
+  content without moving version and every later optimistic lock is wrong.
+  Mandatory, not an optimisation.
+- **The 409 body is nested**: `error.details.currentVersion`, not
+  `currentVersion`. The web client read it one level too shallow for months
+  and its keep-mine retry silently sent no If-Match at all.
+- **426 means the client is too old**, not that the write was refused. Show an
+  upgrade prompt; do not park the queue.
+
+Four behaviours in the web client are defects, not the contract, and are
+deliberately not mirrored here: a 409 closing a form like a success, 426 as a
+terminal refusal, `markOperationParcel` answering 409 vs 200 for the same
+state by timing, and `PlantingBoard` creating entries through a keyless post.
 
 `public/openapi.json` has component schemas but **zero paths**, so it could not
 be used to generate this. Worth fixing separately: an API document that
