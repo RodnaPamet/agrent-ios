@@ -52,8 +52,13 @@ struct CreateLogEntry: Encodable, Sendable {
     var occurredAt: Date?
 }
 
-/// The list endpoint is paginated; the slice reads the first page only.
+/// The list endpoint's paginated envelope.
+///
+/// The key is `rows`, NOT `items`. The use-case returns `{ items, pageInfo }`
+/// but the ROUTE re-shapes it to `{ rows, nextCursor }` before responding, and
+/// the wire is what a client sees. Guessing `items` from the use-case name
+/// produces a decode failure and an ever-empty list.
 struct JournalPage: Decodable, Sendable {
-    let items: [LogEntry]
+    let rows: [LogEntry]
     let nextCursor: String?
 }

@@ -15,9 +15,28 @@ actor APIClient {
 
     private var refreshTask: Task<Tokens, Error>?
 
+    /// Prisma serialises through Next as `2026-09-12T10:00:00.000Z` — ISO 8601
+    /// WITH fractional seconds. Foundation's `.iso8601` strategy rejects those
+    /// outright, so every entry fails to decode and the list comes back empty
+    /// with a decoding error rather than anything that names the cause. Accept
+    /// both spellings.
     private let decoder: JSONDecoder = {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+
         let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
+        d.dateDecodingStrategy = .custom { decoder in
+            let text = try decoder.singleValueContainer().decode(String.self)
+            if let date = withFraction.date(from: text) ?? plain.date(from: text) {
+                return date
+            }
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath,
+                debugDescription: "Not an ISO 8601 date: \(text)"
+            ))
+        }
         return d
     }()
     private let encoder: JSONEncoder = {

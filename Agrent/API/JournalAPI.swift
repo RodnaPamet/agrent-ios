@@ -10,7 +10,7 @@ enum JournalAPI {
         // shape is the other one.
         do {
             return try await APIClient.shared
-                .get("\(base)?limit=50", as: JournalPage.self).items
+                .get("\(base)?limit=50", as: JournalPage.self).rows
         } catch is DecodingError {
             return try await APIClient.shared.get("\(base)?limit=50", as: [LogEntry].self)
         }
