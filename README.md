@@ -9,68 +9,80 @@ was read from the server source, not guessed.
 
 ---
 
-## Before the app can sign in — a server change is required
+## Before the app can sign in — server state
 
-The native auth endpoints already exist (`/api/auth/native/*`, shipped in
-#601/#603), but **the redirect allowlist is empty by default and fails
-closed**. Until it is set, every sign-in returns `redirect_uri_not_allowed`.
-
-On the VM, add to `/opt/agrent/.env`:
+**The redirect allowlist is SET (2026-09-17).** `/opt/agrent/.env` now carries:
 
 ```
 NATIVE_AUTH_REDIRECT_ALLOWLIST=bg.agrent.app://auth/callback
 ```
 
-then restart the app container. It is comma-separated, so a second scheme for
-a debug build can be appended later.
+The container was **recreated, not restarted** — `env_file` is read at container
+creation, so `docker restart` would have silently applied nothing. Verified with
+both controls: the start endpoint went **400 → 307**, and an unlisted scheme
+still returns **400**, so the allowlist is enforcing rather than disabled. It is
+comma-separated, so a debug scheme can be appended later.
 
-This is the only server-side change the slice needs.
+**One blocker remains, and it is in the web app rather than the VM.** Getting
+past the 400 revealed that `/api/auth/native/start` builds its redirect from
+`new URL(req.url).origin` (`route.ts:35`, `:98-99`) instead of the configured
+public origin, so it hands the browser `https://0.0.0.0:3000/...`, which a phone
+cannot reach. This is not a deployment problem: `APP_URL`, `NEXTAUTH_URL` and
+`AUTH_URL` are all `https://app.agrent.bg` inside the container, and Caddy
+forwards `Host {host}` and `X-Forwarded-Proto {scheme}`. The route discards
+them. The sibling route `sso/oidc/callback/route.ts:107` already does it right —
+`env.APP_URL || req.nextUrl.origin`. Fixed separately in agri-saas; until that
+ships, the app builds and runs but sign-in cannot complete.
 
 ---
 
 ## On the Mac mini
 
-**First, get the sources.**
-
 ```bash
 gh repo clone RodnaPamet/agrent-ios
-# or: git clone https://github.com/RodnaPamet/agrent-ios.git
 cd agrent-ios
+
+brew install xcodegen      # once
+xcodegen generate          # writes Agrent.xcodeproj from project.yml
+open Agrent.xcodeproj
 ```
 
-Build for the **simulator** first — no signing, no Apple ID, and it reaches the
-sign-in screen, which is the real first milestone for code that has never been
-compiled. A physical iPhone needs a team; a free Apple ID gives a 7-day profile.
+`project.yml` is the source of truth; the `.xcodeproj` is derived and
+gitignored, so regenerate rather than hand-edit it. Generating it already sets
+the three things most easily got wrong by hand:
 
-1. **Xcode → File → New → Project → iOS → App.**
-   - Product Name: `Agrent`
-   - Interface: **SwiftUI**, Language: **Swift**
-   - Uncheck Core Data and Tests for now.
-   - Save it somewhere outside this folder.
+| | |
+|---|---|
+| Bundle identifier | `bg.agrent.app` |
+| URL type | `bg.agrent.app` — must match `Config.redirectScheme` **and** the server allowlist |
+| Deployment target | iOS 17.0 — `@Observable`, `@Environment(_.self)`, `MainActor.assumeIsolated`, `ContentUnavailableView` |
 
-2. **Replace the generated sources with these.** Delete the `ContentView.swift`
-   and `AgrentApp.swift` Xcode made, then drag the `Agrent/` folder from this
-   repo into the project navigator with *Copy items if needed* ticked and
-   *Create groups* selected.
+Then:
 
-3. **Register the URL scheme.** Target → Info → *URL Types* → **+**
-   - Identifier: `bg.agrent.app`
-   - URL Schemes: `bg.agrent.app`
-
-   This must match `Config.redirectScheme` and the server allowlist. All three
-   agree or sign-in fails.
-
-4. **Set your tenant.** In `Config.swift` replace
+1. **Set your tenant.** In `Agrent/Config.swift` replace
    `REPLACE_WITH_YOUR_TENANT_SLUG` with the slug from your web URL —
    `app.agrent.bg/t/<slug>/journal`.
 
-5. **Signing.** Target → Signing & Capabilities → your Apple team. Bundle
-   identifier `bg.agrent.app`.
+2. **Build for the simulator first** — ⌘R against any iPhone simulator. No
+   signing, no Apple ID, no device. This code was written on Linux and has
+   never been compiled, so proving it *builds* is the milestone worth having
+   before signing enters the picture.
 
-6. **Minimum deployment: iOS 17.** The code uses `@Observable` and
-   `ContentUnavailableView`, both iOS 17+.
+3. **Then a device**, once it compiles: Signing & Capabilities → your team.
+   A free Apple ID gives a 7-day provisioning profile; a paid account a year.
+   Plug the iPhone in, pick it as the run destination, ⌘R.
 
-7. Plug the iPhone in, pick it as the run destination, **⌘R**.
+### What is most likely to fail on that first compile
+
+Two shapes, both in `AuthClient.swift`, flagged from reading rather than from a
+build — there is no macOS on the machine this was written on:
+
+- **`@Observable` + `@MainActor` on an `NSObject` subclass** (`:11-13`). The
+  macro and `NSObject` together are the fiddliest thing in the file.
+- **`nonisolated func presentationAnchor` calling `MainActor.assumeIsolated`**
+  (`:132-141`). Fine under Swift 5; Swift 6 strict concurrency may reject it.
+  `project.yml` pins `SWIFT_STRICT_CONCURRENCY: minimal` for exactly this
+  reason — if Xcode offers to migrate to Swift 6, decline until it runs.
 
 ---
 

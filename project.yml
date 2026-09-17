@@ -1,0 +1,67 @@
+# XcodeGen spec — generates Agrent.xcodeproj from this file.
+#
+#   brew install xcodegen
+#   xcodegen generate
+#   open Agrent.xcodeproj
+#
+# The .xcodeproj is NOT committed (see .gitignore): it is derived, and a
+# generated pbxproj is the kind of file that produces conflicts nobody can
+# read. This spec is the source of truth instead.
+#
+# Three values here MUST agree with Config.swift and the server, or sign-in
+# fails with `redirect_uri_not_allowed`:
+#   • CFBundleURLSchemes      bg.agrent.app   ← here
+#   • Config.redirectScheme   bg.agrent.app   ← Agrent/Config.swift
+#   • NATIVE_AUTH_REDIRECT_ALLOWLIST on the server (set 2026-09-17)
+name: Agrent
+
+options:
+  bundleIdPrefix: bg.agrent
+  deploymentTarget:
+    iOS: "17.0"          # @Observable, @Environment(_.self),
+                         # MainActor.assumeIsolated, ContentUnavailableView
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Swift 5 language mode on purpose. `presentationAnchor` is declared
+    # nonisolated and calls MainActor.assumeIsolated (AuthClient.swift:132);
+    # Swift 6 strict concurrency may reject that shape. Move to 6 once the
+    # thing compiles and runs, not before.
+    SWIFT_STRICT_CONCURRENCY: minimal
+
+targets:
+  Agrent:
+    type: application
+    platform: iOS
+    sources:
+      - path: Agrent
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: bg.agrent.app
+        PRODUCT_NAME: Agrent
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # Signing is left unset deliberately: the simulator needs none, and
+        # a device build wants YOUR team rather than a value committed here.
+        # Xcode → Signing & Capabilities → Team, then it persists locally.
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: Agrent/Info.plist
+      properties:
+        CFBundleDisplayName: Agrent
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # The callback scheme. ASWebAuthenticationSession intercepts it, and
+        # Config.swift's header requires it registered here too.
+        CFBundleURLTypes:
+          - CFBundleURLName: bg.agrent.app
+            CFBundleURLSchemes:
+              - bg.agrent.app
