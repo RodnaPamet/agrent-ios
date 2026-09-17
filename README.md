@@ -3,7 +3,7 @@
 A native SwiftUI client for the Field Journal, talking to the existing
 `app.agrent.bg` API. No web code is reused and none is touched.
 
-**688 lines of Swift, 11 files. Written on Linux and never compiled** — expect
+**771 lines of Swift, 11 files. Written on Linux and never compiled** — expect
 to fix a few small things in Xcode on the first build. Everything it talks to
 was read from the server source, not guessed.
 
@@ -29,6 +29,18 @@ This is the only server-side change the slice needs.
 ---
 
 ## On the Mac mini
+
+**First, get the sources.**
+
+```bash
+gh repo clone RodnaPamet/agrent-ios
+# or: git clone https://github.com/RodnaPamet/agrent-ios.git
+cd agrent-ios
+```
+
+Build for the **simulator** first — no signing, no Apple ID, and it reaches the
+sign-in screen, which is the real first milestone for code that has never been
+compiled. A physical iPhone needs a team; a free Apple ID gives a 7-day profile.
 
 1. **Xcode → File → New → Project → iOS → App.**
    - Product Name: `Agrent`
@@ -134,6 +146,9 @@ deliberately not mirrored here: a 409 closing a form like a success, 426 as a
 terminal refusal, `markOperationParcel` answering 409 vs 200 for the same
 state by timing, and `PlantingBoard` creating entries through a keyless post.
 
-`public/openapi.json` has component schemas but **zero paths**, so it could not
-be used to generate this. Worth fixing separately: an API document that
-describes no endpoints is not much of a document.
+When this was written `public/openapi.json` had component schemas but **zero
+paths**, so it could not be used to generate this client. That has since been
+fixed (#947/#948/#953): the document moved to `src/generated/openapi.json` and
+now describes **26 paths and 87 schemas**. A later version of this client could
+be generated from it rather than hand-written — the hand-written contract notes
+above are what it replaces.
