@@ -11,7 +11,7 @@ enum Config {
 
     /// The tenant slug from the web URL: app.agrent.bg/t/<slug>/journal
     /// Hard-coded for the slice; a real build reads it from /api/auth/me.
-    static let tenantSlug = "REPLACE_WITH_YOUR_TENANT_SLUG"
+    static let tenantSlug = "agrent"
 
     static let redirectScheme = "bg.agrent.app"
     static let redirectURI = "\(redirectScheme)://auth/callback"

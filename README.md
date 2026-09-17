@@ -59,9 +59,15 @@ the three things most easily got wrong by hand:
 
 Then:
 
-1. **Set your tenant.** In `Agrent/Config.swift` replace
-   `REPLACE_WITH_YOUR_TENANT_SLUG` with the slug from your web URL —
-   `app.agrent.bg/t/<slug>/journal`.
+1. **Check the tenant.** `Agrent/Config.swift` is set to `agrent`, the slug
+   from `app.agrent.bg/t/agrent/journal`. Production has exactly two tenants
+   (`agrent`, 4 members; `pwc-mt6a7ff0`, 1), so this is almost certainly right
+   — but confirm it against your own address bar. A wrong slug fails *after*
+   sign-in, with an empty or 404ing journal list, not at the sign-in step.
+
+   Hard-coded on purpose for the slice. `GET /api/auth/me` returns it for the
+   signed-in user, and reading it from there is one of the listed
+   not-yet-done items below.
 
 2. **Build for the simulator first** — ⌘R against any iPhone simulator. No
    signing, no Apple ID, no device. This code was written on Linux and has
