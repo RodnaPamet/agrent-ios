@@ -6,6 +6,20 @@ struct ParcelMapView: View {
 
     @State private var store: ParcelsStore
 
+    /// Remembered per user, and SCHEMATIC BY DEFAULT.
+    ///
+    /// The default is the decision, not the toggle. Schematic's first frame
+    /// needs no network, so a farmer opening this with no coverage sees their
+    /// fields rather than grey tiles — and that is the situation this screen
+    /// exists for. MapKit is the deliberate second look, for geographic
+    /// context, which is when imagery is genuinely what you want. Neither is
+    /// a fallback for the other.
+    ///
+    /// One button, two states. MapKit offers standard/hybrid/satellite for
+    /// free and adding them would turn this into a picker, which is the one
+    /// thing it was asked not to become.
+    @AppStorage("locations.useSchematicMap") private var useSchematic = true
+
     init(location: Location) {
         self.location = location
         _store = State(initialValue: ParcelsStore(locationID: location.id))
@@ -20,6 +34,21 @@ struct ParcelMapView: View {
         }
         .navigationTitle(location.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    useSchematic.toggle()
+                } label: {
+                    Label(
+                        useSchematic ? "Сателит" : "Схема",
+                        systemImage: useSchematic ? "globe.europe.africa" : "square.on.square.dashed"
+                    )
+                }
+                .accessibilityHint(useSchematic
+                    ? "Превключва към сателитна карта"
+                    : "Превключва към схематична карта")
+            }
+        }
         .task { if store.state.value == nil { await store.load() } }
     }
 
@@ -37,12 +66,43 @@ struct ParcelMapView: View {
             VStack(spacing: 0) {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
+                if useSchematic && !drawable.isEmpty { legend }
                 parcelList(response, drawable: drawable)
             }
         }
     }
 
     // MARK: - Map
+
+    /// Only for the schematic view. On satellite the fills sit over imagery
+    /// and the colours are not the only cue, but here they carry the whole
+    /// meaning, so the key has to be on screen.
+    private var legend: some View {
+        HStack(spacing: 16) {
+            swatch(Palette.Map.sownFill, "Засят", dashed: false)
+            swatch(Palette.Map.fallowFill, "Угар", dashed: true)
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(Color(.secondarySystemBackground))
+    }
+
+    private func swatch(_ color: Color, _ label: String, dashed: Bool) -> some View {
+        HStack(spacing: 7) {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(color.opacity(0.85))
+                .frame(width: 14, height: 14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .strokeBorder(
+                            dashed ? Palette.Map.fallowStroke : Palette.Map.sownStroke,
+                            style: StrokeStyle(lineWidth: 1.5, dash: dashed ? [3, 2] : [])
+                        )
+                )
+            Text(label).font(.subheadline).foregroundStyle(.primary)
+        }
+    }
 
     @ViewBuilder
     private func map(_ response: ParcelsResponse, drawable: [Parcel]) -> some View {
@@ -52,6 +112,8 @@ struct ParcelMapView: View {
                 systemImage: "map",
                 description: Text("Парцелите съществуват, но нямат географски очертания.")
             )
+        } else if useSchematic, let box = response.bounds ?? location.boundsJson {
+            SchematicParcelMap(parcels: drawable, bounds: box)
         } else {
             // Camera from `bounds` when the server sent one, otherwise from
             // the location's own boundsJson. Both are [minLon, minLat, …] and
