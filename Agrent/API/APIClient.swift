@@ -94,6 +94,20 @@ actor APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
+    /// The raw bytes of a GET, for callers that cache the payload before
+    /// deciding how to read it. `ResponseCache` stores `Data` rather than
+    /// decoded models on purpose — see its header.
+    func data(for path: String) async throws -> Data {
+        try await send(path: path, method: "GET", body: nil, idempotencyKey: nil)
+    }
+
+    /// Decode with THIS client's decoder — the one that accepts ISO 8601 both
+    /// with and without fractional seconds. A caller reaching for a fresh
+    /// `JSONDecoder()` reintroduces the bug documented above it.
+    func decode<T: Decodable>(_ data: Data, as _: T.Type) throws -> T {
+        try decoder.decode(T.self, from: data)
+    }
+
     /// EDITS (when they land) MUST send `If-Match: <version>` — digits only.
     /// The version increment sits INSIDE the If-Match guard on the server, so
     /// an unguarded PATCH changes content WITHOUT moving version, and every

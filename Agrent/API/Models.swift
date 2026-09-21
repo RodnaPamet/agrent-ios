@@ -57,7 +57,7 @@ enum LogEntryStatus: String, Codable, Sendable {
     var label: String { self == .planned ? "Планирано" : "Готово" }
 }
 
-struct LogEntry: Codable, Identifiable, Sendable {
+struct LogEntry: Codable, Identifiable, Equatable, Sendable {
     let id: String
     var type: LogEntryType
     var status: LogEntryStatus
