@@ -181,8 +181,29 @@ struct SchematicParcelMap: View {
     ) {
         let lonStep = Self.graticuleStep(forSpan: bounds.lonSpan)
         let latStep = Self.graticuleStep(forSpan: bounds.latSpan)
-        let stroke = StrokeStyle(lineWidth: 1)
-        let colour = Palette.Map.graticule.opacity(0.55)
+
+        // MAJOR AND MINOR, in the design's own path tones.
+        //
+        // The reference artboard breaks up the flat ground with three strokes
+        // — one heavy #8C8770, two lighter #7E7A63. Those are drawn as roads,
+        // and there is no road data, so they are not reproduced: inventing
+        // tracks on a map somebody drives a tractor by is not a styling
+        // decision.
+        //
+        // But the artboard is right that an unbroken field of one colour
+        // reads as empty. So the grid carries that structure instead, at the
+        // same two weights and the same two colours — and every line here
+        // means something true, which a fake road would not. Every fifth line
+        // is major, which at a 0.02° step puts a heavier line every 0.1°.
+        let minorStroke = StrokeStyle(lineWidth: 1)
+        let majorStroke = StrokeStyle(lineWidth: 2)
+        let minorColour = Palette.Map.pathMinor.opacity(0.55)
+        let majorColour = Palette.Map.pathMajor.opacity(0.7)
+
+        func isMajor(_ value: Double, step: Double) -> Bool {
+            let index = (value / step).rounded()
+            return Int(index) % 5 == 0
+        }
 
         // Longitude labels run horizontally and the lines can sit closer
         // together than the text is wide — at this farm's scale they printed
@@ -195,7 +216,12 @@ struct SchematicParcelMap: View {
             var line = Path()
             line.move(to: CGPoint(x: x, y: 0))
             line.addLine(to: CGPoint(x: x, y: size.height))
-            context.stroke(line, with: .color(colour), style: stroke)
+            let major = isMajor(value, step: lonStep)
+            context.stroke(
+                line,
+                with: .color(major ? majorColour : minorColour),
+                style: major ? majorStroke : minorStroke
+            )
 
             let label = gridLabel(value, step: lonStep)
             let width = context.resolve(label).measure(in: size).width
@@ -214,7 +240,12 @@ struct SchematicParcelMap: View {
             var line = Path()
             line.move(to: CGPoint(x: 0, y: y))
             line.addLine(to: CGPoint(x: size.width, y: y))
-            context.stroke(line, with: .color(colour), style: stroke)
+            let major = isMajor(value, step: latStep)
+            context.stroke(
+                line,
+                with: .color(major ? majorColour : minorColour),
+                style: major ? majorStroke : minorStroke
+            )
             context.draw(
                 gridLabel(value, step: latStep),
                 at: CGPoint(x: 6, y: y - 4),
@@ -232,7 +263,9 @@ struct SchematicParcelMap: View {
     /// Which way is up. Cheap, and the first question anyone asks of a map
     /// with no landmarks on it.
     private func drawNorthArrow(in context: inout GraphicsContext) {
-        let origin = CGPoint(x: 18, y: 20)
+        // Below the location card, which occupies the top strip. At y:20 the
+        // card covered it completely — the arrow was drawn, and invisible.
+        let origin = CGPoint(x: 20, y: 78)
         var arrow = Path()
         arrow.move(to: CGPoint(x: origin.x, y: origin.y))
         arrow.addLine(to: CGPoint(x: origin.x - 5, y: origin.y + 12))
