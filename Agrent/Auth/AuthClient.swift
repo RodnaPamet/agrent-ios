@@ -28,6 +28,7 @@ final class AuthClient: NSObject {
 
     func signIn() async {
         state = .signingIn
+        Log.auth.info("sign-in started")
         let pkce = PKCE()
 
         var comps = URLComponents(
@@ -47,14 +48,18 @@ final class AuthClient: NSObject {
                 .queryItems?.first(where: { $0.name == "code" })?.value
             else {
                 state = .failed("The sign-in came back without a code.")
+                Log.auth.error("callback carried no code")
                 return
             }
             try await exchange(code: code, verifier: pkce.verifier)
             state = .signedIn
+            Log.auth.info("sign-in complete")
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             state = .signedOut
+            Log.auth.info("sign-in cancelled by user")
         } catch {
             state = .failed(friendly(error))
+            Log.auth.error("sign-in failed: \(Log.summary(for: error), privacy: .public)")
         }
     }
 
@@ -91,6 +96,8 @@ final class AuthClient: NSObject {
         req.httpBody = try JSONEncoder().encode(["code": code, "code_verifier": verifier])
 
         let (data, response) = try await URLSession.shared.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        Log.auth.info("native exchange → \(status, privacy: .public)")
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw AuthError.server(String(data: data, encoding: .utf8) ?? "exchange failed")
         }

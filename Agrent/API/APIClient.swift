@@ -211,9 +211,23 @@ actor APIClient {
         if let key { req.setValue(key, forHTTPHeaderField: "Idempotency-Key") }
         if let ifMatch { req.setValue(ifMatch, forHTTPHeaderField: "If-Match") }
 
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        return (data, http)
+        let loggable = LoggablePath(path)
+        Log.request(method, loggable)
+        let started = Date()
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            Log.response(
+                method, loggable, status: http.statusCode, bytes: data.count,
+                ms: Int(Date().timeIntervalSince(started) * 1000)
+            )
+            return (data, http)
+        } catch {
+            Log.failure(method, loggable, error)
+            throw error
+        }
     }
 
     private func currentTokens() throws -> Tokens {
@@ -226,6 +240,7 @@ actor APIClient {
         if let inflight = refreshTask { return try await inflight.value }
         let task = Task<Tokens, Error> {
             defer { refreshTask = nil }
+            Log.auth.info("token refresh starting")
             var req = URLRequest(url: Config.baseURL.appending(path: "/api/auth/token/refresh"))
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -233,6 +248,7 @@ actor APIClient {
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                Log.auth.error("token refresh rejected, clearing tokens")
                 TokenStore.clear()
                 throw APIError.notSignedIn
             }
