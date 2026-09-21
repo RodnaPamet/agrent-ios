@@ -104,8 +104,66 @@ final class ExchangeModelsTests: XCTestCase {
         )
         let row = try XCTUnwrap(page.rows.first)
         XCTAssertTrue(row.isOwn)
-        XCTAssertEqual(row.status, "ACTIVE")
+        XCTAssertEqual(row.status, .active)
         XCTAssertTrue(row.isActive)
+        XCTAssertEqual(row.side, .sell)
+        XCTAssertEqual(row.kind, .culture)
+    }
+
+    // MARK: - Vocabularies
+
+    /// Written out literally from prisma/schema/enums.prisma rather than
+    /// derived from allCases — a test generated from the thing it checks
+    /// cannot detect a change to it.
+    func testServerVocabulariesDecode() throws {
+        func parse<T: Decodable>(_ raw: String, as type: T.Type) throws -> T {
+            try JSONDecoder().decode(T.self, from: Data("\"\(raw)\"".utf8))
+        }
+        XCTAssertEqual(try parse("SELL", as: ExchangeSide.self), .sell)
+        XCTAssertEqual(try parse("BUY", as: ExchangeSide.self), .buy)
+
+        let kinds: [(String, ExchangeKind)] = [
+            ("CULTURE", .culture), ("FERTILIZER", .fertilizer),
+            ("SEEDS", .seeds), ("PRODUCT", .product),
+        ]
+        for (raw, expected) in kinds {
+            XCTAssertEqual(try parse(raw, as: ExchangeKind.self), expected)
+        }
+
+        let statuses: [(String, ExchangeListingStatus)] = [
+            ("ACTIVE", .active), ("FULFILLED", .fulfilled),
+            ("WITHDRAWN", .withdrawn), ("EXPIRED", .expired),
+        ]
+        for (raw, expected) in statuses {
+            XCTAssertEqual(try parse(raw, as: ExchangeListingStatus.self), expected)
+        }
+
+        let inquiry: [(String, ExchangeInquiryStatus)] = [
+            ("PENDING", .pending), ("ACCEPTED", .accepted), ("DECLINED", .declined),
+        ]
+        for (raw, expected) in inquiry {
+            XCTAssertEqual(try parse(raw, as: ExchangeInquiryStatus.self), expected)
+        }
+    }
+
+    /// The LogEntryType lesson, enforced: an unrecognised value costs a vague
+    /// label on one field and the ROW STILL DECODES around it.
+    func testUnknownVocabularyValueDoesNotFailTheRow() async throws {
+        let json = Data("{\"rows\":[{\"id\":\"lst_1\",\"side\":\"BARTER\",\"kind\":\"LIVESTOCK\",\"status\":\"SOMETHING_NEW\",\"commodity\":\"wheat\",\"quantityTonnes\":\"1\",\"pricePerTonne\":\"2\",\"priceCurrency\":\"EUR\",\"regionCode\":null,\"regionName\":null,\"lat\":null,\"lon\":null,\"description\":null,\"sellerDisplayName\":null,\"createdAt\":\"2026-07-04T13:38:19.222Z\",\"expiresAt\":null,\"isOwn\":false}],\"nextCursor\":null}".utf8)
+        let page = try await APIClient.shared.decode(json, as: ExchangeListingPage.self)
+        let listing = try XCTUnwrap(page.rows.first)
+        XCTAssertEqual(listing.side, .unknown)
+        XCTAssertEqual(listing.kind, .unknown)
+        XCTAssertEqual(listing.status, .unknown)
+        XCTAssertEqual(listing.commodity, "wheat", "the rest of the row survived")
+        XCTAssertFalse(listing.isActive)
+    }
+
+    func testEveryVocabularyCaseHasALabel() {
+        for v in ExchangeSide.allCases { XCTAssertFalse(v.label.isEmpty) }
+        for v in ExchangeKind.allCases { XCTAssertFalse(v.label.isEmpty) }
+        for v in ExchangeListingStatus.allCases { XCTAssertFalse(v.label.isEmpty) }
+        for v in ExchangeInquiryStatus.allCases { XCTAssertFalse(v.label.isEmpty) }
     }
 
     // MARK: - Inquiries
@@ -127,6 +185,7 @@ final class ExchangeModelsTests: XCTestCase {
         let row = try decoder.decode(OwnExchangeListing.self, from: json)
         XCTAssertEqual(row.inquiries.count, 1)
         XCTAssertEqual(row.inquiries.first?.id, "inq_1")
+        XCTAssertEqual(row.inquiries.first?.status, .pending)
     }
 
     /// `contactSharedAt` is the enforcement point, so a nil one must read as

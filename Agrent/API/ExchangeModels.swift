@@ -34,13 +34,9 @@ import Foundation
 struct ExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     let id: String
 
-    /// Vocabularies NOT modelled as enums. Only SELL / CULTURE / ACTIVE /
-    /// EXPIRED have been observed, and inventing the rest is the
-    /// `LogEntryType` mistake — that shipped six cases against ten. They stay
-    /// `String` until the server's enum source is in hand.
-    let side: String
-    let kind: String
-    let status: String
+    let side: ExchangeSide
+    let kind: ExchangeKind
+    let status: ExchangeListingStatus
 
     let commodity: String
 
@@ -67,7 +63,7 @@ struct ExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     var quantity: Decimal? { quantityTonnes.flatMap { Decimal(string: $0) } }
     var price: Decimal? { pricePerTonne.flatMap { Decimal(string: $0) } }
 
-    var isActive: Bool { status == "ACTIVE" }
+    var isActive: Bool { status == .active }
 }
 
 /// `GET /api/t/{slug}/exchange/listings` — envelope, paged.
@@ -81,9 +77,9 @@ struct ExchangeListingPage: Decodable, Equatable, Sendable {
 /// rather than a reuse of `ExchangeListing`.
 struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     let id: String
-    let side: String
-    let kind: String
-    let status: String
+    let side: ExchangeSide
+    let kind: ExchangeKind
+    let status: ExchangeListingStatus
     let commodity: String
     let quantityTonnes: String?
     let pricePerTonne: String?
@@ -117,9 +113,9 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
-        side = try c.decode(String.self, forKey: .side)
-        kind = try c.decode(String.self, forKey: .kind)
-        status = try c.decode(String.self, forKey: .status)
+        side = try c.decode(ExchangeSide.self, forKey: .side)
+        kind = try c.decode(ExchangeKind.self, forKey: .kind)
+        status = try c.decode(ExchangeListingStatus.self, forKey: .status)
         commodity = try c.decode(String.self, forKey: .commodity)
         quantityTonnes = try c.decodeIfPresent(String.self, forKey: .quantityTonnes)
         pricePerTonne = try c.decodeIfPresent(String.self, forKey: .pricePerTonne)
@@ -168,10 +164,93 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
 /// built on it.
 struct ExchangeInquiry: Decodable, Equatable, Sendable, Identifiable {
     let id: String
-    let status: String?
+    let status: ExchangeInquiryStatus?
     let message: String?
     let createdAt: Date?
     let contactSharedAt: Date?
 
     var contactShared: Bool { contactSharedAt != nil }
+}
+
+
+// MARK: - Server vocabularies
+
+/// From `prisma/schema/enums.prisma`. All four are lenient: an unrecognised
+/// value costs a vague label, never the payload. Written out because
+/// inventing a vocabulary is the `LogEntryType` mistake and observing only
+/// part of one is how that happened.
+///
+/// Observed on the wire: SELL, CULTURE, ACTIVE, EXPIRED. The rest come from
+/// the schema — including `WITHDRAWN`, which is the state the my-listings
+/// custody exemption exists to let a seller reach.
+enum ExchangeSide: String, CaseIterable, LenientDecodable, Sendable {
+    static var unknownCase: ExchangeSide { .unknown }
+    case sell = "SELL"
+    case buy = "BUY"
+    case unknown = "UNKNOWN"
+
+    var label: String {
+        switch self {
+        case .sell: "Продава"
+        case .buy: "Купува"
+        case .unknown: "—"
+        }
+    }
+}
+
+/// `ExchangeKind`, not `ExchangeListingKind` — the field name does not give
+/// the type name here.
+enum ExchangeKind: String, CaseIterable, LenientDecodable, Sendable {
+    static var unknownCase: ExchangeKind { .unknown }
+    case culture = "CULTURE"
+    case fertilizer = "FERTILIZER"
+    case seeds = "SEEDS"
+    case product = "PRODUCT"
+    case unknown = "UNKNOWN"
+
+    var label: String {
+        switch self {
+        case .culture: "Култура"
+        case .fertilizer: "Тор"
+        case .seeds: "Семена"
+        case .product: "Продукт"
+        case .unknown: "Друго"
+        }
+    }
+}
+
+enum ExchangeListingStatus: String, CaseIterable, LenientDecodable, Sendable {
+    static var unknownCase: ExchangeListingStatus { .unknown }
+    case active = "ACTIVE"
+    case fulfilled = "FULFILLED"
+    case withdrawn = "WITHDRAWN"
+    case expired = "EXPIRED"
+    case unknown = "UNKNOWN"
+
+    var label: String {
+        switch self {
+        case .active: "Активна"
+        case .fulfilled: "Изпълнена"
+        case .withdrawn: "Оттеглена"
+        case .expired: "Изтекла"
+        case .unknown: "—"
+        }
+    }
+}
+
+enum ExchangeInquiryStatus: String, CaseIterable, LenientDecodable, Sendable {
+    static var unknownCase: ExchangeInquiryStatus { .unknown }
+    case pending = "PENDING"
+    case accepted = "ACCEPTED"
+    case declined = "DECLINED"
+    case unknown = "UNKNOWN"
+
+    var label: String {
+        switch self {
+        case .pending: "Чака отговор"
+        case .accepted: "Приета"
+        case .declined: "Отказана"
+        case .unknown: "—"
+        }
+    }
 }

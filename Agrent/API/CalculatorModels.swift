@@ -56,7 +56,9 @@ struct CalculatorPayload: Decodable, Equatable, Sendable {
 /// decode — every row vanishing, not just the odd one. A server that adds an
 /// uncertainty level should cost us a vague label on one figure, not a blank
 /// screen.
-enum Uncertainty: String, CaseIterable, Decodable, Sendable {
+enum Uncertainty: String, CaseIterable, LenientDecodable, Sendable {
+    static var unknownCase: Uncertainty { .unknown }
+
     case exact
     case atLeast
     case atMost
@@ -66,11 +68,6 @@ enum Uncertainty: String, CaseIterable, Decodable, Sendable {
     /// Anything the server adds that this build has not heard of.
     case unknown
 
-    init(from decoder: Decoder) throws {
-        let raw = try decoder.singleValueContainer().decode(String.self)
-        let folded = raw.lowercased()
-        self = Self.allCases.first { $0.rawValue.lowercased() == folded } ?? .unknown
-    }
 }
 
 struct CalculatorRow: Decodable, Equatable, Sendable, Identifiable {
