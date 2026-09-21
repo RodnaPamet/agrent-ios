@@ -63,10 +63,23 @@ proofs ran; see the commits for each.
   query anyway. **Bodies and the `Authorization` header are NOT logged.** So any
   future endpoint passing an id or anything personal must use a header or a
   body, never a query parameter. Bites Phase 2 filters and Phase 3 parcels.
-- **The sign-in path has never run WITH logging attached.** Logging landed 25
-  minutes after the only sign-in; every relaunch since has used an existing
-  token. Verified by construction, not execution. Closing it needs a real
-  sign-out and sign-in.
+- ~~**The sign-in path has never run WITH logging attached.**~~ **CLOSED
+  2026-09-21 16:48** by a real sign-out and sign-in from the owner. The auth
+  path ran with logging present and the leak check over the live code exchange
+  is clean — zero hits in our subsystem AND across the whole process for the
+  JWT prefix, `accessToken`, `refreshToken`, `Bearer`, `code_verifier`,
+  `code_challenge`, the `bg.agrent.app://` callback, the handoff cookie and
+  live body substrings. (One `code=` match process-wide is UIKit's own
+  `_UIViewServiceHostSessionErrorDomain Code=4`, not the OAuth code.)
+  Verified by EXECUTION, not reading — which matters here because this is the
+  one path where a leak would be a real compromise: the callback carries the
+  auth code, the exchange body carries `code` + `code_verifier`, and its
+  response carries both tokens.
+
+  Also established: **the callback URL does NOT reach the unified log.**
+  `ASWebAuthenticationSession` hands it back in-process and CFNetwork never
+  sees it, so the CFNetwork query-string exposure below is correctly scoped to
+  ordinary outbound requests and does NOT extend to the OAuth callback.
 - `.debug` lines (request start, cache hit/miss/write) never persist to disk —
   good for privacy, but they can only be watched live, not audited with
   `log show`.
