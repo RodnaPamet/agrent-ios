@@ -39,7 +39,7 @@ enum CachedResource {
         decode: @Sendable (Data) async throws -> T
     ) async -> LoadState<T> {
         guard let hit = await ResponseCache.shared.read(key) else {
-            return .failed(error.localizedDescription)
+            return .failed(UserMessage.text(for: error))
         }
         do {
             let value = try await decode(hit.data)
@@ -51,7 +51,7 @@ enum CachedResource {
             // the next successful fetch repopulates it.
             Log.cache.error("cached payload did not decode, evicting")
             await ResponseCache.shared.remove(key)
-            return .failed(error.localizedDescription)
+            return .failed(UserMessage.text(for: error))
         }
     }
 }

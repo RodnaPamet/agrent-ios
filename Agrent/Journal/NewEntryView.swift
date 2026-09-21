@@ -69,7 +69,7 @@ struct NewEntryView: View {
             // Stay open on failure. Closing a form after a refused write is
             // exactly the defect filed against the web app as #921 — it reads
             // as success and the operator's work is gone.
-            self.error = error.localizedDescription
+            self.error = UserMessage.text(for: error)
         }
         saving = false
     }

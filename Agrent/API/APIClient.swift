@@ -62,13 +62,15 @@ actor APIClient {
         var errorDescription: String? {
             switch self {
             case .notSignedIn:
-                "Not signed in."
+                "Не сте влезли в профила си."
             case .conflict:
                 "Записът е променен на сървъра, докато го редактирахте."
             case .clientTooOld:
                 "Тази версия на приложението е твърде стара. Обновете я."
             case .http(let code, let body):
-                body.isEmpty ? "Server error \(code)." : "Server error \(code): \(body)"
+                body.isEmpty
+                    ? "Грешка от сървъра (\(code))."
+                    : "Грешка от сървъра (\(code)): \(body)"
             }
         }
     }
