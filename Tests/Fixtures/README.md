@@ -84,3 +84,28 @@ a row cannot carry an area its own figures disagree with.
 Regenerate by re-running the emitter against `buildCalculatorPayload` in the
 `agri-saas` repo — never by editing this file, which would make it a
 hand-written fixture again.
+
+## `locations-list.json` / `locations-parcels.json`
+
+**Synthetic, and deliberately so.** The real endpoints return the owner's
+actual field boundaries with cadastral identifiers attached, and this repo is
+public. Publishing them is the owner's decision to make, and the default is no.
+
+What is NOT invented is the STRUCTURE. It was measured off the live wire on
+2026-09-21 and reproduces what was found there:
+
+- `/locations` is a **bare array**, not an envelope. The fixture also carries
+  the seven unmodelled fields (`tenantId`, `retentionUntil`, `deletedAt` …) so
+  the tests prove `Decodable` ignores them rather than assuming it.
+- `/locations/{id}/parcels` is an **object** `{locationId, bounds, parcels}`.
+- `bounds` is `[minLon, minLat, maxLon, maxLat]` — **longitude first**.
+- Geometry nests four deep: `coordinates[polygon][ring][point][lon, lat]`.
+- Parcel `SYNTH-1` has **one polygon with five rings** — an outer boundary and
+  four holes — matching the owner's real parcel `15655-19`. An earlier plan
+  for this fixture had a single hole; production disagreed.
+- Parcel `SYNTH-3` has `geometry: null`, exercising the server's fail-soft
+  path, which production does **not** currently exercise on this tenant.
+
+Coordinates are in central Bulgaria (~42.5°N 25.1°E) rather than the real farm
+(~43.1°N 24.2°E, Pleven): inside the country so latitude/longitude bounds
+assertions are meaningful, and nowhere near the real boundaries.

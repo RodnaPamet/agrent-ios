@@ -1,0 +1,32 @@
+[
+ {
+  "id": "loc_synthetic_1",
+  "tenantId": "ten_synthetic",
+  "key": null,
+  "name": "Synthetic Land",
+  "description": null,
+  "status": "ACTIVE",
+  "kind": "FIELD",
+  "capacityTonnes": null,
+  "ownerUserId": null,
+  "spatialFileId": "spf_synthetic",
+  "spatialFormat": "shapefile",
+  "boundsJson": [
+   25.1,
+   42.5,
+   25.2,
+   42.6
+  ],
+  "createdByUserId": "usr_synthetic",
+  "isSampleData": false,
+  "createdAt": "2026-06-27T17:24:10.903Z",
+  "updatedAt": "2026-07-09T16:04:31.840Z",
+  "deletedAt": null,
+  "deletedByUserId": null,
+  "retentionUntil": null,
+  "_count": {
+   "parcels": 3
+  },
+  "owner": null
+ }
+]
