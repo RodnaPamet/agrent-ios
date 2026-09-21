@@ -36,7 +36,7 @@ struct MainTabView: View {
             CalculatorView()
                 .tabItem { Label("Калкулатор", systemImage: "plusminus") }
 
-            ComingSoonView(title: "Борса")
+            ExchangeView()
                 .tabItem { Label("Борса", systemImage: "arrow.left.arrow.right") }
 
             LocationsView()

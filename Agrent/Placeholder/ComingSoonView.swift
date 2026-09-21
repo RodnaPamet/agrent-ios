@@ -14,7 +14,7 @@ struct ComingSoonView: View {
             ContentUnavailableView(
                 "Предстои",
                 systemImage: "hammer",
-                description: Text("Този раздел още не е наличен в приложението.")
+                description: Text("Този раздел не е наличен в приложението. Използвайте уеб приложението.")
             )
             .navigationTitle(title)
         }
