@@ -124,6 +124,21 @@ final class LocationGeometryTests: XCTestCase {
         XCTAssertEqual(parcel.areaHa, 32.478)
     }
 
+    /// A reversed box must FAIL, not be quietly absorbed.
+    ///
+    /// Before the guard, `abs()` in latSpan/lonSpan turned swapped corners
+    /// into a correct-looking span, and the centre is order-independent — so
+    /// MapKit would have centred and sized a region perfectly from nonsense.
+    func testReversedBoundsAreRejectedAtDecode() throws {
+        let reversed = Data("[25.2, 42.6, 25.1, 42.5]".utf8)
+        XCTAssertThrowsError(try JSONDecoder().decode(BoundingBox.self, from: reversed))
+
+        let ordered = Data("[25.1, 42.5, 25.2, 42.6]".utf8)
+        let box = try JSONDecoder().decode(BoundingBox.self, from: ordered)
+        XCTAssertEqual(box.lonSpan, 0.1, accuracy: 1e-9)
+        XCTAssertEqual(box.latSpan, 0.1, accuracy: 1e-9)
+    }
+
     /// The list endpoint is a bare array, and the raw Prisma row's extra
     /// fields must be ignored rather than break the decode.
     func testLocationListIsABareArrayAndIgnoresUnmodelledFields() async throws {

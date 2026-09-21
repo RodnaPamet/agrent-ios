@@ -73,12 +73,38 @@ struct BoundingBox: Decodable, Equatable, Sendable {
     let maxLon: Double
     let maxLat: Double
 
+    /// Ordering is guarded HERE, at the boundary, rather than downstream.
+    ///
+    /// A reversed box used to SURVIVE rather than merely pass: `latSpan` and
+    /// `lonSpan` took `abs()`, so swapped corners produced a correct-looking
+    /// span, and `centerLat`/`centerLon` are order-independent so they came
+    /// out right too. Everything downstream got plausible numbers and nothing
+    /// noticed — MapKit would centre and size a region perfectly from a box
+    /// whose corners were the wrong way round. That `abs()` was not
+    /// tolerating bad input, it was destroying the evidence of it.
+    ///
+    /// The only place it surfaced was the schematic projection, where
+    /// `maxLat - lat` goes negative and the farm draws off-screen — an
+    /// accident of that arithmetic, not a check anyone designed.
+    ///
+    /// So it fails loudly at the one point the data arrives, and the spans
+    /// below no longer take `abs()`: with ordering guaranteed it could never
+    /// fire, and leaving it would tell the next reader that reversed boxes
+    /// are expected here.
     init(from decoder: Decoder) throws {
         var c = try decoder.unkeyedContainer()
         minLon = try c.decode(Double.self)
         minLat = try c.decode(Double.self)
         maxLon = try c.decode(Double.self)
         maxLat = try c.decode(Double.self)
+
+        guard maxLon >= minLon, maxLat >= minLat else {
+            let seen = "[\(minLon), \(minLat), \(maxLon), \(maxLat)]"
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath,
+                debugDescription: "Bounds corners reversed: \(seen). Expected [minLon, minLat, maxLon, maxLat]."
+            ))
+        }
     }
 
     init(minLon: Double, minLat: Double, maxLon: Double, maxLat: Double) {
@@ -90,8 +116,8 @@ struct BoundingBox: Decodable, Equatable, Sendable {
 
     var centerLat: Double { (minLat + maxLat) / 2 }
     var centerLon: Double { (minLon + maxLon) / 2 }
-    var latSpan: Double { abs(maxLat - minLat) }
-    var lonSpan: Double { abs(maxLon - minLon) }
+    var latSpan: Double { maxLat - minLat }
+    var lonSpan: Double { maxLon - minLon }
 }
 
 /// `GET /locations/{id}/parcels` — an object, not an array.
