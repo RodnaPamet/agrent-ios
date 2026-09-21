@@ -23,13 +23,7 @@ struct LocationsView: View {
             ProgressView("Зареждане…").frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .failed(let message):
-            ContentUnavailableView {
-                Label("Неуспешно зареждане", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Опитай пак") { Task { await store.load() } }
-            }
+            ErrorState(message: message) { await store.load() }
 
         case .loaded(let locations, _) where locations.isEmpty:
             ContentUnavailableView(
@@ -54,6 +48,7 @@ struct LocationsView: View {
                         }
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .accessibilityElement(children: .combine)
                     }
                     .padding(.vertical, 2)
                 }

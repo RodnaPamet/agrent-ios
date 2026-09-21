@@ -8,23 +8,14 @@ struct JournalListView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Above the switch on purpose: an EMPTY list can be stale too,
-                // and "no entries" from a week-old cache means something very
-                // different from "no entries" off a live fetch.
                 if let age = store.state.freshness?.ageDescription {
                     StaleBanner(age: age)
                 }
                 content
+                newEntryButton
             }
             .navigationTitle("Земеделски дневник")
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        composing = true
-                    } label: {
-                        Label("Нов запис", systemImage: "plus")
-                    }
-                }
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Изход") { auth.signOut() }
                 }
@@ -36,6 +27,27 @@ struct JournalListView: View {
         }
     }
 
+    /// The primary action is a full-width target at the bottom of the screen,
+    /// not a toolbar glyph. A gloved thumb reaches the bottom of a phone; the
+    /// top-right corner is the hardest place on the device to hit one-handed,
+    /// and this is the action an operator performs standing in a field.
+    @ViewBuilder
+    private var newEntryButton: some View {
+        if store.state.value != nil {
+            Button {
+                composing = true
+            } label: {
+                Text("Нов запис").frame(maxWidth: .infinity, minHeight: 30)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            .background(.bar)
+        }
+    }
+
     @ViewBuilder
     private var content: some View {
         switch store.state {
@@ -44,13 +56,7 @@ struct JournalListView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .failed(let message):
-            ContentUnavailableView {
-                Label("Неуспешно зареждане", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Опитай пак") { Task { await store.load() } }
-            }
+            ErrorState(message: message) { await store.load() }
 
         case .loaded(let entries, _) where entries.isEmpty:
             ContentUnavailableView(
@@ -60,23 +66,61 @@ struct JournalListView: View {
             )
 
         case .loaded(let entries, _):
-            List(entries) { entry in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.title).font(.headline)
-                    HStack(spacing: 8) {
-                        Text(entry.type.label)
-                        Text("·")
-                        Text(entry.occurredAt, format: .dateTime.day().month().year())
-                        if entry.status == .planned {
-                            Text("·"); Text(entry.status.label)
-                        }
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            List {
+                Section {
+                    ForEach(entries) { JournalRow(entry: $0) }
+                } header: {
+                    Text("^[\(entries.count) записа](inflect: true)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
                 }
-                .padding(.vertical, 2)
             }
+            .listStyle(.plain)
             .refreshable { await store.load() }
         }
+    }
+}
+
+/// One diary entry.
+///
+/// Sized for the actual reading conditions: outdoors, in sunlight, at arm's
+/// length, with Dynamic Type possibly turned well up. The previous version
+/// set the title at `.subheadline` and everything else at `.caption` — the
+/// design review counted `.footnote` used ten times across the app and
+/// `.body` not once, which is a desk application's type scale on a tool meant
+/// to be used standing in a field.
+///
+/// So: `.headline` title, `.subheadline` supporting text, and the type as a
+/// CHIP rather than one more grey word in a run of grey words — at a glance a
+/// regulated input application is now distinguishable from an observation
+/// without reading either.
+struct JournalRow: View {
+    let entry: LogEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(entry.title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            HStack(spacing: 8) {
+                CategoryChip(
+                    text: entry.type.label,
+                    foreground: entry.type.chipColors.foreground,
+                    background: entry.type.chipColors.background
+                )
+                Text(entry.occurredAt, format: .dateTime.day().month(.wide))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if entry.status == .planned {
+                    Text("·").foregroundStyle(.secondary)
+                    Text(entry.status.label)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 6)
     }
 }

@@ -30,13 +30,7 @@ struct ParcelMapView: View {
             ProgressView("Зареждане…").frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .failed(let message):
-            ContentUnavailableView {
-                Label("Неуспешно зареждане", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Опитай пак") { Task { await store.load() } }
-            }
+            ErrorState(message: message) { await store.load() }
 
         case .loaded(let response, _):
             let drawable = response.parcels.filter(\.isDrawable)
@@ -99,25 +93,28 @@ struct ParcelMapView: View {
                                     Text("·"); Text("под аренда")
                                 }
                             }
-                            .font(.caption)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                         }
                         Spacer()
                         if !parcel.isDrawable {
                             // Says WHY it is absent from the map. A parcel
-                            // silently missing from a map reads as lost data.
+                            // silently missing reads as lost data — but an
+                            // outline the server never had is not a fault, so
+                            // it is stated, not warned about.
                             Label("без очертание", systemImage: "questionmark.square.dashed")
                                 .labelStyle(.iconOnly)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(.secondary)
                                 .accessibilityLabel("Без географско очертание")
                         }
                     }
                 }
             }
             if drawable.count != response.parcels.count {
-                Text("\(response.parcels.count - drawable.count) парцела без очертания не се показват на картата.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                RefusalNote(
+                    text: "\(response.parcels.count - drawable.count) парцела без очертания не се показват на картата.",
+                    icon: "map"
+                )
             }
         }
         .frame(maxHeight: 260)

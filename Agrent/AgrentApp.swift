@@ -15,6 +15,21 @@ struct AgrentApp: App {
                 }
             }
             .environment(auth)
+            // Ochre, not the system blue and emphatically not green: green on
+            // the parcel map is DATA — it encodes whether a parcel is sown —
+            // so an accent in that family would read as one more state.
+            .tint(Palette.accent)
+            // Every literal in this app is hard-coded Bulgarian, but dates
+            // were formatting against the DEVICE locale, which reports en-BG
+            // here — so an all-Bulgarian journal printed "11 September".
+            // Same root cause as the English error strings fixed earlier, in
+            // a place nobody thought to look because the numbers were already
+            // right: en-BG gives European digits and separators, so only the
+            // month NAMES gave it away.
+            //
+            // Set once at the root rather than per call site: a formatter
+            // somebody forgets is exactly how this came back a second time.
+            .environment(\.locale, Locale(identifier: "bg_BG"))
         }
     }
 }
@@ -61,8 +76,8 @@ struct SignInView: View {
 
             if case .failed(let message) = auth.state {
                 Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.error)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
