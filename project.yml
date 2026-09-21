@@ -65,3 +65,19 @@ targets:
           - CFBundleURLName: bg.agrent.app
             CFBundleURLSchemes:
               - bg.agrent.app
+
+  # The app shipped with NO tests at all. Two bugs this week were decode
+  # failures that a decode test would have caught before a device did:
+  # LogEntryType shipped six cases against the server's ten, and the
+  # calculator payload cannot be exercised in production because the tenant
+  # has no grain data. Both are testable without a server.
+  AgrentTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Agrent
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
