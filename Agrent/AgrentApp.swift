@@ -39,7 +39,7 @@ struct MainTabView: View {
             ComingSoonView(title: "Борса")
                 .tabItem { Label("Борса", systemImage: "arrow.left.arrow.right") }
 
-            ComingSoonView(title: "Локации")
+            LocationsView()
                 .tabItem { Label("Локации", systemImage: "map") }
 
             ComingSoonView(title: "Админ")
