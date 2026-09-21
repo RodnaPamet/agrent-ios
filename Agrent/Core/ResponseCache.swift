@@ -37,10 +37,19 @@ actor ResponseCache {
 
     private let directory: URL
     private let fileManager = FileManager.default
+    private let byteBudget: Int
 
-    init(directoryName: String = "ResponseCache") {
+    /// 8 MB. Chosen against measured payloads rather than picked round: the
+    /// journal is 10 KB, the calculator 0.6 KB, and one location's parcels are
+    /// 22 KB. A farm with fifty fields caching every parcel set still sits
+    /// near 1 MB, so the budget is roughly an order of magnitude of headroom
+    /// over the largest realistic working set.
+    static let defaultByteBudget = 8 * 1024 * 1024
+
+    init(directoryName: String = "ResponseCache", byteBudget: Int = ResponseCache.defaultByteBudget) {
         let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         directory = caches.appendingPathComponent(directoryName, isDirectory: true)
+        self.byteBudget = byteBudget
     }
 
     /// Hashed so the filename carries neither the tenant nor the query in the
@@ -80,6 +89,7 @@ actor ResponseCache {
                 options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
             )
             Log.cache.debug("wrote \(data.count, privacy: .public)B")
+            evictIfOverBudget(keeping: key)
         } catch {
             // A cache that cannot write is a slow app, not a broken one.
             Log.cache.error("write failed: \(Log.summary(for: error), privacy: .public)")
@@ -94,6 +104,50 @@ actor ResponseCache {
     func removeAll() {
         try? fileManager.removeItem(at: directory)
         Log.cache.debug("cleared")
+    }
+
+    /// Keep the cache under its byte budget, oldest first.
+    ///
+    /// Before this, the cache was UNBOUNDED: no cap, no entry limit, and the
+    /// only eviction was iOS purging the whole Caches directory at a moment of
+    /// its choosing — which, for a farm app, can be immediately before someone
+    /// walks into a field with no signal. Losing the oldest entry to stay
+    /// under a budget we chose is strictly better than losing everything at a
+    /// time the system chose.
+    ///
+    /// Ordered by modification date, which here means LAST SUCCESSFUL FETCH:
+    /// entries are rewritten on every refresh, so the oldest file is the least
+    /// recently confirmed. Reads deliberately do not touch it — promoting on
+    /// read would keep a screen nobody refreshes ahead of one that is actively
+    /// failing over to cache.
+    ///
+    /// The entry just written is never the one evicted, however tight the
+    /// budget: writing and immediately discarding would be worse than not
+    /// caching at all.
+    private func evictIfOverBudget(keeping key: String) {
+        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: keys
+        ) else { return }
+
+        var sized: [(url: URL, size: Int, modified: Date)] = entries.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)),
+                  let size = values.fileSize,
+                  let modified = values.contentModificationDate
+            else { return nil }
+            return (url, size, modified)
+        }
+
+        var total = sized.reduce(0) { $0 + $1.size }
+        guard total > byteBudget else { return }
+
+        sized.sort { $0.modified < $1.modified }
+        for entry in sized where total > byteBudget {
+            guard entry.url.lastPathComponent != key else { continue }
+            try? fileManager.removeItem(at: entry.url)
+            total -= entry.size
+            Log.cache.debug("evicted \(entry.size, privacy: .public)B over budget")
+        }
     }
 
     private func fileURL(_ key: String) -> URL {
