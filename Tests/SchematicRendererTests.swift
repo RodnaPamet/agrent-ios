@@ -70,41 +70,59 @@ final class SchematicRendererTests: XCTestCase {
         XCTAssertNotEqual(correct.x, swapped.x, accuracy: 0.001)
     }
 
-    // MARK: - Holes
+    // MARK: - Square sizing
 
-    /// A HOLE MUST ACTUALLY BE A HOLE.
-    ///
-    /// Asserted by hit-testing under the even-odd rule rather than by
-    /// counting path elements — an earlier version of this test counted
-    /// `.move` elements and failed at 4 instead of 2, because closing a
-    /// subpath inserts its own move. That count was measuring the path's
-    /// internal representation, not the property anyone cares about.
-    ///
-    /// Filling each ring separately instead would paint the holes solid:
-    /// four invented hectares of crop across the owner's real 32-hectare
-    /// parcel 15655-19.
-    func testHolesAreActuallyHoles() throws {
-        let outer = square(lonFrom: 24.21, lonTo: 24.29, latFrom: 43.12, latTo: 43.18)
-        let hole = square(lonFrom: 24.23, lonTo: 24.25, latFrom: 43.14, latTo: 43.16)
+    /// AREA scales with the recorded figure, not edge length. Sizing the side
+    /// directly by hectares would show a 69 ha parcel as thirty times a
+    /// 2.28 ha one instead of five and a half.
+    func testSideScalesWithTheSquareRootOfArea() {
         let p = projection()
-        let path = try XCTUnwrap(SchematicParcelMap.path(for: [outer, hole], with: p))
+        let big = SchematicParcelMap.squareSide(
+            areaHa: 69.098, geometry: anyGeometry, projection: p, exaggeration: 1)
+        let small = SchematicParcelMap.squareSide(
+            areaHa: 2.280, geometry: anyGeometry, projection: p, exaggeration: 1)
 
-        // Dead centre of the hole, and a point inside the ring but outside it.
-        let inHole = p.point(lon: 24.24, lat: 43.15)
-        let inRing = p.point(lon: 24.22, lat: 43.13)
-
-        XCTAssertTrue(path.contains(inRing, eoFill: true), "the field itself must be filled")
-        XCTAssertFalse(path.contains(inHole, eoFill: true), "the hole must NOT be filled")
-
-        // And the same point IS covered without even-odd — which is exactly
-        // the bug this guards against.
-        XCTAssertTrue(path.contains(inHole, eoFill: false),
-                      "non-zero winding would paint the hole solid")
+        let expectedRatio = (69.098 / 2.280).squareRoot()   // ~5.5
+        XCTAssertEqual(big / small, CGFloat(expectedRatio), accuracy: 0.01)
+        XCTAssertEqual(big / small, 5.5, accuracy: 0.1, "the real farm's spread")
     }
 
-    func testDegenerateRingIsDroppedNotDrawn() {
-        let twoPoints = [[24.21, 43.12], [24.22, 43.13]]
-        XCTAssertNil(SchematicParcelMap.path(for: [twoPoints], with: projection()))
+    /// Exaggeration is linear on the side, so 5x side is 25x area. That is
+    /// the intended reading of "five times bigger" and the reason neighbours
+    /// begin to overlap.
+    func testExaggerationIsLinearOnTheSide() {
+        let p = projection()
+        let trueSize = SchematicParcelMap.squareSide(
+            areaHa: 32.478, geometry: anyGeometry, projection: p, exaggeration: 1)
+        let exaggerated = SchematicParcelMap.squareSide(
+            areaHa: 32.478, geometry: anyGeometry, projection: p, exaggeration: 5)
+        XCTAssertEqual(exaggerated, trueSize * 5, accuracy: 0.001)
+    }
+
+    /// At 1x the squares are true to the ground. 32.478 ha is a 570 m square;
+    /// over this farm's ~8.5 km of longitude in 358 pt of width, that is
+    /// roughly 24 pt — which is precisely why the exaggeration exists.
+    func testTrueScaleMatchesTheGroundAndIsTooSmallToRead() {
+        let side = SchematicParcelMap.squareSide(
+            areaHa: 32.478, geometry: anyGeometry, projection: projection(), exaggeration: 1)
+        XCTAssertEqual(side, 24, accuracy: 4, "a real 32 ha field is ~24pt here")
+        XCTAssertLessThan(side, 44, "below the minimum comfortable touch target")
+    }
+
+    /// A parcel with no recorded area still gets drawn at roughly its own
+    /// size rather than vanishing or defaulting to something arbitrary.
+    func testMissingAreaFallsBackToTheOutlineExtent() {
+        let p = projection()
+        let side = SchematicParcelMap.squareSide(
+            areaHa: nil, geometry: anyGeometry, projection: p, exaggeration: 5)
+        XCTAssertGreaterThan(side, 0)
+        XCTAssertLessThan(side, 2000, "a fallback must not explode the canvas")
+    }
+
+    func testZeroAreaDoesNotCollapseTheSquare() {
+        let side = SchematicParcelMap.squareSide(
+            areaHa: 0, geometry: anyGeometry, projection: projection(), exaggeration: 5)
+        XCTAssertGreaterThan(side, 0, "a zero-area parcel must still be visible")
     }
 
     // MARK: - Sown inference
@@ -120,6 +138,15 @@ final class SchematicRendererTests: XCTestCase {
     private func square(lonFrom: Double, lonTo: Double,
                         latFrom: Double, latTo: Double) -> [[Double]] {
         [[lonFrom, latFrom], [lonTo, latFrom], [lonTo, latTo], [lonFrom, latTo], [lonFrom, latFrom]]
+    }
+
+    /// Only used where the geometry is a fallback path, never for sizing.
+    private var anyGeometry: ParcelGeometry {
+        ParcelGeometry(
+            type: "MultiPolygon",
+            coordinates: [[square(lonFrom: 24.21, lonTo: 24.23,
+                                  latFrom: 43.12, latTo: 43.14)]]
+        )
     }
 
     private func parcel(crop: String?) -> Parcel {
