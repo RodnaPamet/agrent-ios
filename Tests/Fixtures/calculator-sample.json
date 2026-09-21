@@ -1,0 +1,204 @@
+{
+  "generatedAt": "2026-09-21T15:04:09.618Z",
+  "seasonId": "season_2026",
+  "rows": [
+    {
+      "commodity": "WHEAT",
+      "pricePerTonne": 420,
+      "priceCurrency": "BGN",
+      "priceObservedAt": "2026-09-18",
+      "priceSource": "sofia-grain",
+      "standingCropAreaHa": 12.34,
+      "standingCropExpectedKg": 61700,
+      "standingCropValue": 25914,
+      "perArea": {
+        "areaDca": 123.4,
+        "standingValuePerDca": 210,
+        "attributableCostPerDca": 90.5,
+        "marginPerDca": 119.5,
+        "uncertainty": "EXACT",
+        "refusalCode": null
+      },
+      "breakEven": {
+        "breakEvenPricePerTonne": 181.2,
+        "marketPricePerTonne": 420,
+        "currency": "BGN",
+        "coverPercent": 231.8,
+        "covered": true,
+        "uncertainty": "EXACT",
+        "refusalCode": null
+      },
+      "grainOnHandTonnes": 4.5,
+      "grainOnHandValue": 1890,
+      "rentCostProduceKg": 0,
+      "rentCostProduceValue": null,
+      "payrollAllocated": true,
+      "cashCostTotal": 1250,
+      "unvaluedNoUnitCost": 0,
+      "unvaluedUnitMismatch": 0,
+      "netWorth": 26554,
+      "netWorthUnavailableReason": null,
+      "netWorthUnavailableCode": null,
+      "netWorthUnavailableParams": null,
+      "netUncertainty": "exact",
+      "costUncertainty": "allocated",
+      "costCurrencyCodes": [
+        "BGN"
+      ],
+      "rentCurrencyUnknown": false,
+      "showProduceRent": false,
+      "costBreakdown": [
+        {
+          "id": "field",
+          "labelKey": "costFieldLabel",
+          "value": 800,
+          "variant": "brand"
+        },
+        {
+          "id": "rent",
+          "labelKey": "costRentLabel",
+          "value": 300,
+          "variant": "warning"
+        },
+        {
+          "id": "payroll",
+          "labelKey": "costPayrollLabel",
+          "value": 150,
+          "variant": "info"
+        }
+      ]
+    },
+    {
+      "commodity": "SUNFLOWER",
+      "pricePerTonne": null,
+      "priceCurrency": null,
+      "priceObservedAt": null,
+      "priceSource": null,
+      "standingCropAreaHa": 12.34,
+      "standingCropExpectedKg": 61700,
+      "standingCropValue": null,
+      "perArea": {
+        "areaDca": 45,
+        "standingValuePerDca": null,
+        "attributableCostPerDca": 60,
+        "marginPerDca": null,
+        "uncertainty": "REFUSED",
+        "refusalCode": "NO_STANDING_CROP_VALUE"
+      },
+      "breakEven": {
+        "breakEvenPricePerTonne": null,
+        "marketPricePerTonne": null,
+        "currency": null,
+        "coverPercent": null,
+        "covered": null,
+        "uncertainty": "REFUSED",
+        "refusalCode": "NO_PRICE"
+      },
+      "grainOnHandTonnes": 4.5,
+      "grainOnHandValue": null,
+      "rentCostProduceKg": 500,
+      "rentCostProduceValue": null,
+      "payrollAllocated": true,
+      "cashCostTotal": 1250,
+      "unvaluedNoUnitCost": 2,
+      "unvaluedUnitMismatch": 1,
+      "netWorth": null,
+      "netWorthUnavailableReason": "No market price for SUNFLOWER",
+      "netWorthUnavailableCode": "NO_PRICE",
+      "netWorthUnavailableParams": {
+        "commodity": "SUNFLOWER"
+      },
+      "netUncertainty": "refused",
+      "costUncertainty": "atLeast",
+      "costCurrencyCodes": [
+        "BGN"
+      ],
+      "rentCurrencyUnknown": true,
+      "showProduceRent": true,
+      "costBreakdown": [
+        {
+          "id": "field",
+          "labelKey": "costFieldLabel",
+          "value": 800,
+          "variant": "brand"
+        },
+        {
+          "id": "rent",
+          "labelKey": "costRentLabel",
+          "value": 300,
+          "variant": "warning"
+        },
+        {
+          "id": "payroll",
+          "labelKey": "costPayrollLabel",
+          "value": 150,
+          "variant": "info"
+        }
+      ]
+    }
+  ],
+  "farm": {
+    "totals": [
+      {
+        "currency": "BGN",
+        "netWorth": 26554,
+        "refusedCommodities": [
+          "SUNFLOWER"
+        ]
+      }
+    ],
+    "refusedWithoutCurrency": []
+  },
+  "exclusions": {
+    "plantingsMissingYieldEstimate": [
+      {
+        "id": "pl_9",
+        "label": "Нива до реката"
+      }
+    ],
+    "plantingsUnknownCommodity": [],
+    "lotsUnresolvedUnit": [],
+    "lotsUnknownCommodity": [],
+    "commoditiesWithNoPrice": [
+      {
+        "id": "SUNFLOWER",
+        "label": "Слънчоглед"
+      }
+    ],
+    "leasesUnresolvedRent": [],
+    "leasesUnattributed": [],
+    "leasesProduceRentUnpriced": [],
+    "payrollUnattributable": []
+  },
+  "unvalued": {
+    "noUnitCost": 2,
+    "unitMismatch": 1
+  },
+  "cashOut": [
+    {
+      "currency": "BGN",
+      "amount": 4120,
+      "categories": [
+        "SEED",
+        "FUEL"
+      ]
+    }
+  ],
+  "unallocatedToCrop": {
+    "amount": 210,
+    "areaHa": 3.1,
+    "parcelIds": [
+      "pa_7"
+    ],
+    "currencies": [
+      "BGN"
+    ]
+  },
+  "imputedLandCharge": {
+    "perHa": 480,
+    "areaHa": 6.2,
+    "totalAmount": 2976,
+    "refusalCode": null
+  },
+  "truncated": false
+}
