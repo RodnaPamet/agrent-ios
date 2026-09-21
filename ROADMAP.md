@@ -24,7 +24,10 @@ Shipped and proven end to end on a device simulator (2026-09-21):
 - `APIClient`'s status switch has no `304` case. URLSession converts 304→200
   below us today, so it is unreachable — but `default:` would render
   "Server error 304." on a screen whose data is fine. One line, not yet taken.
-- The journal list was counted at "at least 10" of an expected 11. Not settled.
+- ~~The journal list was counted at "at least 10" of an expected 11.~~
+  **CLOSED 2026-09-21: 11, confirmed on screen by the owner.** Matches the
+  production count exactly (`INPUT_APPLICATION` 9 + `ACTIVITY` 2), so the
+  database prediction and the rendered list agree.
 
 ## Decisions locked
 
