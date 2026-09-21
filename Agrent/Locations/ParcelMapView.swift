@@ -32,7 +32,7 @@ struct ParcelMapView: View {
             }
             content
         }
-        .navigationTitle(location.name)
+        .navigationTitle(useSchematic ? "" : location.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -74,6 +74,39 @@ struct ParcelMapView: View {
 
     // MARK: - Map
 
+    /// The location's identity, over the map rather than in the navigation
+    /// bar, as the reference artboard places it.
+    ///
+    /// NOT A SEARCH FIELD, though it reads like one at a glance — a white
+    /// pill floating over a map with an icon on the left is a familiar
+    /// shape. There is no input here: a pin, the location's name, and how
+    /// many parcels it holds. If search is wanted it is a separate feature
+    /// and a separate conversation, because searching four parcels is not
+    /// obviously worth a control.
+    ///
+    /// It sits over the map because on schematic the map has no imagery to
+    /// obscure, and putting the name here frees the navigation bar to carry
+    /// only the way back.
+    @ViewBuilder
+    private func locationCard(_ response: ParcelsResponse) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "mappin.and.ellipse")
+                .foregroundStyle(Palette.accent)
+            Text(location.name)
+                .font(.headline)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text("^[\(response.parcels.count) парцела](inflect: true)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+    }
+
     /// Only for the schematic view. On satellite the fills sit over imagery
     /// and the colours are not the only cue, but here they carry the whole
     /// meaning, so the key has to be on screen.
@@ -114,6 +147,7 @@ struct ParcelMapView: View {
             )
         } else if useSchematic, let box = response.bounds ?? location.boundsJson {
             SchematicParcelMap(parcels: drawable, bounds: box)
+                .overlay(alignment: .top) { locationCard(response) }
         } else {
             // Camera from `bounds` when the server sent one, otherwise from
             // the location's own boundsJson. Both are [minLon, minLat, …] and
