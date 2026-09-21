@@ -65,8 +65,17 @@ Shipped and proven end to end on a device simulator (2026-09-21):
 
    **The toggle is one button with two states, not a menu.** Two modes only;
    a third would make it a picker and it stops being simple. Remember the
-   choice per user. Sensible default: schematic, since the offline case is
-   the one that bites — but that is the owner's call, not mine.
+   choice per user.
+
+   **Schematic opens by default** (owner, 2026-09-21). The map's first frame
+   is therefore the one that cannot fail: no tiles to fetch, nothing to time
+   out, no grey squares. A farmer opening Локации with no signal sees their
+   fields. MapKit becomes the deliberate second look — for geographic
+   context, which is when you actually want the imagery — rather than the
+   thing you wait for and then discover is unavailable.
+
+   It also means the app's slowest, most network-dependent screen no longer
+   has a network-dependent first paint.
 
    Parcel fill still encodes state, so the accent-colour constraint in
    `DESIGN.md` holds in both modes: the app's accent cannot be green.
