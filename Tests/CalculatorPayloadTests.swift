@@ -55,33 +55,71 @@ final class CalculatorPayloadTests: XCTestCase {
     /// rounds to 2dp, so the two disagree. Every per-dca figure was computed
     /// against the payload's value, so anything shown beside them must use it.
     ///
-    /// Row 1 of the fixture proves the point by accident: its
-    /// `standingCropAreaHa` is 12.34 (= 123.4 dca) while its `areaDca` is 45.
-    /// Recomputing would put 123.4 on screen next to costs derived from 45.
-    func testAreaDcaIsReadNotRecomputed() async throws {
+    /// The shipped fixture cannot show this: both its rows divide evenly, so
+    /// recomputing from hectares happens to agree. The divergence is
+    /// constructed here rather than borrowed from data that does not contain
+    /// it.
+    ///
+    /// An earlier version asserted it using fixture row 1, which had
+    /// `standingCropAreaHa` 12.34 against `areaDca` 45. That was a defect in
+    /// the fixture's seed, not a rounding difference — the test passed for the
+    /// wrong reason and would have kept passing if the rounding had been
+    /// removed entirely.
+    func testAreaDcaIsReadNotRecomputed() throws {
+        // round2(12.3456 * 10) = 123.46, while the web's unrounded haToDca
+        // gives 123.456.
+        let json = Data("{\"areaDca\":123.46,\"standingValuePerDca\":210,\"attributableCostPerDca\":90.5,\"marginPerDca\":119.5,\"uncertainty\":\"exact\",\"refusalCode\":null}".utf8)
+        let perArea = try JSONDecoder().decode(PerArea.self, from: json)
+
+        let areaHa = 12.3456
+        XCTAssertEqual(perArea.areaDca, 123.46, "must be the payload's rounded value")
+        XCTAssertNotEqual(
+            perArea.areaDca, areaHa * 10,
+            "recomputing disagrees with the per-dca figures, which used 123.46"
+        )
+    }
+
+    func testAreaDcaMatchesTheFixture() async throws {
         let payload = try await decoded()
         XCTAssertEqual(payload.rows[0].perArea.areaDca, 123.4)
         XCTAssertEqual(payload.rows[1].perArea.areaDca, 45)
-        XCTAssertNotEqual(
-            payload.rows[1].perArea.areaDca,
-            payload.rows[1].standingCropAreaHa * 10,
-            "recomputing areaDca diverges from the payload — use the payload's"
-        )
     }
 
     // MARK: - Uncertainty: two casings, and an unknown that must not be fatal
 
-    func testUncertaintyDecodesBothCasings() async throws {
-        let payload = try await decoded()
-        let exact = payload.rows[0], refused = payload.rows[1]
-        XCTAssertEqual(exact.netUncertainty, .exact)          // "exact"
-        XCTAssertEqual(exact.costUncertainty, .allocated)     // "allocated"
-        XCTAssertEqual(exact.perArea.uncertainty, .exact)     // "EXACT"
-        XCTAssertEqual(exact.breakEven.uncertainty, .exact)   // "EXACT"
+    /// The server's whole vocabulary, written out literally rather than
+    /// derived from `allCases` — a test generated from the thing it checks
+    /// cannot detect a change to it. Source: `uncertainty.ts:31-44`.
+    func testEveryServerUncertaintyValueDecodes() throws {
+        let expected: [(String, Uncertainty)] = [
+            ("exact", .exact), ("atLeast", .atLeast), ("atMost", .atMost),
+            ("allocated", .allocated), ("partial", .partial), ("refused", .refused),
+        ]
+        for (raw, value) in expected {
+            let data = Data("\"\(raw)\"".utf8)
+            let decoded = try JSONDecoder().decode(Uncertainty.self, from: data)
+            XCTAssertEqual(decoded, value, "\(raw) decoded to \(decoded)")
+        }
+    }
 
-        XCTAssertEqual(refused.netUncertainty, .refused)      // "refused"
-        XCTAssertEqual(refused.costUncertainty, .atLeast)     // "atLeast"
-        XCTAssertEqual(refused.perArea.uncertainty, .refused) // "REFUSED"
+    func testUncertaintyOnTheFixture() async throws {
+        let payload = try await decoded()
+        XCTAssertEqual(payload.rows[0].netUncertainty, .exact)
+        XCTAssertEqual(payload.rows[0].costUncertainty, .allocated)
+        XCTAssertEqual(payload.rows[0].perArea.uncertainty, .allocated)
+        XCTAssertEqual(payload.rows[1].netUncertainty, .refused)
+        XCTAssertEqual(payload.rows[1].costUncertainty, .atLeast)
+        XCTAssertEqual(payload.rows[1].perArea.uncertainty, .refused)
+    }
+
+    /// Case-insensitivity is kept as cheap defence. It is NOT a workaround for
+    /// observed behaviour: the earlier claim that the payload mixed casings
+    /// was a fixture defect, and the server uses one convention.
+    func testCasingToleranceIsDefenceNotWorkaround() throws {
+        for raw in ["EXACT", "Exact", "exact"] {
+            let data = Data("\"\(raw)\"".utf8)
+            XCTAssertEqual(try JSONDecoder().decode(Uncertainty.self, from: data), .exact)
+        }
     }
 
     /// The `LogEntryType` lesson applied: an uncertainty level the app has

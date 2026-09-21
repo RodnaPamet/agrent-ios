@@ -33,27 +33,37 @@ struct CalculatorPayload: Decodable, Equatable, Sendable {
 
 /// How much to trust a figure.
 ///
-/// TWO CASING CONVENTIONS IN ONE PAYLOAD — measured, not assumed:
+/// The server's vocabulary, all lowercase, from `uncertainty.ts:31-44`:
 ///
-///     netUncertainty        "exact"    "refused"      lower
-///     costUncertainty       "allocated" "atLeast"     lower/camel
-///     perArea.uncertainty   "EXACT"    "REFUSED"      UPPER
-///     breakEven.uncertainty "EXACT"    "REFUSED"      UPPER
+///     exact  atLeast  atMost  allocated  partial  refused
 ///
-/// A plain `String` rawValue enum decodes one convention and throws on the
-/// other, which would fail the whole payload. Matching is case-insensitive.
+/// A NOTE ON A RETRACTED CLAIM, because it was committed and pushed. An
+/// earlier version of this file recorded that the payload used TWO casing
+/// conventions — lowercase for `netUncertainty`/`costUncertainty` and
+/// UPPERCASE for `perArea`/`breakEven` — and said it was "measured, not
+/// assumed". That was wrong. It was measured, but against a fixture whose
+/// seed had those values hand-written; the mapper passed them through
+/// verbatim and the defect looked exactly like a server inconsistency. The
+/// server has one vocabulary and there is nothing to fix on it.
 ///
-/// `.unknown` is the other half of that and matters more. `LogEntryType`
-/// shipped six cases against the server's ten, and because the field was a
+/// Matching stays case-insensitive anyway, as cheap defence — but it is
+/// defence against a hypothetical, NOT a workaround for observed behaviour,
+/// and nobody should read it as evidence the server is inconsistent.
+///
+/// `.unknown` is the part that matters and is unaffected. `LogEntryType`
+/// shipped six cases against the server's ten, and because that field is a
 /// non-optional enum ONE unrecognised value would have failed the entire list
 /// decode — every row vanishing, not just the odd one. A server that adds an
 /// uncertainty level should cost us a vague label on one figure, not a blank
 /// screen.
 enum Uncertainty: String, CaseIterable, Decodable, Sendable {
     case exact
-    case allocated
     case atLeast
+    case atMost
+    case allocated
+    case partial
     case refused
+    /// Anything the server adds that this build has not heard of.
     case unknown
 
     init(from decoder: Decoder) throws {

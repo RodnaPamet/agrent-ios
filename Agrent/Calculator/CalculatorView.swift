@@ -201,7 +201,9 @@ private struct UncertaintyBadge: View {
         switch value {
         case .exact: nil
         case .allocated: "разпределено"
+        case .partial: "частично"
         case .atLeast: "най-малко"
+        case .atMost: "най-много"
         case .refused: "няма данни"
         case .unknown: "неясно"
         }
@@ -210,7 +212,7 @@ private struct UncertaintyBadge: View {
     private var tint: Color {
         switch value {
         case .exact, .allocated: .secondary
-        case .atLeast: .orange
+        case .atLeast, .atMost, .partial: .orange
         case .refused, .unknown: .red
         }
     }
