@@ -4,6 +4,29 @@ Scope set by the owner on 2026-09-21: **calculator, exchange, locations, admin**
 — not the full web experience. The web app has 70 operator pages; this plan
 covers four areas and deliberately leaves the rest on the laptop.
 
+## How changes land
+
+**Branch → PR → CI → merge.** Not direct pushes to `master`.
+
+Everything before 2026-09-21 went straight to `master` — 24 commits, no pull
+requests, no automated gate. The history is clean and each commit is
+separately revertible, but nothing was ever checked by anything except the
+author running the tests locally.
+
+CI (`.github/workflows/ci.yml`) runs on every PR and every push to `master`:
+
+| | |
+|---|---|
+| Guards | no committed credentials; `Agrent.xcodeproj` and `Agrent/Info.plist` stay untracked |
+| Generate | `xcodegen generate` — the project is derived, so CI builds it the way a developer does |
+| Verify | `CFBundleURLSchemes` contains `bg.agrent.app` — the silent failure that only shows at sign-in |
+| Test | full suite on a simulator resolved at runtime, not pinned |
+| Warnings | fails if more than the 2 known `ISO8601DateFormatter` ones appear |
+
+The credential guard is not hypothetical: a GitHub PAT was pasted into this
+file during development. It was caught before it was committed, but only
+because someone looked, and this repo is public.
+
 ## Where we are
 
 Shipped and proven end to end on a device simulator (2026-09-21):

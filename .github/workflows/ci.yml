@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# A superseded run tells you nothing, and macOS minutes are the expensive kind.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    name: Guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A GitHub PAT was pasted into ROADMAP.md during development. It was
+      # caught before it was committed, but only because someone looked. This
+      # repo is PUBLIC, so a committed credential is a published one.
+      - name: No credentials in the tree
+        run: |
+          if grep -rInE 'github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}' \
+               --exclude-dir=.git . ; then
+            echo "::error::A GitHub token appears to be committed."
+            exit 1
+          fi
+          if grep -rInE 'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.' --exclude-dir=.git . ; then
+            echo "::error::Something JWT-shaped is committed — an access token?"
+            exit 1
+          fi
+          echo "No credential-shaped strings found."
+
+      # Agrent.xcodeproj and Agrent/Info.plist are DERIVED from project.yml and
+      # gitignored. Committing either reintroduces the conflict-prone pbxproj
+      # the spec exists to avoid, and lets the two drift apart.
+      - name: Generated files stay out of git
+        run: |
+          for path in "Agrent.xcodeproj" "Agrent/Info.plist"; do
+            if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+              echo "::error::$path is tracked but is generated from project.yml."
+              exit 1
+            fi
+          done
+          echo "Generated files are untracked, as intended."
+
+  test:
+    name: Build and test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to the newest Xcode the image carries, and NOT left to the
+      # image default — GitHub's macOS runners ship several Xcodes under
+      # /Applications/Xcode_<version>.app and the default is not always the
+      # newest. CI building on a different toolchain than the developer is a
+      # particular kind of lie: green here would stop meaning green there.
+      #
+      # DEVELOPER_DIR is set explicitly rather than inherited. On the
+      # developer's machine `xcode-select -p` points at CommandLineTools, so
+      # every local build already overrides it; inheriting a default that was
+      # wrong locally is not a habit worth carrying into CI.
+      #
+      # Developer toolchain as of 2026-09-21: Xcode 26.6 (17F113),
+      # macOS 26.5.1, iOS Simulator SDK 26.5.
+      - name: Select Xcode
+        run: |
+          echo "Xcodes on this image:"
+          ls -d /Applications/Xcode*.app
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$NEWEST" ] || NEWEST=/Applications/Xcode.app
+          echo "DEVELOPER_DIR=$NEWEST/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Selected: $NEWEST"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          xcodegen --version
+          xcrun simctl list runtimes | grep -i ios || true
+          MAJOR=$(xcodebuild -version | head -1 | sed -E 's/Xcode ([0-9]+).*/\1/')
+          echo "Xcode major: $MAJOR (developer builds on 26)"
+          if [ "$MAJOR" != "26" ]; then
+            echo "::warning::CI is on Xcode $MAJOR; the developer builds on 26. \
+          Green here does not fully imply green there."
+          fi
+          {
+            echo "### Toolchain"
+            echo ""
+            echo '```'
+            xcodebuild -version
+            echo "xcodegen $(xcodegen --version)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The project is not committed; CI must build it the same way a developer
+      # does, from project.yml.
+      - name: Generate the project
+        run: xcodegen generate
+
+      # This step exists because the failure it catches is SILENT. A missing
+      # CFBundleURLSchemes still builds and still runs — it breaks only at
+      # sign-in, when the OAuth callback has nowhere to land, which is a much
+      # more confusing thing to debug later.
+      #
+      # Note the -A6: an earlier version of this check used -A3 and stopped one
+      # line short of the value, so a plist with a correct URLName and NO
+      # scheme passed it. It asserts the value now, not the neighbourhood.
+      - name: Verify the callback URL scheme survived generation
+        run: |
+          plutil -p Agrent/Info.plist | grep -A6 CFBundleURLTypes
+          plutil -p Agrent/Info.plist \
+            | grep -A6 CFBundleURLTypes \
+            | grep -A2 CFBundleURLSchemes \
+            | grep -q '"bg.agrent.app"' \
+            || { echo "::error::CFBundleURLSchemes is missing bg.agrent.app"; exit 1; }
+
+      # Runner images change their Xcode and simulator sets without warning, so
+      # the destination is resolved rather than hardcoded. A pinned
+      # "iPhone 17 Pro" would turn an image update into a red build that has
+      # nothing to do with the code.
+      - name: Pick a simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+import json, sys
+data = json.load(sys.stdin)["devices"]
+best = None
+for runtime, devices in data.items():
+    if "iOS" not in runtime:
+        continue
+    for d in devices:
+        if d.get("isAvailable") and d["name"].startswith("iPhone"):
+            key = tuple(int(p) for p in runtime.split("iOS-")[-1].split("-") if p.isdigit())
+            if best is None or key > best[0]:
+                best = (key, d["udid"], d["name"], runtime)
+if not best:
+    sys.exit("no available iPhone simulator on this runner")
+print(best[1])
+sys.stderr.write("using %s (%s)\n" % (best[2], best[3]))
+')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Agrent.xcodeproj \
+            -scheme Agrent \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath TestResults.xcresult \
+            | tee xcodebuild.log \
+            | grep -E "error:|warning:|Executed [0-9]+ test|\*\* (TEST|BUILD)" \
+            || { echo "::error::xcodebuild test failed"; tail -60 xcodebuild.log; exit 1; }
+
+      # A COUNT NOBODY SEES IS A COUNT NOBODY CHECKS. Printed into the job
+      # summary, where a human actually looks, rather than left buried in
+      # thousands of lines of xcodebuild output. A suite can silently collect
+      # the wrong set — or stop collecting most of it — and a green tick looks
+      # identical either way; the denominator is the only thing that shows it.
+      - name: Report test count
+        if: always()
+        run: |
+          LINE=$(grep -oE "Executed [0-9]+ tests?, with [0-9]+ failures?" xcodebuild.log | tail -1)
+          COUNT=$(echo "$LINE" | grep -oE "^Executed [0-9]+" | grep -oE "[0-9]+")
+          FAILURES=$(echo "$LINE" | grep -oE "with [0-9]+ failure" | grep -oE "[0-9]+")
+          : "${COUNT:=0}"; : "${FAILURES:=0}"
+          echo "::notice title=Tests::${COUNT} executed, ${FAILURES} failed"
+          {
+            echo "### Tests"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Executed | **${COUNT}** |"
+            echo "| Failed | ${FAILURES} |"
+            echo ""
+            grep -oE "Test Suite '[A-Za-z]+Tests?'.*(passed|failed)" xcodebuild.log | sort -u || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::Zero tests executed — a suite that collects nothing is green for the wrong reason."
+            exit 1
+          fi
+
+      # The two ISO8601DateFormatter Sendable warnings are known and tracked.
+      # This fails if NEW ones appear, so warning count cannot creep upward
+      # unnoticed the way it usually does.
+      - name: No new warnings
+        run: |
+          COUNT=$(grep -cE "warning: " xcodebuild.log | tr -d ' ')
+          UNIQUE=$(grep -oE "warning: .*" xcodebuild.log | sort -u | wc -l | tr -d ' ')
+          echo "Unique warnings: $UNIQUE"
+          grep -oE "warning: .*" xcodebuild.log | sort -u || true
+          if [ "$UNIQUE" -gt 2 ]; then
+            echo "::error::$UNIQUE unique warnings; 2 are known (ISO8601DateFormatter Sendable)."
+            exit 1
+          fi
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: TestResults.xcresult
+          retention-days: 7
