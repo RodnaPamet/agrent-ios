@@ -24,13 +24,7 @@ struct CalculatorView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .failed(let message):
-            ContentUnavailableView {
-                Label("Неуспешно зареждане", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Опитай пак") { Task { await store.load() } }
-            }
+            ErrorState(message: message) { await store.load() }
 
         case .loaded(let payload, _) where payload.rows.isEmpty:
             // Says WHY rather than just "empty". This is the state production
@@ -72,7 +66,7 @@ struct CalculatorView: View {
                         // total: a number that silently omits a crop reads as
                         // complete.
                         Text("Без: \(total.refusedCommodities.joined(separator: ", "))")
-                            .font(.footnote)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -91,11 +85,11 @@ struct CalculatorView: View {
                         .font(.headline)
                 }
             } else if let reason = row.netWorthUnavailableReason {
-                // The server's own sentence. Shown rather than hidden: a row
-                // with no number and no explanation looks like a bug.
-                Label(reason, systemImage: "exclamationmark.circle")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
+                // The server's own sentence, in the SAME weight as any other
+                // row. The calculator declining to invent a number is the
+                // product working; colouring it like a fault taught the
+                // operator to distrust a correct answer.
+                RefusalNote(text: reason)
             }
 
             // areaDca comes from the payload — never recomputed from
@@ -143,9 +137,8 @@ struct CalculatorView: View {
                 }
             }
             if row.rentCurrencyUnknown {
-                Text("Валутата на рентата е неизвестна.")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
+                RefusalNote(text: "Валутата на рентата е неизвестна.",
+                            icon: "questionmark.circle")
             }
         } header: {
             HStack {
@@ -163,16 +156,16 @@ struct CalculatorView: View {
         if !payload.exclusions.isEmpty || !payload.unvalued.isClean || payload.truncated {
             Section("Извън изчислението") {
                 ForEach(payload.exclusions.all) { item in
-                    Text(item.label).font(.footnote)
+                    Text(item.label).font(.subheadline)
                 }
                 if payload.unvalued.noUnitCost > 0 {
-                    Text("\(payload.unvalued.noUnitCost) без единична цена").font(.footnote)
+                    Text("\(payload.unvalued.noUnitCost) без единична цена").font(.subheadline)
                 }
                 if payload.unvalued.unitMismatch > 0 {
-                    Text("\(payload.unvalued.unitMismatch) с несъвпадаща мерна единица").font(.footnote)
+                    Text("\(payload.unvalued.unitMismatch) с несъвпадаща мерна единица").font(.subheadline)
                 }
                 if payload.truncated {
-                    Text("Списъкът е съкратен.").font(.footnote).foregroundStyle(.orange)
+                    RefusalNote(text: "Списъкът е съкратен.", icon: "ellipsis.circle")
                 }
             }
         }
@@ -188,12 +181,7 @@ private struct UncertaintyBadge: View {
 
     var body: some View {
         if let label {
-            Text(label)
-                .font(.caption2.weight(.semibold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(tint.opacity(0.18)))
-                .foregroundStyle(tint)
+            CategoryChip(text: label, foreground: tint, background: tint.opacity(0.14))
         }
     }
 
@@ -209,11 +197,15 @@ private struct UncertaintyBadge: View {
         }
     }
 
+    /// Deliberately restrained. "atLeast" and "refused" describe how a
+    /// figure was derived, not that anything went wrong — the design review
+    /// separated refusal from error precisely because colouring them alike
+    /// trains people to ignore both. Nothing here is `Palette.error`, which
+    /// is reserved for things that are actually broken.
     private var tint: Color {
         switch value {
         case .exact, .allocated: .secondary
-        case .atLeast, .atMost, .partial: .orange
-        case .refused, .unknown: .red
+        case .atLeast, .atMost, .partial, .refused, .unknown: Palette.accentDeep
         }
     }
 }

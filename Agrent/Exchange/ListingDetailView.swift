@@ -51,7 +51,7 @@ struct ListingDetailView: View {
             if listing.isOwn {
                 Section {
                     Text("Това е ваша обява.")
-                        .font(.footnote)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             } else if listing.isActive {
@@ -105,7 +105,7 @@ struct InquiryComposeView: View {
                         Label("Запитването е изпратено.", systemImage: "checkmark.circle")
                             .foregroundStyle(.green)
                         Text("Продавачът ще види контактите ви само ако приеме запитването.")
-                            .font(.footnote)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 case .failed(let message):

@@ -125,8 +125,8 @@ struct ExchangeView: View {
                         Text(row.commodity).font(.headline)
                         Spacer()
                         Text(row.status.label)
-                            .font(.caption)
-                            .foregroundStyle(row.status == .active ? .green : .secondary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                     Text(summary(side: row.side, kind: row.kind,
                                  quantity: row.quantityTonnes, price: row.pricePerTonne,
@@ -134,7 +134,7 @@ struct ExchangeView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     if row.inquiries.isEmpty {
-                        Text("Няма запитвания").font(.caption).foregroundStyle(.secondary)
+                        Text("Няма запитвания").font(.subheadline).foregroundStyle(.secondary)
                     } else {
                         ForEach(row.inquiries) { inquiry in
                             InquiryRow(inquiry: inquiry)
@@ -173,13 +173,7 @@ struct ExchangeView: View {
 
     @ViewBuilder
     private func failure(_ message: String, retry: @escaping () async -> Void) -> some View {
-        ContentUnavailableView {
-            Label("Неуспешно зареждане", systemImage: "exclamationmark.triangle")
-        } description: {
-            Text(message)
-        } actions: {
-            Button("Опитай пак") { Task { await retry() } }
-        }
+        ErrorState(message: message, retry: retry)
     }
 }
 
@@ -194,10 +188,11 @@ struct ListingRow: View {
                 Text(listing.commodity).font(.headline)
                 // The only thing distinguishing your rows in a global table.
                 if listing.isOwn {
-                    Text("ваша")
-                        .font(.caption2.weight(.semibold))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Capsule().fill(.secondary.opacity(0.15)))
+                    CategoryChip(
+                        text: "ваша",
+                        foreground: Palette.Chip.neutralText,
+                        background: Palette.Chip.neutralFill
+                    )
                 }
             }
             Text(summary(side: listing.side, kind: listing.kind,
@@ -206,7 +201,7 @@ struct ListingRow: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             if let region = listing.regionName {
-                Text(region).font(.caption).foregroundStyle(.secondary)
+                Text(region).font(.subheadline).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)
@@ -223,11 +218,11 @@ struct InquiryRow: View {
                 Spacer()
                 if let created = inquiry.createdAt {
                     Text(created, format: .dateTime.day().month().year())
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
             }
             if let message = inquiry.message, !message.isEmpty {
-                Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                Text(message).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
             }
             // CONTACT DETAILS ARE WITHHELD UNTIL contactSharedAt IS SET, and
             // that withholding is the feature. A PENDING or DECLINED inquiry
@@ -237,8 +232,8 @@ struct InquiryRow: View {
             // Only the positive case is rendered.
             if inquiry.contactShared {
                 Label("Контактите са споделени", systemImage: "checkmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.green)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)
