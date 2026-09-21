@@ -1,6 +1,24 @@
 import SwiftUI
 
-/// Parcels drawn from their own coordinates — no tiles, no network, no MapKit.
+/// Parcels as a DIAGRAM: each one a square at its true position, sized by its
+/// real area and drawn larger than life. No tiles, no network, no MapKit.
+///
+/// THIS IS NOT A SURVEY AND DOES NOT PRETEND TO BE. The real outlines are one
+/// tap away on the satellite view; this view trades shape fidelity for
+/// legibility, because at true scale the owner's farm is four shapes a few
+/// hundred metres across scattered over nine kilometres — geometrically
+/// perfect and nearly unreadable on a phone held at arm's length.
+///
+/// WHAT IS STILL TRUE HERE, and it is the part worth protecting:
+///   - POSITION. Each square is centred on its parcel's real centroid, so
+///     which field is north of which, and how far apart they are, is exact.
+///   - RELATIVE SIZE. Side length is proportional to the square root of the
+///     recorded area, so a 69 ha parcel is genuinely ~5.5x the side of a
+///     2.28 ha one. Sizes can be compared to each other.
+///
+/// WHAT IS DELIBERATELY FALSE: the shape, and the absolute size. Every parcel
+/// is a square, and every square is `exaggeration` times larger than the
+/// ground truth. Nothing here should be measured off.
 ///
 /// THIS IS THE DEFAULT MAP, and the reason is the offline case. MapKit's first
 /// frame depends on tiles it may not have: Apple caches opportunistically, not
@@ -33,6 +51,18 @@ struct SchematicParcelMap: View {
     /// Matches the padding the projection's test vectors were computed at.
     private let padding: CGFloat = 16
 
+    /// How much larger than life. ONE NUMBER, on purpose — this is a legibility
+    /// dial, and the right value is whatever a person holding the phone says
+    /// it is, so it should be trivial to turn.
+    ///
+    /// At 1 the squares are true to area and, on this farm, too small to read.
+    /// At 5 they are comfortably legible and adjacent parcels begin to
+    /// overlap, because 5x the side is 25x the area and neighbours genuinely
+    /// are close together. That overlap is the honest cost of the exaggeration
+    /// rather than a bug: they are drawn back-to-front so the smaller square
+    /// stays visible on top.
+    var exaggeration: CGFloat = 5
+
     var body: some View {
         GeometryReader { geo in
             Canvas { context, size in
@@ -46,50 +76,78 @@ struct SchematicParcelMap: View {
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
         var labels: [(name: String, at: CGPoint)] = []
+
+        // The projection pads for POINTS; a square has extent, so at 5x the
+        // largest one ran off the edge of the canvas — a field half
+        // off-screen, which is worse than a smaller layout. Inset by half the
+        // biggest square so every parcel is fully drawn.
+        //
+        // Measured once against the unpadded projection, because the side
+        // depends on the scale and the scale depends on the padding. One pass
+        // is enough: the second scale is smaller, so its squares are smaller
+        // too and still fit.
+        let probe = ParcelProjection(
+            bounds: ParcelProjection.Bounds(bounds), size: size, padding: padding
+        )
+        let widest = parcels.compactMap { parcel -> CGFloat? in
+            guard let geometry = parcel.geometry else { return nil }
+            return Self.squareSide(
+                areaHa: parcel.areaHa, geometry: geometry,
+                projection: probe, exaggeration: exaggeration
+            )
+        }.max() ?? 0
+
+        let fitted = min(padding + widest / 2, min(size.width, size.height) / 2 - 8)
         let projection = ParcelProjection(
             bounds: ParcelProjection.Bounds(bounds),
             size: size,
-            padding: padding
+            padding: max(padding, fitted)
         )
 
-        for parcel in parcels {
+        // Largest first. At 5x, neighbours overlap; painting the big ones
+        // underneath keeps the small parcel visible instead of swallowed.
+        let ordered = parcels.sorted { ($0.areaHa ?? 0) > ($1.areaHa ?? 0) }
+
+        for parcel in ordered {
             guard let geometry = parcel.geometry else { continue }
             let sown = parcel.isSown
 
-            for polygon in geometry.coordinates {
-                guard let path = Self.path(for: polygon, with: projection) else { continue }
+            guard let centre = Self.labelAnchor(for: geometry, with: projection) else { continue }
+            let side = Self.squareSide(
+                areaHa: parcel.areaHa,
+                geometry: geometry,
+                projection: projection,
+                exaggeration: exaggeration
+            )
+            let square = Path(
+                roundedRect: CGRect(
+                    x: centre.x - side / 2, y: centre.y - side / 2,
+                    width: side, height: side
+                ),
+                cornerRadius: min(4, side / 8)
+            )
 
-                // evenOdd is what makes a hole a hole. Every ring of the
-                // polygon goes into ONE path — ring 0 the outline, the rest
-                // the holes — and the even-odd rule punches them out. Filling
-                // each ring separately would paint the holes solid, which on
-                // the owner's real parcel 15655-19 means four invented
-                // hectares of crop across a 32-hectare field.
-                context.fill(
-                    path,
-                    with: .color(
-                        (sown ? Palette.Map.sownFill : Palette.Map.fallowFill)
-                            .opacity(Palette.Map.fillOpacity)
-                    ),
-                    style: FillStyle(eoFill: true)
+            context.fill(
+                square,
+                with: .color(
+                    (sown ? Palette.Map.sownFill : Palette.Map.fallowFill)
+                        .opacity(Palette.Map.fillOpacity)
                 )
-                context.stroke(
-                    path,
-                    with: .color(sown ? Palette.Map.sownStroke : Palette.Map.fallowStroke),
-                    style: StrokeStyle(
-                        lineWidth: Palette.Map.strokeWidth,
-                        lineJoin: .round,
-                        // Dashed means fallow — a second channel besides
-                        // colour, so the distinction survives a monochrome
-                        // screenshot and colour-blind vision.
-                        dash: sown ? [] : Palette.Map.dash
-                    )
+            )
+            context.stroke(
+                square,
+                with: .color(sown ? Palette.Map.sownStroke : Palette.Map.fallowStroke),
+                style: StrokeStyle(
+                    lineWidth: Palette.Map.strokeWidth,
+                    lineJoin: .round,
+                    // Dashed means fallow — a second channel besides colour,
+                    // so the distinction survives a monochrome screenshot and
+                    // colour-blind vision.
+                    dash: sown ? [] : Palette.Map.dash
                 )
-            }
+            )
 
-            if let anchor = Self.labelAnchor(for: geometry, with: projection) {
-                labels.append((parcel.name, anchor))
-            }
+            labels.append((parcel.name, centre))
         }
 
         // Labels last, so no parcel fill can paint over one — and nudged
@@ -133,20 +191,10 @@ struct SchematicParcelMap: View {
         }
     }
 
-    /// One `Path` per GeoJSON polygon, every ring included.
-    static func path(for polygon: [[[Double]]], with projection: ParcelProjection) -> Path? {
-        var path = Path()
-        var drew = false
-        for ring in polygon {
-            let points = screenPoints(ring, projection)
-            guard points.count >= 3 else { continue }
-            path.move(to: points[0])
-            path.addLines(Array(points.dropFirst()))
-            path.closeSubpath()
-            drew = true
-        }
-        return drew ? path : nil
-    }
+    // NOTE: outline rendering was removed with the move to squares. Hole
+    // handling still matters and still lives on the MapKit path, in
+    // `ParcelGeometry.mapPolygons`, where it is separately tested — a hole
+    // drawn as land is a real error there because that view IS the outlines.
 
     /// Area-weighted centroid of the outer ring of the largest polygon.
     ///
@@ -184,6 +232,46 @@ struct SchematicParcelMap: View {
             )
         }
         return CGPoint(x: x / (3 * twiceArea), y: y / (3 * twiceArea))
+    }
+
+    /// The side of a parcel's square, in points.
+    ///
+    /// Proportional to the SQUARE ROOT of the area, so that AREA — not edge
+    /// length — is what scales with the real figure. Sizing the side directly
+    /// by hectares would make a 69 ha parcel look thirty times a 2.28 ha one
+    /// rather than five and a half.
+    ///
+    /// Metres reach points through the projection's own scale, so the squares
+    /// stay consistent with the positions around them at any view size. A
+    /// degree of latitude is ~111,320 m everywhere, which is why the
+    /// conversion uses the latitude axis and not the longitude one — that is
+    /// the axis the projection already normalised the cosine out of.
+    ///
+    /// Falls back to the parcel's real extent when `areaHa` is missing, so a
+    /// parcel without a recorded area is still drawn at roughly its own size
+    /// rather than vanishing or defaulting to some arbitrary square.
+    static func squareSide(
+        areaHa: Double?,
+        geometry: ParcelGeometry,
+        projection: ParcelProjection,
+        exaggeration: CGFloat
+    ) -> CGFloat {
+        let metresPerDegreeLatitude = 111_320.0
+        let pointsPerMetre = projection.scale / CGFloat(metresPerDegreeLatitude)
+
+        if let areaHa, areaHa > 0 {
+            let sideMetres = (areaHa * 10_000).squareRoot()
+            return CGFloat(sideMetres) * pointsPerMetre * exaggeration
+        }
+
+        // No recorded area: use the on-screen extent of the outline itself.
+        let points = geometry.coordinates
+            .compactMap(\.first)
+            .flatMap { screenPoints($0, projection) }
+        guard points.count >= 3 else { return 8 * exaggeration }
+        let width = (points.map(\.x).max() ?? 0) - (points.map(\.x).min() ?? 0)
+        let height = (points.map(\.y).max() ?? 0) - (points.map(\.y).min() ?? 0)
+        return max(4, (width + height) / 2) * exaggeration
     }
 
     /// THE ONE PLACE A GeoJSON POSITION BECOMES A SCREEN POINT.
