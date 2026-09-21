@@ -131,8 +131,16 @@ layout; the native version is a fraction of that.
 
 First real write path beyond the journal. All endpoints exist.
 
-`GET/POST /api/exchange/listings` · `/listings/[listingId]` ·
+`GET/POST /api/t/:slug/exchange/listings` · `/listings/[listingId]` ·
 `/inquiries` · `/my-listings`
+
+**Measured 2026-09-21, because this line was wrong:** the unprefixed
+`/api/exchange/listings` returns **404**. The routes are tenant-scoped in the
+URL — but the DATA is not: `ExchangeListing` is a GLOBAL table with no
+`tenantId` and no RLS, deliberately, because cross-tenant readability is the
+product. The slug is for auth and context only, and `isOwn` is the sole marker
+separating your rows. `ExchangeInquiry` is the opposite: RLS-protected and
+private. The two must not share a UI that treats them alike.
 
 - Listings list + detail
 - Create inquiry (write — reuse the journal's `Idempotency-Key` discipline)

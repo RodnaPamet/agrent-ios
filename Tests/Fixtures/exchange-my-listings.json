@@ -1,0 +1,42 @@
+[
+  {
+    "id": "lst_f50d87da",
+    "side": "SELL",
+    "kind": "CULTURE",
+    "commodity": "wheat",
+    "quantityTonnes": "10",
+    "pricePerTonne": "50",
+    "priceCurrency": "EUR",
+    "regionCode": "BG-03",
+    "regionName": "Varna",
+    "lat": 43.2295,
+    "lon": 27.5145,
+    "description": null,
+    "sellerDisplayName": null,
+    "status": "EXPIRED",
+    "createdAt": "2026-07-08T03:30:06.979Z",
+    "expiresAt": "2026-07-22T00:00:00.000Z",
+    "isOwn": true,
+    "inquiries": []
+  },
+  {
+    "id": "lst_8c437acc",
+    "side": "SELL",
+    "kind": "CULTURE",
+    "commodity": "wheat",
+    "quantityTonnes": "250",
+    "pricePerTonne": "51.13",
+    "priceCurrency": "EUR",
+    "regionCode": "BG-15",
+    "regionName": "Pleven",
+    "lat": 43.4433,
+    "lon": 24.5959,
+    "description": null,
+    "sellerDisplayName": null,
+    "status": "ACTIVE",
+    "createdAt": "2026-07-04T13:38:19.222Z",
+    "expiresAt": null,
+    "isOwn": true,
+    "inquiries": []
+  }
+]
