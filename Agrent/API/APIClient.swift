@@ -57,6 +57,14 @@ actor APIClient {
         /// write was refused. Both web drains currently mistake it for a
         /// terminal payload rejection and park the whole queue (#938, open).
         case clientTooOld
+        /// 304 Not Modified — the server confirms the cached copy is current.
+        ///
+        /// Normally unreachable: URLSession revalidates its own HTTP cache and
+        /// hands the caller the stored 200 before this switch sees anything.
+        /// But `default:` used to catch it and render "Грешка от сървъра
+        /// (304)" on a screen whose data is perfectly fine, so the one path
+        /// where it CAN surface produced an error for a success.
+        case notModified
         case http(Int, String)
 
         var errorDescription: String? {
@@ -67,6 +75,8 @@ actor APIClient {
                 "Записът е променен на сървъра, докато го редактирахте."
             case .clientTooOld:
                 "Тази версия на приложението е твърде стара. Обновете я."
+            case .notModified:
+                "Данните не са променени."
             case .http(let code, let body):
                 body.isEmpty
                     ? "Грешка от сървъра (\(code))."
@@ -161,6 +171,8 @@ actor APIClient {
                 currentVersion: env?.error?.details?.currentVersion,
                 expectedVersion: env?.error?.details?.expectedVersion
             )
+        case 304:
+            throw APIError.notModified
         case 426:
             throw APIError.clientTooOld
         default:

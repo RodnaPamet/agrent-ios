@@ -77,6 +77,7 @@ enum Log {
             case .notSignedIn: return "APIError.notSignedIn"
             case .conflict: return "APIError.conflict"
             case .clientTooOld: return "APIError.clientTooOld"
+            case .notModified: return "APIError.notModified"
             case .http(let code, _): return "APIError.http(\(code))"
             }
         case let url as URLError:

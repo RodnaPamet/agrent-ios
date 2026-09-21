@@ -28,6 +28,18 @@ enum CachedResource {
             let value = try await decode(data)
             await ResponseCache.shared.write(key, data)
             return .loaded(value, .fresh)
+        } catch APIClient.APIError.notModified {
+            // Not a failure — the server just told us the cached copy is
+            // current. So the cache is served as .fresh, NOT .stale: the age
+            // shown to an operator should reflect how current the DATA is,
+            // and the server has this second confirmed it is.
+            if let hit = await ResponseCache.shared.read(key),
+               let value = try? await decode(hit.data) {
+                return .loaded(value, .fresh)
+            }
+            // A 304 with nothing cached to pair it with — the app asked to
+            // revalidate something it does not hold. Nothing to show.
+            return .failed(UserMessage.text(for: APIClient.APIError.notModified))
         } catch {
             return await fallback(key: key, error: error, decode: decode)
         }
