@@ -5,10 +5,27 @@ on:
   push:
     branches: [master]
 
-# A superseded run tells you nothing, and macOS minutes are the expensive kind.
+# Cancel superseded PULL REQUEST runs — a superseded one tells you nothing,
+# and macOS minutes are the expensive kind.
+#
+# NEVER cancel a master run. With cancel-in-progress on every event, two
+# merges in quick succession cancel the first one's verification, and the
+# commit that just landed is never checked. That happened: the master run for
+# 98138df (the Борса screen) was cancelled by the next merge, and it went onto
+# master unverified.
+#
+# Nothing was broken by it — later master runs are green and contain that
+# commit — but "a green master run exists somewhere after this" is a weaker
+# claim than "this commit was checked", and it is the wrong one to rely on
+# when bisecting. It also means a genuine break can land and be silently
+# skipped if the next merge is fast enough.
+#
+# This matters more here than usual because merges are --rebase: the commit
+# that lands on master is NOT the commit CI tested on the branch. The
+# post-merge master run is the only thing that ever sees what actually landed.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   guards:
