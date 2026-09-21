@@ -9,12 +9,41 @@ struct AgrentApp: App {
             Group {
                 switch auth.state {
                 case .signedIn:
-                    JournalListView()
+                    MainTabView()
                 default:
                     SignInView()
                 }
             }
             .environment(auth)
+        }
+    }
+}
+
+/// Exactly five tabs, and that is a ceiling rather than a coincidence: iOS
+/// collapses a sixth and everything after it into a "More" list, which buries
+/// real features behind an extra tap and reads as a bug to an operator. The
+/// roadmap scopes the app to four areas plus the journal, which spends the
+/// budget precisely and leaves nothing for a sixth.
+///
+/// The auth gate stays in `AgrentApp` above and the Изход button stays in
+/// `JournalListView`'s toolbar — this type only routes.
+struct MainTabView: View {
+    var body: some View {
+        TabView {
+            JournalListView()
+                .tabItem { Label("Дневник", systemImage: "book.closed") }
+
+            ComingSoonView(title: "Калкулатор")
+                .tabItem { Label("Калкулатор", systemImage: "plusminus") }
+
+            ComingSoonView(title: "Борса")
+                .tabItem { Label("Борса", systemImage: "arrow.left.arrow.right") }
+
+            ComingSoonView(title: "Локации")
+                .tabItem { Label("Локации", systemImage: "map") }
+
+            ComingSoonView(title: "Админ")
+                .tabItem { Label("Админ", systemImage: "person.2") }
         }
     }
 }
