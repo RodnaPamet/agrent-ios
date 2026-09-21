@@ -38,9 +38,40 @@ Shipped and proven end to end on a device simulator (2026-09-21):
 3. **Read-caching everywhere, no offline writes.** Every screen serves
    last-known data when offline and says so. Writes still require connectivity.
 
-## Phase 0 — Foundations
+## Phase 0 — Foundations — DONE (2a8f6f1..d6d8798)
 
-Nothing else can land cleanly until these exist. Build them once, here.
+Shipped and proven on the simulator: five-tab shell, `os_log` diagnostics with
+the three prohibitions enforced by SHAPE, `ResponseCache` + `LoadState`, and
+the journal refactored onto it with a staleness banner. All four mutation
+proofs ran; see the commits for each.
+
+**Carried forward as gaps, neither blocking:**
+
+- **The cache is unbounded.** No size cap, no entry limit, no TTL — only
+  explicit `remove`/`removeAll`. It lives in `Library/Caches`, which iOS purges
+  under storage pressure, so it cannot fill a disk. But that cuts both ways:
+  the purge is the system's decision and can land right before an operator goes
+  into a field. Bound it before Phase 3 puts map and parcel data in there.
+- **No staleness ceiling.** Six-month-old data is served with its age shown.
+  The age display is the mitigation and is probably right for a person who can
+  judge — but it is a decision, not an oversight, and Phase 3 should revisit it
+  for parcels.
+- **A query string is never safe on iOS.** CFNetwork writes the full request
+  URL, query included, to the unified log from Apple's own subsystems — the app
+  cannot suppress it. Our logging is clean (verified: zero hits for JWT
+  prefixes, bearer keys, body substrings, ids), but eight Apple lines carry the
+  query anyway. **Bodies and the `Authorization` header are NOT logged.** So any
+  future endpoint passing an id or anything personal must use a header or a
+  body, never a query parameter. Bites Phase 2 filters and Phase 3 parcels.
+- **The sign-in path has never run WITH logging attached.** Logging landed 25
+  minutes after the only sign-in; every relaunch since has used an existing
+  token. Verified by construction, not execution. Closing it needs a real
+  sign-out and sign-in.
+- `.debug` lines (request start, cache hit/miss/write) never persist to disk —
+  good for privacy, but they can only be watched live, not audited with
+  `log show`.
+
+### What it built (for reference)
 
 - **Navigation.** The app is currently `if signedIn { JournalListView }`. Needs
   a `TabView`: Journal · Calculator · Exchange · Locations · Admin (exactly 5,
