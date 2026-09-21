@@ -56,13 +56,22 @@ proofs ran; see the commits for each.
   The age display is the mitigation and is probably right for a person who can
   judge — but it is a decision, not an oversight, and Phase 3 should revisit it
   for parcels.
-- **A query string is never safe on iOS.** CFNetwork writes the full request
-  URL, query included, to the unified log from Apple's own subsystems — the app
+- **A query string is never safe on iOS — on requests the app SENDS.**
+  CFNetwork writes the full request URL, query included, to the unified log
+  from Apple's own subsystems — the app
   cannot suppress it. Our logging is clean (verified: zero hits for JWT
   prefixes, bearer keys, body substrings, ids), but eight Apple lines carry the
   query anyway. **Bodies and the `Authorization` header are NOT logged.** So any
   future endpoint passing an id or anything personal must use a header or a
   body, never a query parameter. Bites Phase 2 filters and Phase 3 parcels.
+
+  **Scope — read this before applying the rule.** It covers requests made
+  through the networking stack. It does NOT cover the OAuth callback, which is
+  also a URL carrying a secret in its query: `ASWebAuthenticationSession`
+  returns it in-process, CFNetwork never sees it, and a live sign-in measured
+  zero hits for it. Applied unscoped, this rule condemns the
+  PKCE-over-custom-scheme design the app is built on, and would push a future
+  session to replace a supported iOS pattern with something worse.
 - ~~**The sign-in path has never run WITH logging attached.**~~ **CLOSED
   2026-09-21 16:48** by a real sign-out and sign-in from the owner. The auth
   path ran with logging present and the leak check over the live code exchange
@@ -78,8 +87,9 @@ proofs ran; see the commits for each.
 
   Also established: **the callback URL does NOT reach the unified log.**
   `ASWebAuthenticationSession` hands it back in-process and CFNetwork never
-  sees it, so the CFNetwork query-string exposure below is correctly scoped to
-  ordinary outbound requests and does NOT extend to the OAuth callback.
+  sees it, so the CFNetwork query-string exposure noted ABOVE is correctly
+  scoped to ordinary outbound requests and does NOT extend to the OAuth
+  callback.
 - `.debug` lines (request start, cache hit/miss/write) never persist to disk —
   good for privacy, but they can only be watched live, not audited with
   `log show`.
