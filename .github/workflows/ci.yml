@@ -169,17 +169,48 @@ jobs:
             exit 1
           fi
 
-      # The two ISO8601DateFormatter Sendable warnings are known and tracked.
-      # This fails if NEW ones appear, so warning count cannot creep upward
-      # unnoticed the way it usually does.
+      # SOURCE warnings only — file:line:col — because that is what "no new
+      # warnings" is actually about. Build-tool chatter is reported but does
+      # not gate: the AppIntents processor emits
+      # "Metadata extraction skipped. No AppIntents.framework dependency
+      # found." on every build, which says nothing about the code.
+      #
+      # The first CI run failed here, and the bug was in the LOCAL checking,
+      # not in CI. Every by-hand warning count this session used
+      # `grep "warning: [a-z].*"` — lowercase initial — which silently
+      # excluded that capital-M line. So the local number was 2 and the honest
+      # number was 3, for the whole session, and nothing noticed until
+      # something counted it differently.
+      #
+      # Both numbers are printed for exactly that reason: a single total hides
+      # which kind moved.
       - name: No new warnings
         run: |
-          COUNT=$(grep -cE "warning: " xcodebuild.log | tr -d ' ')
-          UNIQUE=$(grep -oE "warning: .*" xcodebuild.log | sort -u | wc -l | tr -d ' ')
-          echo "Unique warnings: $UNIQUE"
-          grep -oE "warning: .*" xcodebuild.log | sort -u || true
-          if [ "$UNIQUE" -gt 2 ]; then
-            echo "::error::$UNIQUE unique warnings; 2 are known (ISO8601DateFormatter Sendable)."
+          SOURCE=$(grep -oE "[A-Za-z0-9_+/.-]+\.swift:[0-9]+:[0-9]+: warning: .*" xcodebuild.log \
+            | sed -E 's/.*(warning: .*)/\1/' | sed 's/[[:space:]]*$//' | sort -u)
+          SOURCE_COUNT=$(printf '%s' "$SOURCE" | grep -c . || true)
+          TOOLING=$(grep -oE "warning: .*" xcodebuild.log | sed 's/[[:space:]]*$//' | sort -u \
+            | grep -vF "$(printf '%s' "$SOURCE")" || true)
+
+          echo "Source warnings: $SOURCE_COUNT"
+          printf '%s\n' "$SOURCE"
+          {
+            echo "### Warnings"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Source (gated) | **$SOURCE_COUNT** / 2 allowed |"
+            echo ""
+            [ -n "$SOURCE" ] && printf '%s\n' "$SOURCE" | sed 's/^/- /'
+            if [ -n "$TOOLING" ]; then
+              echo ""
+              echo "Build-tool notices, not gated:"
+              printf '%s\n' "$TOOLING" | sed 's/^/- /'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$SOURCE_COUNT" -gt 2 ]; then
+            echo "::error::$SOURCE_COUNT source warnings; 2 are known (ISO8601DateFormatter Sendable)."
             exit 1
           fi
 
