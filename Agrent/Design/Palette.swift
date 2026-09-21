@@ -49,6 +49,12 @@ enum Palette {
         static let fallowFill = Color(hex: 0x9A9560)
         static let fallowStroke = Color(hex: 0x6F6B3E)
         static let label = Color.white
+        /// The coordinate grid. Shares the minor-path value deliberately —
+        /// same family, no new colour introduced into a closed palette — but
+        /// named separately because it means something else, and because
+        /// path strokes will want their own value the day there is path data.
+        static let graticule = Color(hex: 0x7E7A63)
+        static let graticuleLabel = Color(hex: 0xC9C4A8)
         static let fillOpacity: Double = 0.55
         static let strokeWidth: CGFloat = 2.5
         static let dash: [CGFloat] = [7, 5]
