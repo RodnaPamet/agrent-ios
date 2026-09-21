@@ -104,6 +104,9 @@ struct SchematicParcelMap: View {
             padding: max(padding, fitted)
         )
 
+        drawGraticule(in: &context, size: size, projection: projection)
+        drawNorthArrow(in: &context)
+
         // Largest first. At 5x, neighbours overlap; painting the big ones
         // underneath keeps the small parcel visible instead of swallowed.
         let ordered = parcels.sorted { ($0.areaHa ?? 0) > ($1.areaHa ?? 0) }
@@ -156,6 +159,119 @@ struct SchematicParcelMap: View {
         // names on top of each other. Small scattered parcels are the normal
         // case here, not the exception.
         draw(labels: labels, in: &context, size: size)
+    }
+
+    /// A latitude/longitude grid, so position stays readable.
+    ///
+    /// This matters MORE here than on the satellite view, not less. There the
+    /// imagery itself orients you — the Hemus motorway and the village of
+    /// Toros are recognisable, which is how the axis order was verified by
+    /// eye. Strip the imagery and exaggerate the shapes, and position is the
+    /// only thing left that is still true; without a reference it is also the
+    /// only thing with nothing to read it against.
+    ///
+    /// NO SCALE BAR, deliberately, and this is the one judgement worth
+    /// stating. Distances BETWEEN parcels are exact, so a scale bar would be
+    /// correct for them — but the squares beside it are five times life size,
+    /// and a ruler next to a deliberately false shape invites someone to
+    /// measure the shape. Coordinates cannot be misread that way: they label
+    /// position, which is the thing that is true.
+    private func drawGraticule(
+        in context: inout GraphicsContext, size: CGSize, projection: ParcelProjection
+    ) {
+        let lonStep = Self.graticuleStep(forSpan: bounds.lonSpan)
+        let latStep = Self.graticuleStep(forSpan: bounds.latSpan)
+        let stroke = StrokeStyle(lineWidth: 1)
+        let colour = Palette.Map.graticule.opacity(0.55)
+
+        // Longitude labels run horizontally and the lines can sit closer
+        // together than the text is wide — at this farm's scale they printed
+        // as "24.2224.2424.26". A label that cannot fit is DROPPED rather
+        // than overprinted: a gridline with no number still orients you, but
+        // an unreadable smear of digits is worse than a bare line.
+        var lastLabelEnd: CGFloat = -.greatestFiniteMagnitude
+        for value in Self.gridValues(from: bounds.minLon, to: bounds.maxLon, step: lonStep) {
+            let x = projection.point(lon: value, lat: bounds.maxLat).x
+            var line = Path()
+            line.move(to: CGPoint(x: x, y: 0))
+            line.addLine(to: CGPoint(x: x, y: size.height))
+            context.stroke(line, with: .color(colour), style: stroke)
+
+            let label = gridLabel(value, step: lonStep)
+            let width = context.resolve(label).measure(in: size).width
+            if x + 4 > lastLabelEnd + 8, x + 4 + width < size.width {
+                context.draw(
+                    label,
+                    at: CGPoint(x: x + 4, y: size.height - 8),
+                    anchor: .bottomLeading
+                )
+                lastLabelEnd = x + 4 + width
+            }
+        }
+
+        for value in Self.gridValues(from: bounds.minLat, to: bounds.maxLat, step: latStep) {
+            let y = projection.point(lon: bounds.minLon, lat: value).y
+            var line = Path()
+            line.move(to: CGPoint(x: 0, y: y))
+            line.addLine(to: CGPoint(x: size.width, y: y))
+            context.stroke(line, with: .color(colour), style: stroke)
+            context.draw(
+                gridLabel(value, step: latStep),
+                at: CGPoint(x: 6, y: y - 4),
+                anchor: .bottomLeading
+            )
+        }
+    }
+
+    private func gridLabel(_ value: Double, step: Double) -> Text {
+        Text(Self.formatDegrees(value, step: step))
+            .font(.system(size: 11, weight: .medium).monospacedDigit())
+            .foregroundStyle(Palette.Map.graticuleLabel)
+    }
+
+    /// Which way is up. Cheap, and the first question anyone asks of a map
+    /// with no landmarks on it.
+    private func drawNorthArrow(in context: inout GraphicsContext) {
+        let origin = CGPoint(x: 18, y: 20)
+        var arrow = Path()
+        arrow.move(to: CGPoint(x: origin.x, y: origin.y))
+        arrow.addLine(to: CGPoint(x: origin.x - 5, y: origin.y + 12))
+        arrow.addLine(to: CGPoint(x: origin.x, y: origin.y + 8))
+        arrow.addLine(to: CGPoint(x: origin.x + 5, y: origin.y + 12))
+        arrow.closeSubpath()
+        context.fill(arrow, with: .color(Palette.Map.graticuleLabel))
+        context.draw(
+            Text("С").font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Palette.Map.graticuleLabel),
+            at: CGPoint(x: origin.x, y: origin.y + 22)
+        )
+    }
+
+    /// The largest round step that still puts at least three lines across the
+    /// span. Round in DEGREES rather than pixels, so the labels are numbers a
+    /// person can read off a GPS rather than arbitrary fractions.
+    static func graticuleStep(forSpan span: Double, minimumLines: Int = 3) -> Double {
+        let candidates: [Double] = [1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0005]
+        for candidate in candidates where span / candidate >= Double(minimumLines) {
+            return candidate
+        }
+        return candidates.last ?? 0.0005
+    }
+
+    /// Multiples of `step` inside the range. Indexed rather than accumulated,
+    /// because repeatedly adding 0.02 drifts and the lines stop landing on
+    /// the values the labels claim.
+    static func gridValues(from low: Double, to high: Double, step: Double) -> [Double] {
+        guard step > 0, high > low else { return [] }
+        let first = (low / step).rounded(.up)
+        let last = (high / step).rounded(.down)
+        guard last >= first, last - first < 200 else { return [] }
+        return stride(from: Int(first), through: Int(last), by: 1).map { Double($0) * step }
+    }
+
+    static func formatDegrees(_ value: Double, step: Double) -> String {
+        let decimals = max(0, Int(ceil(-log10(step))))
+        return String(format: "%.\(decimals)f°", value)
     }
 
     /// Place labels, pushing a collision downward until it clears.

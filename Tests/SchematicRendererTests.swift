@@ -125,6 +125,68 @@ final class SchematicRendererTests: XCTestCase {
         XCTAssertGreaterThan(side, 0, "a zero-area parcel must still be visible")
     }
 
+    // MARK: - Coordinate grid
+
+    /// Steps are round numbers of DEGREES, so a label is something a person
+    /// can compare against a GPS rather than an arbitrary fraction.
+    func testGraticuleStepIsARoundNumberOfDegrees() {
+        // The real farm: 0.1046° of longitude, 0.0885° of latitude.
+        XCTAssertEqual(SchematicParcelMap.graticuleStep(forSpan: 0.104625), 0.02)
+        XCTAssertEqual(SchematicParcelMap.graticuleStep(forSpan: 0.088539), 0.02)
+        // And it adapts rather than hard-coding that.
+        XCTAssertEqual(SchematicParcelMap.graticuleStep(forSpan: 3.0), 1)
+        XCTAssertEqual(SchematicParcelMap.graticuleStep(forSpan: 0.004), 0.001)
+    }
+
+    /// Indexed, not accumulated. Adding 0.02 repeatedly drifts, and the lines
+    /// then stop landing on the values their own labels claim — a map whose
+    /// gridline is not where it says it is, which is worse than no grid.
+    func testGridValuesLandExactlyOnMultiples() {
+        let values = SchematicParcelMap.gridValues(from: 43.107932, to: 43.196471, step: 0.02)
+        XCTAssertEqual(values.count, 4)
+        for value in values {
+            let multiple = (value / 0.02).rounded()
+            XCTAssertEqual(value, multiple * 0.02, accuracy: 1e-9,
+                           "\(value) is not an exact multiple of the step")
+        }
+        XCTAssertEqual(values.first ?? 0, 43.12, accuracy: 1e-9)
+        XCTAssertEqual(values.last ?? 0, 43.18, accuracy: 1e-9)
+    }
+
+    func testGridValuesStayInsideTheBounds() {
+        let low = 43.107932, high = 43.196471
+        for value in SchematicParcelMap.gridValues(from: low, to: high, step: 0.02) {
+            XCTAssertGreaterThanOrEqual(value, low)
+            XCTAssertLessThanOrEqual(value, high)
+        }
+    }
+
+    /// A degenerate range must produce nothing rather than a runaway loop.
+    func testGridValuesRefuseDegenerateInput() {
+        XCTAssertTrue(SchematicParcelMap.gridValues(from: 43, to: 43, step: 0.02).isEmpty)
+        XCTAssertTrue(SchematicParcelMap.gridValues(from: 44, to: 43, step: 0.02).isEmpty)
+        XCTAssertTrue(SchematicParcelMap.gridValues(from: 43, to: 44, step: 0).isEmpty)
+        XCTAssertTrue(SchematicParcelMap.gridValues(from: 0, to: 90, step: 0.0005).isEmpty,
+                      "an absurd line count is refused, not drawn")
+    }
+
+    /// Decimals follow the step, so 0.02 labels as "43.12°" and not
+    /// "43.1200000°" or a rounded-off "43°".
+    func testDegreeLabelPrecisionFollowsTheStep() {
+        XCTAssertEqual(SchematicParcelMap.formatDegrees(43.12, step: 0.02), "43.12°")
+        XCTAssertEqual(SchematicParcelMap.formatDegrees(43.1, step: 0.1), "43.1°")
+        XCTAssertEqual(SchematicParcelMap.formatDegrees(43.125, step: 0.001), "43.125°")
+    }
+
+    /// The grid is drawn in the same space as the parcels, so a gridline at
+    /// a latitude must sit at the same y as a point at that latitude.
+    func testGridLinesShareTheParcelProjection() {
+        let p = projection()
+        let lineY = p.point(lon: bounds.minLon, lat: 43.18).y
+        let pointY = SchematicParcelMap.screenPoints([[24.25, 43.18]], p)[0].y
+        XCTAssertEqual(lineY, pointY, accuracy: 0.001)
+    }
+
     // MARK: - Sown inference
 
     func testSownIsInferredFromCropAndIsNotAServerField() {
