@@ -33,7 +33,7 @@ struct MainTabView: View {
             JournalListView()
                 .tabItem { Label("Дневник", systemImage: "book.closed") }
 
-            ComingSoonView(title: "Калкулатор")
+            CalculatorView()
                 .tabItem { Label("Калкулатор", systemImage: "plusminus") }
 
             ComingSoonView(title: "Борса")
