@@ -34,8 +34,42 @@ Shipped and proven end to end on a device simulator (2026-09-21):
 1. **MapKit, not MapLibre.** No SPM map dependency. Parcel geometry renders as
    `MapPolygon` overlays on Apple's basemap. Consequence accepted: the phone
    will not look pixel-identical to the web, and Apple's rural Bulgarian
-   imagery is weaker than the tile route the web uses. Revisit only if parcel
-   work proves unusable on Apple's base layer.
+   imagery is weaker than the tile route the web uses.
+
+   **AMENDED 2026-09-21 — a second, schematic layer, toggled by one button.**
+   Alongside the MapKit view, a *tileless* mode that draws the parcels
+   directly from their coordinates: flat ground, minimal path strokes, parcel
+   fills carrying state, labels. Rendered in SwiftUI (`Canvas` or `Path`) from
+   the same GeoJSON, normalised to the view bounds.
+
+   This is not decoration. It is the answer to the consequence accepted above:
+
+   - **It needs no tiles, so it works with no signal.** A field with no
+     coverage is the case the cache exists for, and Apple Maps cannot be
+     relied on there. The schematic layer has nothing to fetch.
+   - **Every colour is ours**, so it stays legible in direct sun where a
+     satellite basemap washes out — see `DESIGN.md`, "Who this is for".
+   - **Rural Bulgarian imagery quality stops mattering** in this mode.
+
+   The visual spec is the `Локации` artboard in the design canvas, and it is
+   binding rather than indicative — the values below are taken from it:
+
+   ```
+   ground            #6E6A52
+   path (major)      #8C8770, 10px
+   path (minor)      #7E7A63, 5–6px
+   parcel, sown      fill #3E8E4F @ 0.55, stroke #2C6E3A 2.5px
+   parcel, fallow    fill #9A9560 @ 0.55, stroke #6F6B3E 2.5px dashed 7/5
+   label             #FFFFFF, 14px, weight 600
+   ```
+
+   **The toggle is one button with two states, not a menu.** Two modes only;
+   a third would make it a picker and it stops being simple. Remember the
+   choice per user. Sensible default: schematic, since the offline case is
+   the one that bites — but that is the owner's call, not mine.
+
+   Parcel fill still encodes state, so the accent-colour constraint in
+   `DESIGN.md` holds in both modes: the app's accent cannot be green.
 2. **Admin = `members` + `farm-profile` only.** `sso`, `scim`, `roles`,
    `api-keys`, `rbac` stay on the laptop. Nobody configures SAML on a phone.
 3. **Read-caching everywhere, no offline writes.** Every screen serves
