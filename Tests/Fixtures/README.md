@@ -30,10 +30,40 @@ printing the derived fields next to the inputs:
 - `netWorth` was never set, so `netWorthUncertainty()` returned `refused` for
   **both** rows — by accident, looking exactly like intent.
 
+### v2 — four defects, all in the INPUT, none in the mapper
+
+The first version had **four**. Every one was in the synthetic input I wrote;
+the mapper faithfully rendered each into something plausible.
+
+| | defect | caught by |
+|---|---|---|
+| 1 | sentinel written as `'UNKNOWN_RENT_CURRENCY'`; its value is `'UNKNOWN'` | printing derived fields |
+| 2 | `netWorth` unset → both rows `refused` **by accident** | printing derived fields |
+| 3 | row 1 carried row 0's `standingCropAreaHa` (12.34ha) beside its own `areaDca` (45) | the iOS peer, reading it |
+| 4 | `uncertainty` hand-written UPPERCASE; the real vocabulary is lowercase | investigating (3) |
+
+**Defect 4 matters beyond this file**: it made the payload look like it carried
+*two casing conventions*, and a reader could reasonably have "fixed" the server
+to match. It does not. `UNCERTAINTY` (`uncertainty.ts:31-44`) is one lowercase
+vocabulary — `exact`, `atLeast`, `atMost`, `allocated`, `partial`, `refused` —
+and `per-area.ts:111` / `break-even.ts:91` assign from it like everything else.
+
+**The root cause of 2 and 4 was a cast.** The emitter said
+`as unknown as CommodityNetWorthRow`, which disabled the one instrument that
+would have caught both: `UncertaintyState` is a literal union, so `'EXACT'` is
+a type error, and a missing required `netWorth` is too. A fixture generated
+through a real mapper is only as trustworthy as its inputs, and casting the
+inputs throws away the check.
+
+v2 therefore: **no casts on the seed**, and `perArea`/`breakEven` are COMPUTED
+by the real `computePerArea` / `computeBreakEven` rather than hand-written, so
+a row cannot carry an area its own figures disagree with.
+
 ### What it exercises
 
 | | row 0 (WHEAT) | row 1 (SUNFLOWER) |
 |---|---|---|
+| area | 12.34 ha → 123.4 dca | 4.5 ha → 45 dca (its own) |
 | `netUncertainty` | `exact` | `refused`, with code + params |
 | `priceObservedAt` | `"2026-09-18"` — **yyyy-mm-dd** | `null` |
 | `showProduceRent` | `false` | `true` |
