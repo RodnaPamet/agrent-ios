@@ -1,26 +1,51 @@
 import Foundation
 
-/// Mirrors prisma/schema/journal.prisma `LogEntryType`.
+/// Mirrors `LogEntryType` in **prisma/schema/enums.prisma**.
+///
+/// NOT `journal.prisma` — this comment said that and it was wrong, and the
+/// wrong citation is why the enum was never checked against the real one. The
+/// app shipped SIX cases against the server's TEN, and invented an `OTHER` the
+/// server has never had:
+///
+///     missing   SEEDING  TRANSPLANTING  IRRIGATION  LAB_TEST  GRAZING
+///     invented  OTHER
+///
+/// `LogEntry.type` is non-optional, so ONE entry of an unknown type fails the
+/// whole list decode — every entry disappears, not just that one. It had not
+/// bitten yet only because the live tenant holds nothing but INPUT_APPLICATION
+/// (9) and ACTIVITY (2); the first Сеитба or Напояване entry would have done
+/// it. `OTHER` was the write-side twin: creating with it would have been
+/// rejected by the server's enum.
 enum LogEntryType: String, Codable, CaseIterable, Identifiable, Sendable {
     case activity = "ACTIVITY"
     case observation = "OBSERVATION"
     case inputApplication = "INPUT_APPLICATION"
+    case seeding = "SEEDING"
+    case transplanting = "TRANSPLANTING"
     case harvest = "HARVEST"
+    case irrigation = "IRRIGATION"
     case maintenance = "MAINTENANCE"
-    case other = "OTHER"
+    case labTest = "LAB_TEST"
+    case grazing = "GRAZING"
 
     var id: String { rawValue }
 
-    /// Bulgarian first — the operators using this are Bulgarian, and the web
-    /// app's own journalEnums.logType.* reads this way.
+    /// Taken VERBATIM from the web app's `messages/bg.json`
+    /// `journalEnums.logType.*`, so both clients name the same thing the same
+    /// way to the same operator. (`INPUT_APPLICATION` read "Влагане" here and
+    /// "Внасяне на препарат" there — the web app's wording wins.)
     var label: String {
         switch self {
         case .activity: "Дейност"
         case .observation: "Наблюдение"
-        case .inputApplication: "Влагане"
+        case .inputApplication: "Внасяне на препарат"
+        case .seeding: "Сеитба"
+        case .transplanting: "Разсаждане"
         case .harvest: "Прибиране на реколтата"
+        case .irrigation: "Напояване"
         case .maintenance: "Поддръжка"
-        case .other: "Друго"
+        case .labTest: "Лабораторен анализ"
+        case .grazing: "Паша"
         }
     }
 }

@@ -68,7 +68,7 @@ actor APIClient {
             case .clientTooOld:
                 "Тази версия на приложението е твърде стара. Обновете я."
             case .http(let code, let body):
-                "Server error \(code): \(body)"
+                body.isEmpty ? "Server error \(code)." : "Server error \(code): \(body)"
             }
         }
     }
@@ -148,15 +148,60 @@ actor APIClient {
         case 426:
             throw APIError.clientTooOld
         default:
-            throw APIError.http(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+            throw APIError.http(http.statusCode, Self.readableBody(data, http))
         }
+    }
+
+    /// A body a HUMAN can read, or none at all.
+    ///
+    /// Measured 2026-09-21: a 404 returned Next.js's 102,151-byte HTML error
+    /// page. `.http` interpolated it whole into `errorDescription`, which
+    /// `JournalListView` handed to a SwiftUI `Text`. The layout blew up — the
+    /// user saw NO readable message and the "Опитай пак" button was pushed off
+    /// screen, so the failure was illegible AND inescapable. The error had to be
+    /// read off the network log instead.
+    ///
+    /// Any HTML error page does this — a 500, a proxy page, a Cloudflare block —
+    /// so it is bounded here, once, rather than at each call site.
+    private static func readableBody(_ data: Data, _ http: HTTPURLResponse) -> String {
+        let contentType = http.value(forHTTPHeaderField: "Content-Type") ?? ""
+        guard contentType.contains("json") else { return "" }
+        let text = String(data: data, encoding: .utf8) ?? ""
+        return text.count <= 300 ? text : String(text.prefix(300)) + "…"
+    }
+
+    /// Build a request URL from a path that MAY carry a query string.
+    ///
+    /// NOT `URL.appending(path:)`. That percent-encodes its whole argument, so
+    /// `?` becomes `%3F` and "/api/t/agrent/journal?limit=50" turns into a PATH
+    /// segment literally named `journal?limit=50`. No route matches it, the
+    /// server answers with its 404 HTML page, and `limit` never arrives.
+    ///
+    /// Measured 2026-09-21: this 404'd every journal load while sign-in worked
+    /// perfectly — `AuthClient` builds its URL with `URLComponents` and this did
+    /// not. Same codebase, two idioms, one of them wrong.
+    ///
+    /// The trap that hides it: `url.path` prints the DECODED form and looks
+    /// exactly right in a debugger. Only `absoluteString` or `.query` shows the
+    /// damage, and `.query` is nil.
+    ///
+    /// The query is taken VERBATIM, so a caller interpolating a value into it
+    /// owns percent-encoding that value.
+    private static func url(for pathAndQuery: String) throws -> URL {
+        guard var comps = URLComponents(url: Config.baseURL, resolvingAgainstBaseURL: false)
+        else { throw URLError(.badURL) }
+        let parts = pathAndQuery.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        comps.path = String(parts[0])
+        comps.percentEncodedQuery = parts.count > 1 && !parts[1].isEmpty ? String(parts[1]) : nil
+        guard let url = comps.url else { throw URLError(.badURL) }
+        return url
     }
 
     private func perform(
         _ path: String, _ method: String, _ body: Data?, _ key: String?,
         _ ifMatch: String?, _ tokens: Tokens
     ) async throws -> (Data, HTTPURLResponse) {
-        var req = URLRequest(url: Config.baseURL.appending(path: path))
+        var req = URLRequest(url: try Self.url(for: path))
         req.httpMethod = method
         req.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
         if let body {
