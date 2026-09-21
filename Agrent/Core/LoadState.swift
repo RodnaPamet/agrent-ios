@@ -19,6 +19,15 @@ enum Freshness: Equatable, Sendable {
     /// "данни отпреди 5 minutes ago".
     var ageDescription: String? {
         guard case .stale(let since) = self else { return nil }
+
+        // Under a minute — or ahead of us, which clock skew between the file
+        // system and the device can produce — the formatter renders a FUTURE
+        // tense: "след 0 секунди", "in 0 seconds". Observed on screen. Data
+        // read off disk is by definition not from the future, so anything
+        // that recent is described in fixed words instead.
+        let elapsed = Date().timeIntervalSince(since)
+        guard elapsed >= 60 else { return "преди малко" }
+
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = Locale(identifier: "bg_BG")
         formatter.unitsStyle = .full
