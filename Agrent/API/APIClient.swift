@@ -247,6 +247,26 @@ actor APIClient {
         return try decoder.decode(T.self, from: data)
     }
 
+    /// PUT, with NO idempotency key.
+    ///
+    /// The key is for creates, where a retry must not make a second row.
+    /// A PUT that replaces a whole value is idempotent by construction —
+    /// sending it twice leaves the same state — so a key would be
+    /// ceremony. Same reasoning `setTaskStatus` records for comparing
+    /// state rather than replaying a request.
+    func put<B: Encodable, T: Decodable>(
+        _ path: String, body: B, as _: T.Type
+    ) async throws -> T {
+        let payload = try encoder.encode(body)
+        let data = try await send(
+            path: path, method: "PUT", body: payload, idempotencyKey: nil
+        )
+        // A 204 carries no body. `EmptyResponse` decodes nothing, but
+        // JSONDecoder still refuses zero bytes, so an empty body becomes
+        // an empty object first.
+        return try decoder.decode(T.self, from: data.isEmpty ? Data("{}".utf8) : data)
+    }
+
     // MARK: - internals
 
     private func send(

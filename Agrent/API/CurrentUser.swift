@@ -43,8 +43,23 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// to decide whether to OFFER an affordance.
     let role: String?
 
+    /// The saved bottom-row order, or nil when never chosen.
+    ///
+    /// nil and `[]` are DIFFERENT and the column is nullable to keep them
+    /// so: "never chose" draws the default, "deliberately cleared" does
+    /// not. Collapsing them is unrecoverable.
+    ///
+    /// Nested inside `user`, beside `role` — confirmed by the server
+    /// side after this was first written against a deployment that did
+    /// not yet have the column. The earlier version read both here and
+    /// at the envelope root, because a probe could only show where the
+    /// field was NOT, and guessing wrong would have decoded nil forever
+    /// rather than failing: a save that silently never persists. With the
+    /// location known, the second read is noise.
+    let bottomTabOrder: [String]?
+
     private enum Outer: String, CodingKey { case user }
-    private enum Inner: String, CodingKey { case id, name, email, role }
+    private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder }
 
     init(from decoder: Decoder) throws {
         let outer = try decoder.container(keyedBy: Outer.self)
@@ -53,6 +68,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.name = try user.decodeIfPresent(String.self, forKey: .name)
         self.email = try user.decodeIfPresent(String.self, forKey: .email)
         self.role = try user.decodeIfPresent(String.self, forKey: .role)
+        self.bottomTabOrder = try user.decodeIfPresent([String].self, forKey: .bottomTabOrder)
     }
 
     /// May this person create a field operation?
@@ -77,6 +93,22 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// can read and report, the absence is a feature they conclude does
     /// not exist. The server is the authority either way, and its refusal
     /// is rendered.
+    /// A MECHANISATOR, as far as the OLDEST membership knows.
+    ///
+    /// `isOperatorAllowedPath` in the server's `guard.ts` is a middleware
+    /// lockdown, not presentation: anything under `/api/t/{slug}/` outside
+    /// `farm-tasks|field-operations|tasks|locations|agro` returns 403
+    /// `operator_scope` for this role. So a tab whose screen calls
+    /// anything else is not a tab this person has — it is a tab that
+    /// errors.
+    ///
+    /// Only MECHANISATOR. READER and AUDITOR are refused *writes* by
+    /// `mayCreateOperations`, and whether the same path lockdown applies
+    /// to them is not something this app has been told. Extending a rule
+    /// past what was verified is how a screen gets taken away from
+    /// somebody who could have used it.
+    var isOperator: Bool { role?.uppercased() == "MECHANISATOR" }
+
     var mayCreateOperations: Bool {
         switch role?.uppercased() {
         case "MECHANISATOR", "READER", "AUDITOR": false
@@ -84,11 +116,13 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         }
     }
 
-    init(id: String, name: String?, email: String?, role: String?) {
+    init(id: String, name: String?, email: String?, role: String?,
+         bottomTabOrder: [String]? = nil) {
         self.id = id
         self.name = name
         self.email = email
         self.role = role
+        self.bottomTabOrder = bottomTabOrder
     }
 }
 

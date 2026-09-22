@@ -26,9 +26,14 @@ import SwiftUI
 struct AppMenuButton: View {
     @Environment(AuthClient.self) private var auth
 
+    @State private var tabs = BottomTabsStore.shared
     @State private var showingAdmin = false
-    @State private var showingTrends = false
-    @State private var showingNews = false
+
+    /// Which overflow screen is open, if any. One piece of state rather
+    /// than a Bool per surface — the set is now derived from what is NOT
+    /// in the bottom row, so it changes at runtime and cannot have a
+    /// fixed number of flags.
+    @State private var presented: AppSurface?
 
     var body: some View {
         Menu {
@@ -37,20 +42,19 @@ struct AppMenuButton: View {
             // getting it wrong means filing a record against the wrong
             // holding — which for a regulatory diary is not a small mistake.
             Section(Config.tenantSlug) {
-                // Тенденции and Новини are two surfaces on the web
-                // (`/trends` and `/news`) and stay two here. They share an
-                // API prefix and nothing else: one is a number over time,
-                // the other is what happened this week.
-                Button {
-                    showingTrends = true
-                } label: {
-                    Label("Тенденции", systemImage: "chart.line.uptrend.xyaxis")
-                }
-
-                Button {
-                    showingNews = true
-                } label: {
-                    Label("Новини", systemImage: "newspaper")
+                // EVERY surface not in the bottom row, always.
+                //
+                // This is what makes the tab customiser safe rather than a
+                // trap. A farmer who takes Дневник out of the bar must
+                // still be able to open the diary, and a preference
+                // control that can strand a feature is not a setting. The
+                // list is derived from the bar, so the two cannot drift.
+                ForEach(tabs.overflow) { surface in
+                    Button {
+                        presented = surface
+                    } label: {
+                        Label(surface.label, systemImage: surface.icon)
+                    }
                 }
 
                 Button {
@@ -83,8 +87,7 @@ struct AppMenuButton: View {
         // Each screen owns its own NavigationStack and Затвори button, the
         // same shape AdminView already uses — the menu presents, the screen
         // knows how to be presented.
-        .sheet(isPresented: $showingTrends) { TrendsView() }
-        .sheet(isPresented: $showingNews) { NewsView() }
+        .sheet(item: $presented) { $0.screen }
     }
 }
 
@@ -97,6 +100,28 @@ extension View {
     func appMenu() -> some View {
         toolbar {
             ToolbarItem(placement: .topBarLeading) { AppMenuButton() }
+            // Top right, as asked. On Борса it joins the filter and the
+            // map toggle, which is three trailing glyphs — tight, and it
+            // fits, and consistency across the five tab roots is worth
+            // more than one uncrowded bar.
+            ToolbarItem(placement: .topBarTrailing) { TabCustomiserButton() }
         }
+    }
+}
+
+
+/// The top-right control that opens the bottom-row editor.
+struct TabCustomiserButton: View {
+    @State private var editing = false
+
+    var body: some View {
+        Button {
+            editing = true
+        } label: {
+            Label("Раздели", systemImage: "square.grid.2x2")
+        }
+        .accessibilityLabel("Раздели")
+        .accessibilityHint("Избира кои екрани са в долната лента")
+        .sheet(isPresented: $editing) { TabCustomiserView() }
     }
 }
