@@ -48,9 +48,18 @@ struct LocationsView: View {
                         }
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .accessibilityElement(children: .combine)
                     }
                     .padding(.vertical, 2)
+                    // `.combine` was here and it read the `·` aloud as
+                    // "middle dot". Built from the values instead, and
+                    // covering the name too, so the row is one stop rather
+                    // than a heading followed by a combined fragment.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(A11y.sentence([
+                        location.name,
+                        location.kind,
+                        location.parcelCount.map { "^[\($0) парцела](inflect: true)" },
+                    ]))
                 }
             }
             .refreshable { await store.load() }
