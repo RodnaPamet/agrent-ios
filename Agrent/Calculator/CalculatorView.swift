@@ -30,11 +30,11 @@ struct CalculatorView: View {
             // Says WHY rather than just "empty". This is the state production
             // actually returns today, and "no data" without a reason reads as
             // a broken screen.
-            ContentUnavailableView {
-                Label("Няма какво да се изчисли", systemImage: "chart.pie")
-            } description: {
-                Text("Калкулаторът показва стойност само когато има сезон със засети площи. За това стопанство още няма такива.")
-            } actions: {
+            EmptyState(
+                "Няма какво да се изчисли",
+                icon: "chart.pie",
+                message: "Калкулаторът показва стойност само когато има сезон със засети площи. За това стопанство още няма такива."
+            ) {
                 Button("Опитай пак") { Task { await store.load() } }
             }
 

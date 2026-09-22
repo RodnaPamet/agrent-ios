@@ -72,10 +72,10 @@ struct ExchangeView: View {
             failure(message) { await listings.load() }
 
         case .loaded(let page, _) where page.rows.isEmpty:
-            ContentUnavailableView(
+            EmptyState(
                 "Няма активни обяви",
-                systemImage: "tray",
-                description: Text("В момента никое стопанство не предлага нищо на борсата.")
+                icon: "tray",
+                message: "В момента никое стопанство не предлага нищо на борсата."
             )
 
         case .loaded(let page, _):
@@ -112,10 +112,10 @@ struct ExchangeView: View {
             failure(message) { await mine.load() }
 
         case .loaded(let rows, _) where rows.isEmpty:
-            ContentUnavailableView(
+            EmptyState(
                 "Нямате обяви",
-                systemImage: "tray",
-                description: Text("Тук се появяват обявите, които вашето стопанство е публикувало.")
+                icon: "tray",
+                message: "Тук се появяват обявите, които вашето стопанство е публикувало."
             )
 
         case .loaded(let rows, _):
@@ -159,10 +159,10 @@ struct ExchangeView: View {
             failure(message) { await inquiries.load() }
 
         case .loaded(let rows, _) where rows.isEmpty:
-            ContentUnavailableView(
+            EmptyState(
                 "Нямате заявки",
-                systemImage: "paperplane",
-                description: Text("Тук се появяват запитванията, които сте изпратили към чужди обяви.")
+                icon: "paperplane",
+                message: "Тук се появяват запитванията, които сте изпратили към чужди обяви."
             )
 
         case .loaded(let rows, _):

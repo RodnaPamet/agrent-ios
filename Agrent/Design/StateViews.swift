@@ -18,7 +18,10 @@ struct StaleBanner: View {
     let age: String
 
     var body: some View {
-        HStack(spacing: 7) {
+        // Top-aligned: at large Dynamic Type the text wraps to three lines and
+        // a vertically-centred icon floats away from the sentence it belongs
+        // to.
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
             Image(systemName: "clock.arrow.circlepath")
             Text("Последно обновено \(age)")
             Spacer()
@@ -54,19 +57,84 @@ struct ErrorState: View {
     let retry: () async -> Void
 
     var body: some View {
-        ContentUnavailableView {
-            Label {
-                Text("Неуспешно зареждане")
-            } icon: {
-                Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(Palette.error)
+        ScrollableState {
+            ContentUnavailableView {
+                Label {
+                    Text("Неуспешно зареждане")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(Palette.error)
+                }
+            } description: {
+                Text(message).font(.body)
+            } actions: {
+                Button("Опитай пак") { Task { await retry() } }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             }
-        } description: {
-            Text(message).font(.body)
-        } actions: {
-            Button("Опитай пак") { Task { await retry() } }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+        }
+    }
+}
+
+/// An empty state that can always be reached in full.
+///
+/// Same container as `ErrorState`, for the same reason — see `ScrollableState`.
+struct EmptyState<Actions: View>: View {
+    let title: String
+    let icon: String
+    let message: String
+    @ViewBuilder var actions: () -> Actions
+
+    init(
+        _ title: String,
+        icon: String,
+        message: String,
+        @ViewBuilder actions: @escaping () -> Actions = { EmptyView() }
+    ) {
+        self.title = title
+        self.icon = icon
+        self.message = message
+        self.actions = actions
+    }
+
+    var body: some View {
+        ScrollableState {
+            ContentUnavailableView {
+                Label(title, systemImage: icon)
+            } description: {
+                Text(message).font(.body)
+            } actions: {
+                actions()
+            }
+        }
+    }
+}
+
+/// Centred while it fits, scrollable when it does not.
+///
+/// `ContentUnavailableView` centres its content and does NOT scroll, so at
+/// large Dynamic Type sizes the description grows until the action button is
+/// pushed off the bottom — behind the tab bar, still rendered, unreachable.
+/// Observed on the calculator at accessibility3: "Опитай пак" sat underneath
+/// the tab bar, faintly visible through it.
+///
+/// That is the same failure as the 102 KB error body that pushed this app's
+/// retry button off screen in the first place — a state whose only exit
+/// cannot be reached is worse than one with no exit, because it looks like it
+/// has one.
+///
+/// `minHeight` on the content plus a scroll view means it stays optically
+/// centred at ordinary sizes and becomes scrollable exactly when it has to.
+struct ScrollableState<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                content()
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+            .scrollBounceBehavior(.basedOnSize)
         }
     }
 }
