@@ -295,8 +295,78 @@ actor APIClient {
         return t
     }
 
-    /// Single-flight: concurrent callers await the same refresh.
-    private func refresh(_ current: Tokens) async throws -> Tokens {
+    /// What to do when a caller asks to refresh.
+    ///
+    /// Pure, and separate from the network, because the rule it encodes is
+    /// the whole bug — see `refresh(_:)`.
+    enum RefreshDecision: Equatable {
+        /// Somebody else already rotated past the token this caller saw.
+        /// Their result is in the keychain; use it and send nothing.
+        case alreadyRotated(Tokens)
+        case perform
+        case signedOut
+    }
+
+    static func refreshDecision(seen: Tokens, stored: Tokens?) -> RefreshDecision {
+        guard let stored else { return .signedOut }
+        return stored.refreshToken == seen.refreshToken
+            ? .perform
+            : .alreadyRotated(stored)
+    }
+
+    /// Single-flight, and single-flight was NOT enough.
+    ///
+    /// ── The bug this fixes, measured in production ──
+    ///
+    /// Refresh tokens rotate and are single-use. Presenting one that has
+    /// already been consumed is treated as THEFT: the server burns the whole
+    /// rotation lineage and the session, immediately and irreversibly. The
+    /// owner was signed out twice in one afternoon, 34 minutes into a
+    /// session, and the database recorded both as
+    /// `security:refresh-replayed`.
+    ///
+    /// The app was the thief. Two requests race:
+    ///
+    ///   1. A and B both go out carrying the same expired access token.
+    ///   2. Both come back 401.
+    ///   3. A refreshes, rotates, stores the new pair, clears `refreshTask`.
+    ///   4. B now calls refresh — and `refreshTask` is already nil, so the
+    ///      guard does nothing. B sends the refresh token IT captured in
+    ///      step 1, which A consumed 1.02 seconds ago.
+    ///
+    /// The old guard covered concurrency only while a refresh was IN FLIGHT.
+    /// The dangerous window is longer than that: it lasts as long as any
+    /// caller is still holding a `Tokens` value it read before the rotation.
+    /// A single-flight promise cannot see that, because the second caller
+    /// never overlapped the first — it arrived just after.
+    ///
+    /// So the keychain, not the promise, is the source of truth. If the
+    /// stored refresh token is not the one this caller saw, the rotation
+    /// already happened and its result is sitting there: take it and send
+    /// nothing. The promise still exists, for genuine overlap.
+    ///
+    /// ── What this does NOT fix ──
+    ///
+    /// The owner's FIRST sign-out had a 522-second gap, not 1.02, and that
+    /// is a different animal: the server rotated and committed, the response
+    /// never arrived, and the app kept a token the server had already spent.
+    /// From then on the stored token is poisoned and the next refresh —
+    /// however well behaved — is indistinguishable from a replay. No client
+    /// can fix that alone. The server is adding a bounded grace window that
+    /// re-issues the live successor instead of burning the family, which is
+    /// the same idea as the `Idempotency-Key` on writes: a lost response
+    /// must not be punished as a second attempt.
+    private func refresh(_ seen: Tokens) async throws -> Tokens {
+        switch Self.refreshDecision(seen: seen, stored: TokenStore.load()) {
+        case .signedOut:
+            throw APIError.notSignedIn
+        case .alreadyRotated(let fresh):
+            Log.auth.info("refresh skipped, another caller already rotated")
+            return fresh
+        case .perform:
+            break
+        }
+
         if let inflight = refreshTask { return try await inflight.value }
         let task = Task<Tokens, Error> {
             defer { refreshTask = nil }
@@ -304,11 +374,36 @@ actor APIClient {
             var req = URLRequest(url: Config.baseURL.appending(path: "/api/auth/token/refresh"))
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.httpBody = try JSONEncoder().encode(["refreshToken": current.refreshToken])
+            req.httpBody = try JSONEncoder().encode(["refreshToken": seen.refreshToken])
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                Log.auth.error("token refresh rejected, clearing tokens")
+                // The status and code are logged, but DO NOT expect them
+                // to name the cause, and this correction matters because the
+                // commit that added this line claimed they would.
+                //
+                // The server returns 401 `invalid_grant` for EVERY refresh
+                // failure — unparseable body, missing field, unknown token,
+                // revoked, expired, replayed — deliberately and identically,
+                // so a caller cannot enumerate the difference. Telling a
+                // thief that their replay was the thing that was noticed is
+                // exactly what that uniformity prevents.
+                //
+                // So this cannot discriminate, and only the server's own
+                // logs can. It is still worth recording: it confirms the
+                // response really was 401 rather than a 404 from a moved
+                // route or a proxy page, which is a different failure
+                // wearing the same words.
+                //
+                // Both values are safe to persist: a status is a number and a
+                // code is a fixed identifier chosen by the server's authors.
+                // The body is NOT logged — it is the one response in the app
+                // guaranteed to contain tokens.
+                let code = Self.envelope(from: data)?.code
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                Log.auth.error(
+                    "token refresh rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), clearing tokens"
+                )
                 TokenStore.clear()
                 throw APIError.notSignedIn
             }
