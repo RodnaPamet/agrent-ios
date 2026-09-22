@@ -23,8 +23,14 @@ struct TabCustomiserView: View {
                        + "Всичко останало е в менюто горе вляво и остава достъпно.")
                 }
 
+                // `permitted`, not `allCases` — the editor must not offer a
+                // tab whose every screen would 403. An operator choosing
+                // Борса would get a bar that errors, and would reasonably
+                // conclude the app is broken rather than that they lack
+                // the role.
                 let rest = AppSurface.allCases.filter { surface in
-                    !chosen.contains { $0.id == surface.id }
+                    store.permitted.contains(surface)
+                        && !chosen.contains { $0.id == surface.id }
                 }
                 if !rest.isEmpty {
                     Section("В менюто") {

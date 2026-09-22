@@ -65,7 +65,7 @@ struct MainTabView: View {
             // fetched and cached for the whole session — so this costs
             // nothing on top of what the app asks for anyway.
             if let me = await CurrentUserStore.shared.load() {
-                tabs.adopt(me.bottomTabOrder)
+                tabs.adopt(me.bottomTabOrder, isOperator: me.isOperator)
             }
         }
     }

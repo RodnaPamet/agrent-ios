@@ -17,6 +17,10 @@ final class BottomTabsStore {
     /// opposite behaviour.
     private(set) var stored: [String]?
 
+    /// Refreshed from `/api/auth/me` on every launch, alongside the
+    /// order itself.
+    private(set) var isOperator = false
+
     private(set) var isSaving = false
     private(set) var saveFailure: String?
 
@@ -30,13 +34,30 @@ final class BottomTabsStore {
     /// array can mean the right thing on two clients with different
     /// surfaces.
     var bottomTabs: [AppSurface] {
-        guard let stored else { return AppSurface.fallback }
-        let resolved = stored.compactMap(AppSurface.init(rawValue:))
+        let allowed = permitted
+        guard let stored else { return AppSurface.fallback(isOperator: isOperator) }
+        let resolved = stored
+            .compactMap(AppSurface.init(rawValue:))
+            .filter { allowed.contains($0) }
         // Everything the reader chose is unavailable here. Falling back is
         // better than an empty tab bar, which is not a preference anyone
         // expressed — it is the absence of one this client can honour.
-        guard !resolved.isEmpty else { return AppSurface.fallback }
+        guard !resolved.isEmpty else { return AppSurface.fallback(isOperator: isOperator) }
         return Array(resolved.prefix(AppSurface.capacity))
+    }
+
+    /// The surfaces this member can actually reach, resolved ON EVERY
+    /// READ rather than once at save time.
+    ///
+    /// A stored order is a PREFERENCE, never a grant. A role can change
+    /// server-side long after a bar was saved, so a list validated only
+    /// when written would keep showing a former owner tabs that now 403.
+    /// Filtering here means the bar is correct the first time the app
+    /// opens after the change, with nothing to migrate.
+    var permitted: Set<AppSurface> {
+        Set(isOperator
+            ? AppSurface.allCases.filter(\.isOperatorAllowed)
+            : AppSurface.allCases)
     }
 
     /// The surfaces NOT in the bottom row, for the app menu.
@@ -47,7 +68,13 @@ final class BottomTabsStore {
     /// setting. Everything off the bar is in the menu, always.
     var overflow: [AppSurface] {
         let shown = Set(bottomTabs.map(\.id))
-        return AppSurface.allCases.filter { !shown.contains($0.id) }
+        // Over `permitted`, not `allCases`. The invariant is "bar ∪ menu
+        // is everything this member can reach" — putting a 403 in the
+        // menu instead of the bar would move the error rather than
+        // prevent it.
+        return AppSurface.allCases.filter {
+            permitted.contains($0) && !shown.contains($0.id)
+        }
     }
 
     #if DEBUG
@@ -57,8 +84,9 @@ final class BottomTabsStore {
     var storedForTesting: [String]? { stored }
     #endif
 
-    func adopt(_ order: [String]?) {
+    func adopt(_ order: [String]?, isOperator: Bool = false) {
         stored = order
+        self.isOperator = isOperator
     }
 
     func save(_ surfaces: [AppSurface]) async {

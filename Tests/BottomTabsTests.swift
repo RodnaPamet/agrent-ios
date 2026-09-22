@@ -4,14 +4,14 @@ import XCTest
 @MainActor
 final class BottomTabsTests: XCTestCase {
 
-    private func store(_ order: [String]?) -> BottomTabsStore {
+    private func store(_ order: [String]?, isOperator: Bool = false) -> BottomTabsStore {
         let store = BottomTabsStore.shared
-        store.adopt(order)
+        store.adopt(order, isOperator: isOperator)
         return store
     }
 
     override func tearDown() {
-        BottomTabsStore.shared.adopt(nil)
+        BottomTabsStore.shared.adopt(nil, isOperator: false)
         super.tearDown()
     }
 
@@ -75,12 +75,15 @@ final class BottomTabsTests: XCTestCase {
     /// Дневник makes the diary unreachable and the customiser becomes a
     /// way to lose a feature.
     func testEverySurfaceIsReachable() {
-        for order in [nil, ["/trends"], ["/journal", "/news"],
-                      ["/dashboard"], []] as [[String]?] {
-            let s = store(order)
-            let reachable = Set(s.bottomTabs.map(\.id)).union(s.overflow.map(\.id))
-            XCTAssertEqual(reachable, Set(AppSurface.allCases.map(\.id)),
-                           "order \(String(describing: order)) stranded a surface")
+        for isOperator in [false, true] {
+            for order in [nil, ["/trends"], ["/journal", "/news"],
+                          ["/dashboard"], []] as [[String]?] {
+                let s = store(order, isOperator: isOperator)
+                let reachable = Set(s.bottomTabs.map(\.id)).union(s.overflow.map(\.id))
+                XCTAssertEqual(reachable, Set(s.permitted.map(\.id)),
+                               "order \(String(describing: order)) operator=\(isOperator) "
+                               + "stranded a surface")
+            }
         }
     }
 
@@ -130,14 +133,14 @@ final class CurrentUserTabOrderTests: XCTestCase {
         XCTAssertEqual(user.bottomTabOrder, ["/trends", "/journal"])
     }
 
-    /// Read from the envelope root too. Guessing one location and being
-    /// wrong would decode nil forever — a save that silently never
-    /// persists — rather than fail loudly.
-    func testItIsAlsoReadFromTheEnvelopeRoot() async throws {
+    /// Confirmed nested, so a value at the envelope root is NOT read —
+    /// asserted rather than left ambiguous, because the earlier version
+    /// accepted both and this is the behaviour that changed.
+    func testTheEnvelopeRootIsNotReadAnyMore() async throws {
         let user = try await me("""
         {"user":{"id":"u","role":"OWNER"},"bottomTabOrder":["/news"]}
         """)
-        XCTAssertEqual(user.bottomTabOrder, ["/news"])
+        XCTAssertNil(user.bottomTabOrder)
     }
 
     func testAnExplicitNullIsNil() async throws {
@@ -152,5 +155,95 @@ final class CurrentUserTabOrderTests: XCTestCase {
         {"user":{"id":"u","role":"OWNER","bottomTabOrder":[]}}
         """)
         XCTAssertEqual(user.bottomTabOrder, [])
+    }
+}
+
+
+/// A MECHANISATOR's bar, against the server's own middleware allowlist:
+/// anything under `/api/t/{slug}/` outside
+/// `farm-tasks|field-operations|tasks|locations|agro` is a 403
+/// `operator_scope`.
+@MainActor
+final class OperatorTabsTests: XCTestCase {
+
+    override func tearDown() {
+        BottomTabsStore.shared.adopt(nil, isOperator: false)
+        super.tearDown()
+    }
+
+    private func store(_ order: [String]?, isOperator: Bool) -> BottomTabsStore {
+        let store = BottomTabsStore.shared
+        store.adopt(order, isOperator: isOperator)
+        return store
+    }
+
+    func testOnlyLocationsAndTasksClearTheAllowlist() {
+        let allowed = AppSurface.allCases.filter(\.isOperatorAllowed)
+        XCTAssertEqual(Set(allowed), Set([.locations, .tasks]))
+    }
+
+    /// A tab whose screen 403s is not a tab, it is an error the person
+    /// would read as the app being broken.
+    func testAnOperatorNeverGetsAForbiddenTab() {
+        let s = store(["/journal", "/exchange", "/grain/calculator",
+                       "/locations", "/trends"], isOperator: true)
+        XCTAssertEqual(s.bottomTabs, [.locations])
+        XCTAssertFalse(s.overflow.contains(.journal))
+        XCTAssertFalse(s.overflow.contains(.exchange))
+    }
+
+    /// Filtering must not leave an empty bar — the default is filtered too.
+    func testAnOperatorWithNoPermittedChoiceGetsTheFilteredDefault() {
+        let s = store(["/journal", "/exchange"], isOperator: true)
+        XCTAssertEqual(s.bottomTabs, [.locations, .tasks])
+        XCTAssertFalse(s.bottomTabs.isEmpty)
+    }
+
+    func testAnOperatorWhoNeverChoseGetsTheFilteredDefault() {
+        XCTAssertEqual(store(nil, isOperator: true).bottomTabs, [.locations, .tasks])
+    }
+
+    /// THE ORDERING HAZARD. A role can change after a bar was saved, so
+    /// the filter runs on read. The same stored array must produce
+    /// different bars for the two roles with nothing migrated.
+    func testTheSameSavedOrderResolvesDifferentlyPerRole() {
+        let order = ["/journal", "/locations", "/exchange", "/farm-tasks"]
+        XCTAssertEqual(store(order, isOperator: false).bottomTabs,
+                       [.journal, .locations, .exchange, .tasks])
+        XCTAssertEqual(store(order, isOperator: true).bottomTabs,
+                       [.locations, .tasks])
+    }
+
+    /// An owner loses nothing. A filter that fired for everyone would be
+    /// the more damaging bug and would pass every test above.
+    func testAnOwnerKeepsEverything() {
+        let s = store(nil, isOperator: false)
+        XCTAssertEqual(s.permitted.count, AppSurface.allCases.count)
+        XCTAssertEqual(s.bottomTabs, AppSurface.fallback)
+    }
+}
+
+@MainActor
+final class OperatorRoleTests: XCTestCase {
+
+    private func me(_ role: String?) -> CurrentUser {
+        CurrentUser(id: "u", name: nil, email: nil, role: role)
+    }
+
+    func testOnlyMechanisatorIsAnOperator() {
+        XCTAssertTrue(me("MECHANISATOR").isOperator)
+        XCTAssertTrue(me("mechanisator").isOperator)
+    }
+
+    /// READER and AUDITOR are refused WRITES, and whether the same path
+    /// lockdown applies to them was never stated. Extending an unverified
+    /// rule takes screens away from people who could use them.
+    func testRolesRefusedWritesAreNotAssumedToBeOperators() {
+        XCTAssertFalse(me("READER").isOperator)
+        XCTAssertFalse(me("AUDITOR").isOperator)
+        XCTAssertFalse(me("OWNER").isOperator)
+        XCTAssertFalse(me(nil).isOperator)
+        // …while still being refused the write, which is a separate gate.
+        XCTAssertFalse(me("READER").mayCreateOperations)
     }
 }
