@@ -66,10 +66,23 @@ enum Log {
 
     /// A one-line error summary that is SAFE TO PERSIST.
     ///
-    /// Deliberately not `error.localizedDescription`: `APIError.http` embeds up
-    /// to 300 characters of the response body in its description, and a JSON
-    /// error body is still a body. Rule 2 above forbids exactly that, so the
-    /// status code survives here and the body is dropped on the floor.
+    /// Deliberately not `error.localizedDescription`. `APIError.http` used to
+    /// embed up to 300 characters of the response BODY in its description,
+    /// and a JSON error body is still a body — rule 2 above forbids exactly
+    /// that, so only the status survived here.
+    ///
+    /// The envelope is now taken apart at the client, which makes the `code`
+    /// available separately, and a code is SAFE: it is a fixed identifier
+    /// chosen by the server's authors, not a payload, not interpolated with
+    /// anything, and it is the same string for every tenant that hits the
+    /// same condition. So the log gets strictly more useful without getting
+    /// less clean — `APIError.http(404, INVALID_PARCEL)` names the actual
+    /// failure where `APIError.http(404)` named a category.
+    ///
+    /// `message` is still dropped, and that is not an oversight. It is prose
+    /// the server composed, it interpolates ids today, and it is exactly the
+    /// kind of field that grows a name or an email in it one day without
+    /// anyone thinking about this file.
     static func summary(for error: Error) -> String {
         switch error {
         case let api as APIClient.APIError:
@@ -78,7 +91,9 @@ enum Log {
             case .conflict: return "APIError.conflict"
             case .clientTooOld: return "APIError.clientTooOld"
             case .notModified: return "APIError.notModified"
-            case .http(let code, _): return "APIError.http(\(code))"
+            case .http(let status, let code, _):
+                return code.map { "APIError.http(\(status), \($0))" }
+                    ?? "APIError.http(\(status))"
             }
         case let url as URLError:
             return "URLError(\(url.code.rawValue))"

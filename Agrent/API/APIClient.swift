@@ -65,8 +65,28 @@ actor APIClient {
         /// (304)" on a screen whose data is perfectly fine, so the one path
         /// where it CAN surface produced an error for a success.
         case notModified
-        case http(Int, String)
+        /// An HTTP failure, with the envelope already taken apart.
+        ///
+        /// It used to be `http(Int, String)` where the String was up to 300
+        /// characters of RAW JSON, interpolated whole into the sentence an
+        /// operator reads:
+        ///
+        ///     Грешка от сървъра (404): {"error":{"code":"NOT_FOUND",
+        ///     "message":"Access review not found"}}
+        ///
+        /// Braces, quotes, an English sentence and a Bulgarian prefix, on a
+        /// screen where the only actionable thing is whether to try again.
+        /// The server's own `code` was sitting inside that string, already
+        /// decodable, already the thing worth having.
+        case http(status: Int, code: String?, message: String?)
 
+        /// DELIBERATELY NOT the operator-facing text.
+        ///
+        /// `LocalizedError` is Foundation's channel and it has no idea which
+        /// codes this app can name in Bulgarian. `UserMessage.text(for:)` is
+        /// the one that decides what a person sees; this stays a developer
+        /// description so the two cannot silently diverge, and so nothing
+        /// reaches a screen by accidentally reading `localizedDescription`.
         var errorDescription: String? {
             switch self {
             case .notSignedIn:
@@ -77,10 +97,8 @@ actor APIClient {
                 "Тази версия на приложението е твърде стара. Обновете я."
             case .notModified:
                 "Данните не са променени."
-            case .http(let code, let body):
-                body.isEmpty
-                    ? "Грешка от сървъра (\(code))."
-                    : "Грешка от сървъра (\(code)): \(body)"
+            case .http(let status, let code, _):
+                code.map { "HTTP \(status) \($0)" } ?? "HTTP \(status)"
             }
         }
     }
@@ -89,16 +107,32 @@ actor APIClient {
     /// Reading `currentVersion` off the top level silently yields nil, and a
     /// keep-mine retry then sends no If-Match at all. The web client did
     /// exactly that for months (#922).
-    private struct ConflictEnvelope: Decodable {
+    struct ErrorEnvelope: Decodable {
         struct Err: Decodable {
             struct Details: Decodable {
                 let currentVersion: Int?
                 let expectedVersion: Int?
             }
             let code: String?
+            let message: String?
             let details: Details?
         }
         let error: Err?
+    }
+
+    /// Read the envelope off ANY failing status, not just 409.
+    ///
+    /// The 409 path has parsed this shape against real responses since the
+    /// optimistic-locking work, so the structure is proven rather than
+    /// guessed — it was simply never used anywhere else, and every other
+    /// status fell back to printing the bytes.
+    ///
+    /// Returns nil rather than throwing: an error path that can itself fail
+    /// is how a 404 became a blank screen once already. A server that
+    /// answers a failure with an HTML page is the ordinary case, not an
+    /// exceptional one.
+    static func envelope(from data: Data) -> ErrorEnvelope.Err? {
+        (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error
     }
 
     func get<T: Decodable>(_ path: String, as _: T.Type) async throws -> T {
@@ -166,37 +200,35 @@ actor APIClient {
         case 200..<300:
             return data
         case 409:
-            let env = try? decoder.decode(ConflictEnvelope.self, from: data)
+            let env = Self.envelope(from: data)
             throw APIError.conflict(
-                currentVersion: env?.error?.details?.currentVersion,
-                expectedVersion: env?.error?.details?.expectedVersion
+                currentVersion: env?.details?.currentVersion,
+                expectedVersion: env?.details?.expectedVersion
             )
         case 304:
             throw APIError.notModified
         case 426:
             throw APIError.clientTooOld
         default:
-            throw APIError.http(http.statusCode, Self.readableBody(data, http))
+            let env = Self.envelope(from: data)
+            throw APIError.http(
+                status: http.statusCode, code: env?.code, message: env?.message
+            )
         }
     }
 
-    /// A body a HUMAN can read, or none at all.
-    ///
-    /// Measured 2026-09-21: a 404 returned Next.js's 102,151-byte HTML error
-    /// page. `.http` interpolated it whole into `errorDescription`, which
-    /// `JournalListView` handed to a SwiftUI `Text`. The layout blew up — the
-    /// user saw NO readable message and the "Опитай пак" button was pushed off
-    /// screen, so the failure was illegible AND inescapable. The error had to be
-    /// read off the network log instead.
-    ///
-    /// Any HTML error page does this — a 500, a proxy page, a Cloudflare block —
-    /// so it is bounded here, once, rather than at each call site.
-    private static func readableBody(_ data: Data, _ http: HTTPURLResponse) -> String {
-        let contentType = http.value(forHTTPHeaderField: "Content-Type") ?? ""
-        guard contentType.contains("json") else { return "" }
-        let text = String(data: data, encoding: .utf8) ?? ""
-        return text.count <= 300 ? text : String(text.prefix(300)) + "…"
-    }
+    // `readableBody` used to live here. It bounded an error body to 300
+    // characters of raw JSON and handed it to the view, which was the right
+    // fix for the bug it was written for — a 404 returned Next.js's
+    // 102,151-byte HTML error page, the layout blew up, and the "Опитай пак"
+    // button was pushed off screen, making the failure illegible AND
+    // inescapable.
+    //
+    // Bounding the blast radius was never the same as reading the message.
+    // `envelope(from:)` takes the response apart instead, so a non-JSON body
+    // yields nil rather than a truncated fragment of HTML, and the HTML page
+    // cannot reach a screen at all — which is a stronger guarantee than a
+    // length cap.
 
     /// Build a request URL from a path that MAY carry a query string.
     ///
