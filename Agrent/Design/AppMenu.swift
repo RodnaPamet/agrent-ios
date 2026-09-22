@@ -61,9 +61,7 @@ struct AppMenuButton: View {
         // A sheet, not a tab. Админ left the tab bar because it is a monthly
         // action; presenting it modally says the same thing — you came here
         // on purpose and you will go back.
-        .sheet(isPresented: $showingAdmin) {
-            ComingSoonView(title: "Админ")
-        }
+        .sheet(isPresented: $showingAdmin) { AdminView() }
     }
 }
 

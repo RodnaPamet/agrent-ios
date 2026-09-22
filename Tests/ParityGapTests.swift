@@ -263,3 +263,53 @@ final class ExchangeDecimalTests: XCTestCase {
         XCTAssertNil(WireDecimal.parse("abc"))
     }
 }
+
+/// Bulgarian counting forms.
+///
+/// `^[…](inflect: true)` works only when the markup reaches `Text` as a
+/// LITERAL. Build the same string in a variable and `Text(_ content:
+/// String)` wins the overload, the markup is never processed, and the
+/// operator reads it raw — which is what the admin screen did, on
+/// production data:
+///
+///     ^[7 активни сесии](inflect: true)
+///
+/// Eleven sites used the markup; four reached `Text` as a literal and
+/// seven did not. Two of the seven were inside accessibility labels,
+/// where it can NEVER work — a label is a String, so VoiceOver would have
+/// spoken the markup aloud. Invisible to anyone who can see the screen.
+final class PluralTests: XCTestCase {
+
+    func testOneTakesTheSingular() {
+        XCTAssertEqual(Plural.bg(1, "запис", "записа"), "1 запис")
+        XCTAssertEqual(Plural.bg(1, "парцел", "парцела"), "1 парцел")
+    }
+
+    /// Bulgarian nouns take a counting form after any numeral other than
+    /// one — including zero.
+    func testEverythingElseTakesTheCountingForm() {
+        XCTAssertEqual(Plural.bg(0, "запис", "записа"), "0 записа")
+        XCTAssertEqual(Plural.bg(2, "запис", "записа"), "2 записа")
+        XCTAssertEqual(Plural.bg(7, "активна сесия", "активни сесии"), "7 активни сесии")
+        XCTAssertEqual(Plural.bg(13, "запис", "записа"), "13 записа")
+    }
+
+    /// THE regression: no markup may survive into the output, because the
+    /// output goes to screens AND to VoiceOver.
+    func testNoMarkupReachesTheOutput() {
+        for n in [0, 1, 2, 7, 100] {
+            let text = Plural.bg(n, "парцел", "парцела")
+            XCTAssertFalse(text.contains("^["), text)
+            XCTAssertFalse(text.contains("inflect"), text)
+            XCTAssertFalse(text.contains("]("), text)
+        }
+    }
+
+    /// Usable in an accessibility label, which is the half the markup
+    /// could never do.
+    func testItComposesIntoAnAccessibilityLabel() {
+        let label = A11y.sentence(["Северен блок", Plural.bg(3, "парцел", "парцела")])
+        XCTAssertEqual(label, "Северен блок, 3 парцела.")
+        XCTAssertFalse(label.contains("^["))
+    }
+}

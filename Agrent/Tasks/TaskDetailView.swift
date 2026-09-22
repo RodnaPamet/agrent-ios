@@ -219,9 +219,9 @@ struct TaskDetailView: View {
     @ViewBuilder
     private func related(_ item: WorkItem) -> some View {
         let parts: [String?] = [
-            item.counts?.comments.flatMap { $0 > 0 ? "^[\($0) коментара](inflect: true)" : nil },
-            item.counts?.evidence.flatMap { $0 > 0 ? "^[\($0) доказателства](inflect: true)" : nil },
-            item.counts?.links.flatMap { $0 > 0 ? "^[\($0) връзки](inflect: true)" : nil },
+            item.counts?.comments.flatMap { $0 > 0 ? Plural.bg($0, "коментар", "коментара") : nil },
+            item.counts?.evidence.flatMap { $0 > 0 ? Plural.bg($0, "доказателство", "доказателства") : nil },
+            item.counts?.links.flatMap { $0 > 0 ? Plural.bg($0, "връзка", "връзки") : nil },
         ]
         let present = parts.compactMap { $0 }
         if !present.isEmpty {
