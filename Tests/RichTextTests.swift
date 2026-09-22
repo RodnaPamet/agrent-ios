@@ -149,3 +149,86 @@ final class RichTextTests: XCTestCase {
         XCTAssertEqual(RichText.plainText("<p>&notanentity;</p>"), "&notanentity;")
     }
 }
+
+/// The write half. `notes` is a rich-text HTML column on both ends, and the
+/// app was POSTing plain text into it — valid HTML only because a string with
+/// no markup means itself. A two-paragraph note was stored faithfully and read
+/// as one run-on paragraph on the web, because HTML collapses whitespace and
+/// that field is rendered with no `white-space: pre-line`.
+final class RichTextWriteTests: XCTestCase {
+
+    func testSingleParagraphIsUnchangedInSubstance() {
+        XCTAssertEqual(RichText.html(fromPlainText: "Внесен азот"), "<p>Внесен азот</p>")
+    }
+
+    func testBlankLineSeparatesParagraphs() {
+        XCTAssertEqual(
+            RichText.html(fromPlainText: "Първи абзац\n\nВтори абзац"),
+            "<p>Първи абзац</p><p>Втори абзац</p>"
+        )
+    }
+
+    /// A single newline is a line break the operator typed. Without `<br>`
+    /// HTML collapses it to a space — the exact defect this change exists to
+    /// fix, one level down.
+    func testSingleNewlineBecomesLineBreak() {
+        XCTAssertEqual(
+            RichText.html(fromPlainText: "ред едно\nред две"),
+            "<p>ред едно<br>ред две</p>"
+        )
+    }
+
+    func testEmptyAndWhitespaceOnlyProduceNil() {
+        XCTAssertNil(RichText.html(fromPlainText: ""))
+        XCTAssertNil(RichText.html(fromPlainText: "   \n\n  \n "))
+    }
+
+    /// Ampersand must be escaped FIRST. The other order is silent: `<` becomes
+    /// `&lt;`, whose `&` the later pass turns into `&amp;lt;`, and the operator
+    /// reads `&lt;` on both clients as though the server were broken.
+    func testEscapingOrderDoesNotDoubleEscape() {
+        XCTAssertEqual(
+            RichText.html(fromPlainText: "температура < 5"),
+            "<p>температура &lt; 5</p>"
+        )
+        XCTAssertEqual(RichText.html(fromPlainText: "N & P"), "<p>N &amp; P</p>")
+        XCTAssertEqual(
+            RichText.html(fromPlainText: "5 > 3 & 2 < 4"),
+            "<p>5 &gt; 3 &amp; 2 &lt; 4</p>"
+        )
+    }
+
+    /// The property that matters more than any single case: what the operator
+    /// typed must come back out of the reader unchanged. This is the round
+    /// trip the two halves exist to make true, and it is the only test here
+    /// that would catch the two of them drifting apart.
+    func testRoundTripsThroughTheReader() {
+        let typed = [
+            "Внесен азот",
+            "Първи абзац\n\nВтори абзац",
+            "температура < 5°C, pH > 7",
+            "N & P, 50 кг/дка",
+            "ред едно\nред две",
+            "<p>операторът е написал таг</p>",
+        ]
+        for original in typed {
+            guard let stored = RichText.html(fromPlainText: original) else {
+                return XCTFail("nil for \(original)")
+            }
+            XCTAssertEqual(
+                RichText.plainText(stored), original,
+                "round trip lost or changed text"
+            )
+        }
+    }
+
+    /// An operator who literally types `<p>` must SEE `<p>` again, not have it
+    /// silently become a paragraph. Covered above, asserted here on its own
+    /// because it is the case where writer and reader could quietly agree on
+    /// the wrong answer.
+    func testTypedTagSurvivesTheRoundTripAsText() {
+        let stored = RichText.html(fromPlainText: "пише <p> в текста")
+        XCTAssertEqual(stored, "<p>пише &lt;p&gt; в текста</p>")
+        XCTAssertEqual(RichText.plainText(stored!), "пише <p> в текста")
+    }
+}
