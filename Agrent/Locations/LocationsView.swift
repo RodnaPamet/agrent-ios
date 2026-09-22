@@ -12,6 +12,7 @@ struct LocationsView: View {
                 content
             }
             .navigationTitle("Локации")
+            .appMenu()
             .task { if store.state.value == nil { await store.load() } }
         }
     }
@@ -46,7 +47,7 @@ struct LocationsView: View {
                                 Text("^[\(count) парцела](inflect: true)")
                             }
                         }
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 2)

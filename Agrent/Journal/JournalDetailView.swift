@@ -112,7 +112,7 @@ struct JournalDetailView: View {
 
         VStack(alignment: .leading, spacing: 8) {
             Text("Бележки")
-                .font(.subheadline.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             if let text, !text.isEmpty {
@@ -159,7 +159,7 @@ private struct LabelledFact<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.subheadline.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
             content
         }

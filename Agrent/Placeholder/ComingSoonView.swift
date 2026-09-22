@@ -17,6 +17,7 @@ struct ComingSoonView: View {
                 message: "Този раздел не е наличен в приложението. Използвайте уеб приложението."
             )
             .navigationTitle(title)
+            .appMenu()
         }
     }
 }

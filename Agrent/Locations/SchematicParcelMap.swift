@@ -67,8 +67,9 @@ struct SchematicParcelMap: View {
     /// environment itself — the value has to be captured here and carried in.
     /// Easy to forget, and the failure is silent: the map simply ignores the
     /// setting for the people who turned it on.
-    /// Height of whatever floats over the top of this map, so the drawing
-    /// keeps clear of it.
+    /// Extra clearance at the top, ON TOP of the safe area the view already
+    /// reports. Zero today; kept because the reason it exists has not gone
+    /// away, only changed owner — see the note in `body`.
     ///
     /// Measured on the device, 2026-09-22: parcel `20688.13` projected to
     /// y = 95pt and the location card occupied roughly y = 55…190, so one of
@@ -87,8 +88,22 @@ struct SchematicParcelMap: View {
 
     var body: some View {
         GeometryReader { geo in
+            // The map is drawn edge to edge, UNDER the navigation bar, which
+            // is what makes it read as a map rather than a panel. The cost is
+            // that the top strip is occupied by chrome — the back button and
+            // the view toggle — and anything drawn there sits behind them.
+            //
+            // Found the hard way with the location card that used to float
+            // here: parcel 20688.13 projected to y=95pt, the card covered
+            // roughly y=55…190, and one of the owner's four fields was
+            // invisible. The card is gone, but the bar is not, so the
+            // clearance is taken from the safe area the view actually
+            // reports rather than from a measured overlay. Same defect, same
+            // fix, a different thing to measure.
+            let clearance = geo.safeAreaInsets.top + topInset
+
             Canvas { context, size in
-                draw(in: &context, size: size)
+                draw(in: &context, size: size, clearance: clearance)
             }
             .background(Palette.Map.ground)
             // A Canvas is one opaque rectangle to VoiceOver. It carried a
@@ -99,7 +114,7 @@ struct SchematicParcelMap: View {
             // place, so the map is navigable rather than merely announced.
             .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibilitySummary)
-            .accessibilityChildren { accessibilityOverlay(in: geo.size) }
+            .accessibilityChildren { accessibilityOverlay(in: geo.size, clearance: clearance) }
         }
     }
 
@@ -108,8 +123,8 @@ struct SchematicParcelMap: View {
     /// to build the accessibility tree — so the frames exist purely to give
     /// VoiceOver something to focus and a sensible order to sweep in.
     @ViewBuilder
-    private func accessibilityOverlay(in size: CGSize) -> some View {
-        let laid = layout(in: size)
+    private func accessibilityOverlay(in size: CGSize, clearance: CGFloat) -> some View {
+        let laid = layout(in: size, clearance: clearance)
         let centre = Self.centroid(of: laid.placements)
 
         ZStack {
@@ -124,7 +139,7 @@ struct SchematicParcelMap: View {
             }
         }
         // Mirrors `context.translateBy` in `draw`.
-        .offset(y: topInset)
+        .offset(y: clearance)
     }
 
     /// What one parcel sounds like.
@@ -181,7 +196,7 @@ struct SchematicParcelMap: View {
     /// that is computed separately is an accessibility tree that drifts, and
     /// it drifts silently because the person who can see the screen never
     /// notices.
-    func layout(in size: CGSize) -> (
+    func layout(in size: CGSize, clearance: CGFloat = 0) -> (
         projection: ParcelProjection, placements: [Placement], usable: CGSize
     ) {
         // Everything below works in USABLE space — the canvas minus the band
@@ -189,7 +204,7 @@ struct SchematicParcelMap: View {
         // same `topInset`, once each and visibly: `translateBy` in `draw`,
         // `.offset` in the accessibility overlay.
         let size = CGSize(
-            width: size.width, height: max(size.height - topInset, 1)
+            width: size.width, height: max(size.height - clearance, 1)
         )
         // The projection pads for POINTS; a square has extent, so at 5x the
         // largest one ran off the edge of the canvas — a field half
@@ -238,14 +253,14 @@ struct SchematicParcelMap: View {
         return (projection, placements, size)
     }
 
-    private func draw(in context: inout GraphicsContext, size: CGSize) {
+    private func draw(in context: inout GraphicsContext, size: CGSize, clearance: CGFloat) {
         var labels: [(name: String, at: CGPoint)] = []
 
-        let laid = layout(in: size)
+        let laid = layout(in: size, clearance: clearance)
         // Mirrored by `.offset(y: topInset)` in `accessibilityOverlay`. If
         // one of these two changes the other must, or the map a screen
         // reader describes is not the map on screen.
-        context.translateBy(x: 0, y: topInset)
+        context.translateBy(x: 0, y: clearance)
         drawGraticule(in: &context, size: laid.usable, projection: laid.projection)
         drawNorthArrow(in: &context, size: laid.usable)
 

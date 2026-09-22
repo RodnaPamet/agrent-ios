@@ -22,11 +22,6 @@ struct ParcelMapView: View {
 
     @Environment(\.colorSchemeContrast) private var contrast
 
-    /// Measured rather than guessed. At accessibility3 this card is more than
-    /// twice its default height, so any constant here would be right at one
-    /// text size and wrong at the one the app is actually tested at.
-    @State private var cardHeight: CGFloat = 0
-
     init(location: Location) {
         self.location = location
         _store = State(initialValue: ParcelsStore(locationID: location.id))
@@ -39,7 +34,7 @@ struct ParcelMapView: View {
             }
             content
         }
-        .navigationTitle(useSchematic ? "" : location.name)
+        .navigationTitle(location.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -81,72 +76,6 @@ struct ParcelMapView: View {
 
     // MARK: - Map
 
-    /// The location's identity, over the map rather than in the navigation
-    /// bar, as the reference artboard places it.
-    ///
-    /// NOT A SEARCH FIELD, though it reads like one at a glance — a white
-    /// pill floating over a map with an icon on the left is a familiar
-    /// shape. There is no input here: a pin, the location's name, and how
-    /// many parcels it holds. If search is wanted it is a separate feature
-    /// and a separate conversation, because searching four parcels is not
-    /// obviously worth a control.
-    ///
-    /// It sits over the map because on schematic the map has no imagery to
-    /// obscure, and putting the name here frees the navigation bar to carry
-    /// only the way back.
-    @ViewBuilder
-    private func locationCard(_ response: ParcelsResponse) -> some View {
-        // Measured at accessibility3 on the device, 2026-09-22: the fixed
-        // HStack truncated the location's NAME to "Ivo's L…" while the count
-        // beside it broke mid-word across three lines — "4 / парцел / а" —
-        // and the card grew tall enough to cover a parcel on the map behind
-        // it. Two flexible children sharing one line, reflowing
-        // independently: the same failure as the journal row, on a different
-        // screen, which is why it is worth fixing by the same shape rather
-        // than by tightening a number.
-        //
-        // No `lineLimit(1)` on the name either. Truncating the one word that
-        // says WHICH farm you are looking at, on the card whose only job is
-        // to say so, is the wrong thing to spend the space on.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) { pin; name; Spacer(minLength: 8); count(response) }
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 10) { pin; name }
-                count(response)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        // The pin is decoration and the count is a fact about the name; one
-        // stop, not three.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(A11y.sentence([
-            location.name,
-            "^[\(response.parcels.count) парцела](inflect: true)",
-        ]))
-    }
-
-    private var pin: some View {
-        Image(systemName: "mappin.and.ellipse")
-            .foregroundStyle(Palette.accent)
-    }
-
-    private var name: some View {
-        Text(location.name)
-            .font(.headline)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func count(_ response: ParcelsResponse) -> some View {
-        Text("^[\(response.parcels.count) парцела](inflect: true)")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
     /// Only for the schematic view. On satellite the fills sit over imagery
     /// and the colours are not the only cue, but here they carry the whole
     /// meaning, so the key has to be on screen.
@@ -180,7 +109,7 @@ struct ParcelMapView: View {
                             style: StrokeStyle(lineWidth: 1.5, dash: dashed ? [3, 2] : [])
                         )
                 )
-            Text(label).font(.subheadline).foregroundStyle(.primary)
+            Text(label).font(.footnote).foregroundStyle(.primary)
         }
     }
 
@@ -193,18 +122,7 @@ struct ParcelMapView: View {
                 message: "Парцелите съществуват, но нямат географски очертания."
             )
         } else if useSchematic, let box = response.bounds ?? location.boundsJson {
-            SchematicParcelMap(parcels: drawable, bounds: box, topInset: cardHeight)
-                .overlay(alignment: .top) {
-                    locationCard(response)
-                        .background(
-                            GeometryReader { card in
-                                Color.clear.preference(
-                                    key: CardHeightKey.self, value: card.size.height
-                                )
-                            }
-                        )
-                }
-                .onPreferenceChange(CardHeightKey.self) { cardHeight = $0 }
+            SchematicParcelMap(parcels: drawable, bounds: box)
         } else {
             // Camera from `bounds` when the server sent one, otherwise from
             // the location's own boundsJson. Both are [minLon, minLat, …] and
@@ -243,7 +161,7 @@ struct ParcelMapView: View {
                         Text("·"); Text("под аренда")
                     }
                 }
-                .font(.subheadline)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
             }
             Spacer()
@@ -277,7 +195,7 @@ struct ParcelMapView: View {
     @ViewBuilder
     private func parcelList(_ response: ParcelsResponse, drawable: [Parcel]) -> some View {
         List {
-            Section("Парцели") {
+            Section(header: Text("^[\(response.parcels.count) парцела](inflect: true)")) {
                 ForEach(response.parcels) { parcel in
                     parcelRow(parcel)
                 }
@@ -290,19 +208,5 @@ struct ParcelMapView: View {
             }
         }
         .frame(maxHeight: 260)
-    }
-}
-
-
-/// How much of the map the floating location card covers.
-///
-/// A preference rather than a constant because the card's height depends on
-/// the text size, and the size this app is tested at — accessibility3 — is
-/// more than double the default. A hard-coded inset would be correct in a
-/// screenshot and wrong on the device.
-private struct CardHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
     }
 }
