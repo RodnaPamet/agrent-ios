@@ -63,20 +63,134 @@ struct SchematicParcelMap: View {
     /// stays visible on top.
     var exaggeration: CGFloat = 5
 
+    /// A `Canvas` draws outside the view hierarchy, so it cannot read the
+    /// environment itself — the value has to be captured here and carried in.
+    /// Easy to forget, and the failure is silent: the map simply ignores the
+    /// setting for the people who turned it on.
+    /// Height of whatever floats over the top of this map, so the drawing
+    /// keeps clear of it.
+    ///
+    /// Measured on the device, 2026-09-22: parcel `20688.13` projected to
+    /// y = 95pt and the location card occupied roughly y = 55…190, so one of
+    /// the owner's four fields was drawn entirely underneath it. Nothing was
+    /// wrong with the projection — the probe showed all four placements
+    /// present and correct — the map simply had less usable area than it
+    /// thought, and a parcel you cannot see reads as a parcel you do not
+    /// have.
+    ///
+    /// The card is not moved out of the way: floating it over the ground is
+    /// the design, and on schematic there is no imagery for it to obscure.
+    /// The CONTENT moves instead.
+    var topInset: CGFloat = 0
+
+    @Environment(\.colorSchemeContrast) private var contrast
+
     var body: some View {
         GeometryReader { geo in
             Canvas { context, size in
                 draw(in: &context, size: size)
             }
             .background(Palette.Map.ground)
-            .accessibilityElement()
+            // A Canvas is one opaque rectangle to VoiceOver. It carried a
+            // single summary label, which described the data the parcel list
+            // below already reads out better — and dropped POSITION, the one
+            // thing this map knows that the list does not. These children put
+            // each parcel back on the screen as its own element, at its own
+            // place, so the map is navigable rather than merely announced.
+            .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibilitySummary)
+            .accessibilityChildren { accessibilityOverlay(in: geo.size) }
         }
     }
 
-    private func draw(in context: inout GraphicsContext, size: CGSize) {
-        var labels: [(name: String, at: CGPoint)] = []
+    /// Invisible proxies, one per drawn square, laid out where the squares
+    /// are. Never rendered — `accessibilityChildren` uses this hierarchy only
+    /// to build the accessibility tree — so the frames exist purely to give
+    /// VoiceOver something to focus and a sensible order to sweep in.
+    @ViewBuilder
+    private func accessibilityOverlay(in size: CGSize) -> some View {
+        let laid = layout(in: size)
+        let centre = Self.centroid(of: laid.placements)
 
+        ZStack {
+            ForEach(laid.placements, id: \.parcel.id) { placement in
+                Color.clear
+                    .frame(width: max(placement.side, 1), height: max(placement.side, 1))
+                    .position(placement.centre)
+                    .accessibilityElement()
+                    .accessibilityLabel(Self.label(
+                        for: placement, centre: centre, count: laid.placements.count
+                    ))
+            }
+        }
+        // Mirrors `context.translateBy` in `draw`.
+        .offset(y: topInset)
+    }
+
+    /// What one parcel sounds like.
+    ///
+    /// Sown/fallow is spoken because on screen it is carried by fill colour
+    /// and a dashed stroke, and neither reaches this channel at all.
+    static func label(
+        for placement: Placement, centre: CGPoint, count: Int
+    ) -> String {
+        let parcel = placement.parcel
+        let direction = A11y.compass(
+            dx: placement.centre.x - centre.x,
+            dy: placement.centre.y - centre.y,
+            // A twentieth of the canvas. Below that the bearing is noise
+            // dressed as information, and a confident wrong direction on a
+            // map is worse than none.
+            deadband: max(placement.side, 12) / 2
+        )
+
+        return A11y.sentence([
+            parcel.name,
+            parcel.isSown ? "засят" : "угар",
+            parcel.cropType,
+            parcel.areaHa.map { "\(Num.text($0)) хектара" },
+            count == 1 ? nil : (direction ?? "в средата"),
+        ])
+    }
+
+    static func centroid(of placements: [Placement]) -> CGPoint {
+        guard !placements.isEmpty else { return .zero }
+        // The midpoint of the EXTENT, not the mean of the centres. Five
+        // parcels clustered together and one far off would drag a mean into
+        // the cluster and report the five as lying in every direction from
+        // themselves.
+        let xs = placements.map(\.centre.x)
+        let ys = placements.map(\.centre.y)
+        return CGPoint(
+            x: ((xs.min() ?? 0) + (xs.max() ?? 0)) / 2,
+            y: ((ys.min() ?? 0) + (ys.max() ?? 0)) / 2
+        )
+    }
+
+    /// Where one parcel's square ends up. Shared by the drawing pass and the
+    /// accessibility pass so the two cannot describe different maps.
+    struct Placement {
+        let parcel: Parcel
+        let centre: CGPoint
+        let side: CGFloat
+    }
+
+    /// The geometry both passes need, computed once from the same inputs.
+    ///
+    /// Extracted from `draw` rather than duplicated: an accessibility tree
+    /// that is computed separately is an accessibility tree that drifts, and
+    /// it drifts silently because the person who can see the screen never
+    /// notices.
+    func layout(in size: CGSize) -> (
+        projection: ParcelProjection, placements: [Placement], usable: CGSize
+    ) {
+        // Everything below works in USABLE space — the canvas minus the band
+        // the card sits in. Both consumers shift into screen space by the
+        // same `topInset`, once each and visibly: `translateBy` in `draw`,
+        // `.offset` in the accessibility overlay.
+        let size = CGSize(
+            width: size.width, height: max(size.height - topInset, 1)
+        )
         // The projection pads for POINTS; a square has extent, so at 5x the
         // largest one ran off the edge of the canvas — a field half
         // off-screen, which is worse than a smaller layout. Inset by half the
@@ -104,24 +218,42 @@ struct SchematicParcelMap: View {
             padding: max(padding, fitted)
         )
 
-        drawGraticule(in: &context, size: size, projection: projection)
-        drawNorthArrow(in: &context)
-
         // Largest first. At 5x, neighbours overlap; painting the big ones
         // underneath keeps the small parcel visible instead of swallowed.
         let ordered = parcels.sorted { ($0.areaHa ?? 0) > ($1.areaHa ?? 0) }
 
-        for parcel in ordered {
-            guard let geometry = parcel.geometry else { continue }
-            let sown = parcel.isSown
-
-            guard let centre = Self.labelAnchor(for: geometry, with: projection) else { continue }
-            let side = Self.squareSide(
-                areaHa: parcel.areaHa,
-                geometry: geometry,
-                projection: projection,
-                exaggeration: exaggeration
+        let placements = ordered.compactMap { parcel -> Placement? in
+            guard let geometry = parcel.geometry,
+                  let centre = Self.labelAnchor(for: geometry, with: projection)
+            else { return nil }
+            return Placement(
+                parcel: parcel,
+                centre: centre,
+                side: Self.squareSide(
+                    areaHa: parcel.areaHa, geometry: geometry,
+                    projection: projection, exaggeration: exaggeration
+                )
             )
+        }
+        return (projection, placements, size)
+    }
+
+    private func draw(in context: inout GraphicsContext, size: CGSize) {
+        var labels: [(name: String, at: CGPoint)] = []
+
+        let laid = layout(in: size)
+        // Mirrored by `.offset(y: topInset)` in `accessibilityOverlay`. If
+        // one of these two changes the other must, or the map a screen
+        // reader describes is not the map on screen.
+        context.translateBy(x: 0, y: topInset)
+        drawGraticule(in: &context, size: laid.usable, projection: laid.projection)
+        drawNorthArrow(in: &context, size: laid.usable)
+
+        for placement in laid.placements {
+            let parcel = placement.parcel
+            let sown = parcel.isSown
+            let centre = placement.centre
+            let side = placement.side
             let square = Path(
                 roundedRect: CGRect(
                     x: centre.x - side / 2, y: centre.y - side / 2,
@@ -134,14 +266,14 @@ struct SchematicParcelMap: View {
                 square,
                 with: .color(
                     (sown ? Palette.Map.sownFill : Palette.Map.fallowFill)
-                        .opacity(Palette.Map.fillOpacity)
+                        .opacity(Palette.Map.fillOpacity(contrast))
                 )
             )
             context.stroke(
                 square,
                 with: .color(sown ? Palette.Map.sownStroke : Palette.Map.fallowStroke),
                 style: StrokeStyle(
-                    lineWidth: Palette.Map.strokeWidth,
+                    lineWidth: Palette.Map.strokeWidth(contrast),
                     lineJoin: .round,
                     // Dashed means fallow — a second channel besides colour,
                     // so the distinction survives a monochrome screenshot and
@@ -158,7 +290,7 @@ struct SchematicParcelMap: View {
         // adjacent and their centroids are ~20px apart, which drew the two
         // names on top of each other. Small scattered parcels are the normal
         // case here, not the exception.
-        draw(labels: labels, in: &context, size: size)
+        draw(labels: labels, in: &context, size: laid.usable)
     }
 
     /// A latitude/longitude grid, so position stays readable.
@@ -262,10 +394,21 @@ struct SchematicParcelMap: View {
 
     /// Which way is up. Cheap, and the first question anyone asks of a map
     /// with no landmarks on it.
-    private func drawNorthArrow(in context: inout GraphicsContext) {
-        // Below the location card, which occupies the top strip. At y:20 the
-        // card covered it completely — the arrow was drawn, and invisible.
-        let origin = CGPoint(x: 20, y: 78)
+    private func drawNorthArrow(in context: inout GraphicsContext, size: CGSize) {
+        // TOP RIGHT, and both parts of that are forced.
+        //
+        // It used to sit at (20, 78): x:20 to tuck into the corner, y:78 to
+        // duck under the location card, which at y:20 covered it completely
+        // and left the arrow drawn and invisible. Now that the whole drawing
+        // is inset below the card there is nothing to duck, so the vertical
+        // dodge is gone.
+        //
+        // The horizontal one flipped instead. LATITUDE labels run down the
+        // left edge — that is where they belong, beside the lines they name —
+        // and at x:20 the arrow sat in the middle of them, with "43.16°"
+        // struck through by it. The right edge carries only the longitude
+        // labels along the bottom, so it is the one margin with room.
+        let origin = CGPoint(x: size.width - 22, y: 20)
         var arrow = Path()
         arrow.move(to: CGPoint(x: origin.x, y: origin.y))
         arrow.addLine(to: CGPoint(x: origin.x - 5, y: origin.y + 12))

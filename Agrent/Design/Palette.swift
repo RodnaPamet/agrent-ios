@@ -58,6 +58,26 @@ enum Palette {
         static let fillOpacity: Double = 0.55
         static let strokeWidth: CGFloat = 2.5
         static let dash: [CGFloat] = [7, 5]
+
+        /// Increase Contrast is not a preference about taste. It is switched
+        /// on by people who cannot reliably separate two mid-tone colours,
+        /// and on this map the fill IS the data: #3E8E4F sown against
+        /// #9A9560 fallow, both at 0.55 over a #6E6A52 ground, is three
+        /// muted earth tones within a narrow band of each other. That is a
+        /// deliberate choice for direct sunlight and the wrong one here.
+        ///
+        /// So the fill goes near-solid and the stroke thickens — the parcel
+        /// stops being a tint over the ground and becomes a bordered object.
+        /// The dashed/solid distinction is untouched because it already
+        /// works: it is the non-colour channel, and it is what keeps the map
+        /// readable in a monochrome screenshot.
+        static func fillOpacity(_ contrast: ColorSchemeContrast) -> Double {
+            contrast == .increased ? 0.92 : fillOpacity
+        }
+
+        static func strokeWidth(_ contrast: ColorSchemeContrast) -> CGFloat {
+            contrast == .increased ? 3.5 : strokeWidth
+        }
     }
 }
 

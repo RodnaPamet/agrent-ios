@@ -142,6 +142,22 @@ struct JournalRow: View {
             }
         }
         .padding(.vertical, 6)
+        // One stop per entry, spoken from the VALUES.
+        //
+        // `children: .combine` would read the rendered text, which includes
+        // the `·` between date and status — "21 септември middle dot
+        // Планирано". The separator is typography and has no business in the
+        // audio channel, so the label is built from the fields instead. It
+        // also lets the chip be spoken as what it MEANS ("Внасяне на
+        // препарат") rather than as a decorated fragment, and lets the status
+        // be named only when it is worth naming.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(A11y.sentence([
+            entry.title,
+            entry.type.label,
+            entry.occurredAt.formatted(.dateTime.day().month(.wide).year()),
+            entry.status == .planned ? entry.status.label : nil,
+        ]))
     }
 
     private var chip: some View {

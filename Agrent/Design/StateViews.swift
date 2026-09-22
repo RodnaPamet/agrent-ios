@@ -148,6 +148,8 @@ struct CategoryChip: View {
     let foreground: Color
     let background: Color
 
+    @Environment(\.colorSchemeContrast) private var contrast
+
     var body: some View {
         Text(text)
             .font(.footnote.weight(.semibold))
@@ -155,6 +157,17 @@ struct CategoryChip: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
             .background(background, in: RoundedRectangle(cornerRadius: 6))
+            // A pale tint on a white row is the whole chip: remove the
+            // colour difference and it stops being an object and becomes
+            // slightly-off-white space around a word. Under Increase
+            // Contrast it gets an explicit edge, drawn in its own foreground
+            // colour so no new value enters the palette.
+            .overlay {
+                if contrast == .increased {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(foreground.opacity(0.55), lineWidth: 1)
+                }
+            }
     }
 }
 
