@@ -67,11 +67,11 @@ final class TransitionTests: XCTestCase {
     /// has to be made deliberately on this one too.
     func testTheTableMatchesTheServer() {
         let expected: [WorkItemStatus: Set<WorkItemStatus>] = [
-            .open: [.triaged, .inProgress, .blocked, .resolved, .closed, .canceled],
-            .triaged: [.inProgress, .blocked, .resolved, .closed, .canceled],
-            .inProgress: [.triaged, .blocked, .resolved, .closed, .canceled],
+            .open: [.triaged, .inProgress, .blocked, .closed, .canceled],
+            .triaged: [.inProgress, .blocked, .closed, .canceled],
+            .inProgress: [.triaged, .blocked, .closed, .canceled],
             .blocked: [.inProgress, .triaged, .closed, .canceled],
-            .pendingReview: [.inProgress, .resolved, .closed, .canceled],
+            .pendingReview: [.inProgress, .closed, .canceled],
             .resolved: [.inProgress, .closed],
             .closed: [],
             .canceled: [],
@@ -83,6 +83,26 @@ final class TransitionTests: XCTestCase {
                 "transitions from \(status.rawValue) disagree with the server's table"
             )
         }
+    }
+
+    /// RESOLVED is not offered as a DESTINATION — the web retired it, and
+    /// two clients disagreeing about a workflow is worse than either
+    /// workflow. An operator marking a task Готова on the phone would have
+    /// a state their colleague does not use on the laptop.
+    func testResolvedIsNotOfferedAsADestination() {
+        for status in WorkItemStatus.allCases {
+            XCTAssertFalse(
+                status.allowedNext.contains(.resolved),
+                "\(status.rawValue) still offers RESOLVED"
+            )
+        }
+    }
+
+    /// But transitions OUT of it are kept. Rows already sit in that state,
+    /// and a task that cannot be closed because the app declines to name
+    /// where it is would be stranded by our own tidiness.
+    func testATaskAlreadyResolvedCanStillBeMovedOn() {
+        XCTAssertEqual(Set(WorkItemStatus.resolved.allowedNext), [.inProgress, .closed])
     }
 
     /// Exactly the three terminal statuses require a resolution, and the
