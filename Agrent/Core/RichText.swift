@@ -29,14 +29,30 @@ import Foundation
 /// Two deliberate conservatisms, both chosen because losing text an operator
 /// wrote is worse than leaving a stray tag on screen:
 ///
-/// 1. **A string with no recognised tag is returned VERBATIM.** A note reading
-///    `температура < 5°C` is not HTML and must not be treated as though it
-///    were.
+/// 1. **No recognised tag means no tag pass**, so a note that is not markup is
+///    never rewritten as though it were.
 /// 2. **Only RECOGNISED tag names are stripped**, never `<[^>]*>`. The greedy
 ///    form is the trap: in `<p>температура < 5</p>` it matches from the bare
 ///    `<` to the `>` that closes `</p>` and silently swallows `5`. An unknown
 ///    tag therefore stays on screen — visible, reportable, and not a
 ///    disappeared measurement.
+///
+/// ── Entities always decode, even with no tag in sight ──
+///
+/// Measured server-side on 2026-09-22, against the real sanitiser rather than
+/// the schema: the write path escapes before it stores, and it does so whether
+/// or not there is any markup.
+///
+///     "температура < 5"          stored as  "температура &lt; 5"
+///     "<p>температура < 5</p>"   stored as  "<p>температура &lt; 5</p>"
+///     "5 > 3 & 2 < 4"            stored as  "5 &gt; 3 &amp; 2 &lt; 4"
+///
+/// The first row is the one that matters. It has NO tags, so an implementation
+/// that gates the whole conversion on finding one returns it untouched and
+/// puts a literal `&lt;` in front of the operator. Conservatism 1 therefore
+/// gates the TAG pass only; decoding is unconditional. This is safe precisely
+/// because the server always escapes: an author's literal ampersand is stored
+/// as `&amp;amp;` and decodes back to `&amp;`, once.
 enum RichText {
 
     /// Tag names the server's editor can emit. Anything outside this list is
@@ -63,15 +79,23 @@ enum RichText {
     private static let blankRun    = re("\n{3,}")
 
     static func plainText(_ html: String) -> String {
-        guard anyKnownTag.firstMatch(
-            in: html, range: NSRange(html.startIndex..., in: html)
-        ) != nil else { return html }
-
         var s = html
-        s = sub(lineBreak, in: s, with: "\n")
-        s = sub(blockClose, in: s, with: "\n\n")
-        s = sub(listItem, in: s, with: "\n• ")
-        s = sub(anyKnownTag, in: s, with: "")
+
+        // ONLY the tag pass is gated on finding a tag. Entity decoding always
+        // runs, and that distinction is load-bearing — see the measurement in
+        // the type header. A note reading `температура < 5` is stored by the
+        // server as `температура &lt; 5` with NO tags around it, so gating the
+        // whole conversion would return it verbatim and put a literal `&lt;`
+        // on screen.
+        if anyKnownTag.firstMatch(
+            in: s, range: NSRange(s.startIndex..., in: s)
+        ) != nil {
+            s = sub(lineBreak, in: s, with: "\n")
+            s = sub(blockClose, in: s, with: "\n\n")
+            s = sub(listItem, in: s, with: "\n• ")
+            s = sub(anyKnownTag, in: s, with: "")
+        }
+
         s = decodeEntities(s)
         s = sub(blankRun, in: s, with: "\n\n")
         return s.trimmingCharacters(in: .whitespacesAndNewlines)

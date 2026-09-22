@@ -48,6 +48,41 @@ final class RichTextTests: XCTestCase {
         XCTAssertTrue(RichText.plainText("<p>преди <custom>вътре</custom> след</p>").contains("вътре"))
     }
 
+    // MARK: - Escaped, but tagless
+
+    /// The row that broke the first version of this converter.
+    ///
+    /// These three are not invented either: they are the real server
+    /// sanitiser's output, run against these exact inputs on 2026-09-22. The
+    /// write path escapes BEFORE it stores, and it does so whether or not the
+    /// note contains any markup.
+    ///
+    /// The first case has no tags at all. A converter that gates the whole
+    /// conversion on finding a tag returns it untouched and shows the operator
+    /// a literal `&lt;`. Decoding must not be behind that gate.
+    func testEntitiesDecodeWithNoTagPresent() {
+        let stored = [
+            "температура &lt; 5",
+            "<p>температура &lt; 5</p>",
+            "5 &gt; 3 &amp; 2 &lt; 4",
+        ]
+        let expected = [
+            "температура < 5",
+            "температура < 5",
+            "5 > 3 & 2 < 4",
+        ]
+        for (input, want) in zip(stored, expected) {
+            XCTAssertEqual(RichText.plainText(input), want)
+        }
+    }
+
+    /// Unconditional decoding is safe only because the server always escapes:
+    /// an author's literal `&` is stored as `&amp;amp;` and must come back as
+    /// `&amp;` — once, not twice — with no tag anywhere to gate on.
+    func testAuthoredAmpersandSurvivesTaglessDecode() {
+        XCTAssertEqual(RichText.plainText("N &amp;amp; P"), "N &amp; P")
+    }
+
     // MARK: - Structure
 
     func testParagraphsBecomeBlankLineSeparated() {
