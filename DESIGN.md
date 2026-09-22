@@ -61,19 +61,51 @@ carries meaning.** Pick an accent that cannot be mistaken for a parcel state.
 
 ## Decisions to make, in order
 
-### 1. Type scale — the highest-value change
+### 1. Type scale — SETTLED, and the first answer here was wrong
 
-Rebuild the scale from `body` upward, not `footnote` downward. Concretely:
+**What shipped, and what this section now prescribes:**
 
-| role | now | should be |
-|---|---|---|
-| primary row text | `.headline` / `.footnote` | `.body` |
-| supporting metadata | `.footnote` | `.subheadline` |
-| genuinely incidental | `.caption` | `.caption` — rare |
+| role | use |
+|---|---|
+| primary row text | `.headline` |
+| supporting metadata | `.footnote` |
+| chips / category labels | `.caption` |
 
-Then **verify at `accessibility3`**, not at default. If a row needs Dynamic
-Type turned down to fit, the layout is wrong, not the setting. Let rows grow
-and wrap; never truncate a journal title.
+**The correction, kept because the reasoning is the useful part.**
+
+This table originally said "rebuild the scale from `body` upward" and moved
+primary text to `.body` AND supporting metadata to `.subheadline`. It was
+implemented exactly as written, and the owner's reaction was that the font
+had become very large.
+
+The measurement behind it was right — `.footnote` used 10 times and `.body`
+never is a desk application's scale on a tool used standing in a field. The
+prescription overshot, for two reasons neither of which is visible from a
+static count:
+
+1. **Arithmetic.** Secondary text outnumbers primary roughly three to one —
+   28 `.subheadline` against 1 `.footnote` once applied. Moving SECONDARY up
+   a step therefore moves every screen up a step. The primary sizes were
+   never the problem.
+2. **Hierarchy, which is the one that actually made it read as "large".** At
+   15pt against a 17pt headline there is almost no step left between them,
+   and **a screen with no hierarchy reads as uniformly big whatever the
+   absolute numbers are.** The complaint was not about what was being read;
+   it was about how much of it fit.
+
+So the fix was to restore the STEP, not to shrink the type. Primary stayed
+at `.headline`.
+
+**Verify at `accessibility3`**, not at default. If a row needs Dynamic Type
+turned down to fit, the layout is wrong, not the setting. Let rows grow and
+wrap; never truncate a journal title.
+
+**And never truncate a chip.** The device found category chips clipping at
+AX3 — `Внасяне на препар…`. A category label with its end cut off does not
+identify a category, and on a regulated diary that is the row type someone
+is most likely hunting for. The instinct is to let a small element clip;
+that is backwards. **A chip is small because the word is short at normal
+sizes, not because the word matters less.**
 
 Stay on the system font. SF has Cyrillic coverage, optical sizing and tracking
 tables already tuned — the guidance is explicit that you override it only with
