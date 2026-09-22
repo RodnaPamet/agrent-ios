@@ -75,7 +75,9 @@ struct TasksListView: View {
                     )
                 }
                 ForEach(page.items) { item in
-                    TaskRow(item: item)
+                    NavigationLink { TaskDetailView(summary: item) } label: {
+                        TaskRow(item: item)
+                    }
                 }
             }
             .listStyle(.plain)
@@ -137,7 +139,7 @@ struct TaskRow: View {
     }
 
     private var dueText: String? {
-        item.dueAt.map { $0.formatted(.dateTime.day().month(.wide)) }
+        item.dueAt.map(BgDate.dayMonth)
     }
 
     @ViewBuilder

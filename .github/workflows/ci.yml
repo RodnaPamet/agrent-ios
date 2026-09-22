@@ -50,6 +50,29 @@ jobs:
           fi
           echo "No credential-shaped strings found."
 
+      # Measured on the device: this phone's AppleLocale is en_BG — English
+      # language, Bulgarian region, an ordinary thing for a person to set.
+      # On it, `Date.formatted` returns "11 September 2026" while SwiftUI's
+      # `Text(date, format:)` two tabs away returns "21 септември". The app
+      # had both, so one screen printed English under a Bulgarian label, and
+      # a journal row's ACCESSIBILITY text said "September" while the screen
+      # said "септември" — invisible to everyone who can see the screen.
+      #
+      # This app is Bulgarian-only, so dates are Bulgarian by declaration,
+      # not by whatever the device happens to report. One idiom: BgDate.
+      - name: Dates go through BgDate
+        run: |
+          hits=$(grep -rn --include='*.swift' \
+                   -e '\.formatted(\.dateTime' \
+                   -e ', format: \.dateTime' \
+                   Agrent/ | grep -v 'Agrent/Design/BgDate.swift' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Format dates with BgDate, not Locale.current — see BgDate.swift."
+            exit 1
+          fi
+          echo "All date formatting goes through BgDate."
+
       # Agrent.xcodeproj and Agrent/Info.plist are DERIVED from project.yml and
       # gitignored. Committing either reintroduces the conflict-prone pbxproj
       # the spec exists to avoid, and lets the two drift apart.

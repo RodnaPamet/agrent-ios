@@ -91,7 +91,7 @@ final class WorkItemDecodeTests: XCTestCase {
 
     private let minimal = #"""
     {"id":"w1","tenantId":"t1","type":"TASK","title":"Пръскане на южния блок",
-     "severity":"MEDIUM","priority":"P2","status":"OPEN","createdByUserId":"u1"}
+     "severity":"MEDIUM","priority":"P2","status":"OPEN","createdByUserId":"u1","createdAt":"2026-09-11T00:00:00.000Z","updatedAt":"2026-09-11T00:00:00.000Z"}
     """#
 
     private func decode(_ json: String) throws -> WorkItem {
@@ -102,6 +102,12 @@ final class WorkItemDecodeTests: XCTestCase {
 
     /// Everything the server marks optional must actually be optional. A
     /// required field that the server omits fails the whole list.
+    ///
+    /// The required set GREW after the model was checked against a real
+    /// detail response: `createdAt` and `updatedAt` are always present and
+    /// were not in the field list this was first written from. These
+    /// fixtures were built against a model nothing had verified, which is
+    /// what "modelled, not measured" costs when it is finally measured.
     func testDecodesWithOnlyTheNonOptionalFields() throws {
         let item = try decode(minimal)
         XCTAssertEqual(item.title, "Пръскане на южния блок")
@@ -119,6 +125,7 @@ final class WorkItemDecodeTests: XCTestCase {
         let json = #"""
         {"id":"w1","tenantId":"t1","type":"TASK","title":"t","severity":"LOW",
          "priority":"P3","status":"OPEN","createdByUserId":"u1",
+         "createdAt":"2026-09-11T00:00:00.000Z","updatedAt":"2026-09-11T00:00:00.000Z",
          "description":"температура < 5, без пръскане"}
         """#
         XCTAssertEqual(try decode(json).description, "температура < 5, без пръскане")
@@ -128,7 +135,7 @@ final class WorkItemDecodeTests: XCTestCase {
     func testAnUnknownEnumStillYieldsAUsableItem() throws {
         let json = #"""
         {"id":"w1","tenantId":"t1","type":"SOMETHING_NEW","title":"t",
-         "severity":"LOW","priority":"P3","status":"OPEN","createdByUserId":"u1"}
+         "severity":"LOW","priority":"P3","status":"OPEN","createdByUserId":"u1","createdAt":"2026-09-11T00:00:00.000Z","updatedAt":"2026-09-11T00:00:00.000Z"}
         """#
         let item = try decode(json)
         XCTAssertEqual(item.type, .unknown)
@@ -137,7 +144,7 @@ final class WorkItemDecodeTests: XCTestCase {
 
     func testOverdueNeedsADueDateInThePastAndNoCompletion() throws {
         let past = "2020-01-01T00:00:00Z"
-        let base = #"{"id":"w1","tenantId":"t1","type":"TASK","title":"t","severity":"LOW","priority":"P3","status":"OPEN","createdByUserId":"u1""#
+        let base = #"{"id":"w1","tenantId":"t1","type":"TASK","title":"t","severity":"LOW","priority":"P3","status":"OPEN","createdByUserId":"u1","createdAt":"2026-09-11T00:00:00.000Z","updatedAt":"2026-09-11T00:00:00.000Z""#
         XCTAssertTrue(try decode(base + #","dueAt":"\#(past)"}"#).isOverdue)
         // Completed work is not overdue, however late it was.
         XCTAssertFalse(

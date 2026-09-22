@@ -218,7 +218,7 @@ struct InquiryRow: View {
                 Text(inquiry.status?.label ?? "—").font(.subheadline.weight(.medium))
                 Spacer()
                 if let created = inquiry.createdAt {
-                    Text(created, format: .dateTime.day().month().year())
+                    Text(BgDate.full(created))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }

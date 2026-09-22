@@ -13,3 +13,19 @@ final class TasksStore {
         }
     }
 }
+
+@Observable
+@MainActor
+final class TaskDetailStore {
+    private(set) var state: LoadState<WorkItem> = .loading
+    private let id: String
+
+    init(id: String) { self.id = id }
+
+    func load() async {
+        if state.value == nil { state = .loading }
+        state = await CachedResource.load(WorkItemAPI.detailPath(id)) { data in
+            try await WorkItemAPI.decodeDetail(from: data)
+        }
+    }
+}

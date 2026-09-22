@@ -25,6 +25,18 @@ enum WorkItemAPI {
     /// see `PagedResponse`. The whole point is that the day someone adds
     /// `?limit` here, the failure lands on them and not on an operator
     /// looking at an empty screen in a field.
+    /// The DETAIL route, which returns a whole task — 33 keys against the
+    /// list's 11. An id in the PATH, never a query parameter: CFNetwork
+    /// writes full request URLs to the unified log from Apple's own
+    /// subsystems, and a path segment is as visible there as a query is, but
+    /// this id is a task's own opaque identifier rather than anything about
+    /// a person. The rule bites on `?assignee=` and filters, not here.
+    static func detailPath(_ id: String) -> String { "\(base)/\(id)" }
+
+    static func decodeDetail(from data: Data) async throws -> WorkItem {
+        try await APIClient.shared.decode(data, as: WorkItem.self)
+    }
+
     /// Decodes `WorkItemSummary`, not `WorkItem`. The list route sends a
     /// PROJECTION — eleven keys of nineteen, with no `tenantId` and no
     /// `priority` — and a model built from the full field list fails the
