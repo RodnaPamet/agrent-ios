@@ -94,7 +94,13 @@ struct JournalListView: View {
             )
 
         case .loaded(let entries, _):
-            List(entries) { JournalRow(entry: $0) }
+            List(entries) { entry in
+                NavigationLink {
+                    JournalDetailView(entry: entry)
+                } label: {
+                    JournalRow(entry: entry)
+                }
+            }
             .listStyle(.plain)
             .refreshable { await store.load() }
         }
