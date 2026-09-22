@@ -87,6 +87,18 @@ enum AdminAPI {
     /// "Membership not found or not active"** — a SUCCESSFUL WRITE WHOSE
     /// RETRY REPORTS FAILURE.
     ///
+    /// MEASURED against production on 2026-09-22, on one account the owner
+    /// named, as a full round trip:
+    ///
+    ///     deactivate  → 200, status becomes DEACTIVATED
+    ///     replay      → 404 NOT_FOUND "Membership not found or not active."
+    ///     reactivate  → 200, status back to ACTIVE
+    ///
+    /// So this is first-hand rather than relayed. The 404 also carries the
+    /// generic `NOT_FOUND`, which the app would render as "Търсеното не
+    /// беше намерено" — a confusing sentence for a write that worked, and
+    /// one more reason nothing here retries.
+    ///
     /// That is the already-applied problem wearing a 404 instead of a 400,
     /// and it is exactly the #921 shape: the operator is told their action
     /// did not land when it already has. `setTaskStatus` solved it
