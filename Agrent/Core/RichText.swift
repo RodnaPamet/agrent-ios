@@ -153,6 +153,77 @@ enum RichText {
         return named[body.lowercased()]
     }
 
+    // MARK: - Writing
+
+    /// Turn what an operator typed into the HTML this field actually holds.
+    ///
+    /// `notes` is a rich-text column on both ends — the web renders it through
+    /// `dangerouslySetInnerHTML` and stores it through the same sanitiser, with
+    /// TipTap as the reference producer. The app was POSTing PLAIN TEXT into
+    /// it, which survives only because a string with no markup is valid HTML
+    /// that happens to mean itself. It is the degenerate case, not the format.
+    ///
+    /// The visible consequence: HTML collapses whitespace, and the web renders
+    /// this field with no `white-space: pre-line`. A two-paragraph note typed
+    /// on the phone is stored faithfully and read as ONE run-on paragraph on
+    /// the web. The same record, different on each screen.
+    ///
+    /// ── Why the phone escapes rather than letting the server do it ──
+    ///
+    /// Measured against the real sanitiser on 2026-09-22, both directions:
+    ///
+    ///     "<p>температура &lt; 5</p>"  unchanged, stable over 3 passes
+    ///     "<p>температура < 5</p>"     becomes the escaped form, then stable
+    ///
+    /// So both encodings converge on the same stored bytes and neither is
+    /// wrong. Escaping here is still the better dependency: the escaped form
+    /// is a fixed point on the FIRST pass, so what the phone sends is what is
+    /// stored rather than something the server decided; and the unescaped form
+    /// is malformed markup that the server's parser recovers from. Recovery
+    /// measured well — even `<5` with no space survived — but "sends valid
+    /// markup" is a better guarantee for a client to make than "sends invalid
+    /// markup the server is known to repair".
+    ///
+    /// Also measured: `&amp;amp;` survives three round trips as `&amp;amp;`.
+    /// Escape levels do not accumulate on re-save, so this cannot slowly
+    /// corrupt a register that other tools rewrite.
+    ///
+    /// A single-paragraph note produces exactly one `<p>`, so the ordinary
+    /// case is unchanged by this.
+    static func html(fromPlainText text: String) -> String? {
+        let paragraphs = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !paragraphs.isEmpty else { return nil }
+
+        return paragraphs
+            .map { paragraph in
+                // A single newline inside a paragraph is a line break the
+                // operator typed, not a paragraph boundary. HTML would eat it.
+                let lines = paragraph
+                    .components(separatedBy: "\n")
+                    .map(escape)
+                    .joined(separator: "<br>")
+                return "<p>" + lines + "</p>"
+            }
+            .joined()
+    }
+
+    /// The three that change meaning in markup, ampersand FIRST.
+    ///
+    /// Order is the whole trick and getting it wrong is silent: escape `<`
+    /// first and `&lt;` contains an `&` that the ampersand pass then turns
+    /// into `&amp;lt;`, so the operator reads `&lt;` on both clients. One
+    /// authored character, two escapes, and it looks like a server bug.
+    private static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
     /// `&nbsp;` becomes an ORDINARY space, not U+00A0.
     ///
     /// A non-breaking space is the author's layout intent on a desktop page and

@@ -61,7 +61,10 @@ struct NewEntryView: View {
             try await store.create(CreateLogEntry(
                 type: type,
                 title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-                notes: notes.isEmpty ? nil : notes,
+                // `notes` is a rich-text HTML column on both ends; the app
+                // was POSTing plain text, so a two-paragraph note read as
+                // one run-on paragraph on the web. See RichText.
+                notes: RichText.html(fromPlainText: notes),
                 occurredAt: occurredAt
             ))
             dismiss()
