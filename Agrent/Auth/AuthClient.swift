@@ -65,6 +65,10 @@ final class AuthClient: NSObject {
 
     func signOut() {
         TokenStore.clear()
+        // The cached identity is per-session. Leaving it would let the
+        // next person to sign in on this device be assigned somebody
+        // else's operations.
+        CurrentUserStore.shared.clear()
         state = .signedOut
     }
 

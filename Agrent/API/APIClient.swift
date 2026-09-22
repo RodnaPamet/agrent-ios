@@ -225,6 +225,18 @@ actor APIClient {
         )
     }
 
+    /// A PATCH whose raw response the caller decodes itself, and with no
+    /// `If-Match`. The parcel route takes no version — unlike the
+    /// journal's PATCH, where the version increment sits INSIDE the
+    /// If-Match guard and an unguarded write breaks every later lock.
+    /// Asymmetry noted rather than assumed away.
+    func patchReturningData<B: Encodable>(_ path: String, body: B) async throws -> Data {
+        let payload = try encoder.encode(body)
+        return try await send(
+            path: path, method: "PATCH", body: payload, idempotencyKey: nil
+        )
+    }
+
     func post<B: Encodable, T: Decodable>(
         _ path: String, body: B, as _: T.Type, idempotencyKey: String = UUID().uuidString
     ) async throws -> T {

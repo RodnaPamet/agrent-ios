@@ -22,6 +22,15 @@ struct ParcelMapView: View {
 
     @Environment(\.colorSchemeContrast) private var contrast
 
+    /// The parcel whose operation sheet is open.
+    @State private var operating: Parcel?
+
+    /// Nil until resolved. The tap is offered meanwhile — see
+    /// `CurrentUser.mayCreateOperations`, which fails open.
+    @State private var me: CurrentUser?
+
+    private var mayOperate: Bool { me?.mayCreateOperations ?? true }
+
     init(location: Location) {
         self.location = location
         _store = State(initialValue: ParcelsStore(locationID: location.id))
@@ -51,7 +60,17 @@ struct ParcelMapView: View {
                     : "Превключва към схематична карта")
             }
         }
-        .task { if store.state.value == nil { await store.load() } }
+        .sheet(item: $operating) { parcel in
+            ParcelOperationSheet(
+                locationID: location.id, parcel: parcel
+            ) {
+                Task { await store.load() }
+            }
+        }
+        .task {
+            if store.state.value == nil { await store.load() }
+            me = await CurrentUserStore.shared.load()
+        }
     }
 
     @ViewBuilder
@@ -122,7 +141,10 @@ struct ParcelMapView: View {
                 message: "Парцелите съществуват, но нямат географски очертания."
             )
         } else if useSchematic, let box = response.bounds ?? location.boundsJson {
-            SchematicParcelMap(parcels: drawable, bounds: box)
+            SchematicParcelMap(
+                parcels: drawable, bounds: box,
+                onTap: mayOperate ? { operating = $0 } : nil
+            )
         } else {
             // Camera from `bounds` when the server sent one, otherwise from
             // the location's own boundsJson. Both are [minLon, minLat, …] and
@@ -179,7 +201,11 @@ struct ParcelMapView: View {
         // them: "Пшеница middle dot 12,4 ха middle dot под аренда". Spoken
         // from the values, with the units said in full — "ха" is read as a
         // word, not as "хектара".
+        .contentShape(Rectangle())
+        .onTapGesture { if mayOperate { operating = parcel } }
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(mayOperate ? .isButton : [])
+        .accessibilityHint(mayOperate ? "Двоен допир, за да запишете операция" : "")
         .accessibilityLabel(A11y.sentence([
             parcel.name,
             CommodityName.freeText(parcel.cropType),

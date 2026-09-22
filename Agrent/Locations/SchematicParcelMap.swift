@@ -63,6 +63,10 @@ struct SchematicParcelMap: View {
     /// stays visible on top.
     var exaggeration: CGFloat = 5
 
+    /// Tapping a square opens that parcel. Optional, so the map stays
+    /// usable as a pure display anywhere that has nothing to open.
+    var onTap: ((Parcel) -> Void)?
+
     /// A `Canvas` draws outside the view hierarchy, so it cannot read the
     /// environment itself — the value has to be captured here and carried in.
     /// Easy to forget, and the failure is silent: the map simply ignores the
@@ -115,6 +119,28 @@ struct SchematicParcelMap: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel(accessibilitySummary)
             .accessibilityChildren { accessibilityOverlay(in: geo.size, clearance: clearance) }
+            // Hit-tested against the SAME `layout` the drawing uses, so a
+            // tap cannot land on a square that is not where it appears.
+            // Computing a second set of rects here is the drift that the
+            // accessibility overlay was extracted to avoid.
+            .contentShape(Rectangle())
+            .onTapGesture { point in
+                guard let onTap else { return }
+                let laid = layout(in: geo.size, clearance: clearance)
+                // SMALLEST FIRST. At 5x the squares overlap, and the small
+                // parcel is drawn ON TOP — so the tap must resolve the same
+                // way the eye does, or an operator taps the square they can
+                // see and opens the one behind it.
+                let hit = laid.placements
+                    .sorted { $0.side < $1.side }
+                    .first { placement in
+                        let centre = CGPoint(
+                            x: placement.centre.x, y: placement.centre.y + clearance)
+                        return abs(point.x - centre.x) <= placement.side / 2
+                            && abs(point.y - centre.y) <= placement.side / 2
+                    }
+                if let hit { onTap(hit.parcel) }
+            }
         }
     }
 
