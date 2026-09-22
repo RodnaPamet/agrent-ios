@@ -68,7 +68,13 @@ struct JournalListView: View {
         case .loaded(let entries, _):
             List {
                 Section {
-                    ForEach(entries) { JournalRow(entry: $0) }
+                    ForEach(entries) { entry in
+                        NavigationLink {
+                            JournalDetailView(entry: entry)
+                        } label: {
+                            JournalRow(entry: entry)
+                        }
+                    }
                 } header: {
                     Text("^[\(entries.count) записа](inflect: true)")
                         .font(.subheadline)
