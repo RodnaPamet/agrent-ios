@@ -44,6 +44,21 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   `INPUT_APPLICATION` and `ACTIVITY`, so nothing has ever exercised them. Set
   equality against `enums.prisma` was checked by READING. First real `Сеитба`
   entry is the first live test.
+- ~~`notes` was displayed nowhere, so nobody knew what was in it.~~
+  **CLOSED 2026-09-22 by the device.** The field is rich-text HTML on both
+  ends, and the first screen to render it printed `<p>` tags at the operator.
+  Of the entries in the live tenant carrying notes, **2 of 2** contain HTML —
+  read out of the app's own `ResponseCache`, not assumed from the schema.
+  Fixed both directions: `RichText` (#13 read, #14 write).
+
+  **The lesson is worth more than the bug.** A field's format is not known
+  until a screen displays it. `JournalRow` renders title, type, date and
+  status and never touched `notes`, so the app carried a wrong assumption
+  about a column for as long as it had no reason to look. Every remaining
+  phase adds screens that display fields nothing has displayed before —
+  parcels, members, listings — and each one is the first real test of what
+  that field actually holds. Green CI cannot find this class; only rendering
+  it can.
 - `APIClient`'s status switch has no `304` case. URLSession converts 304→200
   below us today, so it is unreachable — but `default:` would render
   "Server error 304." on a screen whose data is fine. One line, not yet taken.
@@ -106,6 +121,28 @@ Shipped and proven end to end on a device simulator (2026-09-21):
    `api-keys`, `rbac` stay on the laptop. Nobody configures SAML on a phone.
 3. **Read-caching everywhere, no offline writes.** Every screen serves
    last-known data when offline and says so. Writes still require connectivity.
+4. **Every English word an operator can see comes from the server.** Measured
+   2026-09-22 over every user-visible string constructor in the app: the only
+   non-Cyrillic literals are `Agrent`, a `·` separator, `%` and a currency-code
+   fallback. There is no hard-coded English on any screen.
+
+   The English that DOES reach the phone arrives in an error body, and today it
+   arrives raw:
+
+   ```
+   Грешка от сървъра (404): {"error":{"code":"NOT_FOUND","message":"…"}}
+   ```
+
+   `readableBody` bounds the body to 300 characters but does not extract
+   `.message`, so the operator gets a Bulgarian prefix followed by undecoded
+   JSON. The server side is tracking 382 user-facing English messages authored
+   below the i18n guards' reach; the client half of the fix is a `code` →
+   Bulgarian map, and it belongs in **`Agrent/Core/UserMessage.swift`**, beside
+   the mapping that is already there — not in a new module, because a second
+   place to answer one question is how the next session finds the wrong one.
+   `ConflictEnvelope` already decodes `{ error: { code, message } }` for 409,
+   so the shape is proven; it just needs generalising. Waiting on the server's
+   code list, which lands in batches.
 
 ## Phase 0 — Foundations — DONE (2a8f6f1..d6d8798)
 
@@ -228,17 +265,40 @@ Biggest lift, best native payoff — GPS and field use are what a phone is for.
 - Read-cache matters most here: this is the screen that gets opened in a field
   with no signal.
 
+**Locations is READ-ONLY, deliberately** (decision, 2026-09-22). Parcel
+geometry is the input to subsidy and lease paperwork, and an edit made on a
+phone in a field — with a fingertip, on a schematic whose squares are drawn 5×
+larger than life and are not the real shape — is not an edit anyone should be
+able to make by accident. The map exaggerates on purpose so it can be read in
+sun; that same exaggeration makes it the wrong instrument for defining a
+boundary. Recorded here as a choice so a later session does not read the
+missing buttons as unfinished work and add them.
+
 Explicitly **out** for now: cadastre import, lease register, parcel merge,
 clusters, basemap tile download. Those are desk workflows.
 
 ## Phase 4 — Admin (subset)
 
 `GET /api/t/:slug/admin/members` · `/members/[membershipId]` ·
-`/members/[membershipId]/deactivate` · `/admin/farm-profile`
+`/members/[membershipId]/deactivate` · `/admin/farm-profile` ·
+`POST /api/t/:slug/admin/invites`
 
-- Members: list, invite, deactivate — the "someone needs access and I'm not at
-  my desk" case
+**`/admin/invites` is NOT under `/members`**, and this list said it was. An
+invite is its own resource at the admin root. A phone screen built against the
+shape written here would have 404'd on the one action the screen exists for,
+and "invite" is the whole "someone needs access and I'm not at my desk" case.
+
+- Members: list, invite, deactivate
 - Farm profile: the БАБХ identity block
+
+**Membership has THREE statuses, not two:** `ACTIVE`, `INVITED`,
+`DEACTIVATED`. A UI that models this as a boolean cannot render a pending
+invite — it shows as either a member who is not one, or as nothing at all.
+Both are wrong on the screen whose job is to answer "who can get in".
+
+**READER role gets a 403 on these routes**, so the refusal needs a real screen
+rather than a generic error. An operator who cannot administer the farm should
+be told that, not shown "Грешка от сървъра (403)".
 
 Nothing else from the admin panel.
 
