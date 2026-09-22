@@ -31,9 +31,12 @@ struct ParcelMapView: View {
 
     private var mayOperate: Bool { me?.mayCreateOperations ?? true }
 
+    @State private var indices: SatelliteIndexStore
+
     init(location: Location) {
         self.location = location
         _store = State(initialValue: ParcelsStore(locationID: location.id))
+        _indices = State(initialValue: SatelliteIndexStore(locationID: location.id))
     }
 
     var body: some View {
@@ -88,6 +91,7 @@ struct ParcelMapView: View {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
                 if useSchematic && !drawable.isEmpty { legend }
+                if !useSchematic && !drawable.isEmpty { indexControls }
                 parcelList(response, drawable: drawable)
             }
         }
@@ -150,19 +154,161 @@ struct ParcelMapView: View {
             // the location's own boundsJson. Both are [minLon, minLat, …] and
             // both are read through BoundingBox's NAMED fields — never
             // positionally, which is how the camera ends up in the Red Sea.
-            Map(initialPosition: .region((response.bounds ?? location.boundsJson)?.region
-                ?? MKCoordinateRegion(.world))) {
-                ForEach(drawable) { parcel in
-                    // One MKPolygon per GeoJSON polygon, holes already carried
-                    // as interiorPolygons — see ParcelGeometry.mapPolygons.
-                    ForEach(Array((parcel.geometry?.mapPolygons ?? []).enumerated()), id: \.offset) { _, polygon in
-                        MapPolygon(polygon)
-                            .foregroundStyle(.green.opacity(0.35))
-                            .stroke(.green, lineWidth: 2)
+            // One MKPolygon per GeoJSON polygon, holes already carried as
+            // interiorPolygons — see ParcelGeometry.mapPolygons.
+            SatelliteParcelMap(
+                parcels: drawable,
+                region: (response.bounds ?? location.boundsJson)?.region
+                    ?? MKCoordinateRegion(fitting: drawable)
+                    ?? MKCoordinateRegion(.world),
+                tileTemplate: indices.tiles?.tileUrl
+            )
+            .task { await indices.refreshIfNeeded() }
+        }
+    }
+
+    // MARK: - Vegetation indices
+
+    /// The index picker and, when one is drawn, its legend and date.
+    ///
+    /// Hidden entirely when `isConfigured` is nil or false — a deployment
+    /// without Earth Engine has no imagery to offer, and a disabled button is
+    /// a promise this screen cannot keep.
+    @ViewBuilder
+    private var indexControls: some View {
+        if indices.isConfigured != false {
+            VStack(alignment: .leading, spacing: 10) {
+                indexPicker
+                if let selected = indices.selected {
+                    if indices.isLoading && indices.tiles == nil {
+                        ProgressView().controlSize(.small)
+                    } else if let failure = indices.failure {
+                        Text(failure)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if indices.tiles != nil {
+                        legendRamp(selected)
+                        acquisition
                     }
                 }
             }
-            .mapStyle(.hybrid)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.bar)
+        }
+    }
+
+    /// A scrolling row rather than a `Picker`.
+    ///
+    /// Six options — off plus five indices — is two too many for a segmented
+    /// control at any text size, and the first thing a segmented control does
+    /// when it runs out of room is truncate the labels. NDVI and NDMI
+    /// truncate to the same three letters.
+    private var indexPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                indexChip(nil, label: "Без слой")
+                ForEach(VegetationIndex.allCases) { index in
+                    indexChip(index, label: index.name)
+                }
+            }
+            .padding(.horizontal, 2)
+            .padding(.vertical, 2)
+        }
+        // The row is one VoiceOver container of buttons; without this the
+        // horizontal scroll view is announced as a separate stop first.
+        .accessibilityLabel("Растителни индекси")
+    }
+
+    private func indexChip(_ index: VegetationIndex?, label: String) -> some View {
+        let isSelected = indices.selected == index
+        return Button {
+            Task { await indices.select(index) }
+        } label: {
+            Text(label)
+                .font(.footnote.weight(.medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(isSelected ? Color.accentColor : Color(.secondarySystemFill),
+                            in: Capsule())
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(index.map(\.explanation) ?? "Показва само сателитната снимка")
+    }
+
+    /// The colour ramp, with the ends named.
+    ///
+    /// The gradient is the web's five stops in the web's order, so the same
+    /// colour means the same number on both clients. A farmer comparing a
+    /// phone in the field against a laptop at home is the reason that has to
+    /// hold exactly.
+    private func legendRamp(_ index: VegetationIndex) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(index.explanation)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            LinearGradient(colors: index.ramp, startPoint: .leading, endPoint: .trailing)
+                .frame(height: 10)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+
+            // Ends on one line is the one place here two items share a line,
+            // and they can: each is a single short word pinned to its own
+            // edge, so neither can grow into the other.
+            HStack {
+                Text(index.lowLabel)
+                Spacer()
+                Text(index.highLabel)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(index.name). \(index.explanation). "
+            + "Скала от \(index.lowLabel.lowercased()) до \(index.highLabel.lowercased())")
+    }
+
+    /// WHEN THE PICTURE WAS TAKEN, and how long ago.
+    ///
+    /// The server composites the 30 days ending on the date asked for, and
+    /// reaches further back when cloud masking leaves nothing usable — the
+    /// first call this app ever made asked for today and got imagery from
+    /// three days earlier, with nothing in the response marking it as old.
+    ///
+    /// So both the date and the age are printed. The date alone is a fact a
+    /// person has to do arithmetic on; the age is the part that decides
+    /// whether this canopy is worth spraying against. A false-colour field
+    /// with no date is a picture that will be read as current, and that is
+    /// the failure this screen would cause rather than prevent.
+    @ViewBuilder
+    private var acquisition: some View {
+        if let date = indices.acquisitionDate {
+            let days = Calendar.current.dateComponents(
+                [.day], from: Calendar.current.startOfDay(for: date),
+                to: Calendar.current.startOfDay(for: Date())).day ?? 0
+            HStack(spacing: 5) {
+                Image(systemName: "camera.badge.clock")
+                Text(days <= 0
+                    ? "Заснето днес"
+                    : "Заснето на \(BgDate.dayMonth(date)) · преди \(Plural.bg(days, "ден", "дни"))")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.caption)
+            // Never `.secondary`. This is the caveat on everything above it,
+            // and the one line here that must not read as a footnote.
+            .foregroundStyle(days > 10 ? Color.orange : Color.primary)
+        } else {
+            // The server may omit the date. Saying so is the honest answer —
+            // an undated overlay must not be allowed to pass as a dated one.
+            Text("Датата на заснемане е неизвестна.")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
