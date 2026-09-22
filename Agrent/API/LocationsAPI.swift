@@ -18,4 +18,57 @@ enum LocationsAPI {
     static func decodeParcels(from data: Data) async throws -> ParcelsResponse {
         try await APIClient.shared.decode(data, as: ParcelsResponse.self)
     }
+
+    // MARK: - Reference data
+
+    /// Items are the farm's catalogue. Not `?category=` filtered: the
+    /// product/fertiliser split is a CLIENT-side negation — see
+    /// `InputItem.isFertilizer` — and asking the server for one category
+    /// would make the other list impossible to build from the same call.
+    static var itemsPath: String { "/api/t/\(Config.tenantSlug)/items" }
+
+    /// `measure=RATE` is not optional: 4 units against 20, and the 20
+    /// include `kg`, `ha`, `t` and `%`, none of which is a dose rate.
+    ///
+    /// `Unit` has no write path and the server caches the list for 24h,
+    /// so this is effectively static — cached hard on the device through
+    /// the ordinary `CachedResource` path.
+    static var rateUnitsPath: String { "/api/t/\(Config.tenantSlug)/units?measure=RATE" }
+
+    static func decodeItems(from data: Data) async throws -> [InputItem] {
+        try await APIClient.shared.decode(data, as: [InputItem].self)
+    }
+
+    static func decodeUnits(from data: Data) async throws -> [Unit] {
+        try await APIClient.shared.decode(data, as: [Unit].self)
+    }
+
+    // MARK: - Writes
+
+    /// A field operation on one or more parcels.
+    ///
+    /// SAFE TO RETRY — `field-operation` is one of the four usecases that
+    /// honour `Idempotency-Key`, so a replay produces one operation. The
+    /// key is minted ONCE by the caller and reused across attempts; a new
+    /// key per attempt defeats the dedupe entirely, which is the same rule
+    /// `JournalAPI.create` records.
+    static func createOperation(
+        locationID: String, _ draft: CreateFieldOperation, idempotencyKey: String
+    ) async throws -> Data {
+        try await APIClient.shared.postReturningData(
+            "\(base)/\(locationID)/operations",
+            body: draft,
+            idempotencyKey: idempotencyKey
+        )
+    }
+
+    /// Inline crop edit from the parcel sheet.
+    static func setCropType(
+        locationID: String, parcelID: String, cropType: String?
+    ) async throws -> Data {
+        try await APIClient.shared.patchReturningData(
+            "\(base)/\(locationID)/parcels/\(parcelID)",
+            body: ["cropType": cropType]
+        )
+    }
 }

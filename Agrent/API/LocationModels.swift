@@ -127,7 +127,11 @@ struct ParcelsResponse: Decodable, Equatable, Sendable {
     let parcels: [Parcel]
 }
 
-struct Parcel: Decodable, Equatable, Sendable, Identifiable {
+/// `Identifiable` AND `Hashable` so a tap can drive `sheet(item:)`,
+/// which carries the parcel with it. A separate Bool plus a stored parcel
+/// can disagree, and the disagreement writes an operation against the
+/// wrong field.
+struct Parcel: Decodable, Equatable, Hashable, Sendable, Identifiable {
     let id: String
     let name: String
     let cropType: String?
@@ -154,6 +158,13 @@ struct Parcel: Decodable, Equatable, Sendable, Identifiable {
     /// one object, so even `[String: String]` would fail the whole payload.
     /// That is the `netWorthUnavailableParams` situation again.
     var isDrawable: Bool { geometry != nil }
+
+    /// Hashed on `id` alone rather than synthesised over every field.
+    /// The id IS the identity — two values with the same id are the same
+    /// parcel whatever else differs — and synthesising would drag
+    /// `ParcelGeometry` into `Hashable` for nothing, a four-deep
+    /// coordinate array hashed on every sheet presentation.
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 /// GeoJSON MultiPolygon, already parsed server-side — this is an OBJECT on the
