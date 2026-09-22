@@ -27,6 +27,8 @@ struct AppMenuButton: View {
     @Environment(AuthClient.self) private var auth
 
     @State private var showingAdmin = false
+    @State private var showingTrends = false
+    @State private var showingNews = false
 
     var body: some View {
         Menu {
@@ -35,6 +37,22 @@ struct AppMenuButton: View {
             // getting it wrong means filing a record against the wrong
             // holding — which for a regulatory diary is not a small mistake.
             Section(Config.tenantSlug) {
+                // Тенденции and Новини are two surfaces on the web
+                // (`/trends` and `/news`) and stay two here. They share an
+                // API prefix and nothing else: one is a number over time,
+                // the other is what happened this week.
+                Button {
+                    showingTrends = true
+                } label: {
+                    Label("Тенденции", systemImage: "chart.line.uptrend.xyaxis")
+                }
+
+                Button {
+                    showingNews = true
+                } label: {
+                    Label("Новини", systemImage: "newspaper")
+                }
+
                 Button {
                     showingAdmin = true
                 } label: {
@@ -62,6 +80,11 @@ struct AppMenuButton: View {
         // action; presenting it modally says the same thing — you came here
         // on purpose and you will go back.
         .sheet(isPresented: $showingAdmin) { AdminView() }
+        // Each screen owns its own NavigationStack and Затвори button, the
+        // same shape AdminView already uses — the menu presents, the screen
+        // knows how to be presented.
+        .sheet(isPresented: $showingTrends) { TrendsView() }
+        .sheet(isPresented: $showingNews) { NewsView() }
     }
 }
 
