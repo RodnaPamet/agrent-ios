@@ -152,7 +152,7 @@ struct ParcelMapView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(parcel.name).font(.subheadline.weight(.medium))
                 HStack(spacing: 6) {
-                    if let crop = parcel.cropType { Text(crop) }
+                    if let crop = CommodityName.freeText(parcel.cropType) { Text(crop) }
                     if let area = parcel.areaHa {
                         if parcel.cropType != nil { Text("·") }
                         Text("\(Num.text(area)) ха")
@@ -182,7 +182,7 @@ struct ParcelMapView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.sentence([
             parcel.name,
-            parcel.cropType,
+            CommodityName.freeText(parcel.cropType),
             parcel.areaHa.map { "\(Num.text($0)) хектара" },
             parcel.hasActiveLease == true ? "под аренда" : nil,
             // The icon carried this and only as an icon label. It belongs in

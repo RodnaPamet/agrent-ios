@@ -73,6 +73,29 @@ jobs:
           fi
           echo "All date formatting goes through BgDate."
 
+      # A crop name is server DATA, not a UI label, so nothing that
+      # translates labels was ever going to reach it. Eight sites across
+      # three screens rendered the server's English at an operator whose
+      # app is otherwise entirely Bulgarian, and the owner found it.
+      #
+      # The failure mode is a NEW render site, not a regression in an old
+      # one: someone adds a screen, writes Text(row.commodity), and it is
+      # correct-looking English. So any file that touches these fields must
+      # also go through CommodityName.
+      - name: Commodity names go through CommodityName
+        run: |
+          bad=""
+          for f in $(grep -rl --include='*.swift' -e '\.commodity' -e '\.cropType' Agrent/ \
+                       | grep -v 'Agrent/Design/CommodityName.swift'); do
+            case "$f" in Agrent/API/*) continue ;; esac
+            grep -q 'CommodityName' "$f" || bad="$bad $f"
+          done
+          if [ -n "$bad" ]; then
+            echo "::error::These render a commodity name without CommodityName:$bad"
+            exit 1
+          fi
+          echo "All commodity names go through CommodityName."
+
       # Agrent.xcodeproj and Agrent/Info.plist are DERIVED from project.yml and
       # gitignored. Committing either reintroduces the conflict-prone pbxproj
       # the spec exists to avoid, and lets the two drift apart.
