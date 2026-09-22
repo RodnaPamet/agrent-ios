@@ -28,6 +28,12 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// The XYZ template, or nil for imagery alone.
     let tileTemplate: String?
 
+    /// nil when the signed-in member may not create operations — see
+    /// `CurrentUser.mayCreateOperations`, which fails open. Passing nil
+    /// removes the gesture rather than swallowing the tap, so a map that
+    /// cannot act does not absorb touches pretending it might.
+    var onTap: ((Parcel) -> Void)?
+
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> MKMapView {
@@ -38,12 +44,22 @@ struct SatelliteParcelMap: UIViewRepresentable {
         view.showsCompass = false
         // The camera is set HERE and nowhere else. See updateUIView.
         view.setRegion(region, animated: false)
+        context.coordinator.syncParcels(parcels, in: view)
 
-        for parcel in parcels {
-            for polygon in parcel.geometry?.mapPolygons ?? [] {
-                view.addOverlay(polygon, level: .aboveLabels)
+        let tap = UITapGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleTap(_:)))
+        // MKMapView zooms on double tap, and a single-tap recogniser fires
+        // on the first of the two. Without this, double-tapping to zoom in
+        // on a field opens the spray sheet on the way.
+        for existing in view.gestureRecognizers ?? [] {
+            if let other = existing as? UITapGestureRecognizer,
+               other.numberOfTapsRequired == 2 {
+                tap.require(toFail: other)
             }
         }
+        view.addGestureRecognizer(tap)
+        context.coordinator.tap = tap
         return view
     }
 
@@ -55,6 +71,12 @@ struct SatelliteParcelMap: UIViewRepresentable {
         // the whole-farm view every time they switched index — so the one
         // gesture the screen exists for, zooming into a patch and comparing
         // NDVI against NDMI over it, would undo itself on each tap.
+        context.coordinator.onTap = onTap
+        // The gesture is removed rather than made a no-op, so the map does
+        // not consume a touch it will do nothing with.
+        context.coordinator.tap?.isEnabled = onTap != nil
+
+        context.coordinator.syncParcels(parcels, in: view)
         context.coordinator.syncTiles(to: tileTemplate, in: view)
 
         // Solid fills hide the data underneath them, so a parcel is filled
@@ -74,10 +96,81 @@ struct SatelliteParcelMap: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var mountedTemplate: String?
+        private var mountedParcelIDs: [String] = []
+
+        /// Which parcel each `MKPolygon` came from. One parcel can produce
+        /// several — `15655-19` is one polygon with five rings — and MapKit
+        /// hands the delegate the overlay, not the model, so the way back
+        /// has to be kept here.
+        private var owners: [ObjectIdentifier: Parcel] = [:]
+
         var hasOverlay = false
+        var onTap: ((Parcel) -> Void)?
+        weak var tap: UITapGestureRecognizer?
 
         var polygonFill: UIColor {
             hasOverlay ? .clear : UIColor.systemGreen.withAlphaComponent(0.35)
+        }
+
+        func syncParcels(_ parcels: [Parcel], in view: MKMapView) {
+            let ids = parcels.map(\.id)
+            guard ids != mountedParcelIDs else { return }
+            mountedParcelIDs = ids
+
+            for overlay in view.overlays where overlay is MKPolygon {
+                view.removeOverlay(overlay)
+            }
+            owners.removeAll()
+            for parcel in parcels {
+                for polygon in parcel.geometry?.mapPolygons ?? [] {
+                    owners[ObjectIdentifier(polygon)] = parcel
+                    view.addOverlay(polygon, level: .aboveLabels)
+                }
+            }
+        }
+
+        /// Tap a field, open its operation sheet.
+        ///
+        /// Two things this does that a bounding-box test would not.
+        ///
+        /// HOLES COUNT. `MKPolygonRenderer` builds interior rings into the
+        /// same `CGPath`, so an even-odd containment test treats them as
+        /// outside — which is what they are. This is not hypothetical
+        /// tidiness: the owner's `15655-19` is a single polygon with five
+        /// rings, so four holes, across 32 hectares. Tapping one of them
+        /// should select nothing, exactly as tapping the grass beside the
+        /// field does.
+        ///
+        /// SMALLEST WINS, the same rule the schematic map uses. Where
+        /// parcels overlap or nest, the small one is the one drawn on top
+        /// and the one under the finger, so the tap has to resolve the way
+        /// the eye does or an operator opens the parcel behind the one they
+        /// can see.
+        @objc func handleTap(_ recogniser: UITapGestureRecognizer) {
+            guard let onTap, let view = recogniser.view as? MKMapView else { return }
+            let coordinate = view.convert(recogniser.location(in: view), toCoordinateFrom: view)
+            let mapPoint = MKMapPoint(coordinate)
+
+            var hit: (parcel: Parcel, area: Double)?
+            for overlay in view.overlays {
+                guard let polygon = overlay as? MKPolygon,
+                      let parcel = owners[ObjectIdentifier(polygon)],
+                      polygon.boundingMapRect.contains(mapPoint),
+                      let renderer = view.renderer(for: polygon) as? MKPolygonRenderer
+                else { continue }
+
+                // The path is built lazily and is nil until something has
+                // drawn — including for a polygon scrolled off screen.
+                if renderer.path == nil { renderer.createPath() }
+                guard let path = renderer.path,
+                      path.contains(renderer.point(for: mapPoint), using: .evenOdd)
+                else { continue }
+
+                let rect = polygon.boundingMapRect
+                let area = rect.size.width * rect.size.height
+                if hit == nil || area < hit!.area { hit = (parcel, area) }
+            }
+            if let hit { onTap(hit.parcel) }
         }
 
         func syncTiles(to template: String?, in view: MKMapView) {
