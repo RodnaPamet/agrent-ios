@@ -19,6 +19,11 @@ struct ExchangeView: View {
     @State private var inquiries = MyInquiriesStore()
     @State private var posting = false
 
+    /// Remembered per user, and the LIST is the default. The map answers
+    /// "where are the offers"; the list answers "what is on offer", and
+    /// the second is the question somebody opens a trading board with.
+    @AppStorage("exchange.showMap") private var showMap = false
+
     var body: some View {
         NavigationStack {
             stack
@@ -27,6 +32,13 @@ struct ExchangeView: View {
                 .toolbar {
                     if tab == .browse {
                         ToolbarItem(placement: .primaryAction) { filterMenu }
+                        ToolbarItem(placement: .primaryAction) {
+                            Button { showMap.toggle() } label: {
+                                Label(showMap ? "Списък" : "Карта",
+                                      systemImage: showMap ? "list.bullet" : "map")
+                            }
+                            .accessibilityLabel(showMap ? "Покажи списък" : "Покажи карта")
+                        }
                     }
                     // PARITY GAP 3. "Моите обяви" was read-only: you could
                     // see your listings and not make one.
@@ -132,6 +144,10 @@ struct ExchangeView: View {
                     message: "В момента никое стопанство не предлага нищо на борсата."
                 )
             }
+
+        case .loaded where showMap:
+            ExchangeMapView(listings: listings.rows)
+                .refreshable { await listings.load() }
 
         case .loaded:
             List {
