@@ -46,4 +46,28 @@ enum BgDate {
     static func dayMonth(_ date: Date) -> String {
         date.formatted(.dateTime.day().month(.wide).locale(locale))
     }
+
+    /// `"2026-09-19"` → that calendar day.
+    ///
+    /// The agro endpoints answer with a date-only string, which is a DAY and
+    /// not an instant. Parsing it as UTC midnight and rendering it in the
+    /// device's zone is the shape that silently loses a day west of
+    /// Greenwich, so both ends use `.current` and the value round-trips to
+    /// the same digits it arrived as.
+    ///
+    /// `en_US_POSIX` for the parse, `bg_BG` for the display: a fixed format
+    /// must be read against a fixed locale, or a device set to a calendar
+    /// that is not Gregorian reads `2026` as a year it is not.
+    static func parseISODay(_ string: String) -> Date? {
+        isoDay.date(from: string)
+    }
+
+    private static let isoDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }
