@@ -1,20 +1,91 @@
 import Foundation
 
-/// The server calls this a Task. Swift already has `Task`, and shadowing the
-/// concurrency type in a codebase built on actors and `async` would be a
-/// daily cost for a name nobody sees. The server's own enums are all
-/// `WorkItem*` — `WorkItemType`, `WorkItemStatus`, `WorkItemSeverity` — so
-/// this is the server's other name for the same thing, not one invented here.
+/// A row of the task LIST, which is a projection and not a whole task.
 ///
-/// Field list taken from the wire, not the Prisma model. Those differ: the
-/// journal's use case returns `{items, pageInfo}` and its ROUTE reshapes to
-/// `{rows, nextCursor}` before responding. For a single work item the route
-/// does not reshape, but the rule stands — read the route.
+/// MEASURED against production on 2026-09-22, because the field list I was
+/// given was the model's and the wire's is smaller. The list route returns
+/// exactly eleven keys:
 ///
-/// NO NUMBERS ON THIS TYPE. Not a single Decimal or numeric column, which is
-/// worth stating because the codebase has both conventions live at once:
-/// `Parcel.areaHa` is a number and `ExchangeListing.quantityTonnes` is a
-/// decimal-as-string, both verified. There was no third guess to make here.
+///     id · key · title · type · status · severity · dueAt
+///     assignee · assigneeUserId · createdAt · updatedAt
+///
+/// **`priority` is NOT among them.** Nor `tenantId`, `description`,
+/// `source`, `resolution`, `completedAt`, `createdByUserId`,
+/// `reviewerUserId`, `operationType` or `applicationTechnique`. A model built
+/// from the full field list fails the whole list decode on `tenantId` — which
+/// is precisely what it did, on the first run, on the device.
+///
+/// This is the "read the ROUTE, not the model" rule biting the person who
+/// wrote it down two files ago. The rule was right and I applied it to the
+/// envelope, where the previous bug had been, and not to the element. A
+/// lesson learned in one position does not transfer itself to another.
+///
+/// The keys were taken as a UNION across all eight rows, not from the first:
+/// `dueAt` and `assignee` are null on some rows, and reading one row would
+/// have missed whichever keys that row happened not to carry.
+struct WorkItemSummary: Decodable, Identifiable, Equatable, Sendable {
+    let id: String
+
+    /// The human-facing reference, e.g. the thing an operator reads out on
+    /// the phone. Non-null on every row measured.
+    let key: String
+
+    let title: String
+    let type: WorkItemType
+    let status: WorkItemStatus
+    let severity: WorkItemSeverity
+
+    /// Null on all eight production rows today, so the overdue and
+    /// due-date paths below are MODELLED, NOT VERIFIED. First task with a
+    /// deadline is the first real test of them.
+    let dueAt: Date?
+
+    let assignee: Assignee?
+    let assigneeUserId: String?
+    let createdAt: Date
+    let updatedAt: Date
+
+    /// A person, which makes this the first PERSONAL DATA the app models.
+    ///
+    /// `name` and `email` are a third party's details. Two rules follow and
+    /// neither is optional:
+    ///
+    ///   - They may be DISPLAYED — that is what the field is for.
+    ///   - They must never reach a log, a query parameter or a cache key.
+    ///     CFNetwork writes full request URLs to the unified log from
+    ///     Apple's own subsystems and the app cannot suppress it, so a
+    ///     filter-by-assignee must use a header or a body. See ROADMAP,
+    ///     Phase 0.
+    struct Assignee: Decodable, Equatable, Sendable {
+        let id: String
+        let name: String?
+        let email: String?
+
+        /// What to show. Falls back to the email only if there is no name,
+        /// and to nothing at all if there is neither — an empty chip is
+        /// better than the word "Unknown" in English on a Bulgarian screen.
+        var displayName: String? {
+            if let name, !name.isEmpty { return name }
+            if let email, !email.isEmpty { return email }
+            return nil
+        }
+    }
+
+    var isOverdue: Bool {
+        guard let dueAt else { return false }
+        return dueAt < Date() && !status.isFinished
+    }
+}
+
+/// A whole task, as the DETAIL route returns it.
+///
+/// ── NOT VERIFIED AGAINST A RESPONSE ──
+///
+/// Every field here comes from the server's own field list, which is a good
+/// source and is not the same thing as having decoded one. The list route
+/// turned out to send eleven of these nineteen, and that difference was only
+/// found by running it. Treat this as modelled until a detail screen exists
+/// and has loaded a real task; the first one to do so is the test.
 struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     let tenantId: String
