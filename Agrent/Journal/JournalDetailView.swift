@@ -82,7 +82,7 @@ struct JournalDetailView: View {
                 // shares an HStack with the chip and breaks mid-word once
                 // Dynamic Type is turned up; here nothing competes for the
                 // width, and `fixedSize` stops the stack squeezing it.
-                Text(entry.occurredAt, format: .dateTime.day().month(.wide).year())
+                Text(BgDate.full(entry.occurredAt))
                     .font(.body)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -39,11 +39,11 @@ struct ListingDetailView: View {
 
             Section {
                 LabeledContent("Публикувана") {
-                    Text(listing.createdAt, format: .dateTime.day().month().year())
+                    Text(BgDate.full(listing.createdAt))
                 }
                 if let expires = listing.expiresAt {
                     LabeledContent("Валидна до") {
-                        Text(expires, format: .dateTime.day().month().year())
+                        Text(BgDate.full(expires))
                     }
                 }
             }

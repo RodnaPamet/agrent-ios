@@ -23,7 +23,7 @@ import Foundation
 /// The keys were taken as a UNION across all eight rows, not from the first:
 /// `dueAt` and `assignee` are null on some rows, and reading one row would
 /// have missed whichever keys that row happened not to carry.
-struct WorkItemSummary: Decodable, Identifiable, Equatable, Sendable {
+struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let id: String
 
     /// The human-facing reference, e.g. the thing an operator reads out on
@@ -56,18 +56,57 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Sendable {
     ///     Apple's own subsystems and the app cannot suppress it, so a
     ///     filter-by-assignee must use a header or a body. See ROADMAP,
     ///     Phase 0.
-    struct Assignee: Decodable, Equatable, Sendable {
+    struct Assignee: Decodable, Equatable, Hashable, Sendable {
         let id: String
         let name: String?
         let email: String?
 
         /// What to show. Falls back to the email only if there is no name,
-        /// and to nothing at all if there is neither — an empty chip is
+        /// and to nothing at all if there is neither — an empty space is
         /// better than the word "Unknown" in English on a Bulgarian screen.
         var displayName: String? {
-            if let name, !name.isEmpty { return name }
-            if let email, !email.isEmpty { return email }
-            return nil
+            Self.readable(name) ?? Self.readable(email)
+        }
+
+        /// Reject anything that is not a name a person could read.
+        ///
+        /// MEASURED on the device, 2026-09-22: the task detail route
+        /// returned a `createdBy.name` of
+        ///
+        ///     v1:FTDt/A1v/6KngIxn762VOuI9kQdrKrz69Se6XnFAUBVSb0L/Nm8r
+        ///
+        /// which is an encryption envelope, not a name. The field is
+        /// encrypted at rest and that response did not decrypt it. The
+        /// screen rendered it verbatim under "Създадена от", so an operator
+        /// was shown 54 characters of base64 where a colleague's name
+        /// belongs.
+        ///
+        /// Raised with the server, and it is theirs to fix. This is the
+        /// client half, and it belongs here regardless: a ciphertext is
+        /// never something to show a person, whatever the reason it
+        /// arrived. Showing nothing loses one fact; showing the blob makes
+        /// the screen look broken and teaches the operator to distrust it.
+        ///
+        /// Matched on the versioned envelope prefix — `v` digits `:` — not
+        /// on "looks like base64", which would eventually eat a real value.
+        /// A colon cannot appear in a person's name in any case this app
+        /// serves.
+        private static func readable(_ value: String?) -> String? {
+            guard let value else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            guard !isCipherEnvelope(trimmed) else { return nil }
+            return trimmed
+        }
+
+        static func isCipherEnvelope(_ text: String) -> Bool {
+            guard let colon = text.firstIndex(of: ":"), colon > text.startIndex else {
+                return false
+            }
+            let tag = text[text.startIndex..<colon]
+            guard tag.first == "v" else { return false }
+            let digits = tag.dropFirst()
+            return !digits.isEmpty && digits.allSatisfy(\.isNumber)
         }
     }
 
@@ -79,13 +118,17 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Sendable {
 
 /// A whole task, as the DETAIL route returns it.
 ///
-/// ── NOT VERIFIED AGAINST A RESPONSE ──
+/// VERIFIED against production on 2026-09-22 — decoded from a real response
+/// before this screen was written, rather than after it failed. The list
+/// route's projection was found the other way round and cost a screen.
 ///
-/// Every field here comes from the server's own field list, which is a good
-/// source and is not the same thing as having decoded one. The list route
-/// turned out to send eleven of these nineteen, and that difference was only
-/// found by running it. Treat this as modelled until a detail screen exists
-/// and has loaded a real task; the first one to do so is the test.
+/// The detail route sends THIRTY-THREE keys, not the nineteen of the model:
+/// beyond the scalars there are `assignee`, `createdBy` and `reviewer` as
+/// objects, `comments`, `links` and `watchers` as arrays, a `_count`, an
+/// `sla`, `createdAt`/`updatedAt`, and the soft-delete and retention
+/// columns. The extra keys are ignored by Codable, so the model would have
+/// worked — but it would have quietly left the useful half on the wire, and
+/// "it decoded" is not the same as "we read what was there".
 struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     let tenantId: String
@@ -117,6 +160,61 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     /// The dedupe key the server stores for a create. Present on the way
     /// back; the app sends it as `Idempotency-Key`, not in the body.
     let clientMutationId: String?
+
+    let createdAt: Date
+    let updatedAt: Date
+
+    /// Three people, all optional, all personal data. Same rule as
+    /// `WorkItemSummary.Assignee`: displayable, never logged, never in a
+    /// query parameter or a cache key.
+    let assignee: WorkItemSummary.Assignee?
+    let createdBy: WorkItemSummary.Assignee?
+    let reviewer: WorkItemSummary.Assignee?
+
+    let sla: SLA?
+
+    /// How many of each related thing exist, WITHOUT the things themselves.
+    ///
+    /// The detail payload also carries `comments`, `links` and `watchers` as
+    /// arrays, and they are deliberately not modelled: all three were empty
+    /// on the task measured, so their element shapes are unknown, and
+    /// guessing an element shape is what cost the list screen its first run.
+    /// A count is honest and enough to say "3 коментара" — the elements can
+    /// be modelled the day a screen reads them, against a response that has
+    /// some.
+    let counts: Counts?
+
+    struct SLA: Decodable, Equatable, Sendable {
+        /// NOT displayed, deliberately. It is a server-authored string and
+        /// nothing establishes that it is Bulgarian — and this app's one
+        /// rule about English is that it reaches the operator only through
+        /// an error path we cannot yet translate, never through a label we
+        /// chose to render. The breach flags below carry the meaning in
+        /// words this app owns.
+        let label: String?
+        let triageBreach: Bool?
+        let resolveBreach: Bool?
+
+        var isBreached: Bool { triageBreach == true || resolveBreach == true }
+    }
+
+    struct Counts: Decodable, Equatable, Sendable {
+        let comments: Int?
+        let evidence: Int?
+        let links: Int?
+        let watchers: Int?
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, tenantId, type, title, description, severity, priority
+        case status, source, key, resolution, dueAt, completedAt
+        case createdByUserId, assigneeUserId, reviewerUserId
+        case operationType, applicationTechnique, clientMutationId
+        case createdAt, updatedAt, assignee, createdBy, reviewer, sla
+        /// The wire name is `_count`, which is not a legal Swift property
+        /// name and would be a poor one anyway.
+        case counts = "_count"
+    }
 
     /// `metadataJson` is NOT modelled, deliberately, and this is the same
     /// call as `Parcel.properties`. Arbitrary keys with mixed value types

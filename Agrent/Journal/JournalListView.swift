@@ -150,7 +150,7 @@ struct JournalRow: View {
         .accessibilityLabel(A11y.sentence([
             entry.title,
             entry.type.label,
-            entry.occurredAt.formatted(.dateTime.day().month(.wide).year()),
+            BgDate.full(entry.occurredAt),
             entry.status == .planned ? entry.status.label : nil,
         ]))
     }
@@ -167,7 +167,7 @@ struct JournalRow: View {
         // fixedSize on the vertical axis lets the date take the height it
         // needs rather than being compressed into a mid-word break.
         HStack(spacing: 6) {
-            Text(entry.occurredAt, format: .dateTime.day().month(.wide))
+            Text(BgDate.dayMonth(entry.occurredAt))
             if entry.status == .planned {
                 Text("·")
                 Text(entry.status.label)
