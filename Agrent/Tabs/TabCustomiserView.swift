@@ -50,8 +50,20 @@ struct TabCustomiserView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Запази") {
                         Task {
-                            await store.save(chosen)
-                            dismiss()
+                            // ONLY on success.
+                            //
+                            // This dismissed unconditionally. A refused
+                            // write rolls the bar back — so the farmer
+                            // watched their arrangement snap to what it
+                            // was, with the sheet closing over the one
+                            // place the reason is printed. The overlay
+                            // below could never be seen.
+                            //
+                            // Found while the route still 404'd, which is
+                            // the window where the failure path was the
+                            // ONLY path. A week later it would have been
+                            // unreachable code that stays wrong.
+                            if await store.save(chosen) { dismiss() }
                         }
                     }
                     .disabled(chosen.isEmpty || store.isSaving)
