@@ -135,7 +135,14 @@ final class SchematicAccessibilityTests: XCTestCase {
         )
         XCTAssertTrue(label.contains("засят"), label)
         XCTAssertTrue(label.contains("Пшеница"), label)
-        XCTAssertTrue(label.contains("12,4 хектара"), label)
+        // NOT the literal "12,4". `Num.text` formats for the DEVICE locale,
+        // so the decimal separator is a comma here and a full stop on the
+        // en_US CI runner — which is exactly how this test failed on its
+        // first run: the app was right, the assertion had hard-coded an
+        // environment it does not control. Asserted through the same
+        // formatter the view uses, so it checks the wiring rather than the
+        // runner's locale.
+        XCTAssertTrue(label.contains("\(Num.text(12.4)) хектара"), label)
         XCTAssertTrue(label.contains("североизток"), label)
     }
 
@@ -155,7 +162,7 @@ final class SchematicAccessibilityTests: XCTestCase {
         let label = SchematicParcelMap.label(
             for: only, centre: CGPoint(x: 100, y: 100), count: 1
         )
-        XCTAssertEqual(label, "Единствен, угар, 1 хектара.")
+        XCTAssertEqual(label, "Единствен, угар, \(Num.text(1)) хектара.")
     }
 
     /// A parcel genuinely in the middle gets told so, rather than being given
