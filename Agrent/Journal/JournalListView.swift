@@ -11,10 +11,12 @@ struct JournalListView: View {
                 if let age = store.state.freshness?.ageDescription {
                     StaleBanner(age: age)
                 }
+                header
                 content
                 newEntryButton
             }
-            .navigationTitle("Земеделски дневник")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Изход") { auth.signOut() }
@@ -25,6 +27,32 @@ struct JournalListView: View {
             }
             .task { if store.state.value == nil { await store.load() } }
         }
+    }
+
+    /// The title lives in the CONTENT, not the navigation bar.
+    ///
+    /// A large navigation title truncates and cannot be told not to: at
+    /// Dynamic Type accessibility3 "Земеделски дневник" rendered as
+    /// "Земеделски…", which is the app's own name for the screen, cut off, on
+    /// the screen the design document names as the acceptance test. As
+    /// content it simply wraps.
+    ///
+    /// This also matches the reference artboard, which draws the title as a
+    /// block inside the page rather than as chrome.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Земеделски дневник")
+                .font(.largeTitle.bold())
+                .fixedSize(horizontal: false, vertical: true)
+            if let count = store.state.value?.count {
+                Text("^[\(count) записа](inflect: true)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
     }
 
     /// The primary action is a full-width target at the bottom of the screen,
@@ -66,20 +94,11 @@ struct JournalListView: View {
             )
 
         case .loaded(let entries, _):
-            List {
-                Section {
-                    ForEach(entries) { entry in
-                        NavigationLink {
-                            JournalDetailView(entry: entry)
-                        } label: {
-                            JournalRow(entry: entry)
-                        }
-                    }
-                } header: {
-                    Text("^[\(entries.count) записа](inflect: true)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .textCase(nil)
+            List(entries) { entry in
+                NavigationLink {
+                    JournalDetailView(entry: entry)
+                } label: {
+                    JournalRow(entry: entry)
                 }
             }
             .listStyle(.plain)
@@ -110,23 +129,41 @@ struct JournalRow: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
-            HStack(spacing: 8) {
-                CategoryChip(
-                    text: entry.type.label,
-                    foreground: entry.type.chipColors.foreground,
-                    background: entry.type.chipColors.background
-                )
-                Text(entry.occurredAt, format: .dateTime.day().month(.wide))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if entry.status == .planned {
-                    Text("·").foregroundStyle(.secondary)
-                    Text(entry.status.label)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+            // Side by side while they fit, stacked when they do not.
+            //
+            // At accessibility3 the fixed HStack squeezed both children until
+            // the chip wrapped to three lines AND the date broke mid-word —
+            // "септемвр / и". Neither is a wrap; both are a layout that has
+            // run out of room and kept going. ViewThatFits picks the stacked
+            // arrangement instead of forcing the horizontal one to fail.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { chip; dateAndStatus }
+                VStack(alignment: .leading, spacing: 6) { chip; dateAndStatus }
             }
         }
         .padding(.vertical, 6)
+    }
+
+    private var chip: some View {
+        CategoryChip(
+            text: entry.type.label,
+            foreground: entry.type.chipColors.foreground,
+            background: entry.type.chipColors.background
+        )
+    }
+
+    private var dateAndStatus: some View {
+        // fixedSize on the vertical axis lets the date take the height it
+        // needs rather than being compressed into a mid-word break.
+        HStack(spacing: 6) {
+            Text(entry.occurredAt, format: .dateTime.day().month(.wide))
+            if entry.status == .planned {
+                Text("·")
+                Text(entry.status.label)
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
