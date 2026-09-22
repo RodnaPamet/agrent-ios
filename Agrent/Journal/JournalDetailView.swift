@@ -102,7 +102,13 @@ struct JournalDetailView: View {
     /// The reason this screen exists.
     @ViewBuilder
     private var notes: some View {
-        let text = entry.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Server notes are HTML — see RichText. An entry whose whole body
+        // is an empty `<p></p>` therefore lands in the "no notes" branch
+        // below rather than rendering as a blank area, which is the right
+        // answer for both: there is nothing to read either way.
+        let text = entry.notes
+            .map(RichText.plainText)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         VStack(alignment: .leading, spacing: 8) {
             Text("Бележки")
