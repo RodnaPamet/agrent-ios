@@ -117,7 +117,7 @@ final class JournalDecodeShapeTests: XCTestCase {
 
     func testLiveEnvelopeShapeDecodes() async throws {
         let json = #"{"rows":[\#(entry)],"nextCursor":null}"#
-        let rows = try await JournalAPI.decodeList(from: Data(json.utf8))
+        let rows = try await JournalAPI.decodeList(from: Data(json.utf8)).entries
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].title, "Two")
     }
@@ -125,14 +125,14 @@ final class JournalDecodeShapeTests: XCTestCase {
     /// The no-`limit` branch. `listPath` sends `limit` today, but the cache
     /// holds bytes written by whatever the app asked for at the time.
     func testBareArrayStillDecodes() async throws {
-        let rows = try await JournalAPI.decodeList(from: Data("[\(entry)]".utf8))
+        let rows = try await JournalAPI.decodeList(from: Data("[\(entry)]".utf8)).entries
         XCTAssertEqual(rows.count, 1)
     }
 
     /// Pretty-printed or newline-led payloads must still be recognised — the
     /// shape is chosen by the first non-whitespace byte, not the first byte.
     func testLeadingWhitespaceDoesNotChangeTheShapeDecision() async throws {
-        let rows = try await JournalAPI.decodeList(from: Data("\n  [\(entry)]".utf8))
+        let rows = try await JournalAPI.decodeList(from: Data("\n  [\(entry)]".utf8)).entries
         XCTAssertEqual(rows.count, 1)
     }
 
@@ -142,7 +142,7 @@ final class JournalDecodeShapeTests: XCTestCase {
     func testABadEntryIsNotReportedAsAShapeProblem() async {
         let json = #"{"rows":[{"id":"e1","type":"ACTIVITY","status":"DONE","title":"x","occurredAt":"not-a-date"}]}"#
         do {
-            _ = try await JournalAPI.decodeList(from: Data(json.utf8))
+            _ = try await JournalAPI.decodeList(from: Data(json.utf8)).entries
             XCTFail("should not decode")
         } catch let error as DecodingError {
             if case .keyNotFound = error {
@@ -160,7 +160,7 @@ final class JournalDecodeShapeTests: XCTestCase {
     func testAnUnknownTypeFailsTheListToday() async {
         let json = #"{"rows":[{"id":"e1","type":"BRAND_NEW","status":"DONE","title":"x","occurredAt":"2026-09-11T00:00:00.000Z"}]}"#
         do {
-            _ = try await JournalAPI.decodeList(from: Data(json.utf8))
+            _ = try await JournalAPI.decodeList(from: Data(json.utf8)).entries
             XCTFail("an unknown enum case silently decoded")
         } catch {}
     }

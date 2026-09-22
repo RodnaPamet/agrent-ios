@@ -147,13 +147,27 @@ enum UserMessage {
     /// every literal in it is hard-coded Bulgarian; this matches that rather
     /// than pretending to a system that does not exist.
     static let bulgarian: [String: String] = [
-        // Calculator refusals. These four predate the migration and already
-        // work this way on the web through `explainRefusal`, so the wording
-        // is taken from there rather than invented here.
-        "NO_MARKET_PRICE": "Няма пазарна цена за тази култура, затова стойността не може да се изчисли.",
-        "MIXED_COST_CURRENCY": "Разходите са в различни валути, затова сборът не може да се изчисли.",
-        "RENT_CURRENCY_UNRECORDED": "Валутата на рентата не е записана, затова стойността не може да се изчисли.",
-        "COST_PRICE_CURRENCY_MISMATCH": "Валутата на разходите и на цената се различават, затова маржът не може да се изчисли.",
+        // Calculator refusals, from `grain.calculator.refusal.*`, VERBATIM.
+        //
+        // These replace four sentences this app had written itself under a
+        // comment claiming they came from the web. They did not. The four
+        // were plausible — one was close in meaning — and that is exactly
+        // what would have made the false provenance durable: a reader
+        // comparing them to the web would have found a discrepancy and had
+        // a comment telling them not to bother checking.
+        //
+        // THREE OF THE FOUR INTERPOLATE, which the invented ones did not,
+        // so they were not merely differently worded — they were missing
+        // information. Substitution happens in `RefusalText`, not here,
+        // because `{commodity}` needs translating before it goes in.
+        "NO_MARKET_PRICE":
+            "Няма налична пазарна цена за {commodity}.",
+        "MIXED_COST_CURRENCY":
+            "Разходите са записани в повече от една валута; смесването им в нетната стойност би изкривило общата сума.",
+        "RENT_CURRENCY_UNRECORDED":
+            "Договорът за аренда не записва валута за рентата, затова тя не може да се съчетае с активи, оценени по пазарна цена, без да се измисли такава.",
+        "COST_PRICE_CURRENCY_MISMATCH":
+            "Разходите са в {costCurrency}, а пазарната цена е в {priceCurrency}; не се извършва конвертиране на валута.",
 
         // Batch 1.
         "CROP_PLAN_NOT_READY": "Планът за културите не е готов.",

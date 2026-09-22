@@ -74,6 +74,13 @@ struct WireDecimal: Decodable, Equatable, Sendable {
         self.raw = "\(number)"
     }
 
+    /// Parse a wire string without decoding, for models that hold the raw
+    /// string and expose a computed `Decimal`.
+    static func parse(_ text: String?) -> Decimal? {
+        guard let text else { return nil }
+        return Decimal(string: text, locale: wireLocale)
+    }
+
     init(_ value: Decimal) {
         self.value = value
         self.raw = "\(value)"
@@ -83,7 +90,7 @@ struct WireDecimal: Decodable, Equatable, Sendable {
     /// device's locale. Parsing with `Locale.current` would read "1234.5" as
     /// 12345 on a machine that uses `.` for grouping — which is a real
     /// locale, and the failure is a factor of ten in a financial figure.
-    private static let wireLocale = Locale(identifier: "en_US_POSIX")
+    static let wireLocale = Locale(identifier: "en_US_POSIX")
 
     /// Formatted for an operator, in Bulgarian, at the column's scale.
     ///

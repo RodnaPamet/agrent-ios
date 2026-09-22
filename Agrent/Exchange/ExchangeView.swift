@@ -20,28 +20,54 @@ struct ExchangeView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                Picker("Изглед", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.label).tag($0) }
+            stack
+                .navigationTitle("Борса")
+                .appMenu()
+                .toolbar {
+                    if tab == .browse {
+                        ToolbarItem(placement: .primaryAction) { filterMenu }
+                    }
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
+                // On SUBMIT, not on every keystroke. A trading board is a
+                // network round trip per character otherwise, on a
+                // connection this app assumes is bad — and every one of
+                // those keystrokes is also a line in the unified log.
+                .onSubmit(of: .search) { Task { await listings.load() } }
+                .task { await loadCurrent() }
+                .onChange(of: tab) { Task { await loadCurrent() } }
+        }
+    }
 
-                if let age = currentFreshness?.ageDescription {
-                    StaleBanner(age: age)
-                }
-
-                switch tab {
-                case .browse: browse
-                case .mine: myListings
-                case .inquiries: myInquiries
-                }
+    /// Conditionally searchable, so the board gets a search field and the
+    /// other two tabs keep a plain navigation bar.
+    @ViewBuilder
+    private var stack: some View {
+        let content = VStack(spacing: 0) {
+            Picker("Изглед", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.label).tag($0) }
             }
-            .navigationTitle("Борса")
-            .appMenu()
-            .task { await loadCurrent() }
-            .onChange(of: tab) { Task { await loadCurrent() } }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+
+            if let age = currentFreshness?.ageDescription {
+                StaleBanner(age: age)
+            }
+
+            switch tab {
+            case .browse: browse
+            case .mine: myListings
+            case .inquiries: myInquiries
+            }
+        }
+
+        if tab == .browse {
+            content.searchable(
+                text: $listings.query.text,
+                prompt: "Търсене по култура или регион"
+            )
+        } else {
+            content
         }
     }
 
@@ -72,33 +98,110 @@ struct ExchangeView: View {
         case .failed(let message):
             failure(message) { await listings.load() }
 
-        case .loaded(let page, _) where page.rows.isEmpty:
-            EmptyState(
-                "Няма активни обяви",
-                icon: "tray",
-                message: "В момента никое стопанство не предлага нищо на борсата."
-            )
+        case .loaded(_, _) where listings.rows.isEmpty:
+            // A filtered no-result is NOT the same statement as an empty
+            // board, and saying the wrong one is a claim about the market
+            // rather than about the search. "Nobody is offering anything"
+            // when in fact nobody matches "пшеница over 400t" would send
+            // an operator away from a board that has offers on it.
+            if listings.query.isFiltered {
+                EmptyState(
+                    "Няма съвпадения",
+                    icon: "magnifyingglass",
+                    message: "Никоя обява не отговаря на търсенето."
+                ) {
+                    Button("Изчисти филтрите") { Task { await listings.clearFilters() } }
+                }
+            } else {
+                EmptyState(
+                    "Няма активни обяви",
+                    icon: "tray",
+                    message: "В момента никое стопанство не предлага нищо на борсата."
+                )
+            }
 
-        case .loaded(let page, _):
+        case .loaded:
             List {
                 // The table is GLOBAL — every tenant sees every active
                 // listing, and that IS the product. Saying so once is cheaper
                 // than a heading that quietly implies these are the user's,
                 // which would be a factual lie about what is on screen.
                 Section {
-                    ForEach(page.rows) { listing in
+                    ForEach(listings.rows) { listing in
                         NavigationLink {
                             ListingDetailView(listing: listing)
                         } label: {
                             ListingRow(listing: listing)
                         }
                     }
+                    loadMoreRow
                 } footer: {
                     Text("Обявите са от всички стопанства в платформата.")
                 }
             }
             .refreshable { await listings.load() }
         }
+    }
+
+    /// PARITY GAP 2. The board sent no query string at all, so it showed an
+    /// unfiltered first page with no way to search and no way to reach page
+    /// two. On a board that grows, "no way to reach page two" degrades
+    /// SILENTLY — the screen keeps looking correct while holding less and
+    /// less of the truth.
+    @ViewBuilder
+    private var loadMoreRow: some View {
+        if listings.hasMore {
+            VStack(alignment: .leading, spacing: 6) {
+                if listings.loadingMore {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Зареждане…").font(.footnote).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Button("Покажи още") { Task { await listings.loadMore() } }
+                }
+                if let error = listings.loadMoreError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// Min/max tonnage, as a menu rather than a filter screen.
+    ///
+    /// Ranges rather than free numeric entry: a trading board is scanned
+    /// by rough size — "small lots", "a truckload", "a train" — and two
+    /// numeric keyboards on a phone to express that is more precision than
+    /// the question has.
+    @ViewBuilder
+    private var filterMenu: some View {
+        Menu {
+            Picker("Количество", selection: Binding(
+                get: { TonnageBand.matching(listings.query) },
+                set: { band in
+                    listings.query.minTonnes = band.min
+                    listings.query.maxTonnes = band.max
+                    Task { await listings.load() }
+                }
+            )) {
+                ForEach(TonnageBand.allCases) { Text($0.label).tag($0) }
+            }
+            if listings.query.isFiltered {
+                Divider()
+                Button("Изчисти филтрите") { Task { await listings.clearFilters() } }
+            }
+        } label: {
+            Label(
+                "Филтри",
+                systemImage: listings.query.isFiltered
+                    ? "line.3.horizontal.decrease.circle.fill"
+                    : "line.3.horizontal.decrease.circle"
+            )
+        }
+        .accessibilityLabel(listings.query.isFiltered ? "Филтри, активни" : "Филтри")
     }
 
     // MARK: - Mine: the seller's custody view
@@ -241,15 +344,95 @@ struct InquiryRow: View {
     }
 }
 
-/// "Продава · Култура · 250 т · 51.13 EUR/т"
+/// "Продава · Култура · 250 т · 51,13 EUR/т"
 ///
-/// Quantity and price are the payload's STRINGS, printed as sent. They are
-/// Prisma decimals serialised as text; parsing them into a Double to reformat
-/// would put binary rounding into a price on a marketplace.
+/// ── The old comment was half right, and the half that was wrong shipped ──
+///
+/// It said the strings are "printed as sent" because "parsing them into a
+/// Double to reformat would put binary rounding into a price on a
+/// marketplace". The premise is correct — `Double` would — and the
+/// conclusion does not follow: `Decimal` is base-10 and exact at these
+/// magnitudes, so the value can be reformatted without rounding anything.
+///
+/// Printing as sent put `51.13 EUR` on a Bulgarian screen, where the
+/// separator is a comma. A price with the wrong decimal mark on a trading
+/// board is not a typographic nicety; it is the one figure a farmer
+/// reconciles against an invoice.
+///
+/// Scales differ because the quantities differ in kind. A price is money
+/// and takes its currency's two places, so `51.13` reads `51,13`. A tonnage
+/// is a measurement and keeps up to three without padding, so `250` stays
+/// `250` rather than becoming `250,000`.
 func summary(side: ExchangeSide, kind: ExchangeKind,
              quantity: String?, price: String?, currency: String?) -> String {
     var parts = [side.label, kind.label]
-    if let quantity { parts.append("\(quantity) т") }
-    if let price { parts.append("\(price) \(currency ?? "") / т".trimmingCharacters(in: .whitespaces)) }
+    if let tonnes = Exchange.tonnes(quantity) { parts.append("\(tonnes) т") }
+    if let money = Exchange.money(price) {
+        parts.append("\(money) \(currency ?? "") / т".trimmingCharacters(in: .whitespaces))
+    }
     return parts.joined(separator: " · ")
+}
+
+/// Formatting for the exchange's wire decimals, which are STRINGS here —
+/// these routes have no DTO, unlike `grain/costs`. See `WireDecimal`.
+enum Exchange {
+    /// Money: exactly two places, the currency's scale. `51.13` → `51,13`.
+    static func money(_ raw: String?) -> String? {
+        guard let value = WireDecimal.parse(raw) else { return raw }
+        return value.formatted(
+            .number.precision(.fractionLength(2)).grouping(.automatic)
+                .locale(BgDate.locale))
+    }
+
+    /// A measurement: up to three places, not padded. `250` → `250`.
+    static func tonnes(_ raw: String?) -> String? {
+        guard let value = WireDecimal.parse(raw) else { return raw }
+        return value.formatted(
+            .number.precision(.fractionLength(0...3)).grouping(.automatic)
+                .locale(BgDate.locale))
+    }
+}
+
+/// The tonnage bands the board is filtered by.
+///
+/// Named ranges rather than two numeric fields: a trading board is scanned
+/// by rough size, and asking for exact tonnes is more precision than the
+/// question carries. The server takes `minTonnes`/`maxTonnes`, so these
+/// are a UI over the same two parameters rather than a different contract.
+enum TonnageBand: String, CaseIterable, Identifiable {
+    case any, small, medium, large
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .any: "Всяко количество"
+        case .small: "До 50 т"
+        case .medium: "50 – 500 т"
+        case .large: "Над 500 т"
+        }
+    }
+
+    var min: Int? {
+        switch self {
+        case .any, .small: nil
+        case .medium: 50
+        case .large: 500
+        }
+    }
+
+    var max: Int? {
+        switch self {
+        case .any, .large: nil
+        case .small: 50
+        case .medium: 500
+        }
+    }
+
+    /// Which band a query currently expresses. Falls back to `.any` for a
+    /// combination no band produces — a query built by an older build, or
+    /// by hand — rather than silently rewriting it.
+    static func matching(_ query: ExchangeQuery) -> TonnageBand {
+        allCases.first { $0.min == query.minTonnes && $0.max == query.maxTonnes } ?? .any
+    }
 }

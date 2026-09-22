@@ -193,7 +193,7 @@ struct CalculatorView: View {
                     Text(Money.text(net, row.priceCurrency))
                         .font(.headline)
                 }
-            } else if let reason = row.netWorthUnavailableReason {
+            } else if let reason = row.refusalText {
                 // The server's own sentence, in the SAME weight as any other
                 // row. The calculator declining to invent a number is the
                 // product working; colouring it like a fault taught the

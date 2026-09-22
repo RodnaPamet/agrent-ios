@@ -11,11 +11,11 @@ struct ListingDetailView: View {
                 LabeledContent("Тип") { Text(listing.kind.label) }
                 LabeledContent("Посока") { Text(listing.side.label) }
                 if let quantity = listing.quantityTonnes {
-                    LabeledContent("Количество") { Text("\(quantity) т") }
+                    LabeledContent("Количество") { Text("\(Exchange.tonnes(quantity) ?? quantity) т") }
                 }
                 if let price = listing.pricePerTonne {
                     LabeledContent("Цена / т") {
-                        Text("\(price) \(listing.priceCurrency ?? "")")
+                        Text("\(Exchange.money(price) ?? price) \(listing.priceCurrency ?? "")")
                     }
                 }
                 LabeledContent("Състояние") { Text(listing.status.label) }

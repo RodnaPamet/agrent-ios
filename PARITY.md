@@ -27,10 +27,16 @@ Two different questions get confused, so they are separate columns:
 | **Design complete** | also survives `DESIGN.md`'s own acceptance test — outdoors, arm's length, Dynamic Type at accessibility3 |
 | **Functional parity** | does what the web page does |
 
-As of 2026-09-22 **every screen is "applied" and none is "complete"** —
-the acceptance test was run for the first time on the journal and it
-failed (see *Design status* below). Do not let a screen's polished
-appearance at default size stand in for the test.
+**UPDATED 2026-09-22, later the same day.** The AX3 failures are fixed
+and gaps 1, 2, 4, 5 and 6 are closed. What remains is gap 3 and Phase 4
+admin. Each section below carries its own status; this header no longer
+speaks for all of them.
+
+The original line read: *"every screen is applied and none is complete"*.
+That was true when written and is kept because the reason it was written
+still holds — a screen's polished appearance at default text size is not
+the acceptance test, and treating it as one is how the AX3 failures
+survived a design pass.
 
 A note on provenance, because it affects how much this document is worth:
 `DESIGN.md` was authored by me, so auditing against it is not an
@@ -84,9 +90,24 @@ RENT_CURRENCY_UNRECORDED
 COST_PRICE_CURRENCY_MISMATCH
 ```
 
-**To close:** decode both fields, carry the four strings, apply the same
-fallback rule. Keep the fallback — an unknown future code must still say
-something rather than nothing.
+**CLOSED 2026-09-22.** `netWorthUnavailableCode` and `…Params` are
+decoded, `RefusalText` applies `explainRefusal`'s rule, and the fallback
+is kept.
+
+Two things found on the way that the original entry did not anticipate:
+
+1. **Three of the four strings INTERPOLATE.** This app had written its
+   own four sentences under a comment claiming they came from the web.
+   They had not, and they lost `{commodity}` and both currency codes —
+   so they were not merely differently worded, they were missing
+   information. The comment was the worse half: asserting a provenance
+   converts a reader's check into a skip. Corrected in place, strings
+   replaced verbatim.
+2. **`{commodity}` is a canonical SLUG, and the web renders it raw** —
+   "Няма налична пазарна цена за **wheat**", a Bulgarian sentence with
+   an English slug in it. The app deliberately DIVERGES: the wording is
+   the web's, the substitution is not. `{commodity}` goes through
+   `CommodityName.canonical`.
 
 ---
 
@@ -99,21 +120,45 @@ Web `exchange` (1159) + `exchange/my-listings` (394) + `exchange/my-interests`
 tabs — Обяви / Моите обяви / Моите заявки — which is the correct mobile
 shape, not a shortfall.
 
-### Gap 2 — no search, no filter, no pagination
+### Gap 2 — no search, no filter, no pagination — CLOSED 2026-09-22
 
-The web drives the listings query with `q`, `minTonnes`, `maxTonnes`,
-`limit` and `cursor`. `ExchangeAPI.listingsPath` sends **no query string at
-all**, so the app shows an unfiltered first page with no way to search and
-no way to reach page two.
+Search on submit, tonnage bands, and "Покажи още". Three decisions worth
+recording because none is obvious from the endpoint:
 
-On a board that grows, "no way to reach page two" degrades silently: the
-screen keeps looking correct while holding less and less of the truth.
+- **Only the UNFILTERED first page is cached.** `CachedResource` keys on
+  the path, so every search term would mint its own entry — and an
+  operator offline in a field would be shown whatever they last searched
+  for, presented as the board.
+- **Search fires on SUBMIT, not per keystroke.** A round trip per
+  character on a connection this app assumes is bad, and every keystroke
+  is also a line in the unified log.
+- **A filtered no-result says "Няма съвпадения", not "Няма активни
+  обяви".** The second is a claim about the market rather than about the
+  search, and it would send an operator away from a board that has
+  offers on it.
 
-### Gap 3 — cannot create a listing
+Two defects found while doing it: the price rendered `51.13 EUR` on a
+Bulgarian screen — the raw wire string, printed under a comment arguing
+that reformatting needs `Double` and would round. The premise was right
+and the conclusion was not: `Decimal` is exact. And `quantityTonnes`
+parsed with `Decimal(string:)` and no locale, which reads "12.5" as 125
+where `.` groups.
+
+### Gap 3 — cannot create a listing — STILL OPEN
 
 The web posts to `/exchange/listings`. The app has `createInquiry` only, so
 **Моите обяви is read-only** — you can see your listings but not make one.
-The endpoint exists; the client does not call it.
+
+**Deliberately not built on a guess.** A listing is published to every
+tenant in the platform, so the write needs its schema read rather than
+inferred — field names, which are required, the `side`/`kind` enums, and
+whether the decimals go out as numbers or strings. That last one is not
+inferable: the exchange READS are strings because those routes have no
+DTO, and `grain/costs` sends numbers because it has one.
+
+When it is built it ships **unfired**, like `createInquiry`. The owner
+authorising one cost row on his own books does not extend to posting an
+offer other farms can see.
 
 ### Note — the inquiry write is still unexercised
 
@@ -130,13 +175,14 @@ Web `locations` (225) + `locations/[locationId]` (1342, with
 `apiPost`/`apiPatch`/`apiDelete`) · iOS `Locations/LocationsView.swift` (59)
 + `ParcelMapView.swift` (218) + `SchematicParcelMap.swift`
 
-### Gap 4 — read-only
+### Gap 4 — read-only — CLOSED 2026-09-22 as a DECISION
 
-The web location detail creates, edits and deletes; the app renders. For
-field work that is arguably the right split — drawing a parcel boundary on
-a phone in a field is not obviously a feature anyone wants — but it is a
-difference, and it should be a **decision recorded in `ROADMAP.md`**
-rather than an omission nobody has named.
+Recorded in `ROADMAP.md` rather than built. The geometry feeds subsidy
+and lease paperwork, and the schematic draws parcels as squares five
+times life size so they can be read in sun — the right instrument for
+finding a field and the wrong one for defining a boundary.
+
+The gap was never "the app cannot edit"; it was that nobody had said so.
 
 The schematic renderer and the MapKit toggle are ahead of the web here,
 which has no schematic view at all.
@@ -149,7 +195,7 @@ Web `journal` (1785, `apiPost`/`apiPatch`) + `journal/[id]` (904,
 `apiDelete`) · iOS `Journal/JournalListView.swift` (126) +
 `NewEntryView.swift` (76)
 
-### Gap 5 — there is no entry detail
+### Gap 5 — there is no entry detail — CLOSED 2026-09-22
 
 `JournalListView` has a `.sheet` for composing and **no `NavigationLink`**.
 The list is terminal: an entry cannot be opened, so it cannot be read in
@@ -159,11 +205,28 @@ This is the largest functional gap in the app. The journal is the legally
 filed record — the ДНЕВНИК PDF is generated from exactly these rows — and
 an operator standing in a field cannot check what was recorded.
 
-### Gap 6 — the list is capped at 50 with no paging
+### Gap 6 — the list is capped at 50 with no paging — CLOSED 2026-09-22
 
-`JournalAPI.listPath` is `"\(base)?limit=50"`. No cursor, no "load more".
-A tenant past 50 entries silently sees a truncated history, and nothing on
-screen says so.
+Cursor paging with an explicit "Покажи още", and the header count now
+reads "Показани N" while more exists — the old copy claimed N was the
+tenant's history, which was wrong for any farm past fifty entries.
+
+Pages are de-duplicated by id: a cursor is positional, so an entry
+created between two fetches shifts the window and can repeat a row. A
+diary showing one entry twice is not cosmetic — it reads as a register
+that recorded the same operation twice.
+
+Later pages are NOT cached. Page one is the offline case; caching page
+three would give an offline reader a history with holes in it,
+presented as continuous.
+
+**It also refined a rule rather than breaking it.** `ROADMAP.md` said
+"never a query parameter", which read literally forbids a cursor. The
+rule drew the wrong line: CFNetwork logs the whole URL *including the
+path*, and the tenant slug is already in every path. A query parameter
+is not more exposed than a path segment. The honest rule is "nothing
+personal in a URL at all" — an opaque cursor is not, a free-text search
+term can be.
 
 ---
 
@@ -210,15 +273,16 @@ Two shapes the screen has to get right:
 
 ---
 
-## Design status
+## Design status — the AX3 failures are FIXED
 
 Owned by the peer, on hardware. Recorded here so the two halves of the
 owner's request sit in one place.
 
 `DESIGN.md` ends: *"Take a phone outside, in sun, and read the journal at
 arm's length with Dynamic Type at accessibility3. Everything above is
-downstream of that."* Run for the first time on 2026-09-22, on the
-journal — the most-worked screen — it **fails**:
+downstream of that."* Run for the first time on 2026-09-22, on the journal — the most-worked
+screen — it **failed**. All five are fixed; the list is kept because the
+failures are more instructive than the fixes:
 
 - navigation title truncates (`Земеделски…`)
 - the entry-type chip wraps to three lines; the chip shape assumes short
@@ -228,23 +292,26 @@ journal — the most-worked screen — it **fails**:
   independently and fight
 - roughly two entries fit on screen
 
-`DESIGN.md` §5 (accessibility) is essentially unstarted, measured across
-the whole app: 2 `.accessibilityLabel`, 2 `.accessibilityElement`, 1
-`.accessibilityHint`, zero `accessibilityReduceMotion`, zero
-`colorSchemeContrast`.
+`DESIGN.md` §5 (accessibility) was essentially unstarted — 2
+`.accessibilityLabel`, 2 `.accessibilityElement`, 1 `.accessibilityHint`,
+zero `colorSchemeContrast`. Done: every row speaks from its VALUES rather
+than its rendered text (a `·` separator was being read as "middle dot"),
+the schematic map exposes one element per parcel with a compass bearing,
+and `colorSchemeContrast` is honoured where colour carries meaning.
+
+**No `reduceMotion`**, deliberately: the app has zero animations, so
+reading the environment to gate nothing would be an accessibility feature
+in name only.
 
 ---
 
-## Suggested order
+## What is left
 
-1. **The AX3 failures**, because `DESIGN.md` says everything is downstream
-   of that test and it is currently red. A screen that cannot be read
-   outdoors fails before any parity gap matters.
-2. **Journal entry detail (Gap 5)** — the largest functional hole, on the
-   legally-filed record.
-3. **Calculator refusal text (Gap 1)** — small, self-contained, and it
-   removes English from a Bulgarian screen.
-4. **Exchange create + filters (Gaps 2, 3)**.
-5. **Phase 4 admin**, against the contract above.
-6. **Record the Locations read-only split (Gap 4) as a decision**, or close
-   it. Either is fine; leaving it unnamed is not.
+1. **Gap 3 — create a listing.** Blocked on the write schema, by choice
+   rather than by circumstance. Ships unfired when built.
+2. **Phase 4 admin**, against the contract above. The only remaining
+   stub screen, and it now has a home in the app menu rather than a tab.
+
+Everything else on this list is closed. The order the original version
+suggested held up: the AX3 failures first, because a screen that cannot
+be read outdoors fails before any parity gap matters.
