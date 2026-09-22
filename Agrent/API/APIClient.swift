@@ -212,8 +212,12 @@ actor APIClient {
     /// not the detail's expansion. Handing back bytes lets a caller probe
     /// before it models, which is the order that has been right every time
     /// today and wrong every time it was reversed.
+    /// `idempotencyKey` is OPTIONAL, and nil is a statement rather than an
+    /// omission: the grain routes ignore the header entirely, and sending
+    /// one that is ignored would read, to the next person, as protection
+    /// that is not there.
     func postReturningData<B: Encodable>(
-        _ path: String, body: B, idempotencyKey: String
+        _ path: String, body: B, idempotencyKey: String?
     ) async throws -> Data {
         let payload = try encoder.encode(body)
         return try await send(

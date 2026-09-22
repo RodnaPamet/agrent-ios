@@ -2,6 +2,8 @@ import SwiftUI
 
 struct CalculatorView: View {
     @State private var store = CalculatorStore()
+    @State private var costs = CostsStore()
+    @State private var addingCost = false
 
     var body: some View {
         NavigationStack {
@@ -10,11 +12,49 @@ struct CalculatorView: View {
                     StaleBanner(age: age)
                 }
                 content
+                newCostButton
             }
             .navigationTitle("Калкулатор")
             .appMenu()
-            .task { if store.state.value == nil { await store.load() } }
+            .sheet(isPresented: $addingCost) {
+                NewCostView {
+                    Task {
+                        await costs.load()
+                        await store.load()
+                    }
+                }
+            }
+            .task {
+                if store.state.value == nil { await store.load() }
+                if costs.state.value == nil { await costs.load() }
+            }
         }
+    }
+
+    /// A full-width target at the bottom, the same shape as the journal's
+    /// "Нов запис" — a gloved thumb reaches the bottom of a phone, and the
+    /// top-right corner is the hardest place on the device to hit
+    /// one-handed. DESIGN.md asks for one pass across all five tabs rather
+    /// than each screen inventing its own affordance.
+    ///
+    /// Shown even when the report is EMPTY, which is the case this tenant
+    /// is actually in: the calculator has nothing to compute until there is
+    /// a season with sown area, and "nothing to show" is exactly the
+    /// moment an operator wants to put something in. A screen that says
+    /// "няма какво да се изчисли" and offers no way to change that is a
+    /// dead end.
+    private var newCostButton: some View {
+        Button {
+            addingCost = true
+        } label: {
+            Text("Нов разход").frame(maxWidth: .infinity, minHeight: 30)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .background(.bar)
     }
 
     @ViewBuilder
@@ -31,12 +71,31 @@ struct CalculatorView: View {
             // Says WHY rather than just "empty". This is the state production
             // actually returns today, and "no data" without a reason reads as
             // a broken screen.
-            EmptyState(
-                "Няма какво да се изчисли",
-                icon: "chart.pie",
-                message: "Калкулаторът показва стойност само когато има сезон със засети площи. За това стопанство още няма такива."
-            ) {
-                Button("Опитай пак") { Task { await store.load() } }
+            //
+            // The costs list sits below it even here, and that placement is
+            // load-bearing rather than tidy: the grain routes have no
+            // idempotency, so `NewCostView` tells an operator whose save
+            // timed out to CHECK THIS LIST before entering it again. Advice
+            // to look somewhere that does not exist is worse than no advice.
+            List {
+                // NOT the `EmptyState` component. It is built to fill a
+                // screen — centred, with a large icon — and a List row
+                // gives it a row's height instead, which clipped the icon
+                // to a grey sliver. A component that assumes the whole
+                // screen does not become a section by being put in one.
+                Section("Стойност") {
+                    Text("Няма какво да се изчисли")
+                        .font(.headline)
+                    Text("Калкулаторът показва стойност само когато има сезон със засети площи. За това стопанство още няма такива.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                costsSection
+            }
+            .refreshable {
+                await store.load()
+                await costs.load()
             }
 
         case .loaded(let payload, _):
@@ -45,12 +104,61 @@ struct CalculatorView: View {
                 ForEach(payload.rows) { row in
                     rowSection(row)
                 }
+                costsSection
                 footnotes(payload)
             }
-            .refreshable { await store.load() }
+            .refreshable {
+                await store.load()
+                await costs.load()
+            }
         }
     }
 
+    // MARK: - Costs
+
+    /// What has been entered, so a save can be CHECKED.
+    ///
+    /// Without idempotency a duplicate is permanent, so an operator whose
+    /// save timed out must be able to see whether it landed before deciding
+    /// to try again. That makes this list part of the write path rather
+    /// than a nice-to-have beside it.
+    @ViewBuilder
+    private var costsSection: some View {
+        switch costs.state {
+        case .loading:
+            Section("Разходи") { ProgressView() }
+
+        case .failed(let message):
+            Section("Разходи") {
+                Text(message).font(.footnote).foregroundStyle(Palette.error)
+            }
+
+        case .loaded(let page, _) where page.items.isEmpty:
+            Section("Разходи") {
+                Text("Още няма въведени разходи.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+        case .loaded(let page, _):
+            Section(header: Text("Разходи"), footer: costsFooter(page)) {
+                ForEach(page.items) { cost in CostRow(cost: cost) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func costsFooter(_ page: CostPage) -> some View {
+        if page.truncated {
+            // A capped list looks exactly like a complete short one, and on
+            // the screen someone checks a save against, that is the
+            // difference between "it did not save" and "you cannot see it
+            // from here".
+            Text("Списъкът е съкратен от сървъра. Не всички разходи се показват.")
+        } else if let total = page.totalCount, total != page.items.count {
+            Text("Показани \(page.items.count) от ^[\(total) разхода](inflect: true).")
+        }
+    }
     // MARK: - Farm totals
 
     @ViewBuilder
@@ -223,8 +331,55 @@ enum Money {
     /// Currency shown as the payload's own code rather than a symbol: the
     /// payload can carry an "UNKNOWN" sentinel, and rendering that as a
     /// currency symbol would invent a currency.
+    ///
+    /// ── MONEY IS ALWAYS TWO DECIMALS ──
+    ///
+    /// This used `Num.text`, whose precision is `0...2` — trailing zeros
+    /// dropped. Correct for an area or a tonnage, wrong for money: the
+    /// farm's net worth rendered as `12 691,8 EUR` where the books say
+    /// `12 691,80`. Seen on the device the moment the calculator started
+    /// returning real figures.
+    ///
+    /// It is the same defect as the one in `WireDecimal`, reached from the
+    /// other direction — there the server dropped the zero, here the client
+    /// did. A money figure that is not at its currency's scale reads as an
+    /// approximation, and on a screen whose whole job is reconciling
+    /// against a ledger that is the difference between a number someone
+    /// can check and one they have to think about.
     static func text(_ value: Double, _ currency: String?) -> String {
-        guard let currency, !currency.isEmpty else { return Num.text(value) }
-        return "\(Num.text(value)) \(currency)"
+        let amount = value.formatted(
+            .number.precision(.fractionLength(2)).grouping(.automatic)
+        )
+        guard let currency, !currency.isEmpty else { return amount }
+        return "\(amount) \(currency)"
+    }
+}
+
+struct CostRow: View {
+    let cost: CostEntry
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cost.category.label).font(.subheadline.weight(.medium))
+                Text(BgDate.dayMonth(cost.incurredOn))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
+            // Padded back to the column's scale: 1.00 arrives as 1, and
+            // "1 лв" on a books screen is not what the ledger says.
+            Text("\(cost.amountText) \(cost.currency)")
+                .font(.subheadline.monospacedDigit())
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(A11y.sentence([
+            cost.category.label,
+            "\(cost.amountText) \(cost.currency)",
+            BgDate.full(cost.incurredOn),
+            cost.supplier,
+        ]))
     }
 }

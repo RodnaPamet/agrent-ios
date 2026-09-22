@@ -277,6 +277,88 @@ missing buttons as unfinished work and add them.
 Explicitly **out** for now: cadastre import, lease register, parcel merge,
 clusters, basemap tile download. Those are desk workflows.
 
+## Phase 5 — Tasks and cost input (2026-09-22)
+
+Задачи took Админ's tab slot (owner): five slots exist before iOS
+collapses the rest into "More", and Админ was spending the most valuable
+one on a placeholder that said "use the web app". Shipped: task list,
+task detail, status change, and cost entry on the calculator.
+
+### Response shapes are PER-ROUTE. There is no house style.
+
+Everything below was measured on this tenant, not inferred:
+
+| route | shape |
+|---|---|
+| `tasks` list | 11 keys — a projection, no `tenantId`, no `priority` |
+| `tasks/:id` | 33 keys — relations, `_count`, `sla` |
+| `tasks/:id/status`, real change | 25 keys — bare row |
+| `tasks/:id/status`, REPLAY | 32 keys — relations |
+| `grain/costs` envelope | `{rows, totalCount, truncated}` |
+| `journal` envelope | `{rows, nextCursor}` |
+
+Six variants. The write's two are the dangerous pair: the fatter one is
+served on the REPLAY path, which only runs when the connection is bad.
+Nothing decodes that response — the caller reloads instead.
+
+**Read the ROUTE, not the model. Then read it again for the ELEMENT.**
+The tasks list projection was found by running it and watching a screen
+say "неочакван формат", hours after that rule had been written into
+`PagedResponse` and applied to the envelope but not to the element inside
+it. A lesson learned in one position does not transfer itself.
+
+### Decimals are strings on some endpoints and numbers on others
+
+    grain/costs        amount          → 1        NUMBER  (maps via toDto)
+    exchange/listings  quantityTonnes  → "12.5"   STRING  (no DTO)
+
+One database type, two wire types, decided per route by whether it maps
+through a DTO. `WireDecimal` accepts both — not defensive vagueness, the
+actual contract. Ask per endpoint; a rule derived from one is wrong on
+the next.
+
+### Money is always at the currency's scale
+
+`1.00` arrives as `1` and the farm's net worth rendered as `12 691,8 EUR`
+where the books say `12 691,80`. Both ends of this: the server drops the
+trailing zero and `Num.text`'s `0...2` precision dropped it again. Money
+formats at exactly 2; areas and tonnages keep `0...2`.
+
+### A warm cache is not evidence
+
+`imputedLandCharge.totalAmount` is nullable in production and was
+modelled non-optional, so the whole calculator payload failed to decode.
+`CachedResource` fell back to a 21-hour-old copy exactly as designed, and
+the screen said "последно обновено преди 21 часа" — which reads as a
+network problem. The calculator had been showing "няма какво да се
+изчисли" against a farm with a €12,691 wheat position, and a fresh
+install would have shown an error.
+
+**The cache is correct and it is a bad oracle.** When a screen is stale,
+find out WHY before believing what it shows.
+
+### Writes: the rule is per-usecase, not global
+
+Idempotency is honoured by four usecases — journal, farm-task,
+field-operation, inventory. Grain was not one, so a cost create could not
+be safely retried at all: POST twice and the books carry two rows. The
+client therefore never auto-retries a cost, and reports a TIMEOUT as
+*unknown* rather than as failure — telling an operator it failed invites
+the one action that makes it worse. (The server has since added
+exactly-once to both grain creates; the client's caution stays until that
+is verified from here.)
+
+`setTaskStatus` is the opposite: a replay returns 200 because the server
+compares STATE. The `Idempotency-Key` is not the mechanism there — a
+brand-new key behaves identically — and the resolution text is part of
+the compared state, so a retry that re-trims it stops being a replay.
+
+### Every status change is ONE-WAY
+
+`OPEN` is entry-only; nothing returns to it. No UI may imply otherwise,
+and a test plan that assumes a change can be undone is wrong before it
+starts.
+
 ## Phase 4 — Admin (subset)
 
 `GET /api/t/:slug/admin/members` · `/members/[membershipId]` ·
