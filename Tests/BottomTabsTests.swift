@@ -247,3 +247,48 @@ final class OperatorRoleTests: XCTestCase {
         XCTAssertFalse(me("READER").mayCreateOperations)
     }
 }
+
+/// The save refusal is keyed on `error.code`, never on the English.
+final class TabOrderRefusalTests: XCTestCase {
+
+    /// Exactly the envelope the server sends, from `toApiErrorResponse`.
+    func testTheRefusalIsTranslatedFromItsCode() {
+        let text = UserMessage.httpText(
+            status: 400,
+            code: "INVALID_TAB_ORDER",
+            message: "order must be null, or an array of up to 12 unique non-empty ids.")
+        XCTAssertEqual(text, "Подредбата на разделите не беше приета.")
+    }
+
+    /// The English must not leak even though it IS a real sentence and
+    /// would therefore pass `isHumanSentence`. The code has to win.
+    func testTheEnglishMessageIsNotShown() {
+        let english = "order must be null, or an array of up to 12 unique non-empty ids."
+        XCTAssertTrue(UserMessage.isHumanSentence(english),
+                      "precondition: this would otherwise be rendered")
+        XCTAssertFalse(
+            UserMessage.httpText(status: 400, code: "INVALID_TAB_ORDER", message: english)
+                .contains("order must be"))
+    }
+
+    /// The server's cap is 12 and this app's is 5. Quoting the server's
+    /// number would state a rule the farmer is not subject to — they
+    /// cannot build a twelve-item bar, because the editor stops at five.
+    func testTheServersCapIsNotQuoted() {
+        let text = UserMessage.httpText(
+            status: 400, code: "INVALID_TAB_ORDER",
+            message: "order must be null, or an array of up to 12 unique non-empty ids.")
+        XCTAssertFalse(text.contains("12"))
+        XCTAssertLessThan(AppSurface.capacity, 12)
+    }
+
+    /// An unrecognised code still falls back to the server's sentence —
+    /// keying on codes must not make unknown refusals silent. Most of the
+    /// API is still uncoded, so this is the common path, not the rare one.
+    func testAnUnknownCodeStillFallsBackToTheMessage() {
+        XCTAssertEqual(
+            UserMessage.httpText(status: 400, code: "SOME_FUTURE_CODE",
+                                 message: "Something specific went wrong."),
+            "Something specific went wrong.")
+    }
+}

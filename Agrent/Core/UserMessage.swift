@@ -147,6 +147,24 @@ enum UserMessage {
     /// every literal in it is hard-coded Bulgarian; this matches that rather
     /// than pretending to a system that does not exist.
     static let bulgarian: [String: String] = [
+        // The bottom-row editor. `codedBadRequest` gives this refusal a
+        // real identity rather than the shared category code 152 other
+        // call sites use, which is what makes it translatable at all.
+        //
+        // The response also carries `params.max` — currently "12" — and
+        // this DOES NOT quote it. iOS caps the bar at five, because that
+        // is where the system collapses the rest into "More", so a farmer
+        // cannot construct a twelve-item order and telling them the limit
+        // is twelve would describe a rule they are not subject to. The
+        // number in an error should be the one that stopped them.
+        //
+        // Which means this refusal is unreachable by normal use: the
+        // editor cannot produce duplicates, cannot produce empty ids, and
+        // stops at five. If it ever fires it is an iOS defect, so the
+        // sentence says the order was not accepted rather than implying
+        // the person did something wrong.
+        "INVALID_TAB_ORDER": "Подредбата на разделите не беше приета.",
+
         // Calculator refusals, from `grain.calculator.refusal.*`, VERBATIM.
         //
         // These replace four sentences this app had written itself under a
