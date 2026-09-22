@@ -26,10 +26,10 @@ struct LocationsView: View {
             ErrorState(message: message) { await store.load() }
 
         case .loaded(let locations, _) where locations.isEmpty:
-            ContentUnavailableView(
+            EmptyState(
                 "Няма локации",
-                systemImage: "map",
-                description: Text("Това стопанство още няма въведени локации.")
+                icon: "map",
+                message: "Това стопанство още няма въведени локации."
             )
 
         case .loaded(let locations, _):

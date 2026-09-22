@@ -140,10 +140,10 @@ struct ParcelMapView: View {
     @ViewBuilder
     private func map(_ response: ParcelsResponse, drawable: [Parcel]) -> some View {
         if drawable.isEmpty {
-            ContentUnavailableView(
+            EmptyState(
                 "Няма очертания",
-                systemImage: "map",
-                description: Text("Парцелите съществуват, но нямат географски очертания.")
+                icon: "map",
+                message: "Парцелите съществуват, но нямат географски очертания."
             )
         } else if useSchematic, let box = response.bounds ?? location.boundsJson {
             SchematicParcelMap(parcels: drawable, bounds: box)

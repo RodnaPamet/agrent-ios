@@ -87,10 +87,10 @@ struct JournalListView: View {
             ErrorState(message: message) { await store.load() }
 
         case .loaded(let entries, _) where entries.isEmpty:
-            ContentUnavailableView(
+            EmptyState(
                 "Няма записи",
-                systemImage: "book.closed",
-                description: Text("Добавете първия запис в дневника.")
+                icon: "book.closed",
+                message: "Добавете първия запис в дневника."
             )
 
         case .loaded(let entries, _):

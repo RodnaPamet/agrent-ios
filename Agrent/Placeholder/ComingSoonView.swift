@@ -11,10 +11,10 @@ struct ComingSoonView: View {
 
     var body: some View {
         NavigationStack {
-            ContentUnavailableView(
+            EmptyState(
                 "Предстои",
-                systemImage: "hammer",
-                description: Text("Този раздел не е наличен в приложението. Използвайте уеб приложението.")
+                icon: "hammer",
+                message: "Този раздел не е наличен в приложението. Използвайте уеб приложението."
             )
             .navigationTitle(title)
         }
