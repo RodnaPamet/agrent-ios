@@ -161,7 +161,8 @@ struct ParcelMapView: View {
                 region: (response.bounds ?? location.boundsJson)?.region
                     ?? MKCoordinateRegion(fitting: drawable)
                     ?? .bulgaria,
-                tileTemplate: indices.tiles?.tileUrl
+                tileTemplate: indices.tiles?.tileUrl,
+                onTap: mayOperate ? { operating = $0 } : nil
             )
             .task { await indices.refreshIfNeeded() }
         }
