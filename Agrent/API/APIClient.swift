@@ -116,6 +116,39 @@ actor APIClient {
             let code: String?
             let message: String?
             let details: Details?
+
+            init(code: String?, message: String?, details: Details?) {
+                self.code = code
+                self.message = message
+                self.details = details
+            }
+
+            /// TWO SHAPES under the same key, and the diagnostic that found
+            /// it was the one added to chase the sign-out bug:
+            ///
+            ///     tenant API  {"error": {"code": "...", "message": "..."}}
+            ///     auth API    {"error": "invalid_grant"}
+            ///
+            /// The auth routes put a bare STRING where everything else puts
+            /// an object. Decoding only the object form made the refresh
+            /// failure log `(401 no code)` — which read as "the server sent
+            /// no code" when the server had sent one, in the other shape.
+            /// A diagnostic that under-reports is worse than none, because
+            /// it is believed.
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let text = try? container.decode(String.self) {
+                    self.init(code: text, message: nil, details: nil)
+                    return
+                }
+                struct Object: Decodable {
+                    let code: String?
+                    let message: String?
+                    let details: Details?
+                }
+                let object = try container.decode(Object.self)
+                self.init(code: object.code, message: object.message, details: object.details)
+            }
         }
         let error: Err?
     }
@@ -169,6 +202,23 @@ actor APIClient {
             idempotencyKey: idempotencyKey, ifMatch: String(version)
         )
         return try decoder.decode(T.self, from: data)
+    }
+
+    /// A POST whose RAW response the caller decodes itself.
+    ///
+    /// For routes whose response shape is not yet known. `POST
+    /// /tasks/:id/status` returns the whole task row with no relations,
+    /// which is a third shape on that model — not the list's projection and
+    /// not the detail's expansion. Handing back bytes lets a caller probe
+    /// before it models, which is the order that has been right every time
+    /// today and wrong every time it was reversed.
+    func postReturningData<B: Encodable>(
+        _ path: String, body: B, idempotencyKey: String
+    ) async throws -> Data {
+        let payload = try encoder.encode(body)
+        return try await send(
+            path: path, method: "POST", body: payload, idempotencyKey: idempotencyKey
+        )
     }
 
     func post<B: Encodable, T: Decodable>(
