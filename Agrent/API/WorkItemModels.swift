@@ -368,13 +368,30 @@ enum WorkItemStatus: String, LenientDecodable, Sendable {
     ///
     /// `CLOSED` and `CANCELED` are SINKS. Nothing leaves them, by design,
     /// and a task that reaches one is finished with.
+    /// ── RESOLVED IS NOT OFFERED AS A DESTINATION (owner, 2026-09-22) ──
+    ///
+    /// The server permits it from four states and this app offered all
+    /// four. The WEB retired it: there an active task closes in one step,
+    /// and RESOLVED survives only as an intermediate on rows that already
+    /// hold it.
+    ///
+    /// Two clients disagreeing about a workflow is worse than either
+    /// workflow. An operator who marks a task Готова on the phone and
+    /// finds their colleague cannot see that step on the laptop has been
+    /// given a state the rest of the farm does not use.
+    ///
+    /// Transitions OUT of `.resolved` are kept, and that is not an
+    /// inconsistency: rows already sit in that state, and a task that
+    /// cannot be closed because the app declines to name where it is
+    /// would be stranded by our own tidiness.
     var allowedNext: [WorkItemStatus] {
         switch self {
-        case .open:          [.triaged, .inProgress, .blocked, .resolved, .closed, .canceled]
-        case .triaged:       [.inProgress, .blocked, .resolved, .closed, .canceled]
-        case .inProgress:    [.triaged, .blocked, .resolved, .closed, .canceled]
+        case .open:          [.triaged, .inProgress, .blocked, .closed, .canceled]
+        case .triaged:       [.inProgress, .blocked, .closed, .canceled]
+        case .inProgress:    [.triaged, .blocked, .closed, .canceled]
         case .blocked:       [.inProgress, .triaged, .closed, .canceled]
-        case .pendingReview: [.inProgress, .resolved, .closed, .canceled]
+        case .pendingReview: [.inProgress, .closed, .canceled]
+        // Already there. Kept so such a task can still be moved on.
         case .resolved:      [.inProgress, .closed]
         // Sinks, and an unknown status we cannot reason about at all.
         case .closed, .canceled, .unknown: []
