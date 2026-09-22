@@ -6,7 +6,7 @@ import Security
 ///
 /// `kSecAttrAccessibleAfterFirstUnlock` rather than `WhenUnlocked`: a farm
 /// phone in a pocket must still refresh in the background.
-struct Tokens: Codable, Sendable {
+struct Tokens: Codable, Equatable, Sendable {
     var accessToken: String
     var refreshToken: String
     var expiresAt: Date
