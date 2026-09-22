@@ -160,7 +160,7 @@ struct ParcelMapView: View {
                 parcels: drawable,
                 region: (response.bounds ?? location.boundsJson)?.region
                     ?? MKCoordinateRegion(fitting: drawable)
-                    ?? MKCoordinateRegion(.world),
+                    ?? .bulgaria,
                 tileTemplate: indices.tiles?.tileUrl
             )
             .task { await indices.refreshIfNeeded() }
