@@ -97,3 +97,46 @@ final class RefreshReplayTests: XCTestCase {
         }
     }
 }
+
+/// The THIRD shape of the sign-out, and the only one that was the
+/// client's alone.
+///
+/// Measured: at 18:18 a refresh returned **502** — the server restarting
+/// for a deploy — and the app cleared the tokens, because a gateway error
+/// and a rejected credential took the same branch. The refresh token was
+/// perfectly valid and was destroyed anyway.
+///
+/// It is invisible from the server side: no session is revoked, so the
+/// query that finds replayed-token burns correctly reports zero while the
+/// operator is looking at a sign-in screen. Two true statements and one
+/// signed-out farmer.
+final class RefreshInvalidationTests: XCTestCase {
+
+    /// The server returns 401 `invalid_grant` for EVERY genuine refusal —
+    /// unparseable, missing, unknown, revoked, expired, replayed. So 401
+    /// is the whole set of "this token is dead".
+    func testOnlyA401InvalidatesTheToken() {
+        XCTAssertTrue(APIClient.invalidatesToken(status: 401))
+    }
+
+    /// THE regression. A deploy must not sign anybody out.
+    func testAGatewayErrorDoesNotInvalidateTheToken() {
+        for status in [500, 502, 503, 504] {
+            XCTAssertFalse(
+                APIClient.invalidatesToken(status: status),
+                "\(status) would clear a valid refresh token"
+            )
+        }
+    }
+
+    /// Nor does anything else the server might say. A question that was
+    /// not answered is not a no.
+    func testNothingElseInvalidatesEither() {
+        for status in [400, 403, 404, 408, 418, 429, -1] {
+            XCTAssertFalse(
+                APIClient.invalidatesToken(status: status),
+                "\(status) would clear a valid refresh token"
+            )
+        }
+    }
+}

@@ -361,6 +361,14 @@ actor APIClient {
         case signedOut
     }
 
+    /// Does this refresh response mean the token is DEAD, or merely that
+    /// the server did not answer?
+    ///
+    /// Pure, and separate, because the distinction is the whole bug: the
+    /// old code had no such concept and treated a 502 from a deploying
+    /// server exactly like a rejected credential.
+    static func invalidatesToken(status: Int) -> Bool { status == 401 }
+
     static func refreshDecision(seen: Tokens, stored: Tokens?) -> RefreshDecision {
         guard let stored else { return .signedOut }
         return stored.refreshToken == seen.refreshToken
@@ -455,6 +463,34 @@ actor APIClient {
                 // guaranteed to contain tokens.
                 let code = Self.envelope(from: data)?.code
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+
+                // ── ONLY A 401 INVALIDATES THE TOKEN ──
+                //
+                // This used to clear on ANY non-200, and that signed the
+                // owner out of a working session. Measured: at 18:18 the
+                // refresh returned **502** — the server restarting for a
+                // deploy — and the app destroyed a refresh token that was
+                // perfectly valid, because a gateway error and a rejected
+                // credential took the same branch.
+                //
+                // It is invisible from the server side too: no session was
+                // revoked, so the query that finds replayed-token burns
+                // correctly reports zero while the operator is sitting on
+                // a sign-in screen. Two true statements, one signed-out
+                // farmer.
+                //
+                // The server returns 401 `invalid_grant` for every genuine
+                // refusal — unparseable, expired, revoked, replayed — so a
+                // 401 is the whole set of "this token is dead". Anything
+                // else means the server did not answer the question, and a
+                // question that was not answered is not a no.
+                guard status == 401 else {
+                    Log.auth.error(
+                        "token refresh failed but NOT rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), keeping tokens"
+                    )
+                    throw APIError.http(status: status, code: code, message: nil)
+                }
+
                 Log.auth.error(
                     "token refresh rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), clearing tokens"
                 )

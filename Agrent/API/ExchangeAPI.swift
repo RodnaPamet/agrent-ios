@@ -72,12 +72,103 @@ enum ExchangeAPI {
     /// inquirerTenantId])` means a tenant can express interest in a listing at
     /// most once — which is stronger than a header, because it holds even
     /// against a client that never sends one.
+    /// NOT EXERCISED, by the same standing decision as `createInquiry`: a
+    /// listing is published to every tenant in the platform. Built, wired,
+    /// and the first real send is the owner's.
+    static func createListing(_ draft: CreateExchangeListing) async throws -> Data {
+        try await APIClient.shared.postReturningData(
+            "\(base)/listings", body: draft, idempotencyKey: nil
+        )
+    }
+
     static func createInquiry(listingID: String, message: String) async throws -> ExchangeInquiry {
         try await APIClient.shared.post(
             "\(base)/inquiries",
             body: CreateInquiry(listingId: listingID, message: message),
             as: ExchangeInquiry.self
         )
+    }
+}
+
+/// Post an offer to the board.
+///
+/// ── NEVER RETRIED ──
+///
+/// The route honours no idempotency and there is no natural key, so a
+/// replay puts a SECOND OFFER on a board every tenant in the platform can
+/// see, under this farm's name. Withdrawing it is a public act.
+///
+/// Same shape as the cost row and worse: a duplicated cost is wrong on
+/// one farm's books, a duplicated offer is wrong in front of everyone
+/// else's. So: no auto-retry, no queue, the button cannot be pressed
+/// twice, and a TIMEOUT is reported as UNKNOWN rather than as failure —
+/// after a lost response the app does not know whether the listing
+/// exists, and "it failed" invites the one action that makes it worse.
+struct CreateExchangeListing: Encodable, Sendable {
+    let side: String
+    let kind: String
+
+    /// A CANONICAL SLUG, constrained server-side: the field transforms
+    /// through `normalizeCommodity` and a miss is a 400 quoting the whole
+    /// canonical list. So the picker is driven from the same ten the web's
+    /// own modal uses, which is what makes the two incapable of drifting —
+    /// and what stops the phone posting a slug the board cannot filter on.
+    let commodity: String
+
+    /// `boundedDecimal` is `z.union([z.number(), z.string()])`, so this
+    /// route accepts EITHER — unlike `grain/costs`, which is strictly
+    /// `z.number()`. Sent as a number, because that is unambiguous and
+    /// `Decimal` encodes as one without going through `Double`.
+    ///
+    /// `0 < quantity ≤ 1_000_000` and `0 ≤ price ≤ 10_000_000`.
+    let quantityTonnes: Decimal
+    let pricePerTonne: Decimal?
+
+    /// A `z.literal('EUR')`, NOT an enum. The exchange is single-currency
+    /// by design — it used to accept BGN and USD and was deliberately
+    /// narrowed, so BGN is a 400 rather than a conversion. There is no
+    /// picker for this, because there is no choice.
+    let priceCurrency = "EUR"
+
+    let regionCode: String
+    let description: String?
+    let sellerDisplayName: String?
+
+    /// PRIVATE. Never projected into a public listing — it is revealed to
+    /// exactly one buyer, and only if the seller accepts their inquiry.
+    /// Sent on create, never rendered on a listing card, because the
+    /// server keeping it private does not stop a client implying it is
+    /// public.
+    let sellerContact: String?
+
+    /// Must be in the FUTURE when present, or the schema refuses it.
+    let expiresAt: String?
+
+    enum Invalid: Equatable {
+        case quantityOutOfRange
+        case priceOutOfRange
+        case regionMissing
+        case expiryInThePast
+    }
+
+    static let maxQuantity = Decimal(1_000_000)
+    static let maxPrice = Decimal(10_000_000)
+
+    /// The server's bounds, mirrored so an operator learns before the
+    /// request rather than after — and this write in particular must not
+    /// be attempted twice.
+    var problems: [Invalid] {
+        var found: [Invalid] = []
+        if quantityTonnes <= 0 || quantityTonnes > Self.maxQuantity {
+            found.append(.quantityOutOfRange)
+        }
+        if let pricePerTonne, pricePerTonne < 0 || pricePerTonne > Self.maxPrice {
+            found.append(.priceOutOfRange)
+        }
+        if regionCode.trimmingCharacters(in: .whitespaces).isEmpty {
+            found.append(.regionMissing)
+        }
+        return found
     }
 }
 

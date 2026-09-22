@@ -8,6 +8,7 @@ import SwiftUI
 struct AdminView: View {
     @State private var store = AdminStore()
     @State private var revealEGN = false
+    @State private var inviting = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -18,6 +19,18 @@ struct AdminView: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Затвори") { dismiss() }
+                    }
+                    if store.access == .allowed {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button { inviting = true } label: {
+                                Label("Покани", systemImage: "person.badge.plus")
+                            }
+                        }
+                    }
+                }
+                .sheet(isPresented: $inviting) {
+                    InviteMemberView { email, role in
+                        try await store.invite(email: email, role: role)
                     }
                 }
                 .task { await store.load() }
@@ -67,11 +80,63 @@ struct AdminView: View {
             }
 
         case .loaded(let all, _):
-            ForEach(store.grouped(all), id: \.0) { status, rows in
-                Section(status.label) {
-                    ForEach(rows) { MemberRow(member: $0) }
+            if let writeUnknown = store.writeUnknown {
+                Section {
+                    // Not "it failed". The lookup filters ACTIVE, so a
+                    // replay of a deactivation that already landed 404s —
+                    // after a timeout the app cannot tell which happened,
+                    // and the list below is the authority.
+                    Label("Неясен резултат", systemImage: "questionmark.circle")
+                        .foregroundStyle(Palette.error)
+                    Text(writeUnknown).font(.footnote).foregroundStyle(.secondary)
+                    Text("Връзката прекъсна. Проверете статуса в списъка по-долу — той е меродавен.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            if let writeError = store.writeError {
+                Section {
+                    Text(writeError).font(.footnote).foregroundStyle(Palette.error)
+                }
+            }
+            ForEach(store.grouped(all), id: \.0) { status, rows in
+                Section(status.label) {
+                    ForEach(rows) { member in
+                        MemberRow(member: member)
+                            .swipeActions(edge: .trailing) { actions(for: member) }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Deactivate and reactivate, as swipe actions rather than buttons in
+    /// the row: this is a rare, consequential action on a screen that is
+    /// mostly read, and a button on every row invites a tap that was not
+    /// meant.
+    ///
+    /// The control is ABSENT on the last active owner rather than present
+    /// and refused. The server counts them live and a database trigger
+    /// backs it; counting here too means an admin never taps a thing that
+    /// cannot work.
+    @ViewBuilder
+    private func actions(for member: Membership) -> some View {
+        if store.busy.contains(member.id) {
+            EmptyView()
+        } else if member.status == .active {
+            if !store.isLastOwner(member) {
+                Button(role: .destructive) {
+                    Task { await store.setActive(member, active: false) }
+                } label: {
+                    Label("Деактивирай", systemImage: "person.slash")
+                }
+            }
+        } else if member.status == .deactivated {
+            Button {
+                Task { await store.setActive(member, active: true) }
+            } label: {
+                Label("Активирай", systemImage: "person.badge.clock")
+            }
+            .tint(Palette.accent)
         }
     }
 
@@ -208,5 +273,99 @@ struct MemberRow: View {
         .font(.footnote)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Invite somebody to the farm.
+///
+/// ── This one MAY be retried, unlike every other write in the app ──
+///
+/// There is a `@@unique([tenantId, email])` and the usecase writes
+/// through it, so re-inviting an address with a pending invite UPSERTS
+/// rather than creating a second row. A replay therefore produces one
+/// invitation and one extra email — embarrassing, not harmful.
+///
+/// That is the opposite trade from the cost form and the listing form,
+/// where a duplicate is a permanent wrong row. Here, refusing to retry
+/// costs more than it saves, so a failure offers "Опитай пак" rather
+/// than a warning about unknown outcomes.
+private struct InviteMemberView: View {
+    let send: (String, MembershipRole) async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var role: MembershipRole = .reader
+    @State private var sending = false
+    @State private var failure: String?
+
+    /// Deliberately not a full address validator. The server validates,
+    /// and a client-side regex that rejects a legitimate address is worse
+    /// than one round trip — this only catches the empty and obviously
+    /// unfinished cases so the button is not live before there is
+    /// anything to send.
+    private var canSend: Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !sending && trimmed.contains("@") && !trimmed.hasSuffix("@")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Имейл") {
+                    TextField("name@example.com", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+                Section("Роля") {
+                    Picker("Роля", selection: $role) {
+                        // `unknown` is this client's sentinel for a role
+                        // the server added and this build has not heard
+                        // of. It can arrive; it must never be offered.
+                        ForEach(MembershipRole.allCases.filter { $0 != .unknown }, id: \.self) {
+                            Text($0.label).tag($0)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                }
+                if let failure {
+                    Section {
+                        Text(failure).font(.footnote).foregroundStyle(Palette.error)
+                        Text("Поканата може да се изпрати отново безопасно — повторното изпращане не създава втора покана.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Покани член")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отказ") { dismiss() }.disabled(sending)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if sending {
+                        ProgressView()
+                    } else {
+                        Button("Изпрати") { Task { await submit() } }.disabled(!canSend)
+                    }
+                }
+            }
+            .interactiveDismissDisabled(sending)
+        }
+    }
+
+    private func submit() async {
+        sending = true
+        failure = nil
+        defer { sending = false }
+        do {
+            try await send(email.trimmingCharacters(in: .whitespacesAndNewlines), role)
+            dismiss()
+        } catch {
+            // Stays open. A refused write whose message has gone reads as
+            // a write that worked — #921, in a different form.
+            failure = UserMessage.text(for: error)
+        }
     }
 }

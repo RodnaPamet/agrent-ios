@@ -45,4 +45,76 @@ enum AdminAPI {
         guard case APIClient.APIError.http(let status, _, _) = error else { return false }
         return status == 403
     }
+
+    // MARK: - Writes
+
+    /// Invite somebody. `{ email, role }` — nothing else.
+    ///
+    /// ── SAFE TO RETRY, and the reason is a natural key rather than a
+    ///    header ──
+    ///
+    /// The route honours no `Idempotency-Key`, but there is a
+    /// `@@unique([tenantId, email])` and the usecase writes THROUGH it:
+    /// re-inviting an address with a pending invite UPSERTS rather than
+    /// erroring or creating a second. So a replay produces one row and the
+    /// only cost is a second email to a colleague.
+    ///
+    /// That is stronger than a header, because it holds against a client
+    /// that never sends one — the same argument `createInquiry` makes from
+    /// its own unique constraint.
+    ///
+    /// An address that is ALREADY an active member is a 400 with English
+    /// prose and the generic code, so it surfaces through the status
+    /// sentence rather than as itself. Worth knowing when the message on
+    /// screen is vaguer than the situation.
+    static func invite(email: String, role: MembershipRole) async throws -> Data {
+        try await APIClient.shared.postReturningData(
+            invitePath,
+            body: Invite(email: email, role: role.rawValue),
+            idempotencyKey: nil
+        )
+    }
+
+    private struct Invite: Encodable { let email: String; let role: String }
+
+    /// Deactivate or reactivate. **NO BODY** — the membership id in the
+    /// path is the whole request.
+    ///
+    /// ── DO NOT RETRY, and the reason is sharper than "it is a write" ──
+    ///
+    /// The lookup filters `status: 'ACTIVE'`. So once the first call
+    /// succeeds the row no longer matches, and a replay returns **404
+    /// "Membership not found or not active"** — a SUCCESSFUL WRITE WHOSE
+    /// RETRY REPORTS FAILURE.
+    ///
+    /// MEASURED against production on 2026-09-22, on one account the owner
+    /// named, as a full round trip:
+    ///
+    ///     deactivate  → 200, status becomes DEACTIVATED
+    ///     replay      → 404 NOT_FOUND "Membership not found or not active."
+    ///     reactivate  → 200, status back to ACTIVE
+    ///
+    /// So this is first-hand rather than relayed. The 404 also carries the
+    /// generic `NOT_FOUND`, which the app would render as "Търсеното не
+    /// беше намерено" — a confusing sentence for a write that worked, and
+    /// one more reason nothing here retries.
+    ///
+    /// That is the already-applied problem wearing a 404 instead of a 400,
+    /// and it is exactly the #921 shape: the operator is told their action
+    /// did not land when it already has. `setTaskStatus` solved it
+    /// server-side by comparing state; this route has not, and is
+    /// documented rather than fixed.
+    ///
+    /// So a timeout here is never re-sent. The caller RE-READS the member
+    /// list, which is the authority on whether it landed — the list can
+    /// answer the question the retry cannot.
+    static func setActive(_ membershipID: String, active: Bool) async throws -> Data {
+        try await APIClient.shared.postReturningData(
+            active ? reactivatePath(membershipID) : deactivatePath(membershipID),
+            body: EmptyBody(),
+            idempotencyKey: nil
+        )
+    }
+
+    private struct EmptyBody: Encodable {}
 }

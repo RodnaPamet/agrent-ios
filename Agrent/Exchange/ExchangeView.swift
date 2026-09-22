@@ -17,6 +17,7 @@ struct ExchangeView: View {
     @State private var listings = ExchangeListingsStore()
     @State private var mine = MyListingsStore()
     @State private var inquiries = MyInquiriesStore()
+    @State private var posting = false
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,18 @@ struct ExchangeView: View {
                     if tab == .browse {
                         ToolbarItem(placement: .primaryAction) { filterMenu }
                     }
+                    // PARITY GAP 3. "Моите обяви" was read-only: you could
+                    // see your listings and not make one.
+                    if tab == .mine {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button { posting = true } label: {
+                                Label("Нова обява", systemImage: "plus")
+                            }
+                        }
+                    }
+                }
+                .sheet(isPresented: $posting) {
+                    NewListingView { Task { await mine.load() } }
                 }
                 // On SUBMIT, not on every keystroke. A trading board is a
                 // network round trip per character otherwise, on a
