@@ -40,7 +40,13 @@ struct JournalListView: View {
                 .font(.title.bold())
                 .fixedSize(horizontal: false, vertical: true)
             if let count = store.state.value?.count {
-                Text("^[\(count) записа](inflect: true)")
+                // "Показани N" once there is more, because "N записа"
+                // would be a claim about the tenant's history that the app
+                // cannot make from one page. The old copy said exactly
+                // that and was wrong for any farm past fifty entries.
+                Text(store.hasMore
+                     ? "Показани ^[\(count) записа](inflect: true)"
+                     : "^[\(count) записа](inflect: true)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -89,15 +95,57 @@ struct JournalListView: View {
             )
 
         case .loaded(let entries, _):
-            List(entries) { entry in
-                NavigationLink {
-                    JournalDetailView(entry: entry)
-                } label: {
-                    JournalRow(entry: entry)
+            List {
+                ForEach(entries) { entry in
+                    NavigationLink {
+                        JournalDetailView(entry: entry)
+                    } label: {
+                        JournalRow(entry: entry)
+                    }
                 }
+                loadMoreRow
             }
             .listStyle(.plain)
             .refreshable { await store.load() }
+        }
+    }
+
+    /// PARITY GAP 6, and the reason it is a row rather than nothing.
+    ///
+    /// The list was capped at 50 with no cursor, so a tenant past fifty
+    /// entries saw a truncated history and NOTHING ON SCREEN SAID SO. That
+    /// is the worst shape a limit can take: a short list and a complete
+    /// list look identical, so the operator has no way to tell which they
+    /// are looking at — on the register the ДНЕВНИК PDF is generated from.
+    ///
+    /// Explicit, not infinite scroll. Loading on scroll would fetch pages
+    /// an operator did not ask for, on a connection this app assumes is
+    /// bad, and would still say nothing about whether the end had been
+    /// reached. A button that disappears when there is no more is itself
+    /// the answer to "is this all of it".
+    @ViewBuilder
+    private var loadMoreRow: some View {
+        if store.hasMore {
+            VStack(alignment: .leading, spacing: 6) {
+                if store.loadingMore {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Зареждане…").font(.footnote).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Button("Покажи още") { Task { await store.loadMore() } }
+                }
+                if let error = store.loadMoreError {
+                    // The pages already on screen are still good, so this
+                    // is a note beside them rather than an error state that
+                    // replaces them.
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

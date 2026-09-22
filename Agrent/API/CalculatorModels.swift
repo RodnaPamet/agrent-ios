@@ -96,13 +96,59 @@ struct CalculatorRow: Decodable, Equatable, Sendable, Identifiable {
     let unvaluedUnitMismatch: Int
 
     let netWorth: Double?
-    /// Already a human sentence from the server. `netWorthUnavailableCode` and
-    /// `…Params` are deliberately NOT modelled: they exist for the web's i18n,
-    /// this app hard-codes Bulgarian, and `Params` is an open-ended object
-    /// whose value types are unobserved. Decodable ignores keys it is not
-    /// asked for, so leaving them out is safer than guessing at them — a wrong
-    /// guess there fails the whole payload.
+    /// The server's English sentence. Kept as the FALLBACK, never as the
+    /// first choice — see `netWorthUnavailableCode`.
     let netWorthUnavailableReason: String?
+
+    /// The machine-readable reason, which is the one worth having.
+    ///
+    /// PARITY GAP 1. The app decoded only `…Reason` and rendered it, so a
+    /// Bulgarian screen showed an English sentence every time net worth
+    /// could not be computed — and that is an ORDINARY state on this
+    /// payload, not an edge case.
+    ///
+    /// The web does not render the English either. `explainRefusal` in
+    /// `uncertainty.ts` translates a recognised code and falls back to the
+    /// English only for one it does not know:
+    ///
+    ///     if (isKnownRefusalCode(code)) return translate(`refusal.${code}`)
+    ///     return fallbackEnglish
+    ///
+    /// `refusalText` below is that rule, in Swift, against the same code
+    /// map every other server error goes through.
+    let netWorthUnavailableCode: String?
+
+    /// `Record<string, string> | null`, with keys set per-code on the same
+    /// branch that sets the code:
+    ///
+    ///     NO_MARKET_PRICE               { commodity }   canonical SLUG
+    ///     COST_PRICE_CURRENCY_MISMATCH  { costCurrency, priceCurrency }
+    ///     the other two                 null
+    ///
+    /// Null on every row this tenant returns — because its data refuses on
+    /// none of those branches, NOT because the field is vestigial. Two of
+    /// the four populate it the moment a farm grows a crop with no price
+    /// series, which is the commonest refusal of the four.
+    ///
+    /// `[String: String]` is safe here for a reason `Parcel.properties` is
+    /// not: that one has mixed value types, so even this annotation would
+    /// fail the whole payload on one Int. This is typed `string` on the
+    /// server side.
+    let netWorthUnavailableParams: [String: String]?
+
+    /// What to actually show: Bulgarian when the code is known, the
+    /// server's English when it is not, and nothing when there is no
+    /// refusal at all.
+    ///
+    /// Never the code itself. An identifier is not a sentence in any
+    /// language.
+    var refusalText: String? {
+        RefusalText.resolve(
+            code: netWorthUnavailableCode,
+            params: netWorthUnavailableParams,
+            fallback: netWorthUnavailableReason
+        )
+    }
 
     let netUncertainty: Uncertainty
     let costUncertainty: Uncertainty

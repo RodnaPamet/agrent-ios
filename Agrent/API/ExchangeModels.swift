@@ -60,8 +60,18 @@ struct ExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     /// The only marker separating your listings from every other tenant's.
     let isOwn: Bool
 
-    var quantity: Decimal? { quantityTonnes.flatMap { Decimal(string: $0) } }
-    var price: Decimal? { pricePerTonne.flatMap { Decimal(string: $0) } }
+    /// Parsed with an EXPLICIT wire locale. `Decimal(string:)` without one
+    /// is a hazard: the wire uses `.` regardless of the device, and a
+    /// locale that groups with `.` reads "12.5" as 125 — a factor of ten,
+    /// on a tonnage someone is pricing against.
+    ///
+    /// These are the canonical STRING decimals of this API. The exchange
+    /// routes have no DTO, so their `Decimal` columns reach
+    /// `JSON.stringify` raw; `grain/costs` maps through one and sends
+    /// numbers. Same database type, two wire types, per route — see
+    /// `WireDecimal`.
+    var quantity: Decimal? { WireDecimal.parse(quantityTonnes) }
+    var price: Decimal? { WireDecimal.parse(pricePerTonne) }
 
     var isActive: Bool { status == .active }
 }
@@ -101,8 +111,18 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     /// route is deliberately not module-gated server-side.
     let inquiries: [ExchangeInquiry]
 
-    var quantity: Decimal? { quantityTonnes.flatMap { Decimal(string: $0) } }
-    var price: Decimal? { pricePerTonne.flatMap { Decimal(string: $0) } }
+    /// Parsed with an EXPLICIT wire locale. `Decimal(string:)` without one
+    /// is a hazard: the wire uses `.` regardless of the device, and a
+    /// locale that groups with `.` reads "12.5" as 125 — a factor of ten,
+    /// on a tonnage someone is pricing against.
+    ///
+    /// These are the canonical STRING decimals of this API. The exchange
+    /// routes have no DTO, so their `Decimal` columns reach
+    /// `JSON.stringify` raw; `grain/costs` maps through one and sends
+    /// numbers. Same database type, two wire types, per route — see
+    /// `WireDecimal`.
+    var quantity: Decimal? { WireDecimal.parse(quantityTonnes) }
+    var price: Decimal? { WireDecimal.parse(pricePerTonne) }
 
     private enum CodingKeys: String, CodingKey {
         case id, side, kind, status, commodity, quantityTonnes, pricePerTonne
