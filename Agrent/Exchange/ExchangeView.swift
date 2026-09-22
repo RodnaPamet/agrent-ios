@@ -39,6 +39,7 @@ struct ExchangeView: View {
                 }
             }
             .navigationTitle("Борса")
+            .appMenu()
             .task { await loadCurrent() }
             .onChange(of: tab) { Task { await loadCurrent() } }
         }
@@ -125,16 +126,16 @@ struct ExchangeView: View {
                         Text(row.commodity).font(.headline)
                         Spacer()
                         Text(row.status.label)
-                            .font(.subheadline)
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     Text(summary(side: row.side, kind: row.kind,
                                  quantity: row.quantityTonnes, price: row.pricePerTonne,
                                  currency: row.priceCurrency))
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                     if row.inquiries.isEmpty {
-                        Text("Няма запитвания").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Няма запитвания").font(.footnote).foregroundStyle(.secondary)
                     } else {
                         ForEach(row.inquiries) { inquiry in
                             InquiryRow(inquiry: inquiry)
@@ -198,10 +199,10 @@ struct ListingRow: View {
             Text(summary(side: listing.side, kind: listing.kind,
                          quantity: listing.quantityTonnes, price: listing.pricePerTonne,
                          currency: listing.priceCurrency))
-                .font(.subheadline)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
             if let region = listing.regionName {
-                Text(region).font(.subheadline).foregroundStyle(.secondary)
+                Text(region).font(.footnote).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)
@@ -218,11 +219,11 @@ struct InquiryRow: View {
                 Spacer()
                 if let created = inquiry.createdAt {
                     Text(created, format: .dateTime.day().month().year())
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             if let message = inquiry.message, !message.isEmpty {
-                Text(message).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
+                Text(message).font(.footnote).foregroundStyle(.secondary).lineLimit(3)
             }
             // CONTACT DETAILS ARE WITHHELD UNTIL contactSharedAt IS SET, and
             // that withholding is the feature. A PENDING or DECLINED inquiry
@@ -232,7 +233,7 @@ struct InquiryRow: View {
             // Only the positive case is rendered.
             if inquiry.contactShared {
                 Label("Контактите са споделени", systemImage: "checkmark.circle")
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }

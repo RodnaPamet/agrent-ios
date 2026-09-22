@@ -12,6 +12,7 @@ struct CalculatorView: View {
                 content
             }
             .navigationTitle("Калкулатор")
+            .appMenu()
             .task { if store.state.value == nil { await store.load() } }
         }
     }
@@ -66,7 +67,7 @@ struct CalculatorView: View {
                         // total: a number that silently omits a crop reads as
                         // complete.
                         Text("Без: \(total.refusedCommodities.joined(separator: ", "))")
-                            .font(.subheadline)
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -156,13 +157,13 @@ struct CalculatorView: View {
         if !payload.exclusions.isEmpty || !payload.unvalued.isClean || payload.truncated {
             Section("Извън изчислението") {
                 ForEach(payload.exclusions.all) { item in
-                    Text(item.label).font(.subheadline)
+                    Text(item.label).font(.footnote)
                 }
                 if payload.unvalued.noUnitCost > 0 {
-                    Text("\(payload.unvalued.noUnitCost) без единична цена").font(.subheadline)
+                    Text("\(payload.unvalued.noUnitCost) без единична цена").font(.footnote)
                 }
                 if payload.unvalued.unitMismatch > 0 {
-                    Text("\(payload.unvalued.unitMismatch) с несъвпадаща мерна единица").font(.subheadline)
+                    Text("\(payload.unvalued.unitMismatch) с несъвпадаща мерна единица").font(.footnote)
                 }
                 if payload.truncated {
                     RefusalNote(text: "Списъкът е съкратен.", icon: "ellipsis.circle")

@@ -26,7 +26,7 @@ struct StaleBanner: View {
             Text("Последно обновено \(age)")
             Spacer()
         }
-        .font(.subheadline)
+        .font(.footnote)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
@@ -46,7 +46,7 @@ struct RefusalNote: View {
 
     var body: some View {
         Label(text, systemImage: icon)
-            .font(.subheadline)
+            .font(.footnote)
             .foregroundStyle(.secondary)
     }
 }
@@ -152,8 +152,19 @@ struct CategoryChip: View {
 
     var body: some View {
         Text(text)
-            .font(.footnote.weight(.semibold))
+            .font(.caption.weight(.semibold))
             .foregroundStyle(foreground)
+            // WRAP, never truncate. Measured at accessibility3: the row's
+            // chip rendered "Внасяне на препар…", and a category label with
+            // its end cut off does not identify a category — on a regulated
+            // diary, "Внасяне на препарат" truncated is the one row type a
+            // person is most likely to be looking for.
+            //
+            // A chip is small, so the instinct is to keep it on one line and
+            // let it clip. That is backwards: the chip is small because the
+            // word is short at normal sizes, not because the word matters
+            // less.
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 9)
             .padding(.vertical, 3)
             .background(background, in: RoundedRectangle(cornerRadius: 6))

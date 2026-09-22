@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct JournalListView: View {
-    @Environment(AuthClient.self) private var auth
     @State private var store = JournalStore()
     @State private var composing = false
 
@@ -17,11 +16,7 @@ struct JournalListView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Изход") { auth.signOut() }
-                }
-            }
+            .appMenu()
             .sheet(isPresented: $composing) {
                 NewEntryView(store: store)
             }
@@ -42,11 +37,11 @@ struct JournalListView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Земеделски дневник")
-                .font(.largeTitle.bold())
+                .font(.title.bold())
                 .fixedSize(horizontal: false, vertical: true)
             if let count = store.state.value?.count {
                 Text("^[\(count) записа](inflect: true)")
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
@@ -124,7 +119,7 @@ struct JournalRow: View {
     let entry: LogEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(entry.title)
                 .font(.headline)
                 .foregroundStyle(.primary)
@@ -178,7 +173,7 @@ struct JournalRow: View {
                 Text(entry.status.label)
             }
         }
-        .font(.subheadline)
+        .font(.footnote)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
     }
