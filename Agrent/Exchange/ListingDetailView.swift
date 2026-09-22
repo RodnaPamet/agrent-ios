@@ -7,7 +7,7 @@ struct ListingDetailView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Култура") { Text(listing.commodity) }
+                LabeledContent("Култура") { Text(CommodityName.canonical(listing.commodity) ?? listing.commodity) }
                 LabeledContent("Тип") { Text(listing.kind.label) }
                 LabeledContent("Посока") { Text(listing.side.label) }
                 if let quantity = listing.quantityTonnes {
@@ -60,7 +60,7 @@ struct ListingDetailView: View {
                 }
             }
         }
-        .navigationTitle(listing.commodity)
+        .navigationTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $composing) {
             InquiryComposeView(listing: listing)
@@ -84,7 +84,7 @@ struct InquiryComposeView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text(listing.commodity).font(.headline)
+                    Text(CommodityName.canonical(listing.commodity) ?? listing.commodity).font(.headline)
                     Text(summary(side: listing.side, kind: listing.kind,
                                  quantity: listing.quantityTonnes,
                                  price: listing.pricePerTonne,

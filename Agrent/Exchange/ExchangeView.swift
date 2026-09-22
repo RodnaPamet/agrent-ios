@@ -123,7 +123,7 @@ struct ExchangeView: View {
             List(rows) { row in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(row.commodity).font(.headline)
+                        Text(CommodityName.canonical(row.commodity) ?? row.commodity).font(.headline)
                         Spacer()
                         Text(row.status.label)
                             .font(.footnote)
@@ -186,7 +186,7 @@ struct ListingRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(listing.commodity).font(.headline)
+                Text(CommodityName.canonical(listing.commodity) ?? listing.commodity).font(.headline)
                 // The only thing distinguishing your rows in a global table.
                 if listing.isOwn {
                     CategoryChip(

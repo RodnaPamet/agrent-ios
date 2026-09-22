@@ -251,7 +251,7 @@ struct CalculatorView: View {
             }
         } header: {
             HStack {
-                Text(row.commodity)
+                Text(CommodityName.canonical(row.commodity) ?? row.commodity)
                 Spacer()
                 UncertaintyBadge(row.netUncertainty)
             }

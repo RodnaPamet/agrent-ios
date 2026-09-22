@@ -162,7 +162,7 @@ struct SchematicParcelMap: View {
         return A11y.sentence([
             parcel.name,
             parcel.isSown ? "засят" : "угар",
-            parcel.cropType,
+            CommodityName.freeText(parcel.cropType),
             parcel.areaHa.map { "\(Num.text($0)) хектара" },
             count == 1 ? nil : (direction ?? "в средата"),
         ])
