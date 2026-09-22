@@ -43,32 +43,34 @@ struct AgrentApp: App {
 /// The auth gate stays in `AgrentApp` above and the Изход button stays in
 /// `JournalListView`'s toolbar — this type only routes.
 struct MainTabView: View {
+    @State private var tabs = BottomTabsStore.shared
+
     var body: some View {
+        // Built from the saved order rather than written out, so the bar
+        // and the menu's overflow are two views of one list and cannot
+        // disagree about what is where.
+        //
+        // The five-slot ceiling stays — see `AppSurface.capacity`. It is
+        // enforced in the store rather than here, because the editor has
+        // to know it too and a limit spelled in two places is a limit that
+        // will eventually be two different numbers.
         TabView {
-            JournalListView()
-                .tabItem { Label("Дневник", systemImage: "book.closed") }
-
-            CalculatorView()
-                .tabItem { Label("Калкулатор", systemImage: "plusminus") }
-
-            ExchangeView()
-                .tabItem { Label("Борса", systemImage: "arrow.left.arrow.right") }
-
-            LocationsView()
-                .tabItem { Label("Локации", systemImage: "map") }
-
-            // Задачи, not Админ (owner, 2026-09-22). Five slots exist
-            // before iOS collapses the rest into "More", and Админ was
-            // spending the most valuable one on a placeholder that said
-            // "use the web app" — while the surface an operator opens many
-            // times a day would have sat behind a menu. Админ is a monthly
-            // action and now lives in `AppMenuButton`, which is what a menu
-            // is for.
-            TasksListView()
-                .tabItem { Label("Задачи", systemImage: "checklist") }
+            ForEach(tabs.bottomTabs) { surface in
+                surface.screen
+                    .tabItem { Label(surface.label, systemImage: surface.icon) }
+            }
+        }
+        .task {
+            // The order rides along on /api/auth/me, which is already
+            // fetched and cached for the whole session — so this costs
+            // nothing on top of what the app asks for anyway.
+            if let me = await CurrentUserStore.shared.load() {
+                tabs.adopt(me.bottomTabOrder)
+            }
         }
     }
 }
+
 
 struct SignInView: View {
     @Environment(AuthClient.self) private var auth

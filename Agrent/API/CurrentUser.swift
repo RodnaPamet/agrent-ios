@@ -43,8 +43,27 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// to decide whether to OFFER an affordance.
     let role: String?
 
-    private enum Outer: String, CodingKey { case user }
-    private enum Inner: String, CodingKey { case id, name, email, role }
+    /// The saved bottom-row order, or nil when never chosen.
+    ///
+    /// nil and `[]` are DIFFERENT and the column is nullable to keep them
+    /// so: "never chose" draws the default, "deliberately cleared" does
+    /// not. Collapsing them is unrecoverable.
+    ///
+    /// Read from BOTH the `user` object and the envelope root, because at
+    /// the time this was written the field had not deployed and the probe
+    /// could only show where it was NOT:
+    ///
+    ///     {"user":{"id":…,"email":…,"name":…,"role":"OWNER"},
+    ///      "tenant":{…}}
+    ///
+    /// Guessing one location and being wrong would not fail — it would
+    /// decode nil forever, and the feature would look like a save that
+    /// never persists. Accepting both costs four lines and cannot be
+    /// wrong in that particular silent way.
+    let bottomTabOrder: [String]?
+
+    private enum Outer: String, CodingKey { case user, bottomTabOrder }
+    private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder }
 
     init(from decoder: Decoder) throws {
         let outer = try decoder.container(keyedBy: Outer.self)
@@ -53,6 +72,10 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.name = try user.decodeIfPresent(String.self, forKey: .name)
         self.email = try user.decodeIfPresent(String.self, forKey: .email)
         self.role = try user.decodeIfPresent(String.self, forKey: .role)
+        self.bottomTabOrder =
+            (try? user.decodeIfPresent([String].self, forKey: .bottomTabOrder))
+            ?? (try? outer.decodeIfPresent([String].self, forKey: .bottomTabOrder))
+            ?? nil
     }
 
     /// May this person create a field operation?
@@ -84,11 +107,13 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         }
     }
 
-    init(id: String, name: String?, email: String?, role: String?) {
+    init(id: String, name: String?, email: String?, role: String?,
+         bottomTabOrder: [String]? = nil) {
         self.id = id
         self.name = name
         self.email = email
         self.role = role
+        self.bottomTabOrder = bottomTabOrder
     }
 }
 
