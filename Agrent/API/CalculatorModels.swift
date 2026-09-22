@@ -269,9 +269,27 @@ struct UnallocatedToCrop: Decodable, Equatable, Sendable {
     let currencies: [String]
 }
 
+/// The imputed charge for land the farm owns rather than rents.
+///
+/// `totalAmount` IS NULLABLE, and this was found the hard way: production
+/// sends null for it, the field was modelled non-optional, and the whole
+/// payload failed to decode. The screen showed a 21-hour-old cache instead
+/// — `CachedResource` falls back on a decode failure exactly as it should,
+/// which meant the bug was invisible for as long as the cache was warm and
+/// would have surfaced as a broken screen on a fresh install.
+///
+/// A cache that hides a decode failure is the right behaviour and a bad
+/// oracle. Nothing on the screen said "this did not decode"; it said
+/// "последно обновено преди 21 часа", which reads as a network problem.
+///
+/// `perHa` was already optional and `areaHa` is not, which matches the
+/// data: the two computed figures are refused together — `refusalCode`
+/// says why — while the area is an input that is always known. That
+/// reasoning is not measured, only consistent, so if `areaHa` ever arrives
+/// null it is this comment that was wrong.
 struct ImputedLandCharge: Decodable, Equatable, Sendable {
     let perHa: Double?
     let areaHa: Double
-    let totalAmount: Double
+    let totalAmount: Double?
     let refusalCode: String?
 }

@@ -16,3 +16,16 @@ final class CalculatorStore {
         }
     }
 }
+
+@Observable
+@MainActor
+final class CostsStore {
+    private(set) var state: LoadState<CostPage> = .loading
+
+    func load() async {
+        if state.value == nil { state = .loading }
+        state = await CachedResource.load(CostsAPI.listPath) { data in
+            try await CostsAPI.decodeList(from: data)
+        }
+    }
+}
