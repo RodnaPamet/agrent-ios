@@ -195,7 +195,7 @@ struct ParcelMapView: View {
     @ViewBuilder
     private func parcelList(_ response: ParcelsResponse, drawable: [Parcel]) -> some View {
         List {
-            Section(header: Text("^[\(response.parcels.count) парцела](inflect: true)")) {
+            Section(header: Text(Plural.bg(response.parcels.count, "парцел", "парцела"))) {
                 ForEach(response.parcels) { parcel in
                     parcelRow(parcel)
                 }

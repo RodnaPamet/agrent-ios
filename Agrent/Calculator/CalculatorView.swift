@@ -156,7 +156,7 @@ struct CalculatorView: View {
             // from here".
             Text("Списъкът е съкратен от сървъра. Не всички разходи се показват.")
         } else if let total = page.totalCount, total != page.items.count {
-            Text("Показани \(page.items.count) от ^[\(total) разхода](inflect: true).")
+            Text("Показани \(page.items.count) от " + Plural.bg(total, "разход", "разхода") + ".")
         }
     }
     // MARK: - Farm totals

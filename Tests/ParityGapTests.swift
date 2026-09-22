@@ -263,3 +263,116 @@ final class ExchangeDecimalTests: XCTestCase {
         XCTAssertNil(WireDecimal.parse("abc"))
     }
 }
+
+/// Bulgarian counting forms.
+///
+/// `^[…](inflect: true)` works only when the markup reaches `Text` as a
+/// LITERAL. Build the same string in a variable and `Text(_ content:
+/// String)` wins the overload, the markup is never processed, and the
+/// operator reads it raw — which is what the admin screen did, on
+/// production data:
+///
+///     ^[7 активни сесии](inflect: true)
+///
+/// Eleven sites used the markup; four reached `Text` as a literal and
+/// seven did not. Two of the seven were inside accessibility labels,
+/// where it can NEVER work — a label is a String, so VoiceOver would have
+/// spoken the markup aloud. Invisible to anyone who can see the screen.
+final class PluralTests: XCTestCase {
+
+    func testOneTakesTheSingular() {
+        XCTAssertEqual(Plural.bg(1, "запис", "записа"), "1 запис")
+        XCTAssertEqual(Plural.bg(1, "парцел", "парцела"), "1 парцел")
+    }
+
+    /// Bulgarian nouns take a counting form after any numeral other than
+    /// one — including zero.
+    func testEverythingElseTakesTheCountingForm() {
+        XCTAssertEqual(Plural.bg(0, "запис", "записа"), "0 записа")
+        XCTAssertEqual(Plural.bg(2, "запис", "записа"), "2 записа")
+        XCTAssertEqual(Plural.bg(7, "активна сесия", "активни сесии"), "7 активни сесии")
+        XCTAssertEqual(Plural.bg(13, "запис", "записа"), "13 записа")
+    }
+
+    /// THE regression: no markup may survive into the output, because the
+    /// output goes to screens AND to VoiceOver.
+    func testNoMarkupReachesTheOutput() {
+        for n in [0, 1, 2, 7, 100] {
+            let text = Plural.bg(n, "парцел", "парцела")
+            XCTAssertFalse(text.contains("^["), text)
+            XCTAssertFalse(text.contains("inflect"), text)
+            XCTAssertFalse(text.contains("]("), text)
+        }
+    }
+
+    /// Usable in an accessibility label, which is the half the markup
+    /// could never do.
+    func testItComposesIntoAnAccessibilityLabel() {
+        let label = A11y.sentence(["Северен блок", Plural.bg(3, "парцел", "парцела")])
+        XCTAssertEqual(label, "Северен блок, 3 парцела.")
+        XCTAssertFalse(label.contains("^["))
+    }
+}
+
+/// Roles and statuses were BOTH short: six roles against the two this
+/// tenant returns, and four statuses against the three PARITY.md recorded.
+/// Counted against the schema rather than collected from a payload — the
+/// `LogEntryType` lesson applied before it bit rather than after.
+final class MembershipEnumTests: XCTestCase {
+
+    func testSixRolesAndFourStatuses() {
+        XCTAssertEqual(MembershipRole.allCases.count, 6 + 1)   // + unknown
+        XCTAssertEqual(MembershipStatus.allCases.count, 4 + 1)
+    }
+
+    func testEveryServerValueDecodes() throws {
+        for raw in ["OWNER", "ADMIN", "EDITOR", "READER", "AUDITOR", "MECHANISATOR"] {
+            let r = try JSONDecoder().decode(MembershipRole.self, from: Data("\"\(raw)\"".utf8))
+            XCTAssertEqual(r.rawValue, raw)
+            XCTAssertNotEqual(r, .unknown, "\(raw) fell through to unknown")
+        }
+        for raw in ["INVITED", "ACTIVE", "DEACTIVATED", "REMOVED"] {
+            let st = try JSONDecoder().decode(MembershipStatus.self, from: Data("\"\(raw)\"".utf8))
+            XCTAssertEqual(st.rawValue, raw)
+            XCTAssertNotEqual(st, .unknown, "\(raw) fell through to unknown")
+        }
+    }
+
+    /// `REMOVED` is the one PARITY.md missed, and the live tenant has none
+    /// — so nothing but this test would have caught its absence.
+    func testRemovedIsModelled() {
+        XCTAssertEqual(MembershipStatus.removed.label, "Премахнат")
+    }
+
+    /// `MECHANISATOR` is the restricted machine-operator persona. A
+    /// `switch` that omits it silently inherits READER's "view
+    /// everything", so its presence is asserted rather than assumed.
+    func testMechanisatorIsModelledAndLabelled() {
+        XCTAssertEqual(MembershipRole.mechanisator.label, "Механизатор")
+    }
+
+    /// `authEnums.*`, verbatim. Every visible label is Bulgarian — the
+    /// web rendered these RAW until today, so an English value here would
+    /// be the original defect reintroduced.
+    func testEveryLabelIsBulgarian() {
+        let labels = MembershipRole.allCases.map(\.label)
+            + MembershipStatus.allCases.map(\.label)
+        for label in labels where label != "—" {
+            XCTAssertTrue(
+                label.unicodeScalars.contains { $0.value > 0x400 },
+                "\(label) is not Bulgarian"
+            )
+        }
+    }
+
+    /// A 403 is a state with real accounts behind it. Its code is
+    /// deliberately category-level — `requirePermission` never echoes the
+    /// permission key, because naming the capability an unauthorised
+    /// caller lacks is an enumeration aid.
+    func testForbiddenMapsToAPermissionSentence() {
+        let text = UserMessage.httpText(
+            status: 403, code: "FORBIDDEN", message: "Permission denied")
+        XCTAssertEqual(text, "Нямате права за това действие.")
+        XCTAssertFalse(text.contains("Permission denied"))
+    }
+}

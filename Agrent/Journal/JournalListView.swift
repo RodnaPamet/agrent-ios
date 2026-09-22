@@ -45,8 +45,8 @@ struct JournalListView: View {
                 // cannot make from one page. The old copy said exactly
                 // that and was wrong for any farm past fifty entries.
                 Text(store.hasMore
-                     ? "Показани ^[\(count) записа](inflect: true)"
-                     : "^[\(count) записа](inflect: true)")
+                     ? "Показани " + Plural.bg(count, "запис", "записа")
+                     : Plural.bg(count, "запис", "записа"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

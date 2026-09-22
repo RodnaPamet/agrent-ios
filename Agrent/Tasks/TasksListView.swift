@@ -36,7 +36,7 @@ struct TasksListView: View {
                 .font(.title.bold())
                 .fixedSize(horizontal: false, vertical: true)
             if let page = store.state.value {
-                Text("^[\(page.items.count) задачи](inflect: true)")
+                Text(Plural.bg(page.items.count, "задача", "задачи"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

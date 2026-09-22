@@ -44,7 +44,7 @@ struct LocationsView: View {
                             Text(location.kind)
                             if let count = location.parcelCount {
                                 Text("·")
-                                Text("^[\(count) парцела](inflect: true)")
+                                Text(Plural.bg(count, "парцел", "парцела"))
                             }
                         }
                         .font(.footnote)
@@ -59,7 +59,7 @@ struct LocationsView: View {
                     .accessibilityLabel(A11y.sentence([
                         location.name,
                         location.kind,
-                        location.parcelCount.map { "^[\($0) парцела](inflect: true)" },
+                        location.parcelCount.map { Plural.bg($0, "парцел", "парцела") },
                     ]))
                 }
             }

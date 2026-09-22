@@ -169,6 +169,18 @@ enum UserMessage {
         "COST_PRICE_CURRENCY_MISMATCH":
             "Разходите са в {costCurrency}, а пазарната цена е в {priceCurrency}; не се извършва конвертиране на валута.",
 
+        // Authorisation. The code is deliberately CATEGORY-LEVEL:
+        // `requirePermission` never echoes the permission key to the
+        // client, because the key names a capability and telling an
+        // unauthorised caller which one they lack is an enumeration aid.
+        // So this maps to a general sentence and nothing finer is
+        // expected — that is the design, not a gap.
+        //
+        // A denial also writes an AUTHZ_DENIED audit row, so a refusal is
+        // visible to the farm's owner. Worth knowing before anything here
+        // grows a retry.
+        "FORBIDDEN": "Нямате права за това действие.",
+
         // Batch 1.
         "CROP_PLAN_NOT_READY": "Планът за културите не е готов.",
         "FILE_EMPTY": "Файлът е празен.",
