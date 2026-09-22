@@ -60,48 +60,69 @@ struct Membership: Decodable, Identifiable, Equatable, Sendable {
     }
 }
 
-/// THREE statuses, and a two-state control cannot express them.
+/// FOUR statuses. PARITY.md recorded three and this tenant shows one.
+///
+/// `REMOVED` was the missing one, and the only place the full set was
+/// written down outside the Prisma schema was the web's own status-variant
+/// map. Modelled from that rather than from the two a live tenant happened
+/// to hold — which is the `LogEntryType` lesson applied before it bit
+/// rather than after.
 ///
 /// "Has my invite actually gone out?" is the main reason somebody opens
-/// this screen, and an INVITED member rendered as either of the other two
-/// answers it wrongly.
+/// this screen, so INVITED rendered as either of the others answers it
+/// wrongly.
 enum MembershipStatus: String, LenientDecodable, Sendable {
-    case active = "ACTIVE"
     case invited = "INVITED"
+    case active = "ACTIVE"
     case deactivated = "DEACTIVATED"
+    case removed = "REMOVED"
     case unknown = "UNKNOWN"
 
     static var unknownCase: Self { .unknown }
 
+    /// `authEnums.membershipStatus.*`, verbatim.
     var label: String {
         switch self {
-        case .active: "Активен"
         case .invited: "Поканен"
+        case .active: "Активен"
         case .deactivated: "Деактивиран"
+        case .removed: "Премахнат"
         case .unknown: "—"
         }
     }
 }
 
-/// Roles.
+/// SIX roles. This tenant returns two.
 ///
-/// PROVISIONAL, and marked so rather than presented as complete. This
-/// tenant returns only `ADMIN` and `OWNER` — two values out of an enum
-/// whose size nobody here has counted, which is precisely the
-/// `LogEntryType` situation: six cases shipped against the server's ten,
-/// surviving only because the live tenant happened to hold two of them.
+/// Exactly the `LogEntryType` shape — six cases shipped against the
+/// server's ten, surviving only because the live tenant happened to hold
+/// two of them — so these were counted against the schema rather than
+/// collected from a payload.
 ///
-/// `LenientDecodable` means an unrecognised role costs a label on one row
-/// rather than the list, and `label` falls through to the RAW VALUE so an
-/// unknown role reads as `MECHANISATOR` rather than as a dash. Ugly and
-/// legible beats tidy and absent.
+/// `MECHANISATOR` is the one to get right if this screen ever filters by
+/// role: it is the restricted machine-operator persona, confined by
+/// middleware to a short allowlist, never SSO-mappable, and a `switch`
+/// that omits it silently inherits READER's "view everything".
 ///
-/// The Bulgarian is requested from `bg.json` and is NOT written here —
-/// inventing a vocabulary is a mistake this codebase has now made once and
-/// caught twice.
+/// ── The Bulgarian did not exist, on either client ──
+///
+/// `messages/` held three crop vocabularies and NONE for the role a person
+/// holds: the web rendered `{m.role}` and `{row.original.status}` raw, so a
+/// Bulgarian admin has been reading "OWNER" and "ACTIVE" on an otherwise
+/// fully translated screen — the same defect as the calculator's "wheat",
+/// on a different screen, found by asking the same question.
+///
+/// So this was not a fourth vocabulary waiting to happen; it was the
+/// FIRST, and had I written it here the server would have written a second
+/// an hour later. It is canonical now at `authEnums.role.*` with a guard
+/// deriving the required members from the schema, and these are verbatim.
 enum MembershipRole: String, LenientDecodable, Sendable {
     case owner = "OWNER"
     case admin = "ADMIN"
+    case editor = "EDITOR"
+    case reader = "READER"
+    case auditor = "AUDITOR"
+    case mechanisator = "MECHANISATOR"
     case unknown = "UNKNOWN"
 
     static var unknownCase: Self { .unknown }
@@ -110,6 +131,10 @@ enum MembershipRole: String, LenientDecodable, Sendable {
         switch self {
         case .owner: "Собственик"
         case .admin: "Администратор"
+        case .editor: "Редактор"
+        case .reader: "Читател"
+        case .auditor: "Одитор"
+        case .mechanisator: "Механизатор"
         case .unknown: "—"
         }
     }

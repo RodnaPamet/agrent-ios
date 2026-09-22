@@ -313,3 +313,66 @@ final class PluralTests: XCTestCase {
         XCTAssertFalse(label.contains("^["))
     }
 }
+
+/// Roles and statuses were BOTH short: six roles against the two this
+/// tenant returns, and four statuses against the three PARITY.md recorded.
+/// Counted against the schema rather than collected from a payload — the
+/// `LogEntryType` lesson applied before it bit rather than after.
+final class MembershipEnumTests: XCTestCase {
+
+    func testSixRolesAndFourStatuses() {
+        XCTAssertEqual(MembershipRole.allCases.count, 6 + 1)   // + unknown
+        XCTAssertEqual(MembershipStatus.allCases.count, 4 + 1)
+    }
+
+    func testEveryServerValueDecodes() throws {
+        for raw in ["OWNER", "ADMIN", "EDITOR", "READER", "AUDITOR", "MECHANISATOR"] {
+            let r = try JSONDecoder().decode(MembershipRole.self, from: Data("\"\(raw)\"".utf8))
+            XCTAssertEqual(r.rawValue, raw)
+            XCTAssertNotEqual(r, .unknown, "\(raw) fell through to unknown")
+        }
+        for raw in ["INVITED", "ACTIVE", "DEACTIVATED", "REMOVED"] {
+            let st = try JSONDecoder().decode(MembershipStatus.self, from: Data("\"\(raw)\"".utf8))
+            XCTAssertEqual(st.rawValue, raw)
+            XCTAssertNotEqual(st, .unknown, "\(raw) fell through to unknown")
+        }
+    }
+
+    /// `REMOVED` is the one PARITY.md missed, and the live tenant has none
+    /// — so nothing but this test would have caught its absence.
+    func testRemovedIsModelled() {
+        XCTAssertEqual(MembershipStatus.removed.label, "Премахнат")
+    }
+
+    /// `MECHANISATOR` is the restricted machine-operator persona. A
+    /// `switch` that omits it silently inherits READER's "view
+    /// everything", so its presence is asserted rather than assumed.
+    func testMechanisatorIsModelledAndLabelled() {
+        XCTAssertEqual(MembershipRole.mechanisator.label, "Механизатор")
+    }
+
+    /// `authEnums.*`, verbatim. Every visible label is Bulgarian — the
+    /// web rendered these RAW until today, so an English value here would
+    /// be the original defect reintroduced.
+    func testEveryLabelIsBulgarian() {
+        let labels = MembershipRole.allCases.map(\.label)
+            + MembershipStatus.allCases.map(\.label)
+        for label in labels where label != "—" {
+            XCTAssertTrue(
+                label.unicodeScalars.contains { $0.value > 0x400 },
+                "\(label) is not Bulgarian"
+            )
+        }
+    }
+
+    /// A 403 is a state with real accounts behind it. Its code is
+    /// deliberately category-level — `requirePermission` never echoes the
+    /// permission key, because naming the capability an unauthorised
+    /// caller lacks is an enumeration aid.
+    func testForbiddenMapsToAPermissionSentence() {
+        let text = UserMessage.httpText(
+            status: 403, code: "FORBIDDEN", message: "Permission denied")
+        XCTAssertEqual(text, "Нямате права за това действие.")
+        XCTAssertFalse(text.contains("Permission denied"))
+    }
+}

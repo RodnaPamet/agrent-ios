@@ -74,7 +74,12 @@ final class AdminStore {
     /// Grouped for display, in the order the questions get asked:
     /// who is waiting, who is here, who used to be.
     func grouped(_ all: [Membership]) -> [(MembershipStatus, [Membership])] {
-        let order: [MembershipStatus] = [.invited, .active, .deactivated, .unknown]
+        // The order the questions get asked: who is waiting, who is here,
+        // who used to be, who is gone. `removed` last because it is the
+        // only terminal one.
+        let order: [MembershipStatus] = [
+            .invited, .active, .deactivated, .removed, .unknown,
+        ]
         return order.compactMap { status in
             let rows = all.filter { $0.status == status }
             return rows.isEmpty ? nil : (status, rows)

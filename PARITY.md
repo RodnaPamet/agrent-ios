@@ -263,10 +263,20 @@ have blocked the phase:
 
 Two shapes the screen has to get right:
 
-- **Membership status has THREE values** — `ACTIVE`, `INVITED`,
-  `DEACTIVATED`. A two-state control mislabels INVITED as one of the
-  others, and "has my invite actually gone out?" is the main reason
-  somebody opens this screen.
+- **Membership status has FOUR values** — `INVITED`, `ACTIVE`,
+  `DEACTIVATED`, `REMOVED`. This document said three; `REMOVED` was
+  missing, and the only place the full set was written outside the
+  schema was the web's status-variant map. "Has my invite actually gone
+  out?" is the main reason somebody opens this screen, so INVITED
+  rendered as any of the others answers it wrongly.
+- **There are SIX roles** — `OWNER`, `ADMIN`, `EDITOR`, `READER`,
+  `AUDITOR`, `MECHANISATOR`. The live tenant returns two.
+  `MECHANISATOR` is the restricted machine-operator persona; a `switch`
+  that omits it silently inherits READER's "view everything".
+- **Neither had a Bulgarian vocabulary on EITHER client.** The web
+  rendered the raw enum, so a Bulgarian admin read "OWNER" and "ACTIVE"
+  on an otherwise translated screen — the calculator's "wheat" again, on
+  a different screen. Canonical now at `authEnums.*`.
 - **A READER-role user gets 403**, and that is a real state — the web app
   has viewer accounts. It needs a screen that says so, not an empty list
   that reads as "no members".
