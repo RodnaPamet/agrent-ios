@@ -26,6 +26,8 @@ import SwiftUI
 struct AppMenuButton: View {
     @Environment(AuthClient.self) private var auth
 
+    @State private var showingAdmin = false
+
     var body: some View {
         Menu {
             // Context, not an action. Which farm you are signed into is the
@@ -33,6 +35,12 @@ struct AppMenuButton: View {
             // getting it wrong means filing a record against the wrong
             // holding — which for a regulatory diary is not a small mistake.
             Section(Config.tenantSlug) {
+                Button {
+                    showingAdmin = true
+                } label: {
+                    Label("Админ", systemImage: "person.2")
+                }
+
                 Button(role: .destructive) {
                     auth.signOut()
                 } label: {
@@ -50,6 +58,12 @@ struct AppMenuButton: View {
         // "line 3 horizontal".
         .accessibilityLabel("Меню")
         .accessibilityHint("Отваря менюто на приложението")
+        // A sheet, not a tab. Админ left the tab bar because it is a monthly
+        // action; presenting it modally says the same thing — you came here
+        // on purpose and you will go back.
+        .sheet(isPresented: $showingAdmin) {
+            ComingSoonView(title: "Админ")
+        }
     }
 }
 

@@ -57,8 +57,15 @@ struct MainTabView: View {
             LocationsView()
                 .tabItem { Label("Локации", systemImage: "map") }
 
-            ComingSoonView(title: "Админ")
-                .tabItem { Label("Админ", systemImage: "person.2") }
+            // Задачи, not Админ (owner, 2026-09-22). Five slots exist
+            // before iOS collapses the rest into "More", and Админ was
+            // spending the most valuable one on a placeholder that said
+            // "use the web app" — while the surface an operator opens many
+            // times a day would have sat behind a menu. Админ is a monthly
+            // action and now lives in `AppMenuButton`, which is what a menu
+            // is for.
+            TasksListView()
+                .tabItem { Label("Задачи", systemImage: "checklist") }
         }
     }
 }
