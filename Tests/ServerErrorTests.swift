@@ -183,3 +183,37 @@ final class UserMessageHTTPTests: XCTestCase {
         }
     }
 }
+
+/// The auth routes answer in a different envelope shape from everything
+/// else, and the diagnostic added to chase the sign-out bug is what found
+/// it: the refresh failure logged `(401 no code)` when the server had sent a
+/// code, in the other shape. A diagnostic that under-reports is worse than
+/// none, because it is believed.
+final class AuthEnvelopeShapeTests: XCTestCase {
+
+    private func envelope(_ json: String) -> APIClient.ErrorEnvelope.Err? {
+        APIClient.envelope(from: Data(json.utf8))
+    }
+
+    /// The shape every refresh failure actually uses.
+    func testABareStringErrorIsReadAsACode() {
+        XCTAssertEqual(envelope(#"{"error":"invalid_grant"}"#)?.code, "invalid_grant")
+    }
+
+    /// And the object form still works — this must not be a swap.
+    func testTheObjectFormStillDecodes() {
+        let e = envelope(#"{"error":{"code":"INVALID_PARCEL","message":"Parcel not found"}}"#)
+        XCTAssertEqual(e?.code, "INVALID_PARCEL")
+        XCTAssertEqual(e?.message, "Parcel not found")
+    }
+
+    /// A bare code is an identifier, so it must not be rendered at an
+    /// operator — `invalid_grant` is lowercase and would pass the
+    /// shouting check, so the code path matters: it is mapped or it falls
+    /// back to the status, never printed raw as prose.
+    func testTheAuthCodeDoesNotReachTheScreenAsProse() {
+        let text = UserMessage.httpText(status: 401, code: "invalid_grant", message: nil)
+        XCTAssertFalse(text.contains("invalid_grant"))
+        XCTAssertEqual(text, "Сесията е изтекла. Влезте отново.")
+    }
+}

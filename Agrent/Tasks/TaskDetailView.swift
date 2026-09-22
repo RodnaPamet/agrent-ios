@@ -20,6 +20,10 @@ struct TaskDetailView: View {
 
     @State private var store: TaskDetailStore
 
+    /// The status being moved to, while its resolution is being written.
+    /// Non-nil means the sheet is up.
+    @State private var resolving: WorkItemStatus?
+
     init(summary: WorkItemSummary) {
         self.summary = summary
         _store = State(initialValue: TaskDetailStore(id: summary.id))
@@ -34,7 +38,55 @@ struct TaskDetailView: View {
         }
         .navigationTitle(summary.key)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let item = store.state.value, !item.status.allowedNext.isEmpty {
+                ToolbarItem(placement: .primaryAction) { statusMenu(item) }
+            }
+        }
+        .sheet(item: $resolving) { target in
+            ResolutionSheet(target: target) { text in
+                resolving = nil
+                Task { await store.setStatus(target, resolution: text) }
+            } cancel: {
+                resolving = nil
+            }
+        }
         .task { if store.state.value == nil { await store.load() } }
+    }
+
+    /// ONLY THE LEGAL MOVES.
+    ///
+    /// The server enforces `WORK_ITEM_TRANSITIONS` and refuses the rest —
+    /// measured: `IN_PROGRESS → OPEN` comes back 400 "Illegal work-item
+    /// transition". Offering a button that cannot work tells an operator the
+    /// app is broken when they asked for something that was never possible,
+    /// and the refusal arrives in English besides.
+    ///
+    /// The menu is absent entirely on CLOSED and CANCELED, which are sinks.
+    /// A disabled menu invites tapping; no menu says the task is finished.
+    @ViewBuilder
+    private func statusMenu(_ item: WorkItem) -> some View {
+        Menu {
+            ForEach(item.status.allowedNext, id: \.self) { next in
+                Button(next.label) {
+                    // A terminal status needs a resolution, and the server
+                    // checks it AFTER sanitising — so a resolution of pure
+                    // markup is refused rather than stored as something that
+                    // renders as nothing. Asking for it here means the
+                    // operator writes it once, on the screen, instead of
+                    // meeting a 400.
+                    if next.requiresResolution {
+                        resolving = next
+                    } else {
+                        Task { await store.setStatus(next, resolution: nil) }
+                    }
+                }
+            }
+        } label: {
+            Label("Промени статуса", systemImage: "arrow.triangle.swap")
+        }
+        .disabled(store.saving)
+        .accessibilityLabel("Промени статуса")
     }
 
     @ViewBuilder
@@ -61,6 +113,21 @@ struct TaskDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     header(title: item.title, status: item.status)
+                    if store.saving {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Записване…").font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let writeError = store.writeError {
+                        // Stated on the screen, not in a dialog that
+                        // dismisses. A refused write whose message has gone
+                        // reads as a write that worked.
+                        Text(writeError)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.error)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     facts(item)
                     text("Описание", item.description)
                     text("Решение", item.resolution)
@@ -191,4 +258,61 @@ struct TaskDetailView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.sentence([label, value, emphasised ? "просрочена" : nil]))
     }
+}
+
+/// The resolution a terminal status requires.
+///
+/// The server demands a non-empty resolution for RESOLVED, CLOSED and
+/// CANCELED, and checks it AFTER `sanitizePlainText` — so a body of pure
+/// markup is refused rather than stored as something that renders as
+/// nothing. The Създай button therefore stays disabled until there is text
+/// that would survive that, which turns a 400 into a button that is simply
+/// not ready yet.
+private struct ResolutionSheet: View {
+    let target: WorkItemStatus
+    let confirm: (String) -> Void
+    let cancel: () -> Void
+
+    @State private var text = ""
+
+    /// Mirrors the server's check as closely as a client can: trimmed, and
+    /// with anything tag-shaped removed, because that is what it will be
+    /// measured against.
+    private var isUsable: Bool {
+        !RichText.plainText(text)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Решение") {
+                    TextEditor(text: $text).frame(minHeight: 140)
+                }
+                Section {
+                    Text("Изисква се, за да се завърши задачата.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(target.label)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Отказ", action: cancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Запази") { confirm(text) }.disabled(!isUsable)
+                }
+            }
+        }
+    }
+}
+
+/// So the sheet can be driven by `sheet(item:)`, which carries the target
+/// status with it — a separate Bool plus a stored status can disagree, and
+/// the disagreement is a write sent to the wrong state.
+extension WorkItemStatus: Identifiable {
+    public var id: String { rawValue }
 }

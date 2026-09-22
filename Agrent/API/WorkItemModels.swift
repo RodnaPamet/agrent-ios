@@ -352,6 +352,45 @@ enum WorkItemStatus: String, LenientDecodable, Sendable {
         case .open, .triaged, .inProgress, .blocked, .pendingReview, .unknown: false
         }
     }
+
+    /// Where this status may legally go, via `POST /tasks/:id/status`.
+    ///
+    /// Taken from the server's `WORK_ITEM_TRANSITIONS`, with ONE removal:
+    /// `PENDING_REVIEW` is reachable in the server's table but is not
+    /// accepted by this route's schema — it is the field-operation review
+    /// gate and is reached by that flow. Sending it gets a zod 400. So it is
+    /// absent here rather than offered and refused.
+    ///
+    /// Offering only legal moves rather than showing a button that fails is
+    /// the point: an operator who taps "Затворена" on a CANCELED task and
+    /// gets an error has been told the app is broken, when in fact they
+    /// asked for something that was never possible.
+    ///
+    /// `CLOSED` and `CANCELED` are SINKS. Nothing leaves them, by design,
+    /// and a task that reaches one is finished with.
+    var allowedNext: [WorkItemStatus] {
+        switch self {
+        case .open:          [.triaged, .inProgress, .blocked, .resolved, .closed, .canceled]
+        case .triaged:       [.inProgress, .blocked, .resolved, .closed, .canceled]
+        case .inProgress:    [.triaged, .blocked, .resolved, .closed, .canceled]
+        case .blocked:       [.inProgress, .triaged, .closed, .canceled]
+        case .pendingReview: [.inProgress, .resolved, .closed, .canceled]
+        case .resolved:      [.inProgress, .closed]
+        // Sinks, and an unknown status we cannot reason about at all.
+        case .closed, .canceled, .unknown: []
+        }
+    }
+
+    /// Moving to one of these requires a resolution — required, and
+    /// non-empty AFTER the server sanitises it, so a resolution made only of
+    /// markup is refused rather than stored as something that renders as
+    /// nothing.
+    var requiresResolution: Bool {
+        switch self {
+        case .resolved, .closed, .canceled: true
+        case .open, .triaged, .inProgress, .blocked, .pendingReview, .unknown: false
+        }
+    }
 }
 
 enum WorkItemSource: String, LenientDecodable, Sendable {
