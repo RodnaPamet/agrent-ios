@@ -308,7 +308,27 @@ actor APIClient {
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                Log.auth.error("token refresh rejected, clearing tokens")
+                // The STATUS and the error CODE, not just "rejected".
+                //
+                // This line has fired twice in one afternoon, roughly half an
+                // hour after each sign-in, and said the same nine words both
+                // times — which is enough to know the session ends and not
+                // enough to know why. A 401 means the refresh token is
+                // expired or already spent; a 400 means this request is
+                // malformed and refresh has never worked at all; a 404 means
+                // the route is not where we think it is. Those are three
+                // different bugs with three different owners and the log
+                // could not tell them apart.
+                //
+                // Both values are safe to persist: a status is a number and a
+                // code is a fixed identifier chosen by the server's authors.
+                // The body is NOT logged — it is the one response in the app
+                // guaranteed to contain tokens.
+                let code = Self.envelope(from: data)?.code
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                Log.auth.error(
+                    "token refresh rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), clearing tokens"
+                )
                 TokenStore.clear()
                 throw APIError.notSignedIn
             }
