@@ -89,7 +89,13 @@ final class BottomTabsStore {
         self.isOperator = isOperator
     }
 
-    func save(_ surfaces: [AppSurface]) async {
+    /// Returns whether the write landed.
+    ///
+    /// The caller needs to know. A sheet that dismisses on failure takes
+    /// the only place the error is shown away with it — see
+    /// `TabCustomiserView`, where it did exactly that.
+    @discardableResult
+    func save(_ surfaces: [AppSurface]) async -> Bool {
         let order = surfaces.prefix(AppSurface.capacity).map(\.rawValue)
         let previous = stored
         // Optimistic: the bar redraws immediately and rolls back if the
@@ -105,9 +111,11 @@ final class BottomTabsStore {
                 body: BottomTabsPayload(order: Array(order)),
                 as: EmptyResponse.self
             )
+            return true
         } catch {
             stored = previous
             saveFailure = UserMessage.text(for: error)
+            return false
         }
     }
 }
