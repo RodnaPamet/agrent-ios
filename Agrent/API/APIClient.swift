@@ -78,7 +78,12 @@ actor APIClient {
         /// screen where the only actionable thing is whether to try again.
         /// The server's own `code` was sitting inside that string, already
         /// decodable, already the thing worth having.
-        case http(status: Int, code: String?, message: String?)
+        /// `params` carries the refusal's own values — the product that
+        /// was rejected, the fields that were missing. Optional with a
+        /// default so every existing construction still compiles and only
+        /// the routes that send them have to care.
+        case http(status: Int, code: String?, message: String?,
+                  params: [String: String]? = nil)
 
         /// DELIBERATELY NOT the operator-facing text.
         ///
@@ -97,7 +102,7 @@ actor APIClient {
                 "Тази версия на приложението е твърде стара. Обновете я."
             case .notModified:
                 "Данните не са променени."
-            case .http(let status, let code, _):
+            case .http(let status, let code, _, _):
                 code.map { "HTTP \(status) \($0)" } ?? "HTTP \(status)"
             }
         }
@@ -117,10 +122,22 @@ actor APIClient {
             let message: String?
             let details: Details?
 
-            init(code: String?, message: String?, details: Details?) {
+            /// The refusal's own values, for building a sentence about
+            /// THIS failure rather than about its category.
+            ///
+            /// Decoded as strings only. The server sends them as strings
+            /// (`params.max` is `"12"`, not `12`), and a loose `[String: Any]`
+            /// would put decoding of an arbitrary JSON value on the error
+            /// path — which is how a 404 became a blank screen once
+            /// already.
+            let params: [String: String]?
+
+            init(code: String?, message: String?, details: Details?,
+                 params: [String: String]? = nil) {
                 self.code = code
                 self.message = message
                 self.details = details
+                self.params = params
             }
 
             /// TWO SHAPES under the same key, and the diagnostic that found
@@ -145,9 +162,11 @@ actor APIClient {
                     let code: String?
                     let message: String?
                     let details: Details?
+                    let params: [String: String]?
                 }
                 let object = try container.decode(Object.self)
-                self.init(code: object.code, message: object.message, details: object.details)
+                self.init(code: object.code, message: object.message,
+                          details: object.details, params: object.params)
             }
         }
         let error: Err?
@@ -321,7 +340,8 @@ actor APIClient {
         default:
             let env = Self.envelope(from: data)
             throw APIError.http(
-                status: http.statusCode, code: env?.code, message: env?.message
+                status: http.statusCode, code: env?.code, message: env?.message,
+                params: env?.params
             )
         }
     }

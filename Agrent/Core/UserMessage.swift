@@ -24,8 +24,8 @@ import Foundation
 enum UserMessage {
     static func text(for error: Error) -> String {
         switch error {
-        case APIClient.APIError.http(let status, let code, let message):
-            return httpText(status: status, code: code, message: message)
+        case APIClient.APIError.http(let status, let code, let message, let params):
+            return httpText(status: status, code: code, message: message, params: params)
 
         case let api as APIClient.APIError:
             // The rest are written for an operator already — see
@@ -70,7 +70,11 @@ enum UserMessage {
     ///    category — but it is English, so it is second.
     /// 3. A sentence derived from the STATUS. Says what kind of failure it
     ///    was and nothing it cannot support.
-    static func httpText(status: Int, code: String?, message: String?) -> String {
+    static func httpText(status: Int, code: String?, message: String?,
+                         params: [String: String]? = nil) -> String {
+        // A sentence about THIS failure, when the server named what went
+        // wrong. Only for codes that have one — see `interpolated`.
+        if let code, let built = interpolated(code: code, params: params) { return built }
         if let code, let known = bulgarian[code] { return known }
         if let message, isHumanSentence(message) { return message }
         return statusText(status)
@@ -146,6 +150,45 @@ enum UserMessage {
     /// NOT a localisation framework. The app has no string catalogue and
     /// every literal in it is hard-coded Bulgarian; this matches that rather
     /// than pretending to a system that does not exist.
+    /// Refusals whose sentence needs a value out of `params`.
+    ///
+    /// Deliberately NOT the same as quoting any parameter the server
+    /// sends. `INVALID_TAB_ORDER` carries `params.max` = "12" and this
+    /// ignores it, because twelve is a payload bound the farmer is not
+    /// subject to — the editor stops at five. The test is whether the
+    /// value is the thing that stopped THEM.
+    ///
+    /// Here it is. `PRODUCT_IS_SAMPLE_ARCHETYPE` names the product that
+    /// blocked the completion; without it the sentence describes a
+    /// category and leaves a person to work out which of their lines it
+    /// means.
+    static func interpolated(code: String, params: [String: String]?) -> String? {
+        switch code {
+        case "PRODUCT_IS_SAMPLE_ARCHETYPE":
+            guard let product = params?["product"], !product.isEmpty else {
+                return "Операцията използва образцов продукт, а не регистриран. "
+                     + "Изберете или създайте реален продукт."
+            }
+            return "«\(product)» е образцов продукт, а не регистриран. "
+                 + "Изберете или създайте реален продукт, преди да отбележите "
+                 + "операцията като изпълнена."
+
+        case "PESTICIDE_REGULATORY_FIELDS_REQUIRED":
+            // The app already blocks this before sending, so reaching it
+            // means the two rules have drifted. The sentence still has to
+            // work: a farmer must not be shown a refusal only a developer
+            // could read.
+            guard let missing = params?["missing"], !missing.isEmpty else {
+                return "За препарат за РЗ са задължителни рег. № по ЗЗР и "
+                     + "карантинен срок."
+            }
+            return "Липсват задължителни данни за препарат за РЗ: \(missing)."
+
+        default:
+            return nil
+        }
+    }
+
     static let bulgarian: [String: String] = [
         // The bottom-row editor. `codedBadRequest` gives this refusal a
         // real identity rather than the shared category code 152 other

@@ -91,7 +91,7 @@ enum Log {
             case .conflict: return "APIError.conflict"
             case .clientTooOld: return "APIError.clientTooOld"
             case .notModified: return "APIError.notModified"
-            case .http(let status, let code, _):
+            case .http(let status, let code, _, _):
                 return code.map { "APIError.http(\(status), \($0))" }
                     ?? "APIError.http(\(status))"
             }
