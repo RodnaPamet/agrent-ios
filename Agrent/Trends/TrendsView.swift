@@ -63,8 +63,7 @@ struct TrendsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .navigationTitle("Тенденции")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineTitle("Тенденции")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Затвори") { dismiss() }

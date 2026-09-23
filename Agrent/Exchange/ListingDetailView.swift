@@ -60,8 +60,7 @@ struct ListingDetailView: View {
                 }
             }
         }
-        .navigationTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
         .sheet(isPresented: $composing) {
             InquiryComposeView(listing: listing)
         }
@@ -114,8 +113,7 @@ struct InquiryComposeView: View {
                     EmptyView()
                 }
             }
-            .navigationTitle("Ново запитване")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle("Ново запитване")
             .interactiveDismissDisabled(composer.phase == .sending)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -275,8 +275,7 @@ struct ParcelOperationSheet: View {
                     }
                 }
             }
-            .navigationTitle(parcel.name)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle(parcel.name)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }.disabled(saving)

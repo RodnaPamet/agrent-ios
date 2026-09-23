@@ -14,8 +14,7 @@ struct AdminView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Админ")
-                .navigationBarTitleDisplayMode(.inline)
+                .inlineTitle("Админ")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Затвори") { dismiss() }
@@ -337,8 +336,7 @@ private struct InviteMemberView: View {
                     }
                 }
             }
-            .navigationTitle("Покани член")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle("Покани член")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }.disabled(sending)

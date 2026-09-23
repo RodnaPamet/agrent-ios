@@ -166,8 +166,7 @@ struct NewListingView: View {
                 if let problem = problemText { Section { Text(problem).font(.footnote).foregroundStyle(.secondary) } }
                 if let failure { Section { failureView(failure) } }
             }
-            .navigationTitle("Нова обява")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle("Нова обява")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }.disabled(sending)

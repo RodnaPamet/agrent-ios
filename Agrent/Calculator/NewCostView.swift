@@ -108,8 +108,7 @@ struct NewCostView: View {
                     Section { failureView(failure) }
                 }
             }
-            .navigationTitle("Нов разход")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle("Нов разход")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }.disabled(saving)

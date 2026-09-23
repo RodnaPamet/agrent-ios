@@ -36,8 +36,7 @@ struct TaskDetailView: View {
             }
             content
         }
-        .navigationTitle(summary.key)
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineTitle(summary.key)
         .toolbar {
             if let item = store.state.value, !item.status.allowedNext.isEmpty {
                 ToolbarItem(placement: .primaryAction) { statusMenu(item) }
@@ -296,8 +295,7 @@ private struct ResolutionSheet: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(target.label)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle(target.label)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ", action: cancel)

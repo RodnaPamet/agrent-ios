@@ -21,8 +21,7 @@ struct NewsView: View {
             categories
             content
         }
-        .navigationTitle("Новини")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineTitle("Новини")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Затвори") { dismiss() }
