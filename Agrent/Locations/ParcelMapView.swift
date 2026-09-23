@@ -49,8 +49,7 @@ struct ParcelMapView: View {
             }
             content
         }
-        .navigationTitle(location.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineTitle(location.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

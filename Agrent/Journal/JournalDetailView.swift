@@ -49,8 +49,7 @@ struct JournalDetailView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
-        .navigationTitle("Запис")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineTitle("Запис")
     }
 
     // MARK: - Header

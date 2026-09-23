@@ -39,8 +39,7 @@ struct FarmRiskView: View {
                     }
                     .background(.bar)
                 }
-                .navigationTitle("Риск по парцели")
-                .navigationBarTitleDisplayMode(.inline)
+                .inlineTitle("Риск по парцели")
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Затвори") { dismiss() }

@@ -41,8 +41,7 @@ struct NewEntryView: View {
                     }
                 }
             }
-            .navigationTitle("Нов запис")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle("Нов запис")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }

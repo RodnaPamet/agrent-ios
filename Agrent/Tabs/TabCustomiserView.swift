@@ -41,8 +41,7 @@ struct TabCustomiserView: View {
                 }
             }
             .environment(\.editMode, .constant(.active))
-            .navigationTitle("Раздели")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineTitle("Раздели")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
