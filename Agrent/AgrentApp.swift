@@ -44,6 +44,8 @@ struct AgrentApp: App {
 /// `JournalListView`'s toolbar — this type only routes.
 struct MainTabView: View {
     @State private var tabs = BottomTabsStore.shared
+    @State private var outbox = OutboxStore.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         // Built from the saved order rather than written out, so the bar
@@ -54,11 +56,21 @@ struct MainTabView: View {
         // enforced in the store rather than here, because the editor has
         // to know it too and a limit spelled in two places is a limit that
         // will eventually be two different numbers.
-        TabView {
-            ForEach(tabs.bottomTabs) { surface in
-                surface.screen
-                    .tabItem { Label(surface.label, systemImage: surface.icon) }
+        VStack(spacing: 0) {
+            OutboxBanner()
+            TabView {
+                ForEach(tabs.bottomTabs) { surface in
+                    surface.screen
+                        .tabItem { Label(surface.label, systemImage: surface.icon) }
+                }
             }
+        }
+        // Drained on launch and on every return to the foreground — which
+        // is when a farmer who recorded something in a field has most
+        // likely just found signal. Waiting for them to press a button
+        // would make the queue their job rather than the app's.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await outbox.flush() } }
         }
         .task {
             // The order rides along on /api/auth/me, which is already
@@ -67,6 +79,7 @@ struct MainTabView: View {
             if let me = await CurrentUserStore.shared.load() {
                 tabs.adopt(me.bottomTabOrder, isOperator: me.isOperator)
             }
+            await outbox.flush()
         }
     }
 }

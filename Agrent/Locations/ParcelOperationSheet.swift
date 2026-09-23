@@ -51,6 +51,15 @@ struct ParcelOperationSheet: View {
     @State private var saving = false
     @State private var failure: String?
 
+    /// Can this failure be fixed by trying later?
+    ///
+    /// The distinction the outbox turns on. A 400 is the server
+    /// disagreeing and will disagree tomorrow; no signal is a condition
+    /// that passes. Only the second may be queued — see
+    /// `PendingOperations.isWorthRetrying`.
+    @State private var failureIsRetriable = false
+    @State private var queued = false
+
     /// Minted ONCE per logical operation and reused across retries. A new
     /// key per attempt defeats the dedupe entirely.
     @State private var idempotencyKey = UUID().uuidString
@@ -247,6 +256,22 @@ struct ParcelOperationSheet: View {
                         // The ONLY write in this app that may say this.
                         Text("Може да опитате отново — повторното изпращане не създава втора операция.")
                             .font(.footnote).foregroundStyle(.secondary)
+
+                        // Offered only when a later attempt could work. A
+                        // refusal must not be queueable: it would sit in
+                        // the outbox forever under a label promising it is
+                        // on its way.
+                        if failureIsRetriable {
+                            Button {
+                                Task { await queueForLater() }
+                            } label: {
+                                Label("Запази за по-късно", systemImage: "tray.and.arrow.down")
+                            }
+                            Text("Записът остава на устройството и се изпраща "
+                               + "автоматично, когато има връзка.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
@@ -310,7 +335,35 @@ struct ParcelOperationSheet: View {
             dismiss()
         } catch {
             failure = UserMessage.text(for: error)
+            failureIsRetriable = PendingOperations.isWorthRetrying(error)
         }
+    }
+
+    /// Keep it, and send it when there is signal.
+    ///
+    /// The sheet already holds the data safely — on failure it stays open
+    /// with everything intact. What it cannot survive is being dismissed,
+    /// or the app being killed, and in a field the wait for signal can be
+    /// hours. This is the difference between "your work is safe while you
+    /// stand here holding the phone" and "your work is safe".
+    private func queueForLater() async {
+        guard let body = try? await APIClient.shared.encodeBody(draft) else {
+            failure = "Операцията не можа да бъде запазена на устройството."
+            return
+        }
+        await OutboxStore.shared.enqueue(PendingOperation(
+            id: idempotencyKey,
+            locationID: locationID,
+            parcelSummary: "\(parcel.name) · \(kind.label)",
+            payload: body,
+            createdAt: Date(),
+            attempts: 0,
+            lastAttemptAt: nil,
+            lastError: failure
+        ))
+        queued = true
+        onSaved()
+        dismiss()
     }
 }
 

@@ -60,11 +60,17 @@ enum LocationsAPI {
     /// key is minted ONCE by the caller and reused across attempts; a new
     /// key per attempt defeats the dedupe entirely, which is the same rule
     /// `JournalAPI.create` records.
+    /// Where a field operation is posted. Named so the outbox can replay
+    /// to the same place without reconstructing it from a literal.
+    static func operationsPath(_ locationID: String) -> String {
+        "\(base)/\(locationID)/operations"
+    }
+
     static func createOperation(
         locationID: String, _ draft: CreateFieldOperation, idempotencyKey: String
     ) async throws -> Data {
         try await APIClient.shared.postReturningData(
-            "\(base)/\(locationID)/operations",
+            operationsPath(locationID),
             body: draft,
             idempotencyKey: idempotencyKey
         )
