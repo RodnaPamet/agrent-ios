@@ -642,10 +642,3 @@ extension ParcelProjection.Bounds {
     }
 }
 
-extension Parcel {
-    /// Sown versus fallow is INFERRED from whether a crop is recorded — the
-    /// server has no such field. It is the only signal available and it
-    /// matches what the legend claims, but it is an inference: a parcel sown
-    /// with an unrecorded crop reads as fallow here.
-    var isSown: Bool { !(cropType ?? "").isEmpty }
-}

@@ -157,6 +157,23 @@ final class LocationGeometryTests: XCTestCase {
         XCTAssertTrue(bgLon.contains(box.coordinate.longitude))
     }
 
+    // MARK: - Sown inference
+
+    /// Moved here with `isSown` itself. It is a fact about a parcel, and it
+    /// outlives any one map that draws it.
+    func testSownIsInferredFromCropAndIsNotAServerField() throws {
+        func parcel(crop: String?) throws -> Parcel {
+            let cropJSON = crop.map { "\"\($0)\"" } ?? "null"
+            return try JSONDecoder().decode(Parcel.self, from: Data("""
+            {"id":"p","name":"n","cropType":\(cropJSON),"areaHa":1,"geometry":null,
+             "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+            """.utf8))
+        }
+        XCTAssertTrue(try parcel(crop: "Wheat").isSown)
+        XCTAssertFalse(try parcel(crop: nil).isSown)
+        XCTAssertFalse(try parcel(crop: "").isSown, "an empty crop is not a crop")
+    }
+
     // MARK: - Fail-soft geometry
 
     /// A parcel with null geometry EXISTS but cannot be drawn. It belongs in
