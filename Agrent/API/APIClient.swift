@@ -267,6 +267,29 @@ actor APIClient {
         return try decoder.decode(T.self, from: data.isEmpty ? Data("{}".utf8) : data)
     }
 
+    /// Encode with THIS client's encoder.
+    ///
+    /// The outbox needs bytes identical to what a live send would have
+    /// produced — same date strategy, same decimal handling. A caller
+    /// reaching for a fresh `JSONEncoder()` would queue a payload the
+    /// server might read differently from the one it would have received,
+    /// which is the same class of bug as `decode` documents one line up.
+    func encodeBody<B: Encodable>(_ body: B) throws -> Data {
+        try encoder.encode(body)
+    }
+
+    /// POST a body that is ALREADY ENCODED.
+    ///
+    /// For the outbox. A queued operation stores the bytes it was recorded
+    /// as, not a model to re-encode — so an app update that renames a
+    /// field or changes a default cannot alter what the farmer actually
+    /// wrote down before sending it. The recorded intent goes out as
+    /// recorded.
+    func postRaw(_ path: String, body: Data, idempotencyKey: String) async throws -> Data {
+        try await send(path: path, method: "POST", body: body,
+                       idempotencyKey: idempotencyKey)
+    }
+
     // MARK: - internals
 
     private func send(
