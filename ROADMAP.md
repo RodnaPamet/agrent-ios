@@ -59,9 +59,36 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   parcels, members, listings — and each one is the first real test of what
   that field actually holds. Green CI cannot find this class; only rendering
   it can.
-- `APIClient`'s status switch has no `304` case. URLSession converts 304→200
-  below us today, so it is unreachable — but `default:` would render
-  "Server error 304." on a screen whose data is fine. One line, not yet taken.
+- ~~`APIClient`'s status switch has no `304` case.~~
+  **CLOSED — it was already closed, and this entry was stale.** `0871eaf`
+  took the line ("a 304 is a success, not Грешка от сървъра (304)"). Traced
+  end to end 2026-09-23: `case 304 → APIError.notModified`, `CachedResource`
+  serves the cached copy as `.fresh` rather than `.stale` — the server has
+  just confirmed it is current — and only the 304-with-nothing-cached case
+  surfaces, as «Данните не са променени.»
+  **The lesson is the staleness, not the line.** This list exists to stop a
+  green build laundering unverified work, and an entry that describes a gap
+  which no longer exists laundering it just as effectively — it spends the
+  reader's attention on a fixed problem and lends false weight to the
+  entries beside it. Checking one cost four greps.
+
+- ~~Five `LogEntryType` cases and the removal of `OTHER` were verified by
+  READING `enums.prisma`; nothing has exercised them.~~
+  **Superseded 2026-09-23.** Still unexercised, and it no longer matters the
+  same way: the enum is now `LenientDecodable`, so an unrecognised value
+  costs one row a neutral «Друг вид» chip instead of blanking the whole
+  ДНЕВНИК. The frequency argument favoured strict — the server enum has
+  changed once, at inception — and the asymmetry beat it. See
+  `LogEntryType`'s header.
+
+- ~~Sign-in rendered raw JSON and English.~~ **CLOSED 2026-09-23,** and it
+  was found while checking the entry above rather than by looking for it.
+  `AuthError.server` carried the whole response body and `friendly` returned
+  it unchanged, with `error.localizedDescription` as the fallback — so the
+  first screen a farmer sees could print `{"error":{"code":…}}` or
+  "Could not connect to the server." under a Bulgarian heading. Both are
+  defects the rest of the app had already fixed; sign-in was simply never
+  revisited when they were.
 - ~~The journal list was counted at "at least 10" of an expected 11.~~
   **CLOSED 2026-09-21: 11, confirmed on screen by the owner.** Matches the
   production count exactly (`INPUT_APPLICATION` 9 + `ACTIVITY` 2), so the
