@@ -20,7 +20,9 @@ struct NewEntryView: View {
             Form {
                 Section {
                     Picker("Тип", selection: $type) {
-                        ForEach(LogEntryType.allCases) { Text($0.label).tag($0) }
+                        // `selectable`, never `allCases` — the latter now carries
+                        // `.unknown`, whose raw value the server would reject.
+                        ForEach(LogEntryType.selectable) { Text($0.label).tag($0) }
                     }
                     DatePicker("Дата", selection: $occurredAt, displayedComponents: .date)
                 }

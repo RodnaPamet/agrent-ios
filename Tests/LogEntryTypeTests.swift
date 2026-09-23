@@ -33,7 +33,7 @@ final class LogEntryTypeTests: XCTestCase {
 
     func testCaseCountMatchesServer() {
         XCTAssertEqual(
-            Set(LogEntryType.allCases.map(\.rawValue)),
+            Set(LogEntryType.selectable.map(\.rawValue)),
             Set(serverRawValues),
             "app enum and server enum have diverged"
         )
@@ -42,26 +42,69 @@ final class LogEntryTypeTests: XCTestCase {
     /// `OTHER` was invented client-side and the server would have rejected a
     /// create using it.
     func testInventedCaseIsGone() {
-        XCTAssertFalse(LogEntryType.allCases.map(\.rawValue).contains("OTHER"))
+        XCTAssertFalse(LogEntryType.selectable.map(\.rawValue).contains("OTHER"))
     }
 
     func testEveryCaseHasADistinctBulgarianLabel() {
-        let labels = LogEntryType.allCases.map(\.label)
-        for (type, label) in zip(LogEntryType.allCases, labels) {
+        let labels = LogEntryType.selectable.map(\.label)
+        for (type, label) in zip(LogEntryType.selectable, labels) {
             XCTAssertFalse(label.isEmpty, "\(type.rawValue) has no label")
             XCTAssertNotEqual(label, type.rawValue, "\(type.rawValue) label is untranslated")
         }
         XCTAssertEqual(Set(labels).count, labels.count, "two cases share a label")
     }
 
-    /// Documents current behaviour rather than endorsing it: an unrecognised
-    /// type throws, and because `LogEntry.type` is non-optional that failure
-    /// takes the whole list with it. If the server ever adds an eleventh value
-    /// before the app knows it, this is the shape of what happens — and this
-    /// test is where to change the decision.
-    func testUnknownValueStillThrows() {
+    /// THE DECISION CHANGED HERE, 2026-09-23.
+    ///
+    /// This used to assert that an unrecognised type THROWS, documenting
+    /// that an eleventh server value would take the whole journal with it.
+    /// It now asserts it degrades. See `LogEntryType`'s header for why the
+    /// asymmetry beats the frequency.
+    func testAnUnknownValueDegradesInsteadOfThrowing() throws {
         let json = Data("\"COVER_CROPPING\"".utf8)
-        XCTAssertThrowsError(try JSONDecoder().decode(LogEntryType.self, from: json))
+        let decoded = try JSONDecoder().decode(LogEntryType.self, from: json)
+        XCTAssertEqual(decoded, .unknown)
+        XCTAssertEqual(decoded.label, "Друг вид")
+        XCTAssertNotEqual(decoded.label, decoded.rawValue, "raw value reached a screen")
+    }
+
+    /// The point of the change: ONE unknown row must not cost the others.
+    /// This is the failure that was possible before — a whole legally
+    /// required register rendering as nothing.
+    func testOneUnknownRowDoesNotTakeTheListWithIt() throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let list = """
+        [{"id":"a","type":"ACTIVITY","status":"DONE","title":"One",
+          "occurredAt":"2026-09-11T10:00:00Z"},
+         {"id":"b","type":"COVER_CROPPING","status":"DONE","title":"Two",
+          "occurredAt":"2026-09-12T10:00:00Z"},
+         {"id":"c","type":"HARVEST","status":"DONE","title":"Three",
+          "occurredAt":"2026-09-13T10:00:00Z"}]
+        """
+        let rows = try decoder.decode([LogEntry].self, from: Data(list.utf8))
+        XCTAssertEqual(rows.count, 3, "an unknown type blanked the list")
+        XCTAssertEqual(rows.map(\.title), ["One", "Two", "Three"])
+        XCTAssertEqual(rows[1].type, .unknown)
+    }
+
+    /// `.unknown` is readable and NOT offerable. Its raw value is one the
+    /// server would reject on a create, so a picker that included it would
+    /// build a request guaranteed to fail.
+    func testUnknownIsNotSelectable() {
+        XCTAssertFalse(LogEntryType.selectable.contains(.unknown))
+        XCTAssertEqual(LogEntryType.selectable.count, serverRawValues.count)
+        XCTAssertEqual(Set(LogEntryType.selectable.map(\.rawValue)), Set(serverRawValues))
+    }
+
+    /// Case-insensitive, via `LenientDecodable`.
+    func testKnownValuesStillDecodeExactly() throws {
+        for raw in serverRawValues {
+            let decoded = try JSONDecoder().decode(
+                LogEntryType.self, from: Data("\"\(raw)\"".utf8))
+            XCTAssertEqual(decoded.rawValue, raw)
+            XCTAssertNotEqual(decoded, .unknown, "\(raw) fell through to unknown")
+        }
     }
 }
 
