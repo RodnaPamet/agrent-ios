@@ -5,15 +5,29 @@ struct LocationsView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                if let age = store.state.freshness?.ageDescription {
-                    StaleBanner(age: age)
+            // `.safeAreaInset`, NOT a VStack.
+            //
+            // Wrapped in a VStack the List is no longer the scroll view the
+            // navigation bar tracks, so a pull-to-refresh drags the whole
+            // stack — banner, header and all — down the screen with the
+            // rows. The owner described it as pulling the page title along
+            // with the contents.
+            //
+            // As a safe-area inset the banner is chrome: it stays put, and
+            // the List underneath is the primary scrollable, which is what
+            // makes the refresh gesture behave the way every other iOS app
+            // does.
+            content
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if let age = store.state.freshness?.ageDescription {
+                        StaleBanner(age: age)
+                    }
                 }
-                content
-            }
             .navigationTitle("Локации")
             .appMenu()
-            .task { if store.state.value == nil { await store.load() } }
+            .task {
+                if store.state.value == nil { await store.load() }
+            }
         }
     }
 
@@ -63,7 +77,7 @@ struct LocationsView: View {
                     ]))
                 }
             }
-            .refreshable { await store.load() }
+            .refreshable { await PullToRefresh.bounded { await store.refresh() } }
         }
     }
 }

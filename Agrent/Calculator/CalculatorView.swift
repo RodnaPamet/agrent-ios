@@ -7,13 +7,13 @@ struct CalculatorView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                if let age = store.state.freshness?.ageDescription {
-                    StaleBanner(age: age)
+            content
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if let age = store.state.freshness?.ageDescription {
+                        StaleBanner(age: age)
+                    }
                 }
-                content
-                newCostButton
-            }
+                .safeAreaInset(edge: .bottom, spacing: 0) { newCostButton }
             .navigationTitle("Калкулатор")
             .appMenu()
             .sheet(isPresented: $addingCost) {
@@ -94,8 +94,10 @@ struct CalculatorView: View {
                 costsSection
             }
             .refreshable {
-                await store.load()
-                await costs.load()
+                await PullToRefresh.bounded {
+                    await store.load()
+                    await costs.load()
+                }
             }
 
         case .loaded(let payload, _):
@@ -108,8 +110,10 @@ struct CalculatorView: View {
                 footnotes(payload)
             }
             .refreshable {
-                await store.load()
-                await costs.load()
+                await PullToRefresh.bounded {
+                    await store.load()
+                    await costs.load()
+                }
             }
         }
     }

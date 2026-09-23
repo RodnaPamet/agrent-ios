@@ -137,7 +137,7 @@ struct TaskDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             }
-            .refreshable { await store.load() }
+            .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }
 
