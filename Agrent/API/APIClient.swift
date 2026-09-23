@@ -39,6 +39,40 @@ actor APIClient {
         }
         return d
     }()
+    /// NOT `URLSession.shared`, and the difference is a minute of spinner.
+    ///
+    /// ── Measured on a real phone, in a field's worth of signal ──
+    ///
+    /// The shared session's `timeoutIntervalForRequest` is 60 seconds. Put
+    /// an iPhone into airplane mode and iOS commonly leaves Wi-Fi ON — so
+    /// the device still has a link to a router and believes it has
+    /// connectivity. The request does not fail fast; it waits the full
+    /// sixty seconds before `CachedResource` is ever allowed to fall back.
+    ///
+    /// The owner saw exactly this: Локации stuck on a loading spinner
+    /// after turning airplane mode on, having loaded instantly from cache
+    /// moments earlier. Nothing was broken — the cache was populated and
+    /// correct. The app simply refused to look at it for a minute.
+    ///
+    /// ── Why fifteen ──
+    ///
+    /// Long enough for a 17 KB payload over a poor rural connection, and
+    /// short enough that a farmer holding a phone concludes "no signal"
+    /// rather than "broken app". A spinner that resolves in fifteen
+    /// seconds is a slow network; one that resolves in sixty is neither
+    /// believed nor waited for.
+    ///
+    /// `waitsForConnectivity` is false by default for a non-background
+    /// session and is set explicitly, because the failure it produces when
+    /// true — waiting indefinitely rather than erroring — is precisely the
+    /// behaviour this file exists to avoid.
+    private let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 15
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
@@ -404,7 +438,7 @@ actor APIClient {
         Log.request(method, loggable)
         let started = Date()
         do {
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await session.data(for: req)
             guard let http = response as? HTTPURLResponse else {
                 throw URLError(.badServerResponse)
             }
@@ -513,7 +547,7 @@ actor APIClient {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONEncoder().encode(["refreshToken": seen.refreshToken])
 
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await session.data(for: req)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 // The status and code are logged, but DO NOT expect them
                 // to name the cause, and this correction matters because the
