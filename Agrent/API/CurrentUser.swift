@@ -150,21 +150,44 @@ final class CurrentUserStore {
     private(set) var user: CurrentUser?
     private var inFlight: Task<CurrentUser?, Never>?
 
+    /// Who is signed in — from cache first, like every other read.
+    ///
+    /// ── The only uncached read in the app, and it cost 15 seconds ──
+    ///
+    /// This went straight to `APIClient.data(for:)`. Offline that waits out
+    /// the request timeout before returning nil, and it is the FIRST thing
+    /// `MainTabView.task` awaits — so the whole app sat behind it on every
+    /// cold launch with no signal. Measured on a real phone: 15.8 seconds
+    /// from the task starting to anything else happening.
+    ///
+    /// It gates more than startup. `ParcelOperationSheet.canSave` requires
+    /// a known user, so across a fresh launch in a field a farmer could not
+    /// have recorded a spray at all — the offline outbox depended on an
+    /// identity the app refused to remember.
+    ///
+    /// The in-memory `user` is kept for the session; the cache is what
+    /// survives a launch. Both are needed: the first avoids a round trip
+    /// per caller, the second avoids a network round trip per launch.
     func load() async -> CurrentUser? {
         if let user { return user }
         if let inFlight { return await inFlight.value }
 
         let task = Task<CurrentUser?, Never> {
             defer { inFlight = nil }
-            do {
-                let data = try await APIClient.shared.data(for: MeAPI.path)
-                let me = try await MeAPI.decode(from: data)
-                user = me
-                return me
-            } catch {
-                Log.auth.error("could not resolve current user: \(Log.summary(for: error), privacy: .public)")
-                return nil
+            var resolved: CurrentUser?
+            await CachedResource.loadShowingCacheFirst(MeAPI.path) { data in
+                try await MeAPI.decode(from: data)
+            } publish: { state in
+                // Cache first, then the network answer if it differs. The
+                // LAST publish wins, which is the fresh one when there is
+                // a network and the cached one when there is not.
+                if let value = state.value { resolved = value }
             }
+            if resolved == nil {
+                Log.auth.error("could not resolve current user, cached or live")
+            }
+            user = resolved
+            return resolved
         }
         inFlight = task
         return await task.value
