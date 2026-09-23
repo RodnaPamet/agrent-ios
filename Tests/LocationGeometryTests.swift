@@ -157,6 +157,24 @@ final class LocationGeometryTests: XCTestCase {
         XCTAssertTrue(bgLon.contains(box.coordinate.longitude))
     }
 
+    // MARK: - The two cameras
+
+    /// The whole point of the toggle: simplified opens TIGHTER than precise.
+    ///
+    /// Pins the direction rather than a number. If the two ever came out
+    /// equal the toggle would still change the shapes, and the camera not
+    /// moving would read as a half-broken button.
+    func testTheSimplifiedCameraIsTighterThanTheFarmCamera() async throws {
+        let response = try await parcels()
+        let drawable = response.parcels.filter(\.isDrawable)
+
+        let farm = try XCTUnwrap(response.bounds).region
+        let fitted = try XCTUnwrap(MKCoordinateRegion(fitting: drawable))
+
+        XCTAssertLessThan(fitted.span.latitudeDelta, farm.span.latitudeDelta)
+        XCTAssertLessThan(fitted.span.longitudeDelta, farm.span.longitudeDelta)
+    }
+
     // MARK: - Sown inference
 
     /// Moved here with `isSown` itself. It is a fact about a parcel, and it

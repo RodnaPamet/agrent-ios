@@ -6,19 +6,28 @@ struct ParcelMapView: View {
 
     @State private var store: ParcelsStore
 
-    /// Remembered per user, and SCHEMATIC BY DEFAULT.
+    /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
     ///
-    /// The default is the decision, not the toggle. Schematic's first frame
-    /// needs no network, so a farmer opening this with no coverage sees their
-    /// fields rather than grey tiles — and that is the situation this screen
-    /// exists for. MapKit is the deliberate second look, for geographic
-    /// context, which is when imagery is genuinely what you want. Neither is
-    /// a fallback for the other.
+    /// Both modes are now imagery. Simplified draws each field as one
+    /// rectangle, coloured sown or fallow, framed tight on the parcels;
+    /// precise draws the true outlines with their holes, framed on the
+    /// farm's own bounds, and carries the vegetation indices. The tileless
+    /// schematic this replaced is gone, and with it the argument that the
+    /// first frame needs no network — the stale banner above is what answers
+    /// no signal now, and it answers it for every screen rather than for
+    /// this one alone.
+    ///
+    /// A NEW KEY, deliberately, with the old one left unread. What
+    /// `locations.useSchematicMap` recorded was an answer to "do you want
+    /// the tileless, hand-coloured map?", and there is nothing honest to
+    /// migrate that to: someone who chose the schematic was not choosing
+    /// rectangles over outlines. Everyone starts from the owner's default
+    /// and picks again.
     ///
     /// One button, two states. MapKit offers standard/hybrid/satellite for
     /// free and adding them would turn this into a picker, which is the one
     /// thing it was asked not to become.
-    @AppStorage("locations.useSchematicMap") private var useSchematic = true
+    @AppStorage("locations.parcelMapSimplified") private var simplified = false
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -60,16 +69,23 @@ struct ParcelMapView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    useSchematic.toggle()
+                    simplified.toggle()
+                    // THE CAMERA HAS TO BE TOLD. One map view serves both
+                    // modes, so a toggle is not a rebuild and `region` is
+                    // read only when the view is first made — without this
+                    // the shapes would change under an unchanged camera and
+                    // "zoomed in versus zoomed out" would not happen at all.
+                    cameraTick += 1
+                    camera = .init(tick: cameraTick, region: mapRegion(simplified: simplified))
                 } label: {
                     Label(
-                        useSchematic ? "Сателит" : "Схема",
-                        systemImage: useSchematic ? "globe.europe.africa" : "square.on.square.dashed"
+                        simplified ? "Точни граници" : "Опростена",
+                        systemImage: simplified ? "pentagon" : "square.dashed"
                     )
                 }
-                .accessibilityHint(useSchematic
-                    ? "Превключва към сателитна карта"
-                    : "Превключва към схематична карта")
+                .accessibilityHint(simplified
+                    ? "Превключва към точните очертания на парцелите"
+                    : "Превключва към опростена карта с правоъгълни парцели")
             }
         }
         .sheet(item: $operating) { parcel in
@@ -99,8 +115,8 @@ struct ParcelMapView: View {
             VStack(spacing: 0) {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
-                if useSchematic && !drawable.isEmpty { legend }
-                if !useSchematic && !drawable.isEmpty { indexControls }
+                if simplified && !drawable.isEmpty { legend }
+                if !simplified && !drawable.isEmpty { indexControls }
                 parcelList(response, drawable: drawable)
             }
         }
@@ -108,9 +124,11 @@ struct ParcelMapView: View {
 
     // MARK: - Map
 
-    /// Only for the schematic view. On satellite the fills sit over imagery
-    /// and the colours are not the only cue, but here they carry the whole
-    /// meaning, so the key has to be on screen.
+    /// Only for the simplified view, where the fill colour is the only thing
+    /// on screen saying which fields are sown. The precise view has the
+    /// vegetation indices and their own legend, and paints every parcel
+    /// alike, so a sown/fallow key there would explain a distinction it does
+    /// not draw.
     private var legend: some View {
         HStack(spacing: 16) {
             swatch(Palette.Map.sownFill, "Засят", dashed: false)
@@ -153,30 +171,53 @@ struct ParcelMapView: View {
                 icon: "map",
                 message: "Парцелите съществуват, но нямат географски очертания."
             )
-        } else if useSchematic, let box = response.bounds ?? location.boundsJson {
-            SchematicParcelMap(
-                parcels: drawable, bounds: box,
-                onTap: mayOperate ? { operating = $0 } : nil
-            )
         } else {
-            // Camera from `bounds` when the server sent one, otherwise from
-            // the location's own boundsJson. Both are [minLon, minLat, …] and
-            // both are read through BoundingBox's NAMED fields — never
-            // positionally, which is how the camera ends up in the Red Sea.
-            // One MKPolygon per GeoJSON polygon, holes already carried as
-            // interiorPolygons — see ParcelGeometry.mapPolygons.
+            // ONE map view for both modes, differing by `shape`. Two views in
+            // an if/else would give SwiftUI different structural identity,
+            // tearing down the MKMapView and re-firing the index refresh on
+            // every toggle.
+            //
+            // No index tiles under the rectangles. Earth Engine clips each
+            // tile to the TRUE parcel shape, so beneath a box the colour
+            // would stop at the field's real edge and the corners stay bare —
+            // which reads as "the data ends here" rather than as a
+            // simplification.
             SatelliteParcelMap(
                 parcels: drawable,
-                region: (response.bounds ?? location.boundsJson)?.region
-                    ?? MKCoordinateRegion(fitting: drawable)
-                    ?? .bulgaria,
-                tileTemplate: indices.tiles?.tileUrl,
+                region: mapRegion(simplified: simplified),
+                tileTemplate: simplified ? nil : indices.tiles?.tileUrl,
+                shape: simplified ? .boundingBoxes : .outlines,
+                contrast: contrast,
                 camera: camera,
                 onTap: mayOperate ? { operating = $0 } : nil
             )
             .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
             .task { await indices.refreshIfNeeded() }
         }
+    }
+
+    /// Where each mode opens.
+    ///
+    /// PRECISE is unchanged: the server's bounds when it sent any, then the
+    /// location's own, then the parcels, then Bulgaria. Both boxes are
+    /// [minLon, minLat, …] and both are read through `BoundingBox`'s NAMED
+    /// fields — never positionally, which is how a camera ends up in the Red
+    /// Sea.
+    ///
+    /// SIMPLIFIED frames the parcels themselves, which is tighter than the
+    /// farm's holding bounds by construction and needs no invented zoom
+    /// number. Where a location has no server bounds the two are the same
+    /// expression and the toggle will not appear to move the camera — that is
+    /// honest rather than broken, since there is nothing else to frame.
+    private func mapRegion(simplified: Bool) -> MKCoordinateRegion {
+        let response = store.state.value
+        let drawable = response?.parcels.filter(\.isDrawable) ?? []
+        if simplified, let fitted = MKCoordinateRegion(fitting: drawable) {
+            return fitted
+        }
+        return (response?.bounds ?? location.boundsJson)?.region
+            ?? MKCoordinateRegion(fitting: drawable)
+            ?? .bulgaria
     }
 
     // MARK: - Target
