@@ -31,6 +31,76 @@ final class FarmRiskStore {
     /// had no way to see they had done.
     private(set) var askedParcelIDs: Set<String> = []
 
+    /// Nil until `/api/auth/me` resolves. The ask is OFFERED meanwhile —
+    /// `mayAsk` fails open, the same decision `mayCreateOperations`
+    /// records: hiding a control from somebody who could have used it is
+    /// worse than showing one the server might refuse, because a refusal
+    /// is a sentence they can read and an absence is a feature they
+    /// conclude does not exist.
+    private(set) var me: CurrentUser?
+
+    /// May this person ask an insurer?
+    ///
+    /// `/insurance` is outside the operator API allowlist, so a
+    /// MECHANISATOR gets 403 `operator_scope` on both leads calls while
+    /// the readings work fine. That division looks deliberate — knowing a
+    /// field is stressed is field work, contacting an insurer is not — so
+    /// the control is HIDDEN for them rather than shown and refused.
+    var mayAsk: Bool { !(me?.isOperator ?? false) }
+
+    private(set) var asking: Set<String> = []
+    private(set) var askFailure: String?
+
+    func loadWho() async {
+        me = await CurrentUserStore.shared.load()
+    }
+
+    /// Which parcels are already spent. Read from the server every time
+    /// the screen opens; never cached in view state.
+    func loadLeads() async {
+        guard mayAsk else { return }
+        do {
+            let data = try await APIClient.shared.data(for: FarmRiskAPI.leadsPath)
+            askedParcelIDs = Set(try await FarmRiskAPI.decodeLeads(from: data).parcelIds)
+        } catch {
+            // A failure here must NOT be read as "nothing was asked" — that
+            // would re-enable a button whose write the server then refuses.
+            // Leaving the set as it was is the honest degradation: the
+            // control stays in whatever state was last known true.
+            Log.api.error("could not read insurance leads")
+        }
+    }
+
+    /// Fire the ask. NEVER retried automatically.
+    ///
+    /// One parcel can be asked about exactly once, ever. There is no undo
+    /// — it was specified and then dropped — so an automatic retry after a
+    /// lost response is the one thing that could turn a farmer's single
+    /// deliberate tap into something they did not choose. A 409 on replay
+    /// is success, so a manual retry is safe; an automatic one is still
+    /// not offered.
+    func ask(_ parcelID: String) async {
+        guard mayAsk, !asking.contains(parcelID) else { return }
+        asking.insert(parcelID)
+        askFailure = nil
+        defer { asking.remove(parcelID) }
+        do {
+            try await FarmRiskAPI.createLead(parcelID: parcelID)
+            askedParcelIDs.insert(parcelID)
+        } catch {
+            if FarmRiskAPI.isAlreadyAsked(error) {
+                // Already asked — the outcome the farmer wanted, reached
+                // before. Recorded as success so the control settles
+                // rather than inviting a retry that can only 409 again.
+                askedParcelIDs.insert(parcelID)
+            } else {
+                askFailure = UserMessage.text(for: error)
+            }
+        }
+    }
+
+    func clearAskFailure() { askFailure = nil }
+
     func loadLocations() async {
         await CachedResource.loadShowingCacheFirst(LocationsAPI.listPath) { data in
             try await LocationsAPI.decodeList(from: data)
