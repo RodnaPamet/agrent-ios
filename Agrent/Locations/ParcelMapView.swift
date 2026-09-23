@@ -36,6 +36,13 @@ struct ParcelMapView: View {
     /// The index whose explainer is open.
     @State private var explaining: VegetationIndex?
 
+    /// The parcel the target button last jumped to, and the camera move that
+    /// took it there. The tick is what makes a second press on the same
+    /// parcel move again — see `SatelliteParcelMap.CameraCommand`.
+    @State private var focusedID: String?
+    @State private var cameraTick = 0
+    @State private var camera: SatelliteParcelMap.CameraCommand?
+
     init(location: Location) {
         self.location = location
         _store = State(initialValue: ParcelsStore(locationID: location.id))
@@ -164,10 +171,72 @@ struct ParcelMapView: View {
                     ?? MKCoordinateRegion(fitting: drawable)
                     ?? .bulgaria,
                 tileTemplate: indices.tiles?.tileUrl,
+                camera: camera,
                 onTap: mayOperate ? { operating = $0 } : nil
             )
+            .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
             .task { await indices.refreshIfNeeded() }
         }
+    }
+
+    // MARK: - Target
+
+    /// Walks the fields, one press at a time — the web's «Намери моето поле».
+    ///
+    /// ON THE MAP, not in the toolbar. The trailing bar slot already holds
+    /// the mode toggle, and the title beside it is a principal item put there
+    /// because Bulgarian titles truncate when the bar mis-measures them; a
+    /// second glyph would eat what is left of that budget. It is not in the
+    /// control bar under the map either, because that bar does not render at
+    /// all where Earth Engine is unconfigured, and this button has nothing to
+    /// do with the indices.
+    ///
+    /// Bottom-trailing because bottom-leading is Apple's attribution, which
+    /// must not be covered, and because that is where a thumb is.
+    @ViewBuilder
+    private func targetButton(_ drawable: [Parcel]) -> some View {
+        Button {
+            focusNext(drawable)
+        } label: {
+            Image(systemName: "dot.viewfinder")
+                .font(.title3)
+                .padding(11)
+                .background(.thinMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .frame(width: 44, height: 44)
+        .contentShape(Circle())
+        .padding(16)
+        .accessibilityLabel(drawable.count == 1 ? "Центрирай парцела" : "Следващ парцел")
+        .accessibilityHint("Центрира картата върху следващия парцел")
+    }
+
+    /// Camera only — no selection, no sheet — matching the web.
+    ///
+    /// Cycles the DRAWABLE parcels rather than all of them. A parcel with no
+    /// outline is in the list and not on the map, so a press that framed it
+    /// would move the camera to nothing.
+    private func focusNext(_ drawable: [Parcel]) {
+        guard let next = ParcelFocus.next(after: focusedID, in: drawable) else { return }
+        // Advance the focus even when the camera cannot be built, which is
+        // the web's behaviour and the right one: a parcel whose geometry is
+        // degenerate would otherwise trap the button on itself forever, and
+        // pressing again would keep failing on the same field.
+        focusedID = next.id
+        guard let region = MKCoordinateRegion(fitting: [next]) else { return }
+
+        cameraTick += 1
+        camera = .init(tick: cameraTick, region: region)
+
+        // The camera move IS the effect, and MKMapView exposes none of it to
+        // VoiceOver. Said in the same order and the same words as the
+        // parcel's own row, so the two do not describe one field differently.
+        AccessibilityNotification.Announcement(A11y.sentence([
+            ParcelFocus.position(of: next, in: drawable),
+            next.name,
+            CommodityName.freeText(next.cropType),
+            next.areaHa.map { "\(Num.text($0)) хектара" },
+        ])).post()
     }
 
     // MARK: - Vegetation indices
