@@ -163,3 +163,105 @@ final class RiskLevelTests: XCTestCase {
         XCTAssertFalse(path.contains("?"))
     }
 }
+
+/// The insurance ask, which cannot be taken back.
+///
+/// A 15-minute undo was specified and then dropped by the owner. That
+/// makes the confirmation dialog the ONLY protection a farmer has, and
+/// makes every decision below load-bearing rather than merely tidy.
+@MainActor
+final class InsuranceAskTests: XCTestCase {
+
+    /// 409 means "already asked", not "failed". Treating it as an error
+    /// tells a farmer their ask did not go through when it went through
+    /// the first time — and invites the retry that produces the same 409
+    /// forever.
+    func testAlreadyAskedIsRecognised() {
+        XCTAssertTrue(FarmRiskAPI.isAlreadyAsked(
+            APIClient.APIError.http(status: 409, code: nil, message: nil)))
+    }
+
+    /// Everything else is a real failure. A 403 in particular must NOT be
+    /// read as success — that is an operator being refused, and recording
+    /// it as asked would show them a parcel as spent when nothing happened.
+    func testOtherStatusesAreNotSuccess() {
+        for status in [400, 401, 403, 404, 422, 500, 503] {
+            XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(
+                APIClient.APIError.http(status: status, code: nil, message: nil)),
+                "a \(status) was treated as already-asked")
+        }
+        XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(URLError(.notConnectedToInternet)))
+    }
+
+    func testTheLeadsShapeDecodes() async throws {
+        let leads = try await FarmRiskAPI.decodeLeads(
+            from: Data(#"{"parcelIds":["a","b"]}"#.utf8))
+        XCTAssertEqual(Set(leads.parcelIds), ["a", "b"])
+    }
+
+    func testTheCreatePayloadCarriesTheParcel() throws {
+        let data = try JSONEncoder().encode(CreateLead(parcelId: "cmr3vn01"))
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["parcelId"] as? String, "cmr3vn01")
+        XCTAssertEqual(json.keys.count, 1, "the create sends exactly one field")
+    }
+
+    /// The source-level guarantees. These are the ones that protect a
+    /// farmer from an irreversible write, and none of them has a runtime
+    /// seam worth hosting a view for.
+    private var viewSource: String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        return (try? String(contentsOf: url.appendingPathComponent(
+            "Agrent/FarmRisk/FarmRiskView.swift"), encoding: .utf8)) ?? ""
+    }
+
+    private var storeSource: String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        return (try? String(contentsOf: url.appendingPathComponent(
+            "Agrent/FarmRisk/FarmRiskStore.swift"), encoding: .utf8)) ?? ""
+    }
+
+    func testTheSourcesAreRead() {
+        XCTAssertTrue(viewSource.contains("struct FarmRiskView"), "positive control")
+        XCTAssertTrue(storeSource.contains("final class FarmRiskStore"), "positive control")
+    }
+
+    /// The dialog NAMES the parcel. "Are you sure?" over an unnamed action
+    /// is a speed bump, not a confirmation — and with no undo, picking the
+    /// wrong field is unrecoverable.
+    func testTheConfirmationNamesTheParcel() {
+        XCTAssertTrue(viewSource.contains("confirming?.parcel.name"),
+                      "the dialog title does not name the parcel")
+        XCTAssertTrue(viewSource.contains("row.parcel.name"),
+                      "the dialog body does not name the parcel")
+    }
+
+    /// It says the ask cannot be withdrawn. After this there is nowhere
+    /// left to say it.
+    func testTheConfirmationSaysItCannotBeTakenBack() {
+        XCTAssertTrue(viewSource.contains("не може да бъде оттеглено"),
+                      "the dialog does not state that the ask is irreversible")
+        XCTAssertTrue(viewSource.contains("само веднъж"),
+                      "the dialog does not state one ask per parcel")
+    }
+
+    /// NEVER retried automatically. A lost response on a bad connection
+    /// must not turn one deliberate tap into something the farmer did not
+    /// choose.
+    func testTheAskIsNeverRetriedAutomatically() {
+        XCTAssertFalse(storeSource.contains("PendingOperations"),
+                       "the insurance ask can reach the offline outbox")
+        XCTAssertFalse(storeSource.contains("isWorthRetrying"),
+                       "the insurance ask is being classified for retry")
+    }
+
+    /// A failed leads READ must not clear the set — that would re-enable a
+    /// button whose write the server then refuses.
+    func testAFailedLeadsReadDoesNotClearWhatIsKnown() {
+        XCTAssertFalse(storeSource.contains("askedParcelIDs = []"),
+                       "a failure path empties the asked set")
+    }
+}

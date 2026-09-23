@@ -109,4 +109,52 @@ enum FarmRiskAPI {
     static func decodeAnalysis(from data: Data) async throws -> ParcelRisk {
         try await APIClient.shared.decode(data, as: ParcelRisk.self)
     }
+
+    static func decodeLeads(from data: Data) async throws -> InsuranceLeads {
+        try await APIClient.shared.decode(data, as: InsuranceLeads.self)
+    }
+
+    /// Ask an insurer about one parcel.
+    ///
+    /// ── IRREVERSIBLE, and there is no undo by decision ──
+    ///
+    /// Unique per (parcel, tenant) at the database level, with no DELETE
+    /// and no withdraw. A 15-minute undo was specified and then dropped by
+    /// the owner, so the confirmation in front of this is the ONLY
+    /// protection a farmer has. It names the parcel and says the ask
+    /// cannot be taken back, because after this there is nowhere to say it.
+    ///
+    /// No `Idempotency-Key`: the route does not read one and does not need
+    /// to. The (parcel, tenant) pair IS the natural key, so a replay
+    /// returns 409 rather than creating a second lead — which is why the
+    /// 409 is success-on-replay below and not a failure.
+    static func createLead(parcelID: String) async throws {
+        _ = try await APIClient.shared.post(
+            leadsPath, body: CreateLead(parcelId: parcelID),
+            as: EmptyResponse.self, idempotencyKey: UUID().uuidString
+        )
+    }
+
+    /// 409 means "this parcel was already asked about", not "the request
+    /// failed". Treating it as an error would tell a farmer their ask did
+    /// not go through when it went through the first time — and then
+    /// invite the retry that produces the same 409 forever.
+    static func isAlreadyAsked(_ error: Error) -> Bool {
+        if case APIClient.APIError.http(let status, _, _, _) = error { return status == 409 }
+        return false
+    }
+}
+
+struct CreateLead: Encodable, Sendable {
+    let parcelId: String
+}
+
+/// Which parcels have already been asked about.
+///
+/// READ, never remembered. The web page tracked "sent" in component-local
+/// state; it died on unmount, so navigating away and back re-enabled a
+/// button whose write the database then refused, and the operator was
+/// told off for retrying something they had no way to see they had done.
+struct InsuranceLeads: Decodable, Equatable, Sendable {
+    let parcelIds: [String]
 }

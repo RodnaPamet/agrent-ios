@@ -20,6 +20,13 @@ struct FarmRiskView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var store = FarmRiskStore()
 
+    /// The parcel awaiting confirmation. Non-nil drives the alert.
+    ///
+    /// Held as the PARCEL, not a Bool, so the sentence in the dialog can
+    /// name which field is about to be spent. "Are you sure?" over an
+    /// unnamed action is not a confirmation, it is a speed bump.
+    @State private var confirming: RiskRow?
+
     var body: some View {
         NavigationStack {
             content
@@ -40,9 +47,47 @@ struct FarmRiskView: View {
                     }
                 }
                 .task {
+                    await store.loadWho()
                     if store.locations.value == nil { await store.loadLocations() }
                     if store.parcels.value == nil { await store.loadParcels() }
+                    await store.loadLeads()
                     await store.readRisks()
+                }
+                // A confirmation, because there is no undo.
+                //
+                // An insurance ask is unique per (parcel, tenant) with no
+                // DELETE and no withdraw — a 15-minute undo was specified
+                // and then dropped. So this dialog is the ONLY protection
+                // a farmer has, and it carries the whole weight: it names
+                // the parcel, it says the ask cannot be taken back, and
+                // the confirming action is not the default button.
+                .alert(
+                    "Запитване за «\(confirming?.parcel.name ?? "")»",
+                    isPresented: Binding(
+                        get: { confirming != nil },
+                        set: { if !$0 { confirming = nil } }
+                    ),
+                    presenting: confirming
+                ) { row in
+                    Button("Отказ", role: .cancel) { confirming = nil }
+                    Button("Изпрати запитване") {
+                        let id = row.parcel.id
+                        confirming = nil
+                        Task { await store.ask(id) }
+                    }
+                } message: { row in
+                    Text("Ще бъде изпратено запитване за оферта за парцел "
+                       + "«\(row.parcel.name)».\n\n"
+                       + "Запитването не може да бъде оттеглено и всеки парцел "
+                       + "може да бъде заявен само веднъж.")
+                }
+                .alert("Запитването не беше изпратено", isPresented: Binding(
+                    get: { store.askFailure != nil },
+                    set: { if !$0 { store.clearAskFailure() } }
+                )) {
+                    Button("Добре", role: .cancel) { store.clearAskFailure() }
+                } message: {
+                    Text(store.askFailure ?? "")
                 }
         }
     }
@@ -132,8 +177,42 @@ struct FarmRiskView: View {
                     Text("Изчисляване…").font(.footnote).foregroundStyle(.secondary)
                 }
             }
+
+            askControl(row)
         }
-        .accessibilityElement(children: .combine)
+    }
+
+    /// Ask, already asked, or nothing at all.
+    ///
+    /// Hidden entirely for a MECHANISATOR: `/insurance` is outside the
+    /// operator API allowlist, so both leads calls 403 for them while the
+    /// readings work. Hidden rather than shown-and-refused, consistent
+    /// with how the tab filter treats the same division.
+    @ViewBuilder
+    private func askControl(_ row: RiskRow) -> some View {
+        if store.mayAsk {
+            if store.askedParcelIDs.contains(row.parcel.id) {
+                // State read from the server, not remembered locally.
+                Label("Заявено запитване", systemImage: "checkmark.seal")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if store.asking.contains(row.parcel.id) {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Изпраща се…").font(.footnote).foregroundStyle(.secondary)
+                }
+            } else {
+                Button {
+                    confirming = row
+                } label: {
+                    Label("Запитай за оферта", systemImage: "envelope")
+                        .font(.footnote.weight(.medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Palette.accent)
+                .accessibilityHint("Изпраща еднократно запитване за застрахователна оферта")
+            }
+        }
     }
 
     @ViewBuilder
