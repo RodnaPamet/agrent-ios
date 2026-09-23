@@ -51,9 +51,9 @@ final class TrendsStore {
     func loadPrices() async {
         if prices.value == nil { prices = .loading }
         let path = TrendsAPI.pricesPath(commodity, range: range)
-        prices = await CachedResource.load(path) { data in
+        await CachedResource.loadShowingCacheFirst(path) { data in
             try await APIClient.shared.decode(data, as: PricesResponse.self)
-        }
+        } publish: { [weak self] in self?.prices = $0 }
         applyDefaultVisibility()
     }
 
@@ -76,9 +76,9 @@ final class TrendsStore {
     func loadNews() async {
         if news.value == nil { news = .loading }
         let path = TrendsAPI.newsPath(newsCategory)
-        news = await CachedResource.load(path) { data in
+        await CachedResource.loadShowingCacheFirst(path) { data in
             try await APIClient.shared.decode(data, as: NewsResponse.self)
-        }
+        } publish: { [weak self] in self?.news = $0 }
     }
 
     func select(_ commodity: ChartableCommodity) async {

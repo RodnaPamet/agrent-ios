@@ -391,14 +391,14 @@ final class OperationReferenceStore {
 
     func load() async {
         if items.value == nil {
-            items = await CachedResource.load(LocationsAPI.itemsPath) {
+            await CachedResource.loadShowingCacheFirst(LocationsAPI.itemsPath) {
                 try await LocationsAPI.decodeItems(from: $0)
-            }
+            } publish: { [weak self] in self?.items = $0 }
         }
         if units.value == nil {
-            units = await CachedResource.load(LocationsAPI.rateUnitsPath) {
+            await CachedResource.loadShowingCacheFirst(LocationsAPI.rateUnitsPath) {
                 try await LocationsAPI.decodeUnits(from: $0)
-            }
+            } publish: { [weak self] in self?.units = $0 }
         }
     }
 }

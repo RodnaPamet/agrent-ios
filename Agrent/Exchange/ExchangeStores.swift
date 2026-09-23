@@ -30,10 +30,9 @@ final class ExchangeListingsStore {
         if first.isFiltered {
             await loadFiltered(first)
         } else {
-            let loaded = await CachedResource.load(ExchangeAPI.listingsPath(first)) { data in
+            await CachedResource.loadShowingCacheFirst(ExchangeAPI.listingsPath(first)) { data in
                 try await ExchangeAPI.decodeListings(from: data)
-            }
-            apply(loaded)
+            } publish: { [weak self] in self?.apply($0) }
         }
     }
 
@@ -98,9 +97,9 @@ final class MyListingsStore {
 
     func load() async {
         if state.value == nil { state = .loading }
-        state = await CachedResource.load(ExchangeAPI.myListingsPath) { data in
+        await CachedResource.loadShowingCacheFirst(ExchangeAPI.myListingsPath) { data in
             try await ExchangeAPI.decodeMyListings(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 }
 
@@ -111,9 +110,9 @@ final class MyInquiriesStore {
 
     func load() async {
         if state.value == nil { state = .loading }
-        state = await CachedResource.load(ExchangeAPI.inquiriesPath) { data in
+        await CachedResource.loadShowingCacheFirst(ExchangeAPI.inquiriesPath) { data in
             try await ExchangeAPI.decodeInquiries(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 }
 

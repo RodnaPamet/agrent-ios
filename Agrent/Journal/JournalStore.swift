@@ -31,18 +31,20 @@ final class JournalStore {
         // across a reload would append page two of a list that no longer
         // exists — the rows shift as entries are added, and the cursor is
         // positional against the old ordering.
-        let loaded = await CachedResource.load(JournalAPI.listPath) { data in
+        await CachedResource.loadShowingCacheFirst(JournalAPI.listPath) { data in
             try await JournalAPI.decodeList(from: data)
-        }
-        switch loaded {
-        case .loaded(let slice, let freshness):
-            nextCursor = slice.nextCursor
-            state = .loaded(slice.entries, freshness)
-        case .failed(let message):
-            nextCursor = nil
-            state = .failed(message)
-        case .loading:
-            state = .loading
+        } publish: { [weak self] loaded in
+            guard let self else { return }
+            switch loaded {
+            case .loaded(let slice, let freshness):
+                self.nextCursor = slice.nextCursor
+                self.state = .loaded(slice.entries, freshness)
+            case .failed(let message):
+                self.nextCursor = nil
+                self.state = .failed(message)
+            case .loading:
+                self.state = .loading
+            }
         }
     }
 

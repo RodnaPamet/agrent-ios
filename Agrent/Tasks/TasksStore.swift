@@ -8,9 +8,9 @@ final class TasksStore {
 
     func load() async {
         if state.value == nil { state = .loading }
-        state = await CachedResource.load(WorkItemAPI.listPath) { data in
+        await CachedResource.loadShowingCacheFirst(WorkItemAPI.listPath) { data in
             try await WorkItemAPI.decodeList(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 }
 
@@ -27,9 +27,9 @@ final class TaskDetailStore {
 
     func load() async {
         if state.value == nil { state = .loading }
-        state = await CachedResource.load(WorkItemAPI.detailPath(id)) { data in
+        await CachedResource.loadShowingCacheFirst(WorkItemAPI.detailPath(id)) { data in
             try await WorkItemAPI.decodeDetail(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 
     /// Change the status, then RELOAD rather than trusting the response.
