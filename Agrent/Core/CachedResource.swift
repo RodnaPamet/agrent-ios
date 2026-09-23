@@ -15,6 +15,65 @@ import Foundation
 /// cached bytes means cached data goes through exactly the same defensive
 /// decode as fresh data, instead of a simpler one that happens to work today.
 enum CachedResource {
+    /// Cached copy first, network behind it.
+    ///
+    /// ── Why this reverses the policy above ──
+    ///
+    /// The header argues network-first is "the trade a phone in a field
+    /// wants". A real phone in airplane mode disproved it. Airplane mode
+    /// on iOS commonly leaves Wi-Fi ON, so the device holds a link to a
+    /// router and believes it has connectivity — there is no fast failure
+    /// to fall back from, and every screen waited out the request timeout
+    /// before consulting a cache that was populated and correct the whole
+    /// time.
+    ///
+    /// Shortening the timeout only shortens the wait. The wait itself is
+    /// the defect: an app that already has the answer should not make
+    /// somebody watch a spinner to be told it.
+    ///
+    /// So: publish the cache the instant it is read, then publish the
+    /// network result when it arrives. On a good connection the second
+    /// publish lands in well under a second and the first is invisible. On
+    /// no connection the first is the whole answer.
+    ///
+    /// The staleness is not hidden — every screen that uses this carries
+    /// `StaleBanner`, and the first publish is marked `.stale` with the
+    /// time it was fetched. The reader is told what they are looking at.
+    ///
+    /// The network result is published even when it FAILS, so a genuine
+    /// error still reaches the screen — but only after the cached data has
+    /// already been shown, so the failure never costs the reader the
+    /// content.
+    /// - Parameter showCachedFirst: pass `false` for an EXPLICIT refresh — a
+    ///   pull-to-refresh already has content on screen, and re-publishing
+    ///   the cached copy under the reader's finger re-renders the list
+    ///   mid-gesture for no gain. They asked for fresh; give them fresh or
+    ///   an error.
+    static func loadShowingCacheFirst<T: Equatable & Sendable>(
+        _ pathAndQuery: String,
+        showCachedFirst: Bool = true,
+        decode: @Sendable (Data) async throws -> T,
+        publish: @MainActor @Sendable (LoadState<T>) -> Void
+    ) async {
+        let key = ResponseCache.key(tenant: Config.tenantSlug, pathAndQuery: pathAndQuery)
+        let hit = await ResponseCache.shared.read(key)
+        if let hit, showCachedFirst {
+            if let value = try? await decode(hit.data) {
+                await publish(.loaded(value, .stale(since: hit.fetchedAt)))
+            } else {
+            }
+        }
+        let fresh = await load(pathAndQuery, decode: decode)
+        // A network failure must not replace content already on screen
+        // with an error. The cache already answered; the failure is only
+        // news if there was nothing to show.
+        if case .failed = fresh {
+            if await ResponseCache.shared.read(key) == nil { await publish(fresh) }
+        } else {
+            await publish(fresh)
+        }
+    }
+
     static func load<T: Equatable & Sendable>(
         _ pathAndQuery: String,
         decode: @Sendable (Data) async throws -> T

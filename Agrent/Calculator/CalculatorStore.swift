@@ -11,9 +11,9 @@ final class CalculatorStore {
         // nothing on it, so a refresh does not look like a loss.
         if state.value == nil { state = .loading }
 
-        state = await CachedResource.load(CalculatorAPI.path) { data in
+        await CachedResource.loadShowingCacheFirst(CalculatorAPI.path) { data in
             try await CalculatorAPI.decode(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 }
 
@@ -24,8 +24,8 @@ final class CostsStore {
 
     func load() async {
         if state.value == nil { state = .loading }
-        state = await CachedResource.load(CostsAPI.listPath) { data in
+        await CachedResource.loadShowingCacheFirst(CostsAPI.listPath) { data in
             try await CostsAPI.decodeList(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 }

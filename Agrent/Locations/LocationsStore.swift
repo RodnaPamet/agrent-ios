@@ -6,11 +6,21 @@ import Observation
 final class LocationsStore {
     private(set) var state: LoadState<[Location]> = .loading
 
-    func load() async {
+    func load() async { await load(showCachedFirst: true) }
+
+    /// Pull-to-refresh. The screen already has content, so the cached copy
+    /// is NOT re-published under the reader's finger — that re-renders the
+    /// list mid-gesture and reads as the refresh glitching. They asked for
+    /// fresh; give them fresh, or the error.
+    func refresh() async { await load(showCachedFirst: false) }
+
+    private func load(showCachedFirst: Bool) async {
         if state.value == nil { state = .loading }
-        state = await CachedResource.load(LocationsAPI.listPath) { data in
+        await CachedResource.loadShowingCacheFirst(
+            LocationsAPI.listPath, showCachedFirst: showCachedFirst
+        ) { data in
             try await LocationsAPI.decodeList(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 }
 
@@ -25,8 +35,8 @@ final class ParcelsStore {
     func load() async {
         if state.value == nil { state = .loading }
         let path = LocationsAPI.parcelsPath(locationID)
-        state = await CachedResource.load(path) { data in
+        await CachedResource.loadShowingCacheFirst(path) { data in
             try await LocationsAPI.decodeParcels(from: data)
-        }
+        } publish: { [weak self] in self?.state = $0 }
     }
 }

@@ -235,9 +235,9 @@ final class NewProductStore {
     /// in litres or kilograms.
     func loadUnits() async {
         guard units.value == nil else { return }
-        units = await CachedResource.load(LocationsAPI.allUnitsPath) {
+        await CachedResource.loadShowingCacheFirst(LocationsAPI.allUnitsPath) {
             try await LocationsAPI.decodeUnits(from: $0)
-        }
+        } publish: { [weak self] in self?.units = $0 }
     }
 
     /// Never retried automatically. A replay creates a SECOND product with
