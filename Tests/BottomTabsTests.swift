@@ -90,8 +90,8 @@ final class BottomTabsTests: XCTestCase {
     func testTheOverflowIsExactlyWhatIsNotInTheBar() {
         let s = store(["/journal", "/news"])
         XCTAssertEqual(Set(s.overflow.map(\.id)),
-                       Set([AppSurface.calculator, .exchange, .locations, .tasks, .trends]
-                            .map(\.id)))
+                       Set([AppSurface.calculator, .exchange, .locations, .tasks,
+                            .trends, .farmRisk].map(\.id)))
     }
 
     /// An empty array is a deliberate clear, and distinct from nil in the
@@ -177,9 +177,25 @@ final class OperatorTabsTests: XCTestCase {
         return store
     }
 
-    func testOnlyLocationsAndTasksClearTheAllowlist() {
+    /// Which surfaces clear the server's operator allowlist
+    /// (`farm-tasks|field-operations|tasks|locations|agro`).
+    ///
+    /// `farmRisk` joins them because its READINGS come from `/agro` and
+    /// `/locations`, both allowed — a MECHANISATOR sees every parcel's
+    /// vegetation and moisture. Only `/insurance` is outside, so the ask
+    /// control is hidden for them and the screen is not. Knowing a field
+    /// is stressed is field work; contacting an insurer is not.
+    ///
+    /// Written out literally on purpose: this test failed when Farm Risk
+    /// was added, which is exactly what it is for — a new screen cannot
+    /// reach the bar without somebody deciding whether an operator may
+    /// hold it.
+    func testTheOperatorAllowlistIsDecidedPerSurface() {
         let allowed = AppSurface.allCases.filter(\.isOperatorAllowed)
-        XCTAssertEqual(Set(allowed), Set([.locations, .tasks]))
+        XCTAssertEqual(Set(allowed), Set([.locations, .tasks, .farmRisk]))
+        for blocked in [AppSurface.journal, .calculator, .exchange, .trends, .news] {
+            XCTAssertFalse(blocked.isOperatorAllowed, blocked.rawValue)
+        }
     }
 
     /// A tab whose screen 403s is not a tab, it is an error the person

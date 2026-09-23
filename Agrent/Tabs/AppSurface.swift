@@ -26,6 +26,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     case tasks = "/farm-tasks"
     case trends = "/trends"
     case news = "/news"
+    case farmRisk = "/farm-risk"
 
     var id: String { rawValue }
 
@@ -38,6 +39,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .tasks: "Задачи"
         case .trends: "Тенденции"
         case .news: "Новини"
+        case .farmRisk: "Риск"
         }
     }
 
@@ -50,6 +52,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .tasks: "checklist"
         case .trends: "chart.line.uptrend.xyaxis"
         case .news: "newspaper"
+        case .farmRisk: "exclamationmark.shield"
         }
     }
 
@@ -71,7 +74,12 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     /// an operator's job is COMPLETION, not creation.
     var isOperatorAllowed: Bool {
         switch self {
-        case .locations, .tasks: true
+        // The READINGS are reachable: `/agro` and `/locations` are both in
+        // the operator allowlist. Only `/insurance` is not, so a
+        // MECHANISATOR sees every parcel's vegetation and moisture and is
+        // not offered the ask — which is the right division. Knowing a
+        // field is stressed is field work; contacting an insurer is not.
+        case .locations, .tasks, .farmRisk: true
         case .journal, .calculator, .exchange, .trends, .news: false
         }
     }
@@ -103,6 +111,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .tasks: TasksListView()
         case .trends: TrendsView()
         case .news: NewsView()
+        case .farmRisk: FarmRiskView()
         }
     }
 }
