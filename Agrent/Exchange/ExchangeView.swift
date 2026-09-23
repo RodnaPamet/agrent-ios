@@ -147,7 +147,7 @@ struct ExchangeView: View {
 
         case .loaded where showMap:
             ExchangeMapView(listings: listings.rows)
-                .refreshable { await listings.load() }
+                .refreshable { await PullToRefresh.bounded { await listings.load() } }
 
         case .loaded:
             List {
@@ -168,7 +168,7 @@ struct ExchangeView: View {
                     Text("Обявите са от всички стопанства в платформата.")
                 }
             }
-            .refreshable { await listings.load() }
+            .refreshable { await PullToRefresh.bounded { await listings.load() } }
         }
     }
 
@@ -276,7 +276,7 @@ struct ExchangeView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .refreshable { await mine.load() }
+            .refreshable { await PullToRefresh.bounded { await mine.load() } }
         }
     }
 
@@ -300,7 +300,7 @@ struct ExchangeView: View {
 
         case .loaded(let rows, _):
             List(rows) { InquiryRow(inquiry: $0) }
-                .refreshable { await inquiries.load() }
+                .refreshable { await PullToRefresh.bounded { await inquiries.load() } }
         }
     }
 

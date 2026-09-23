@@ -57,7 +57,7 @@ struct AdminView: View {
                 membersSection
                 farmProfileSection
             }
-            .refreshable { await store.load() }
+            .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }
 

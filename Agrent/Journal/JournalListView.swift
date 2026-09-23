@@ -6,14 +6,21 @@ struct JournalListView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                if let age = store.state.freshness?.ageDescription {
-                    StaleBanner(age: age)
+            // Chrome as safe-area insets, List as the scrollable. In a
+            // VStack the List is not what the navigation bar tracks, so a
+            // pull-to-refresh dragged the banner and the in-content title
+            // down the screen with the rows.
+            content
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 0) {
+                        if let age = store.state.freshness?.ageDescription {
+                            StaleBanner(age: age)
+                        }
+                        header
+                    }
+                    .background(.bar)
                 }
-                header
-                content
-                newEntryButton
-            }
+                .safeAreaInset(edge: .bottom, spacing: 0) { newEntryButton }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .appMenu()
@@ -106,7 +113,7 @@ struct JournalListView: View {
                 loadMoreRow
             }
             .listStyle(.plain)
-            .refreshable { await store.load() }
+            .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }
 
