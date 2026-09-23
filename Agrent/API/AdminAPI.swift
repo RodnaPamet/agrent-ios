@@ -42,7 +42,7 @@ enum AdminAPI {
     /// members", which is a false statement about the farm rather than a
     /// true one about the reader.
     static func isForbidden(_ error: Error) -> Bool {
-        guard case APIClient.APIError.http(let status, _, _) = error else { return false }
+        guard case APIClient.APIError.http(let status, _, _, _) = error else { return false }
         return status == 403
     }
 

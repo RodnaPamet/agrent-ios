@@ -86,7 +86,7 @@ actor PendingOperations {
     /// done, which is a different lie from the one this prevents.
     nonisolated static func isWorthRetrying(_ error: Error) -> Bool {
         if error is URLError { return true }
-        if case APIClient.APIError.http(let status, _, _) = error {
+        if case APIClient.APIError.http(let status, _, _, _) = error {
             return status >= 500 || status == 408 || status == 429
         }
         return false
