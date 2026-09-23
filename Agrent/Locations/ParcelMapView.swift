@@ -306,6 +306,30 @@ struct ParcelMapView: View {
                 } label: {
                     Image(systemName: "lightbulb")
                         .font(.footnote)
+                        // The GLYPH is 13pt and the glyph is not the target.
+                        // A `.plain` button is hit-tested against its label's
+                        // bounds, so as drawn this was roughly 10×13pt of
+                        // tappable area — on a screen reached in a field, by
+                        // a thumb, often in a glove. The frame supplies the
+                        // target and `contentShape` is what makes its empty
+                        // part tappable at all; without it the transparent
+                        // space around the bulb stays dead.
+                        //
+                        // 32 rather than 44 in height: 44 is the minimum for
+                        // a control standing alone, and this one sits in a
+                        // row whose height it would otherwise set, pushing
+                        // the map up by that difference. The width carries
+                        // the rest, and the row is at the bar's edge where
+                        // nothing else competes for the touch.
+                        //
+                        // Trailing-aligned so the bulb stays exactly where it
+                        // was drawn — flush with the bar's edge, under the
+                        // "Висока" end of the ramp. A centred frame would
+                        // push it 16pt inward and break that column for a
+                        // change nobody asked for; the target grows inward,
+                        // where there is nothing to hit by mistake.
+                        .frame(width: 44, height: 32, alignment: .trailing)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Palette.accent)
