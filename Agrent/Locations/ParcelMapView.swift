@@ -33,6 +33,9 @@ struct ParcelMapView: View {
 
     @State private var indices: SatelliteIndexStore
 
+    /// The index whose explainer is open.
+    @State private var explaining: VegetationIndex?
+
     init(location: Location) {
         self.location = location
         _store = State(initialValue: ParcelsStore(locationID: location.id))
@@ -286,8 +289,34 @@ struct ParcelMapView: View {
     /// whether this canopy is worth spraying against. A false-colour field
     /// with no date is a picture that will be read as current, and that is
     /// the failure this screen would cause rather than prevent.
+    /// The date on the left, the explainer on the right, one row.
+    ///
+    /// The bulb is placed opposite the date rather than beside the legend
+    /// because the two things a reader questions at this moment are "how
+    /// old is this?" and "what am I looking at?" — so the answers to both
+    /// sit on the same line, at either end of it.
     @ViewBuilder
     private var acquisition: some View {
+        if let selected = indices.selected {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                acquisitionText
+                Spacer(minLength: 8)
+                Button {
+                    explaining = selected
+                } label: {
+                    Image(systemName: "lightbulb")
+                        .font(.footnote)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Palette.accent)
+                .accessibilityLabel("Какво означава \(selected.name)")
+                .accessibilityHint("Отваря обяснение на индекса")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var acquisitionText: some View {
         if let date = indices.acquisitionDate {
             let days = Calendar.current.dateComponents(
                 [.day], from: Calendar.current.startOfDay(for: date),

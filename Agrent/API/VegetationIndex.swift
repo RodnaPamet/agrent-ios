@@ -32,6 +32,58 @@ enum VegetationIndex: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// What the index actually measures, for the explainer sheet.
+    ///
+    /// Describes the MEASUREMENT and how to read it — never what to do
+    /// about it. An app that tells a farmer when to spray from a satellite
+    /// composite is making an agronomic recommendation it has no standing
+    /// to make, and these numbers are a spatial average over cloud-masked
+    /// imagery that can be weeks old. What each index is sensitive to is a
+    /// fact; what to do next is the farmer's judgement.
+    /// What the index actually measures, for the explainer sheet.
+    ///
+    /// Describes the MEASUREMENT and how to read it — never what to do
+    /// about it. An app that tells a farmer when to spray from a satellite
+    /// composite is making an agronomic recommendation it has no standing
+    /// to make, and these numbers are a cloud-masked composite that can be
+    /// weeks old. What each index is sensitive to is a fact; what to do
+    /// next is the farmer's judgement.
+    ///
+    /// Written as whole lines with NO `\` continuations. The first version
+    /// used them and rendered "инфрачервена            светлина" on screen —
+    /// twelve spaces of source indentation inside a sentence. A screenshot
+    /// caught it; the tests could not, because the string was never wrong,
+    /// only ugly.
+    var detail: String {
+        switch self {
+        case .ndvi:
+            "Сравнява отразената близка инфрачервена и червена светлина. Здравата растителност отразява силно в инфрачервения диапазон и поглъща червената.\n\nПо-високите стойности означават по-гъста и по-активна зелена маса. Ниските могат да са гола почва, слаб посев или прибрана реколта — индексът показва колко зеленина има, но не и защо я няма."
+        case .ndmi:
+            "Сравнява близката инфрачервена с късовълновата инфрачервена светлина, която се поглъща от водата в листата.\n\nПо-високите стойности означават повече влага в растителната маса. Отчита влагата в посева, а не влагата в почвата под него — сух профил под зелен посев се вижда по-късно."
+        case .ndre:
+            "Използва тясната ивица на границата между червеното и инфрачервеното, която прониква по-дълбоко в листната маса от NDVI.\n\nЗатова остава чувствителен и когато посевът е гъст и NDVI вече е достигнал тавана си. Свързва се със съдържанието на хлорофил и азот."
+        case .gndvi:
+            "Като NDVI, но със зелената лента вместо червената.\n\nПо-чувствителен към съдържанието на хлорофил и по-малко към общата покривност на почвата."
+        case .evi:
+            "Като NDVI, но с корекция за влиянието на атмосферата и на голата почва между редовете.\n\nПо-надежден при рядък посев и при лека мъгла или дим, където NDVI се влияе от фона."
+        }
+    }
+    /// Caveats that apply to every index on this screen.
+    ///
+    /// All three are things a farmer would otherwise discover by being
+    /// confused: an empty map around the fields, a colour that seems to
+    /// disagree with the web, and a reading that is quietly a fortnight
+    /// old.
+    static let sharedNotes: [String] = [
+        "Слоят е изрязан по очертанията на парцелите. Празното пространство "
+      + "извън тях е нормално, а не липсваща снимка.",
+        "Цветовете са скала, не оценка. Един и същ цвят означава една и съща "
+      + "стойност и тук, и в уеб приложението.",
+        "Снимката е съставена от последните 30 дни. Ако облаците са пречели, "
+      + "най-новото ясно заснемане може да е доста по-старо — затова датата "
+      + "се показва винаги.",
+    ]
+
     /// The ends of the ramp, in words. NDMI measures moisture and reads
     /// dry-to-wet; the rest read low-to-high, and calling moisture "low"
     /// would be true and useless.
