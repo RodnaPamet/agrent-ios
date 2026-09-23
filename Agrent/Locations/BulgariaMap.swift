@@ -29,8 +29,10 @@ import Foundation
 /// 10.0…590.0, matching to under a pixel. So a listing's lat/lon lands in
 /// exactly the same space as the polygons, with nothing guessed.
 ///
-/// `cos` is the latitude correction — the same trick `ParcelProjection`
-/// uses, at country scale instead of field scale.
+/// `cos` is the latitude correction. `ParcelProjection` used the same trick
+/// at field scale until the schematic parcel map it served was replaced by a
+/// second satellite map; this is now the only place in the app that projects
+/// anything by hand, MapKit having taken the rest.
 struct BulgariaMap {
     let width: CGFloat
     let height: CGFloat
