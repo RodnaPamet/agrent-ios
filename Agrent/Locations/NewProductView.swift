@@ -121,7 +121,7 @@ struct NewProductView: View {
                         // text field.
                         Picker("Единица", selection: $unit) {
                             Text("— изберете —").tag(Unit?.none)
-                            ForEach(units) { Text("\($0.name) (\($0.symbol))").tag(Unit?.some($0)) }
+                            ForEach(units) { Text($0.pickerLabel).tag(Unit?.some($0)) }
                         }
                         .pickerStyle(.navigationLink)
                     }

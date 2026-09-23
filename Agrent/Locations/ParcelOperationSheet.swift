@@ -131,9 +131,25 @@ struct ParcelOperationSheet: View {
                 }
 
                 Section(kind == .spray ? "Препарат" : "Тор") {
-                    if store.items.value == nil {
+                    // `.value == nil` is TRUE FOR A FAILURE as well as for
+                    // a load in progress, so this spun forever when the
+                    // items decode broke — a screen that had nothing to
+                    // say and said it indefinitely. Matched on the state,
+                    // not on the absence of a value.
+                    switch store.items {
+                    case .loading:
                         ProgressView()
-                    } else if choices.isEmpty {
+                    case .failed(let message):
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(message)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button("Опитайте отново") { Task { await store.load() } }
+                                .font(.footnote)
+                        }
+                    case .loaded:
+                    if choices.isEmpty {
                         Text("Няма въведени артикули от този вид.")
                             .font(.footnote).foregroundStyle(.secondary)
                     } else {
@@ -170,6 +186,8 @@ struct ParcelOperationSheet: View {
                         .font(.footnote)
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     }
 
                     Button {
