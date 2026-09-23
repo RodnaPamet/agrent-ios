@@ -70,16 +70,48 @@ struct MainTabView: View {
         // likely just found signal. Waiting for them to press a button
         // would make the queue their job rather than the app's.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await outbox.flush() } }
+            if phase == .active {
+                Task {
+                    await outbox.flush()
+                    Task.detached { await OfflinePrefetch.warm() }
+                }
+            }
         }
         .task {
-            // The order rides along on /api/auth/me, which is already
-            // fetched and cached for the whole session — so this costs
-            // nothing on top of what the app asks for anyway.
-            if let me = await CurrentUserStore.shared.load() {
-                tabs.adopt(me.bottomTabOrder, isOperator: me.isOperator)
+            // NOT AWAITED, and caching it was not enough.
+            //
+            // `/api/auth/me` was the only uncached read in the app, so on
+            // a cold launch with no signal it waited out the request
+            // timeout — measured at 16.0s on a real phone — and it was the
+            // FIRST thing this task awaited, so everything behind it
+            // waited too.
+            //
+            // Caching fixed the second launch and not the first: the cache
+            // is written only after a successful fetch, so a farmer whose
+            // first launch of the day is already in a field still paid the
+            // full timeout. The blocking is the defect; the cache miss
+            // merely exposes it.
+            //
+            // Nothing on this screen needs the answer. The tab bar has a
+            // working default (`AppSurface.fallback`) and adopts the saved
+            // order whenever it arrives; the spray sheet resolves the user
+            // separately for its own gate. So it resolves alongside, not in
+            // front.
+            Task {
+                if let me = await CurrentUserStore.shared.load() {
+                    tabs.adopt(me.bottomTabOrder, isOperator: me.isOperator)
+                }
             }
             await outbox.flush()
+            // DETACHED, not awaited.
+            //
+            // The catalogue is opportunistic warming. Awaited here it ran
+            // four sequential requests inside the view's own task, each
+            // timing out at 15s with no signal — a minute of work attached
+            // to the lifetime of the screen that started it. Nothing should
+            // wait on a prefetch, least of all the first screen a farmer
+            // sees.
+            Task.detached { await OfflinePrefetch.warm() }
         }
     }
 }
