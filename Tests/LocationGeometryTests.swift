@@ -289,3 +289,39 @@ final class ParcelShapeMountKeyTests: XCTestCase {
         XCTAssertTrue(SatelliteParcelMap.Coordinator.polygons(for: bare, shape: .boundingBoxes).isEmpty)
     }
 }
+
+/// The camera command's bookkeeping. Nothing here touches an `MKMapView` —
+/// that is the reason the rule was split out of `apply`.
+@MainActor
+final class CameraCommandTests: XCTestCase {
+
+    func testACommandIsObeyedOnceAndNotAgain() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        XCTAssertTrue(coordinator.consume(1), "the first sight of a tick moves the camera")
+        XCTAssertFalse(coordinator.consume(1), "every later update must not")
+    }
+
+    /// Pressing target again after panning away sends the SAME region. It is
+    /// the tick that makes that a second move rather than a no-op.
+    func testTheNextTickMovesAgain() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        XCTAssertTrue(coordinator.consume(1))
+        XCTAssertFalse(coordinator.consume(1))
+        XCTAssertTrue(coordinator.consume(2))
+    }
+
+    /// A command already honoured by `makeUIView` must not replay after a
+    /// teardown, or returning to the screen jumps twice.
+    func testASeededCommandDoesNotReplay() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        coordinator.seed(7)
+        XCTAssertFalse(coordinator.consume(7))
+        XCTAssertTrue(coordinator.consume(8))
+    }
+
+    func testNoCommandSeedsZeroAndStillAcceptsTheFirstPress() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        coordinator.seed(nil)
+        XCTAssertTrue(coordinator.consume(1))
+    }
+}

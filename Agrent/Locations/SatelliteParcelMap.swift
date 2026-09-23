@@ -51,6 +51,20 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// map the fill IS the data, which is the case that setting exists for.
     var contrast: ColorSchemeContrast = .standard
 
+    /// A camera move to make ONCE.
+    ///
+    /// A COUNTER, not a region comparison, and the difference is the feature.
+    /// Pressing the target button again after panning away sends the same
+    /// region and must still move; on a one-parcel farm every press sends the
+    /// identical region and each one is a deliberate recentre. Comparing
+    /// regions would make both of those do nothing.
+    struct CameraCommand {
+        let tick: Int
+        let region: MKCoordinateRegion
+    }
+
+    var camera: CameraCommand?
+
     /// nil when the signed-in member may not create operations — see
     /// `CurrentUser.mayCreateOperations`, which fails open. Passing nil
     /// removes the gesture rather than swallowing the tap, so a map that
@@ -65,8 +79,12 @@ struct SatelliteParcelMap: UIViewRepresentable {
         view.mapType = .hybrid
         view.pointOfInterestFilter = .excludingAll
         view.showsCompass = false
-        // The camera is set HERE and nowhere else. See updateUIView.
-        view.setRegion(region, animated: false)
+        // The opening camera. A command that arrived before the view existed
+        // is honoured here and marked as applied below, otherwise it would
+        // replay as a visible second jump the moment `updateUIView` first
+        // runs — which is what a teardown and rebuild looks like.
+        view.setRegion(camera?.region ?? region, animated: false)
+        context.coordinator.seed(camera?.tick)
         context.coordinator.shape = shape
         context.coordinator.contrast = contrast
         context.coordinator.syncParcels(parcels, shape: shape, in: view)
@@ -89,13 +107,16 @@ struct SatelliteParcelMap: UIViewRepresentable {
     }
 
     func updateUIView(_ view: MKMapView, context: Context) {
-        // THE CAMERA IS NOT TOUCHED HERE.
+        // THE CAMERA IS NOT MOVED BY `region`, AND NEVER WILL BE.
         //
         // `updateUIView` runs on every state change, including each index
-        // selection. Calling setRegion in it would throw the farmer back to
+        // selection. Honouring `region` here would throw the farmer back to
         // the whole-farm view every time they switched index — so the one
         // gesture the screen exists for, zooming into a patch and comparing
         // NDVI against NDMI over it, would undo itself on each tap.
+        //
+        // `camera` is the deliberate exception, and is why it carries a tick:
+        // it moves the map when, and only when, something asked it to.
         context.coordinator.onTap = onTap
         // The gesture is removed rather than made a no-op, so the map does
         // not consume a touch it will do nothing with.
@@ -109,6 +130,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
 
         context.coordinator.syncParcels(parcels, shape: shape, in: view)
         context.coordinator.syncTiles(to: tileTemplate, in: view)
+        context.coordinator.apply(camera, in: view)
 
         // Repaint what MapKit has already drawn. `renderer(for:)` returns nil
         // for anything not yet on screen, which is fine — those get their
@@ -130,6 +152,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var mountedTemplate: String?
         private var mountedKey: String?
+        private var appliedTick = 0
 
         /// Which parcel each `MKPolygon` came from. One parcel can produce
         /// several — `15655-19` is one polygon with five rings — and MapKit
@@ -157,6 +180,28 @@ struct SatelliteParcelMap: UIViewRepresentable {
             case .boundingBoxes: marker = "box"
             }
             return marker + ":" + parcels.map(\.id).joined(separator: ",")
+        }
+
+        /// Records a command as already honoured, without moving anything.
+        func seed(_ tick: Int?) {
+            appliedTick = tick ?? 0
+        }
+
+        /// The bookkeeping, split from the camera move so the rule can be
+        /// tested — no test can drive an `MKMapView`'s camera, and both ways
+        /// of getting this wrong are invisible in a code review.
+        func consume(_ tick: Int) -> Bool {
+            guard tick > appliedTick else { return false }
+            appliedTick = tick
+            return true
+        }
+
+        func apply(_ command: CameraCommand?, in view: MKMapView) {
+            guard let command, consume(command.tick) else { return }
+            // Instant under Reduce Motion. A camera flight across a farm is
+            // precisely what someone turns that setting on to stop, and the
+            // destination is the point rather than the journey.
+            view.setRegion(command.region, animated: !UIAccessibility.isReduceMotionEnabled)
         }
 
         func syncParcels(_ parcels: [Parcel], shape: ParcelShape, in view: MKMapView) {
