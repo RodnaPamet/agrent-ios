@@ -41,6 +41,22 @@ struct TrendsView: View {
         NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // TWO DIFFERENT AGES, and both belong on this screen.
+                //
+                // This one is how long ago THIS PHONE fetched. The orange
+                // line under each series is how long ago the MARKET was
+                // observed — eighty-four days for the reference series,
+                // against a payload that may be five minutes old.
+                //
+                // Every other screen in the app shows this banner and these
+                // two did not, which an offline run made obvious: the
+                // charts rendered perfectly from cache with nothing saying
+                // the data had not been refreshed. On the one screen whose
+                // whole subject is how current a number is, that was the
+                // worst place to have left it out.
+                if let age = store.prices.freshness?.ageDescription {
+                    StaleBanner(age: age)
+                }
                 controls
                 content
             }
