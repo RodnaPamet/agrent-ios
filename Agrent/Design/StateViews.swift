@@ -191,6 +191,14 @@ extension LogEntryType {
             (Palette.Chip.inputText, Palette.Chip.inputFill)
         case .activity, .observation, .harvest, .maintenance, .labTest, .grazing:
             (Palette.Chip.activityText, Palette.Chip.activityFill)
+        // Neither family, because this chip's colour IS the claim
+        // "regulated" or "observational" and an unrecognised type supports
+        // neither. Ochre would assert a new type is regulated when it may
+        // not be; blue would assert it is not when it may be, on the
+        // register where that distinction is the point. Neutral asserts
+        // nothing, which is the only true thing available.
+        case .unknown:
+            (Palette.Chip.neutralText, Palette.Chip.neutralFill)
         }
     }
 }

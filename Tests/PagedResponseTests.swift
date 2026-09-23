@@ -153,15 +153,33 @@ final class JournalDecodeShapeTests: XCTestCase {
         }
     }
 
-    /// An unknown `type` must still fail the WHOLE list, loudly, until
-    /// LenientEnum is applied to it — recorded here so the day someone adds
-    /// a case server-side, this test says what happens rather than a blank
-    /// screen saying nothing.
-    func testAnUnknownTypeFailsTheListToday() async {
+    /// An unknown `type` NO LONGER fails the list — changed deliberately on
+    /// 2026-09-23, and this is the second of two tests that pinned the old
+    /// behaviour. It said "until LenientEnum is applied to it", which is
+    /// exactly what happened; see `LogEntryType`'s header for the asymmetry
+    /// argument.
+    ///
+    /// Kept rather than deleted, and pointed the other way, because the
+    /// valuable half was never the throw. It was the assertion that this
+    /// app has a defined answer for a value the server may add without
+    /// telling it.
+    func testAnUnknownTypeNoLongerFailsTheList() async throws {
         let json = #"{"rows":[{"id":"e1","type":"BRAND_NEW","status":"DONE","title":"x","occurredAt":"2026-09-11T00:00:00.000Z"}]}"#
+        let entries = try await JournalAPI.decodeList(from: Data(json.utf8)).entries
+        XCTAssertEqual(entries.count, 1, "the row survived")
+        XCTAssertEqual(entries.first?.type, .unknown)
+        XCTAssertEqual(entries.first?.title, "x", "its real content is intact")
+    }
+
+    /// The distinction that makes the change safe: leniency is for the ENUM
+    /// only. A malformed date is still a hard failure, because a journal
+    /// entry with no reliable date is not a record that can be filed — and
+    /// degrading everything would be the lazy version of this decision.
+    func testLeniencyDidNotSpreadToTheRestOfTheRow() async {
+        let json = #"{"rows":[{"id":"e1","type":"ACTIVITY","status":"DONE","title":"x","occurredAt":"not-a-date"}]}"#
         do {
             _ = try await JournalAPI.decodeList(from: Data(json.utf8)).entries
-            XCTFail("an unknown enum case silently decoded")
+            XCTFail("a bad date decoded")
         } catch {}
     }
 }
