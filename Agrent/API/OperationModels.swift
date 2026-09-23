@@ -13,6 +13,16 @@ struct InputItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let category: String
     let defaultUnit: Unit?
 
+    /// Who created this row. **nil means the seeder did.**
+    ///
+    /// Verified on the wire rather than taken from the schema: the key is
+    /// present on 24 of 24 rows, and `createdByUserId IS NULL`,
+    /// `attributesJson IS NOT NULL` and `name LIKE 'Generic %'` partition
+    /// the catalogue IDENTICALLY — 22 archetypes, 2 user-created. Three
+    /// signals agreeing is what makes this a fact rather than one of them
+    /// being a guess that happens to work.
+    let createdByUserId: String?
+
     /// ── THE SPLIT IS A NEGATION, NOT AN ALLOWLIST ──
     ///
     ///     FERTILIZER → category == "FERTILIZER"
@@ -25,6 +35,25 @@ struct InputItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
     /// the web does and it is right; a test pins the count so nobody
     /// "tidies" it into an allowlist.
     var isFertilizer: Bool { category.uppercased() == "FERTILIZER" }
+
+    /// A seeded placeholder rather than a real product.
+    ///
+    /// 22 of this tenant's 24 items are archetypes: deliberate, because a
+    /// proprietary label database is a licensing problem, and meant to be
+    /// replaced. Nothing marks them as provisional on the register they
+    /// are printed onto.
+    ///
+    /// Keyed on `createdByUserId`, NOT on the name. The name prefix
+    /// partitions the catalogue identically today, and it is still the
+    /// weaker signal — it is a string heuristic where the other is a
+    /// column. A real product called "Generic Glyphosate 360" would be
+    /// flagged by one and not the other, and the one that gets it right
+    /// is the one that asks who made the row.
+    ///
+    /// If the key ever vanishes from the payload this flags EVERYTHING as
+    /// an archetype, which is the safer direction to fail in: a warning on
+    /// every product is noticed and fixed, a warning on none is not.
+    var isArchetype: Bool { createdByUserId == nil }
 }
 
 /// A unit of measure.
