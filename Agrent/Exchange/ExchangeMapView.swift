@@ -4,7 +4,7 @@ import SwiftUI
 ///
 /// ── Canvas, not MapKit, and for a different reason than the parcel map ──
 ///
-/// The schematic parcel map avoids MapKit because it must draw with no
+/// The schematic parcel map avoided MapKit because it had to draw with no
 /// network. This one avoids it because the geometry is ALREADY the answer:
 /// 28 oblast polygons, pre-projected, bundled. A basemap underneath would
 /// add tiles nobody needs for a country-level overview and put Apple's

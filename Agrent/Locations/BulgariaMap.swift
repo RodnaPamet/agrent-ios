@@ -16,8 +16,10 @@ import Foundation
 ///    Two clients drawing the same country slightly differently is the
 ///    kind of difference nobody can explain later.
 /// 3. It is 41 KB against 66 KB, and it is BUNDLED — so the map draws with
-///    no network, which is the same argument the schematic parcel map is
-///    built on. A border does not change between releases.
+///    no network. That was also the schematic parcel map's whole argument,
+///    and the schematic has since been replaced by a second satellite map
+///    that does need tiles; this one still does not. A border does not
+///    change between releases.
 ///
 /// ── The projection is the file's own, verified rather than inferred ──
 ///

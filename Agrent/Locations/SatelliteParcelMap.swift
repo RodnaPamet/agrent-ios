@@ -8,9 +8,11 @@ import SwiftUI
 /// SwiftUI's MapKit has `MapPolygon`, `MapCircle` and friends, and no tile
 /// overlay of any kind. There is no `MapTileOverlay`, and `MKTileOverlay`
 /// cannot be reached through `MapContentBuilder`. Raster imagery from
-/// somewhere other than Apple means an `MKMapView`, so the satellite branch
-/// moves down a layer and the schematic branch — which is pure Canvas and
-/// touches no MapKit at all, deliberately — is untouched by this.
+/// somewhere other than Apple means an `MKMapView`, so the map moved down a
+/// layer. It now serves BOTH modes the toggle offers — true outlines with
+/// index tiles, and simplified rectangles coloured sown or fallow — because
+/// a second representable in an if/else would tear this view down on every
+/// switch. See `ParcelShape`.
 ///
 /// ── Overlay order is the whole design ──
 ///
@@ -282,7 +284,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         /// should select nothing, exactly as tapping the grass beside the
         /// field does.
         ///
-        /// SMALLEST WINS, the same rule the schematic map uses. Where
+        /// SMALLEST WINS. Where
         /// parcels overlap or nest, the small one is the one drawn on top
         /// and the one under the finger, so the tap has to resolve the way
         /// the eye does or an operator opens the parcel behind the one they
