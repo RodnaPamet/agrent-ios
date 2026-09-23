@@ -227,3 +227,65 @@ final class LocationGeometryTests: XCTestCase {
         XCTAssertEqual(bounds.minLon, 25.1, accuracy: 0.0001)
     }
 }
+
+/// The remount guard, which is the one part of the two-shape switch that can
+/// fail silently. Pure and static, so it needs no `MKMapView`.
+final class ParcelShapeMountKeyTests: XCTestCase {
+
+    private func parcel(_ id: String) throws -> Parcel {
+        try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"\(id)","name":"n","cropType":null,"areaHa":1,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+    }
+
+    /// THE regression this guards. The same fields drawn differently must not
+    /// compare equal, or the toggle returns early and nothing on screen moves.
+    @MainActor
+    func testSameParcelsInDifferentShapesDoNotCompareEqual() throws {
+        let parcels = [try parcel("a"), try parcel("b")]
+        XCTAssertNotEqual(
+            SatelliteParcelMap.Coordinator.mountKey(parcels, .outlines),
+            SatelliteParcelMap.Coordinator.mountKey(parcels, .boundingBoxes))
+    }
+
+    @MainActor
+    func testSameParcelsInTheSameShapeCompareEqual() throws {
+        let parcels = [try parcel("a"), try parcel("b")]
+        XCTAssertEqual(
+            SatelliteParcelMap.Coordinator.mountKey(parcels, .outlines),
+            SatelliteParcelMap.Coordinator.mountKey(parcels, .outlines),
+            "an identical update must not remount a loaded overlay")
+    }
+
+    @MainActor
+    func testADifferentParcelSetRemounts() throws {
+        XCTAssertNotEqual(
+            SatelliteParcelMap.Coordinator.mountKey([try parcel("a")], .outlines),
+            SatelliteParcelMap.Coordinator.mountKey([try parcel("b")], .outlines))
+    }
+
+    /// A box is ONE rectangle for the parcel, however many polygons it has.
+    @MainActor
+    func testBoxesAreOnePolygonPerParcelAndOutlinesAreNot() async throws {
+        let data = try Data(contentsOf: XCTUnwrap(
+            Bundle(for: Self.self).url(forResource: "locations-parcels", withExtension: "json")))
+        let response = try await APIClient.shared.decode(data, as: ParcelsResponse.self)
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_holes" })
+
+        let outlines = SatelliteParcelMap.Coordinator.polygons(for: parcel, shape: .outlines)
+        let boxes = SatelliteParcelMap.Coordinator.polygons(for: parcel, shape: .boundingBoxes)
+        XCTAssertEqual(boxes.count, 1)
+        XCTAssertEqual(outlines[0].interiorPolygons?.count, 4, "the outline keeps its holes")
+        XCTAssertNil(boxes[0].interiorPolygons, "the box does not")
+    }
+
+    /// A parcel with no geometry contributes nothing in either shape, rather
+    /// than a zero-sized rectangle sitting invisibly on the map.
+    @MainActor
+    func testUndrawableParcelContributesNoOverlay() throws {
+        let bare = try parcel("nope")
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.polygons(for: bare, shape: .outlines).isEmpty)
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.polygons(for: bare, shape: .boundingBoxes).isEmpty)
+    }
+}
