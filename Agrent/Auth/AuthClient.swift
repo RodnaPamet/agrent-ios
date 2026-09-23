@@ -47,7 +47,7 @@ final class AuthClient: NSObject {
             guard let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "code" })?.value
             else {
-                state = .failed("The sign-in came back without a code.")
+                state = .failed("Входът приключи без код за достъп.")
                 Log.auth.error("callback carried no code")
                 return
             }
@@ -102,8 +102,14 @@ final class AuthClient: NSObject {
         let (data, response) = try await URLSession.shared.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         Log.auth.info("native exchange → \(status, privacy: .public)")
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw AuthError.server(String(data: data, encoding: .utf8) ?? "exchange failed")
+        guard status == 200 else {
+            // The envelope, not the body. This used to throw the raw
+            // response text, which `friendly` then returned verbatim — so a
+            // failed token exchange printed JSON onto the sign-in screen,
+            // the exact defect `APIError.http` was restructured to remove
+            // and the one screen that had not been restructured with it.
+            let env = APIClient.envelope(from: data)
+            throw AuthError.server(status: status, code: env?.code, message: env?.message)
         }
         let payload = try JSONDecoder().decode(ExchangeResponse.self, from: data)
         TokenStore.save(Tokens(
@@ -113,18 +119,33 @@ final class AuthClient: NSObject {
         ))
     }
 
+    /// Through `UserMessage`, like every other screen.
+    ///
+    /// This read `error.localizedDescription` as its fallback, which is
+    /// precisely what `UserMessage`'s own header documents as the bug: the
+    /// device reports en-BG, so a `URLError` rendered
+    /// "Could not connect to the server." under a Bulgarian heading. Sign-in
+    /// is the FIRST screen a farmer sees and the one most likely to fail —
+    /// no signal, wrong configuration — so it was the worst place left
+    /// holding the defect the rest of the app had fixed.
     private func friendly(_ error: Error) -> String {
-        let text = (error as? AuthError).map(\.message) ?? error.localizedDescription
-        // The one failure worth naming precisely, because it is configuration
-        // rather than a bug and the raw message does not say so.
-        if text.contains("redirect_uri_not_allowed") {
+        if case .server(_, let code, _) = error as? AuthError,
+           code == "redirect_uri_not_allowed" || code == "invalid_redirect_uri" {
+            // Configuration rather than a fault, and the only failure here
+            // worth naming precisely — the generic sentence would send
+            // somebody looking for a network problem that is not there.
+            // The identifiers stay in Latin because they are things to
+            // copy, not words to read.
             return """
-            The server refused this app's callback URL. Add
-            \(Config.redirectURI) to NATIVE_AUTH_REDIRECT_ALLOWLIST on the \
-            server and restart it. See README.
+            Сървърът отхвърли адреса за връщане на това приложение. \
+            Добавете \(Config.redirectURI) в NATIVE_AUTH_REDIRECT_ALLOWLIST \
+            на сървъра и го рестартирайте. Вижте README.
             """
         }
-        return text
+        if case .server(let status, let code, let message) = error as? AuthError {
+            return UserMessage.httpText(status: status, code: code, message: message)
+        }
+        return UserMessage.text(for: error)
     }
 
     private struct ExchangeResponse: Decodable {
@@ -134,9 +155,15 @@ final class AuthClient: NSObject {
     }
 }
 
+/// A refusal from the auth endpoints, taken apart rather than carried whole.
+///
+/// It was `case server(String)` holding the raw response body, and
+/// `friendly` returned that string unchanged — so the sign-in screen could
+/// render `{"error":{"code":"invalid_grant","message":"…"}}` at a farmer.
+/// Structured now, for the same reason and in the same shape as
+/// `APIError.http`.
 enum AuthError: Error {
-    case server(String)
-    var message: String { if case .server(let m) = self { return m }; return "" }
+    case server(status: Int, code: String?, message: String?)
 }
 
 extension AuthClient: ASWebAuthenticationPresentationContextProviding {
