@@ -9,6 +9,7 @@ import SwiftUI
 struct NewsView: View {
     @State private var store = TrendsStore()
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -66,27 +67,52 @@ struct NewsView: View {
         }
     }
 
+    /// Source, category and date — beside each other normally, stacked at
+    /// accessibility sizes.
+    ///
+    /// ── The comment this replaces was wrong ──
+    ///
+    /// It said: "both are short and each is pinned to its own edge, so
+    /// neither can grow into the other." At AX3 they are not short.
+    /// `agrovest` broke to «agroves / t» and «23 септември» to
+    /// «септемв / ри» — three flexible items on one line reflowing
+    /// independently, which is precisely the failure `JournalDetailView`
+    /// documents and stacks to avoid. I wrote the avoidance down on one
+    /// screen and the defect on another.
+    ///
+    /// Stacked rather than shrunk, because these ARE the accessible
+    /// content — unlike a chart axis, where capping the scale is right
+    /// because the numbers live elsewhere. Here there is nowhere else.
+    @ViewBuilder
+    private func metadata(_ item: NewsItem) -> some View {
+        let parts = [item.source, item.categoryLabel]
+            .compactMap { $0 }
+            .joined(separator: " · ")
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(parts)
+                Text(BgDate.dayMonth(item.publishedAt))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack {
+                Text(parts)
+                Spacer(minLength: 8)
+                Text(BgDate.dayMonth(item.publishedAt))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
     private func row(_ item: NewsItem) -> some View {
         Button {
             if let link = item.link { openURL(link) }
         } label: {
             VStack(alignment: .leading, spacing: 6) {
-                // Source and date on one line: both are short and each is
-                // pinned to its own edge, so neither can grow into the
-                // other. Everything below gets the full width.
-                HStack {
-                    Text(item.source)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    if let category = item.categoryLabel {
-                        Text("·").font(.caption).foregroundStyle(.tertiary)
-                        Text(category).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 8)
-                    Text(BgDate.dayMonth(item.publishedAt))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                metadata(item)
 
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
