@@ -99,6 +99,64 @@ final class LocationGeometryTests: XCTestCase {
         XCTAssertNil(polygons[0].interiorPolygons)
     }
 
+    // MARK: - The simplified map's rectangle
+
+    /// The box has to COVER the field, or the simplified map would show a
+    /// rectangle that the precise map's outline pokes out of.
+    func testBoundingBoxCoversTheWholeParcel() async throws {
+        let response = try await parcels()
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_holes" })
+        let geometry = try XCTUnwrap(parcel.geometry)
+
+        let box = try XCTUnwrap(geometry.boundingMapPolygon).boundingMapRect
+        var union = geometry.mapPolygons[0].boundingMapRect
+        for polygon in geometry.mapPolygons.dropFirst() {
+            union = union.union(polygon.boundingMapRect)
+        }
+
+        // Within a map point rather than exactly. The corners are built in
+        // projected space, handed to MapKit as coordinates, and projected
+        // back when MKPolygon recomputes its own rect — a round trip that
+        // costs a fraction of a map point, which is under 15cm on the
+        // ground. Asserting equality would fail on that and teach the next
+        // reader that the box is wrong when it is the assertion that is.
+        XCTAssertEqual(box.minX, union.minX, accuracy: 1)
+        XCTAssertEqual(box.minY, union.minY, accuracy: 1)
+        XCTAssertEqual(box.maxX, union.maxX, accuracy: 1)
+        XCTAssertEqual(box.maxY, union.maxY, accuracy: 1)
+    }
+
+    /// Four corners and no holes. `par_holes` has four interior rings across
+    /// 32 hectares; the simplification is precisely that they stop existing.
+    func testBoundingBoxIsFourCornersAndDropsHoles() async throws {
+        let response = try await parcels()
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_holes" })
+        let box = try XCTUnwrap(try XCTUnwrap(parcel.geometry).boundingMapPolygon)
+
+        XCTAssertEqual(box.pointCount, 4)
+        XCTAssertNil(box.interiorPolygons, "a box has no holes — that is the point")
+    }
+
+    /// Nil rather than a zero-sized rectangle, so a caller can tell "nothing
+    /// to draw" from "something of no size".
+    func testBoundingBoxIsNilWhenNothingIsDrawable() throws {
+        let degenerate = try JSONDecoder().decode(
+            ParcelGeometry.self,
+            from: Data(#"{"type":"Polygon","coordinates":[[[[25.1,42.5],[25.2,42.6]]]]}"#.utf8))
+        XCTAssertTrue(degenerate.mapPolygons.isEmpty, "two points is not a ring")
+        XCTAssertNil(degenerate.boundingMapPolygon)
+    }
+
+    /// The box lands on the farm. Same trap as everywhere else in this file:
+    /// crossed axes give a well-formed rectangle in the Red Sea.
+    func testBoundingBoxLandsInBulgaria() async throws {
+        let response = try await parcels()
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_simple" })
+        let box = try XCTUnwrap(try XCTUnwrap(parcel.geometry).boundingMapPolygon)
+        XCTAssertTrue(bgLat.contains(box.coordinate.latitude))
+        XCTAssertTrue(bgLon.contains(box.coordinate.longitude))
+    }
+
     // MARK: - Fail-soft geometry
 
     /// A parcel with null geometry EXISTS but cannot be drawn. It belongs in
