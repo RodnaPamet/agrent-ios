@@ -64,9 +64,45 @@ struct InputItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
 struct Unit: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let id: String
     let key: String
-    let name: String
+
+    /// OPTIONAL, because `/items` does not send it.
+    ///
+    /// ── This broke the product picker completely ──
+    ///
+    /// Two endpoints return a unit and they return DIFFERENT SHAPES:
+    ///
+    ///     /units        id, key, name, symbol, measure
+    ///     /items[].defaultUnit   id, key, symbol, measure      ← no name
+    ///
+    /// Measured on production, 24 of 24 rows. With `name` non-optional the
+    /// nested object threw, and because `defaultUnit: Unit?` is an optional
+    /// PROPERTY rather than a lenient decode, the throw propagated and took
+    /// the whole array with it:
+    ///
+    ///     DecodingError.keyNotFound: Key 'name' not found.
+    ///     Path: [0].defaultUnit
+    ///
+    /// So `/items` returned 17KB and produced zero products. The spray
+    /// sheet's picker renders `ProgressView()` while `items.value == nil`,
+    /// which a decode failure also satisfies — so it span forever rather
+    /// than saying anything.
+    ///
+    /// Same lesson as `WireDecimal`: a shape is a property of an ENDPOINT,
+    /// not of a type. The same lesson as `notes` being HTML, too — a field
+    /// is not known until a screen displays it, and this one had never
+    /// been decoded by anything that was watched.
+    let name: String?
+
     let symbol: String
     let measure: String?
+
+    /// What to show. `symbol` is present on both shapes, so this never
+    /// falls through to an id — and when the name IS present it is not
+    /// repeated as its own parenthetical.
+    var pickerLabel: String {
+        guard let name, !name.isEmpty, name != symbol else { return symbol }
+        return "\(name) (\(symbol))"
+    }
 }
 
 /// How the input is applied.
