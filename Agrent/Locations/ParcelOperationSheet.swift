@@ -36,6 +36,7 @@ struct ParcelOperationSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var store = OperationReferenceStore()
+    @State private var creatingProduct = false
     @State private var me: CurrentUser?
 
     @State private var kind: Kind = .spray
@@ -150,6 +151,32 @@ struct ParcelOperationSheet: View {
                             }
                         }
                     }
+
+                    // The archetype warning, at the moment of choosing.
+                    //
+                    // 22 of this tenant's 24 products are `Generic …` with
+                    // no active ingredient and no PPP number. They are
+                    // seeded placeholders meant to be replaced, and this
+                    // is the screen where an unreplaced one becomes a row
+                    // in a regulated column of a filed register. Said here
+                    // rather than on the entry afterwards, because here is
+                    // where it can still be changed.
+                    if let chosen = product, chosen.isArchetype {
+                        Label(
+                            "Това е образцов продукт без търговско наименование и без "
+                          + "рег. № по ЗЗР. Дневникът ще се подаде с празни колони.",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Button {
+                        creatingProduct = true
+                    } label: {
+                        Label("Нов продукт", systemImage: "plus.circle")
+                    }
                 }
 
                 Section("Доза") {
@@ -217,7 +244,20 @@ struct ParcelOperationSheet: View {
                 }
             }
             .interactiveDismissDisabled(saving)
-            .task {
+            .sheet(isPresented: $creatingProduct) {
+            NewProductView(
+                onCreated: { created in
+                    // Adopted locally rather than refetched: the list is
+                    // cached, and a round trip here would either show a
+                    // stale picker or spend a spinner on data already in
+                    // hand. The server just returned the row.
+                    store.adopt(created)
+                    product = created
+                },
+                existing: store.items.value ?? []
+            )
+        }
+        .task {
                 await store.load()
                 me = await CurrentUserStore.shared.load()
             }
@@ -266,6 +306,17 @@ struct ParcelOperationSheet: View {
 final class OperationReferenceStore {
     private(set) var items: LoadState<[InputItem]> = .loading
     private(set) var units: LoadState<[Unit]> = .loading
+
+    /// Add a just-created product to the loaded list, in place.
+    ///
+    /// The cached payload on disk is now one row short of the truth, which
+    /// is correct rather than a bug: the next network-first load replaces
+    /// it wholesale. What must not happen is the picker disagreeing with
+    /// what the person just created, in the same breath.
+    func adopt(_ item: InputItem) {
+        guard case .loaded(let items, let freshness) = items else { return }
+        self.items = .loaded(items + [item], freshness)
+    }
 
     func load() async {
         if items.value == nil {

@@ -107,7 +107,8 @@ final class ApplicationTechniqueTests: XCTestCase {
 final class InputItemTests: XCTestCase {
 
     private func item(_ id: String, _ category: String) -> InputItem {
-        InputItem(id: id, name: "Item \(id)", category: category, defaultUnit: nil)
+        InputItem(id: id, name: "Item \(id)", category: category,
+                  defaultUnit: nil, createdByUserId: nil)
     }
 
     /// THE split is a NEGATION. Measured on this tenant: 24 items — 13
