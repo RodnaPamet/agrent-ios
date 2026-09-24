@@ -77,29 +77,46 @@ enum CommodityName {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        // THE PARCEL CATALOGUE FIRST, then the price series.
+        //
+        // These are two different server vocabularies and `freeText` serves
+        // only one of them: every call site is a parcel's `cropType`, while
+        // `canonical` serves listings, costs and price rows. Keeping the
+        // tables apart is what lets `rapeseed` stay the canonical commodity
+        // slug — an existing decision, with a test that says inventing an
+        // alias "is how a fourth vocabulary starts" — while a parcel whose
+        // catalogue word is `Canola` still reads «Рапица».
+        //
+        // Nothing invented here: the pairs are the web's `crops` namespace
+        // verbatim, so the two clients cannot disagree about what to call a
+        // field's crop depending on which one wrote it.
+        if let crop = cropTable[trimmed.lowercased()] { return crop }
         if let known = table[trimmed.lowercased()] { return known }
-        // AN UNMAPPED VALUE MUST NOT SHOUT IN ENGLISH.
+        // AN UNMAPPED VALUE IS LEFT EXACTLY AS STORED.
         //
-        // The table holds ten commodities and five inputs, copied from
-        // `trends.commodities.*` — a PRICE SERIES vocabulary. A parcel's
-        // `cropType` is not drawn from it, so anything a Bulgarian farm
-        // actually grows outside those ten arrives here unmapped and used
-        // to be printed raw: a row reading «Пшеница» above one reading
-        // `ALFALFA`, in an app with no other English on the screen.
+        // `cropType` is nullable free text and deliberately NOT validated
+        // against the catalogue — production already holds `Grass`, which
+        // is not in the picker's list, and validating strictly would have
+        // made the farm's own data unwritable. So a farmer who typed
+        // something sees what they typed. Same rule as the web's
+        // `cropLabel`, and the same rule this app follows for free-text
+        // weeds.
         //
-        // Title-casing only a SCREAMING_SNAKE token, because that shape is
-        // unmistakably a server enum. Free text is left alone — a farmer's
-        // own note is already written the way they wanted it, and
-        // title-casing a Bulgarian phrase would mangle it.
-        //
-        // This makes the failure quieter, NOT fixed. The real fix is the
-        // parcel crop enum from the server, which is not in this repo.
+        // The SCREAMING_SNAKE title-casing below is DEFENSIVE and honestly
+        // so. I added it having seen `ALFALFA` beside «Пшеница» on the risk
+        // screen — and that was MY OWN FIXTURE, invented for a screenshot
+        // harness. The server owner checked: five distinct crop values
+        // across every tenant, all TitleCase, no SCREAMING_SNAKE value
+        // ever. It guards a shape this server does not emit, and is kept
+        // only because an unvalidated column can hold whatever an import
+        // writes.
         return isServerEnum(trimmed) ? titleCased(trimmed.lowercased()) : trimmed
     }
 
-    /// `ALFALFA`, `SUGAR_BEET` — uppercase ASCII with underscores and no
-    /// spaces. Anything with a lowercase letter or a Cyrillic character is
-    /// somebody's own words.
+    /// `SUGAR_BEET` — uppercase ASCII with underscores and no spaces.
+    /// Anything with a lowercase letter or a Cyrillic character is
+    /// somebody's own words. No value of this shape has been observed in
+    /// this server's data; see the note above.
     private static func isServerEnum(_ value: String) -> Bool {
         !value.isEmpty && value.allSatisfy {
             ($0.isASCII && $0.isUppercase) || $0 == "_" || $0 == "-" || $0.isNumber
@@ -117,6 +134,30 @@ enum CommodityName {
     /// canonical commodities and five inputs — the inputs are here because
     /// the same slug space carries them, and a cost or a price series can
     /// name diesel as readily as wheat.
+    /// What a PARCEL's `cropType` holds — the web's `crops` namespace,
+    /// adopted verbatim from `crop-options.ts` rather than translated
+    /// again here.
+    ///
+    /// Six catalogue values, TitleCase on the wire, matched case-insensitively.
+    /// `Canola` is this vocabulary's word for what the price series calls
+    /// `rapeseed`; both reach «Рапица» through their own table, which is
+    /// how the phone and the web stay in agreement without either giving
+    /// up its canonical slug.
+    ///
+    /// NOT COMPLETE, knowingly. Production holds `Grass` on one parcel and
+    /// the catalogue has no such value, so the web renders it in English
+    /// too. Adding a word here alone would make the two clients disagree,
+    /// which is worse than one of them being in English — it is a
+    /// vocabulary decision, and it is the owner's.
+    static let cropTable: [String: String] = [
+        "wheat": "Пшеница",
+        "barley": "Ечемик",
+        "canola": "Рапица",
+        "maize": "Царевица",
+        "sunflower": "Слънчоглед",
+        "peas": "Грах",
+    ]
+
     static let table: [String: String] = [
         "wheat": "Пшеница",
         "maize": "Царевица",
