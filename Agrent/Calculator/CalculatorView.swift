@@ -18,7 +18,6 @@ struct CalculatorView: View {
                 content
             }
                 .safeAreaInset(edge: .bottom, spacing: 0) { newCostButton }
-            .pageBackground()
             .navigationTitle("Калкулатор")
             .appMenu()
             .sheet(isPresented: $addingCost) {
@@ -107,12 +106,12 @@ struct CalculatorView: View {
 
         case .loaded(let payload, _):
             List {
-                farmSection(payload)
+                farmSection(payload).pageRow()
                 ForEach(payload.rows) { row in
-                    rowSection(row)
+                    rowSection(row).pageRow()
                 }
-                costsSection
-                footnotes(payload)
+                costsSection.pageRow()
+                footnotes(payload).pageRow()
             }
             .refreshable {
                 await PullToRefresh.bounded {
@@ -151,7 +150,7 @@ struct CalculatorView: View {
 
         case .loaded(let page, _):
             Section(header: Text("Разходи"), footer: costsFooter(page)) {
-                ForEach(page.items) { cost in CostRow(cost: cost) }
+                ForEach(page.items) { cost in CostRow(cost: cost).pageRow() }
             }
         }
     }

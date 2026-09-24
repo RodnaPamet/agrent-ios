@@ -27,8 +27,7 @@ struct ExchangeView: View {
     var body: some View {
         NavigationStack {
             stack
-                .pageBackground()
-            .navigationTitle("Борса")
+                .navigationTitle("Борса")
                 .appMenu()
                 .toolbar {
                     if tab == .browse {
@@ -148,8 +147,8 @@ struct ExchangeView: View {
 
         case .loaded where showMap:
             ExchangeMapView(listings: listings.rows)
-                .scrollContentBackground(.hidden)
-            .refreshable { await PullToRefresh.bounded { await listings.load() } }
+                .refreshable { await PullToRefresh.bounded { await listings.load() } }
+            .pageBackground()
 
         case .loaded:
             List {
@@ -169,9 +168,12 @@ struct ExchangeView: View {
                 } footer: {
                     Text("Обявите са от всички стопанства в платформата.")
                 }
+                // On the SECTION — it propagates to the rows inside, which
+                // is one modifier per section instead of one per row type.
+                .pageRow()
             }
-            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await listings.load() } }
+            .pageBackground()
         }
     }
 
@@ -279,8 +281,8 @@ struct ExchangeView: View {
                 }
                 .padding(.vertical, 2)
             }
-            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await mine.load() } }
+            .pageBackground()
         }
     }
 
@@ -304,8 +306,8 @@ struct ExchangeView: View {
 
         case .loaded(let rows, _):
             List(rows) { InquiryRow(inquiry: $0) }
-                .scrollContentBackground(.hidden)
-            .refreshable { await PullToRefresh.bounded { await inquiries.load() } }
+                .refreshable { await PullToRefresh.bounded { await inquiries.load() } }
+            .pageBackground()
         }
     }
 
