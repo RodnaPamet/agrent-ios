@@ -4,6 +4,14 @@ import SwiftUI
 struct AgrentApp: App {
     @State private var auth = AuthClient()
 
+    /// BEFORE ANY SCENE EXISTS, because the defect it fixes is paid by the
+    /// first Bulgarian string UIKit measures — and on this app that can be
+    /// the confirmation button on a write with no undo. See
+    /// `BulgarianLayout`.
+    init() {
+        BulgarianLayout.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
