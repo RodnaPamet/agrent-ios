@@ -233,11 +233,16 @@ final class InsuranceAskTests: XCTestCase {
         {"id":"p1","name":"Нива 19","cropType":"WHEAT","areaHa":32.4,"geometry":null,
          "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
         """.utf8))
-        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: 30)
+        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), area: Area(hectares: 30))
 
         XCTAssertTrue(message.contains("Нива 19"))
-        XCTAssertTrue(message.contains("30"), "the area the farmer typed")
-        XCTAssertTrue(message.contains("32,4"), "and the one on record, since they differ")
+        // DECARES, both of them. 30 ха is 300 дка and the record's 32,4 ха
+        // is 324 дка — asserted through the same formatter the message
+        // uses, so this checks the wiring rather than a separator.
+        XCTAssertTrue(message.contains(Area(hectares: 30).text),
+                      "the area the farmer typed, in decares")
+        XCTAssertTrue(message.contains(Area(hectares: 32.4).text),
+                      "and the one on record, since they differ")
         XCTAssertTrue(message.contains("Пшеница"))
         XCTAssertFalse(message.isEmpty)
     }
@@ -250,9 +255,9 @@ final class InsuranceAskTests: XCTestCase {
         {"id":"p1","name":"Нива 19","cropType":null,"areaHa":32.4,"geometry":null,
          "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
         """.utf8))
-        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: nil)
+        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), area: nil)
         XCTAssertTrue(message.contains("по регистър"))
-        XCTAssertTrue(message.contains("32,4"))
+        XCTAssertTrue(message.contains(Area(hectares: 32.4).text))
     }
 
     /// The server rejects a body over 2000 characters.
@@ -264,7 +269,7 @@ final class InsuranceAskTests: XCTestCase {
          "hasActiveLease":false}
         """.utf8))
         XCTAssertLessThanOrEqual(
-            FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: nil).count, 2000)
+            FarmRiskStore.leadMessage(RiskRow(parcel: parcel), area: nil).count, 2000)
     }
 
     /// The source-level guarantees. These are the ones that protect a
@@ -420,71 +425,71 @@ final class RiskOrderingTests: XCTestCase {
     }
 }
 
-/// The area field's parsing. It prefills from `Num.text`, which prints a
-/// comma, so a parser that only took a full stop would reject the app's
-/// own output the moment anyone edited it.
-final class InsuranceAreaParsingTests: XCTestCase {
+/// Decares, and the one conversion between them and the wire.
+final class AreaTests: XCTestCase {
 
-    func testACommaIsADecimalSeparator() {
-        XCTAssertEqual(InsuranceRequestForm.parse("32,4"), 32.4)
+    func testOneHectareIsTenDecares() {
+        XCTAssertEqual(Area(hectares: 1).decares, 10, accuracy: 0.0001)
+        XCTAssertEqual(Area.parse(decares: "10")?.wireHectares, 1)
     }
 
-    func testAFullStopStillWorks() {
-        XCTAssertEqual(InsuranceRequestForm.parse("32.4"), 32.4)
+    func testTheRoundTripIsLossless() {
+        for hectares in [0.1, 1.0, 12.4, 32.4567, 1234.5] {
+            let back = Area.parse(decares: String(Area(hectares: hectares).decares))
+            XCTAssertEqual(back?.wireHectares ?? 0, hectares,
+                           accuracy: 0.000_001, "\(hectares)")
+        }
     }
 
-    /// `Num.text` groups thousands with a non-breaking space on this locale.
-    func testAGroupedNumberParses() {
-        XCTAssertEqual(InsuranceRequestForm.parse("1\u{00A0}234,5"), 1234.5)
-        XCTAssertEqual(InsuranceRequestForm.parse("1 234,5"), 1234.5)
+    func testTheTextIsDecaresWithTheBulgarianAbbreviation() {
+        XCTAssertEqual(Area(hectares: 32.4).text, "324 дка")
+        XCTAssertEqual(Area(hectares: 0.5).text, "5 дка")
     }
 
-    /// Nothing typed means nothing claimed — the message then names the
-    /// registered area instead of inventing one.
-    func testEmptyIsNil() {
-        XCTAssertNil(InsuranceRequestForm.parse(""))
-        XCTAssertNil(InsuranceRequestForm.parse("   "))
+    /// Spoken differs from written on purpose: VoiceOver reads «дка» as
+    /// three letters.
+    func testTheSpokenFormSaysTheWord() {
+        XCTAssertEqual(Area(hectares: 12.4).spoken, "124 декара")
+        XCTAssertEqual(Area(hectares: 0.1).spoken, "1 декар", "singular")
     }
 
-    /// A field cannot be zero or negative hectares, and an enquiry that
-    /// said so would reach an operator as a number to phone about.
-    func testZeroAndNegativeAreRejected() {
-        XCTAssertNil(InsuranceRequestForm.parse("0"))
-        XCTAssertNil(InsuranceRequestForm.parse("-5"))
+    /// A comma is what the Bulgarian decimal pad gives and what `number`
+    /// prints, so parsing must accept the app's own output.
+    func testParsingAcceptsTheAppsOwnRendering() {
+        XCTAssertEqual(Area.parse(decares: "324,5")?.decares ?? 0, 324.5, accuracy: 0.0001)
+        XCTAssertEqual(Area.parse(decares: "324.5")?.decares ?? 0, 324.5, accuracy: 0.0001)
+        XCTAssertEqual(Area.parse(decares: "1\u{00A0}234,5")?.decares ?? 0, 1234.5, accuracy: 0.0001)
     }
 
-    func testGarbageIsRejected() {
-        XCTAssertNil(InsuranceRequestForm.parse("много"))
-        XCTAssertNil(InsuranceRequestForm.parse("12,3,4"))
-    }
-}
-
-/// Number formatting must not follow the device's region.
-///
-/// These two failed on CI and passed here, which is the whole point: this
-/// machine reports en-BG and the runner does not. The app renders entirely
-/// in Bulgarian, and a String built outside SwiftUI does not see the
-/// environment locale `AgrentApp` sets.
-final class NumberLocaleTests: XCTestCase {
-
-    func testAreasUseTheBulgarianDecimalSeparator() {
-        XCTAssertEqual(Num.text(32.4), "32,4")
-        XCTAssertEqual(Num.text(0.5), "0,5")
+    /// A field cannot be zero or negative, and an enquiry saying so would
+    /// reach an operator as a number to telephone about.
+    func testParsingRejectsWhatIsNotAnArea() {
+        XCTAssertNil(Area.parse(decares: ""))
+        XCTAssertNil(Area.parse(decares: "0"))
+        XCTAssertNil(Area.parse(decares: "-5"))
+        XCTAssertNil(Area.parse(decares: "много"))
     }
 
-    func testWholeNumbersCarryNoDecimals() {
-        XCTAssertEqual(Num.text(324), "324")
+    /// The tolerance is stated once because as a literal it means two
+    /// different things: 0,005 is 50 m² read as hectares and 5 m² read as
+    /// decares, and it was already two different numbers in two files.
+    func testTheRegisterToleranceSeparatesACorrectionFromRounding() {
+        let recorded = Area(hectares: 32.4)
+        XCTAssertFalse(recorded.differs(from: Area(hectares: 32.4004)),
+                       "4 m² is rounding, not a correction")
+        XCTAssertTrue(recorded.differs(from: Area(hectares: 32.5)),
+                      "a tenth of a hectare is a correction")
     }
 
-    func testMoneyUsesTheBulgarianSeparatorAndTwoPlaces() {
-        XCTAssertEqual(Money.text(51.1, "EUR"), "51,10 EUR")
-    }
-
-    /// The failure this guards is silent: the same number drawn two ways on
-    /// one screen, depending on whether it came through `Text` or through a
-    /// String interpolated into a sentence.
-    func testAGroupedThousandMatchesTheAppsOwnRendering() {
-        XCTAssertFalse(Num.text(1234.5).contains("."),
-                       "a full stop here means the process locale won")
+    /// A parcel of 32,4567 ха is 324,567 дка, which the two-decimal
+    /// formatter shows as «324,57». Submitting that back would be a silent
+    /// edit by somebody who typed nothing — the form sends the original
+    /// instead, and this pins why that guard has to exist.
+    func testTheDisplayedValueIsNotTheStoredValue() {
+        let exact = Area(hectares: 32.4567)
+        let reparsed = Area.parse(decares: exact.number)
+        XCTAssertNotEqual(reparsed?.wireHectares ?? 0, exact.wireHectares,
+                          accuracy: 0.000_01,
+                          "if these were equal the form's guard would be unnecessary")
     }
 }

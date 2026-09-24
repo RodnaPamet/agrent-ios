@@ -109,12 +109,15 @@ final class FarmRiskStore {
     /// deliberate tap into something they did not choose. A 409 on replay
     /// is success, so a manual retry is safe; an automatic one is still
     /// not offered.
-    /// `areaHa` is what the farmer typed, which may differ from the area
-    /// on record — it is the figure they want insured. It travels inside
+    /// `area` is what the farmer typed, which may differ from the area on
+    /// record — it is the figure they want insured. It travels inside
     /// `message`, because the server has no area column and adding one is a
     /// migration; carried this way it reaches the operator's email today
     /// rather than after a release on both sides.
-    func ask(_ parcelID: String, areaHa: Double? = nil) async {
+    ///
+    /// Typed as `Area` rather than a bare `Double` so the unit cannot be
+    /// lost between the form and the sentence an operator reads.
+    func ask(_ parcelID: String, area: Area? = nil) async {
         guard mayAsk, !asking.contains(parcelID) else { return }
         let row = parcels.value?.first { $0.id == parcelID }
         asking.insert(parcelID)
@@ -123,7 +126,7 @@ final class FarmRiskStore {
         do {
             try await FarmRiskAPI.createLead(CreateLead(
                 parcelId: parcelID,
-                message: Self.leadMessage(row, areaHa: areaHa),
+                message: Self.leadMessage(row, area: area),
                 locationId: selected?.id,
                 risk: row?.risk.map {
                     CreateLead.RiskSnapshot(
@@ -150,17 +153,18 @@ final class FarmRiskStore {
     /// Written for a person, in Bulgarian, and it names the area the FARMER
     /// gave rather than the one on record when the two differ — that
     /// difference is the point of asking them.
-    static func leadMessage(_ row: RiskRow?, areaHa: Double?) -> String {
+    static func leadMessage(_ row: RiskRow?, area: Area?) -> String {
         let name = row?.parcel.name ?? "парцел"
         var parts = ["Запитване за застрахователна оферта за парцел «\(name)»."]
 
-        if let areaHa {
-            parts.append("Площ за застраховане: \(Num.text(areaHa)) ха.")
-            if let recorded = row?.parcel.areaHa, abs(recorded - areaHa) > 0.005 {
-                parts.append("По регистър: \(Num.text(recorded)) ха.")
+        if let area {
+            parts.append("Площ за застраховане: \(area.text).")
+            if let recorded = row?.parcel.areaHa.map(Area.init(hectares:)),
+               area.differs(from: recorded) {
+                parts.append("По регистър: \(recorded.text).")
             }
         } else if let recorded = row?.parcel.areaHa {
-            parts.append("Площ по регистър: \(Num.text(recorded)) ха.")
+            parts.append("Площ по регистър: \(Area(hectares: recorded).text).")
         }
 
         if let crop = CommodityName.freeText(row?.parcel.cropType) {
