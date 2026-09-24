@@ -20,12 +20,15 @@ struct FarmRiskView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var store = FarmRiskStore()
 
-    /// The parcel awaiting confirmation. Non-nil drives the alert.
+    /// The enquiry form's target — a parcel when a row opened it, or none
+    /// when the action button did and the farmer has yet to choose.
     ///
-    /// Held as the PARCEL, not a Bool, so the sentence in the dialog can
-    /// name which field is about to be spent. "Are you sure?" over an
-    /// unnamed action is not a confirmation, it is a speed bump.
-    @State private var confirming: RiskRow?
+    /// It replaced a confirmation alert. The alert asked yes-or-no about a
+    /// figure nobody had been shown; the form asks for the figure, because
+    /// the area a field is INSURED for is not always the area on record and
+    /// the lead cannot be revised once it is sent.
+    @State private var requesting: RequestTarget?
+
 
     var body: some View {
         NavigationStack {
@@ -38,6 +41,23 @@ struct FarmRiskView: View {
                         locationPicker
                     }
                     .background(.bar)
+                }
+                // THE ACTION BUTTON, bottom-leading, as asked for — and
+                // the same control other screens will grow for their own
+                // primary action. Here it opens the enquiry form with
+                // nothing chosen, so a farmer who wants a quote does not
+                // have to find the field first.
+                //
+                // Hidden rather than disabled when there is nothing to ask
+                // about: no parcels, no permission, or every parcel already
+                // asked about. A floating button that refuses is a promise
+                // the screen cannot keep.
+                .actionButton(
+                    "Запитване за оферта",
+                    systemImage: "envelope",
+                    isEnabled: store.mayAsk && !askableParcels.isEmpty
+                ) {
+                    requesting = RequestTarget(parcel: nil)
                 }
                 .inlineTitle("Риск по парцели")
                 .toolbar {
@@ -52,33 +72,23 @@ struct FarmRiskView: View {
                     await store.loadLeads()
                     await store.readRisks()
                 }
-                // A confirmation, because there is no undo.
+                // A FORM, because there is no undo.
                 //
                 // An insurance ask is unique per (parcel, tenant) with no
                 // DELETE and no withdraw — a 15-minute undo was specified
-                // and then dropped. So this dialog is the ONLY protection
-                // a farmer has, and it carries the whole weight: it names
-                // the parcel, it says the ask cannot be taken back, and
-                // the confirming action is not the default button.
-                .alert(
-                    "Запитване за «\(confirming?.parcel.name ?? "")»",
-                    isPresented: Binding(
-                        get: { confirming != nil },
-                        set: { if !$0 { confirming = nil } }
-                    ),
-                    presenting: confirming
-                ) { row in
-                    Button("Отказ", role: .cancel) { confirming = nil }
-                    Button("Изпрати запитване") {
-                        let id = row.parcel.id
-                        confirming = nil
-                        Task { await store.ask(id) }
+                // and then dropped. An alert could only ask yes-or-no about
+                // an area the farmer had never seen; the form settles the
+                // figure BEFORE the single irreversible write, which is the
+                // only order that works when nothing can be corrected
+                // afterwards.
+                .sheet(item: $requesting) { target in
+                    InsuranceRequestForm(
+                        parcels: (store.parcels.value ?? []).map(\.parcel),
+                        alreadyAsked: store.askedParcelIDs,
+                        preselected: target.parcel
+                    ) { parcel, areaHa in
+                        Task { await store.ask(parcel.id, areaHa: areaHa) }
                     }
-                } message: { row in
-                    Text("Ще бъде изпратено запитване за оферта за парцел "
-                       + "«\(row.parcel.name)».\n\n"
-                       + "Запитването не може да бъде оттеглено и всеки парцел "
-                       + "може да бъде заявен само веднъж.")
                 }
                 .alert("Запитването не беше изпратено", isPresented: Binding(
                     get: { store.askFailure != nil },
@@ -110,6 +120,16 @@ struct FarmRiskView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
+    }
+
+    /// Parcels a lead can still be created for. Read from the server on
+    /// load, never remembered locally — the web tracked this in component
+    /// state, it died on unmount, and an operator got a refusal for
+    /// retrying something they had no way to see they had done.
+    private var askableParcels: [Parcel] {
+        (store.parcels.value ?? [])
+            .map(\.parcel)
+            .filter { !store.askedParcelIDs.contains($0.id) }
     }
 
     // MARK: - Content
@@ -209,7 +229,7 @@ struct FarmRiskView: View {
                 }
             } else {
                 Button {
-                    confirming = row
+                    requesting = RequestTarget(parcel: row.parcel)
                 } label: {
                     Label("Запитай за оферта", systemImage: "envelope")
                         .font(.footnote.weight(.medium))

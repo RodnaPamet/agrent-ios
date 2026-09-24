@@ -284,28 +284,46 @@ final class InsuranceAskTests: XCTestCase {
             "Agrent/FarmRisk/FarmRiskStore.swift"), encoding: .utf8)) ?? ""
     }
 
+    private var formSource: String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        return (try? String(contentsOf: url.appendingPathComponent(
+            "Agrent/FarmRisk/InsuranceRequestForm.swift"), encoding: .utf8)) ?? ""
+    }
+
     func testTheSourcesAreRead() {
         XCTAssertTrue(viewSource.contains("struct FarmRiskView"), "positive control")
         XCTAssertTrue(storeSource.contains("final class FarmRiskStore"), "positive control")
+        XCTAssertTrue(formSource.contains("struct InsuranceRequestForm"), "positive control")
     }
 
-    /// The dialog NAMES the parcel. "Are you sure?" over an unnamed action
-    /// is a speed bump, not a confirmation — and with no undo, picking the
-    /// wrong field is unrecoverable.
-    func testTheConfirmationNamesTheParcel() {
-        XCTAssertTrue(viewSource.contains("confirming?.parcel.name"),
-                      "the dialog title does not name the parcel")
-        XCTAssertTrue(viewSource.contains("row.parcel.name"),
-                      "the dialog body does not name the parcel")
+    /// The form NAMES the parcel it is about. An enquiry over an unnamed
+    /// field is a speed bump, not a decision — and with no undo, sending it
+    /// about the wrong one is unrecoverable.
+    ///
+    /// These moved from the alert with the guarantee itself: the alert
+    /// became a form, because the AREA has to be settled before the single
+    /// irreversible write rather than after it.
+    func testTheFormNamesTheParcel() {
+        XCTAssertTrue(formSource.contains("parcel.name"),
+                      "the form does not name the parcel")
     }
 
     /// It says the ask cannot be withdrawn. After this there is nowhere
     /// left to say it.
-    func testTheConfirmationSaysItCannotBeTakenBack() {
-        XCTAssertTrue(viewSource.contains("не може да бъде оттеглено"),
-                      "the dialog does not state that the ask is irreversible")
-        XCTAssertTrue(viewSource.contains("само веднъж"),
-                      "the dialog does not state one ask per parcel")
+    func testTheFormSaysItCannotBeTakenBack() {
+        XCTAssertTrue(formSource.contains("не може да бъде оттеглено"),
+                      "the form does not state that the ask is irreversible")
+        XCTAssertTrue(formSource.contains("само веднъж"),
+                      "the form does not state one ask per parcel")
+    }
+
+    /// A parcel with a lead is never offered. The server 409s it, and
+    /// letting someone pick it, type an area and submit is the failure
+    /// `GET /insurance/leads` exists to prevent.
+    func testTheFormNeverOffersAParcelAlreadyAskedAbout() {
+        XCTAssertTrue(formSource.contains("alreadyAsked.contains"),
+                      "the form does not filter parcels that already have a lead")
     }
 
     /// NEVER retried automatically. A lost response on a bad connection
@@ -399,5 +417,44 @@ final class RiskOrderingTests: XCTestCase {
     func testUnreadSortsBelowEveryVerdict() throws {
         let rows = [try row("a", "Аaa", nil), try row("b", " Zzz", .good)]
         XCTAssertEqual(rows.sorted { $0.sortKey < $1.sortKey }.map(\.id), ["b", "a"])
+    }
+}
+
+/// The area field's parsing. It prefills from `Num.text`, which prints a
+/// comma, so a parser that only took a full stop would reject the app's
+/// own output the moment anyone edited it.
+final class InsuranceAreaParsingTests: XCTestCase {
+
+    func testACommaIsADecimalSeparator() {
+        XCTAssertEqual(InsuranceRequestForm.parse("32,4"), 32.4)
+    }
+
+    func testAFullStopStillWorks() {
+        XCTAssertEqual(InsuranceRequestForm.parse("32.4"), 32.4)
+    }
+
+    /// `Num.text` groups thousands with a non-breaking space on this locale.
+    func testAGroupedNumberParses() {
+        XCTAssertEqual(InsuranceRequestForm.parse("1\u{00A0}234,5"), 1234.5)
+        XCTAssertEqual(InsuranceRequestForm.parse("1 234,5"), 1234.5)
+    }
+
+    /// Nothing typed means nothing claimed — the message then names the
+    /// registered area instead of inventing one.
+    func testEmptyIsNil() {
+        XCTAssertNil(InsuranceRequestForm.parse(""))
+        XCTAssertNil(InsuranceRequestForm.parse("   "))
+    }
+
+    /// A field cannot be zero or negative hectares, and an enquiry that
+    /// said so would reach an operator as a number to phone about.
+    func testZeroAndNegativeAreRejected() {
+        XCTAssertNil(InsuranceRequestForm.parse("0"))
+        XCTAssertNil(InsuranceRequestForm.parse("-5"))
+    }
+
+    func testGarbageIsRejected() {
+        XCTAssertNil(InsuranceRequestForm.parse("много"))
+        XCTAssertNil(InsuranceRequestForm.parse("12,3,4"))
     }
 }
