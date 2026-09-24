@@ -56,7 +56,18 @@ struct ListingDetailView: View {
                 }
             } else if listing.isActive {
                 Section {
-                    Button("Изпрати запитване") { composing = true }
+                    // «Изпрати», not «Изпрати запитване» — the owner's
+                    // wording.
+                    //
+                    // Worth knowing rather than discovering: this button
+                    // OPENS the composer, and the one that actually sends
+                    // is `InquiryComposeView`'s own «Изпрати» in the sheet
+                    // it presents. So the same word now appears twice in
+                    // one flow, on a control that opens and a control that
+                    // sends. Asked for deliberately; if it ever reads
+                    // wrong, «Запитване» names the destination instead of
+                    // promising the action.
+                    Button("Изпрати") { composing = true }
                 }
             }
         }
