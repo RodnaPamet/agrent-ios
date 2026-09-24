@@ -8,26 +8,15 @@ struct ParcelMapView: View {
 
     /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
     ///
-    /// Both modes are now imagery. Simplified draws each field as one
-    /// rectangle, coloured sown or fallow, framed tight on the parcels;
-    /// precise draws the true outlines with their holes, framed on the
-    /// farm's own bounds, and carries the vegetation indices. The tileless
-    /// schematic this replaced is gone, and with it the argument that the
-    /// first frame needs no network — the stale banner above is what answers
-    /// no signal now, and it answers it for every screen rather than for
-    /// this one alone.
+    /// Three modes, one cycling button — see `ParcelMapMode`. The schematic
+    /// is among them, which is the only one of the three that draws a farm
+    /// with no signal at all.
     ///
-    /// A NEW KEY, deliberately, with the old one left unread. What
-    /// `locations.useSchematicMap` recorded was an answer to "do you want
-    /// the tileless, hand-coloured map?", and there is nothing honest to
-    /// migrate that to: someone who chose the schematic was not choosing
-    /// rectangles over outlines. Everyone starts from the owner's default
-    /// and picks again.
-    ///
-    /// One button, two states. MapKit offers standard/hybrid/satellite for
-    /// free and adding them would turn this into a picker, which is the one
-    /// thing it was asked not to become.
-    @AppStorage("locations.parcelMapSimplified") private var simplified = false
+    /// A NEW KEY, with `locations.useSchematicMap` left unread. That one
+    /// recorded an answer to a two-way question, and a boolean cannot say
+    /// which of three a person wanted. Everyone starts from the owner's
+    /// default and picks again once.
+    @AppStorage("locations.parcelMapMode") private var mode: ParcelMapMode = .precise
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -69,16 +58,11 @@ struct ParcelMapView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    toggleMode()
+                    cycleMode()
                 } label: {
-                    Label(
-                        simplified ? "Точни граници" : "Опростена",
-                        systemImage: simplified ? "pentagon" : "square.dashed"
-                    )
+                    Label(mode.next.label, systemImage: mode.next.icon)
                 }
-                .accessibilityHint(simplified
-                    ? "Превключва към точните очертания на парцелите"
-                    : "Превключва към опростена карта с правоъгълни парцели")
+                .accessibilityHint(mode.next.hint)
             }
         }
         .sheet(item: $operating) { parcel in
@@ -108,8 +92,8 @@ struct ParcelMapView: View {
             VStack(spacing: 0) {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
-                if simplified && !drawable.isEmpty { legend }
-                if !simplified && !drawable.isEmpty { indexControls }
+                if mode.showsSownFallow && !drawable.isEmpty { legend }
+                if !mode.showsSownFallow && !drawable.isEmpty { indexControls }
                 parcelList(response, drawable: drawable)
             }
         }
@@ -117,11 +101,11 @@ struct ParcelMapView: View {
 
     // MARK: - Map
 
-    /// Only for the simplified view, where the fill colour is the only thing
-    /// on screen saying which fields are sown. The precise view has the
-    /// vegetation indices and their own legend, and paints every parcel
-    /// alike, so a sown/fallow key there would explain a distinction it does
-    /// not draw.
+    /// For the two modes that colour a parcel by crop state — simplified and
+    /// schematic — where the fill is the only thing on screen saying which
+    /// fields are sown. The precise view has the vegetation indices and their
+    /// own legend, and paints every parcel alike, so a sown/fallow key there
+    /// would explain a distinction it does not draw.
     private var legend: some View {
         HStack(spacing: 16) {
             swatch(Palette.Map.sownFill, "Засят", dashed: false)
@@ -164,11 +148,20 @@ struct ParcelMapView: View {
                 icon: "map",
                 message: "Парцелите съществуват, но нямат географски очертания."
             )
+        } else if mode == .schematic, let box = response.bounds ?? location.boundsJson {
+            // A Canvas, not MapKit. It needs a box to normalise into and has
+            // nothing to fall back on without one, so a location with neither
+            // bound falls through to the satellite branch below — which can
+            // still frame itself from the parcels.
+            SchematicParcelMap(
+                parcels: drawable, bounds: box,
+                onTap: mayOperate ? { operating = $0 } : nil
+            )
         } else {
-            // ONE map view for both modes, differing by `shape`. Two views in
-            // an if/else would give SwiftUI different structural identity,
-            // tearing down the MKMapView and re-firing the index refresh on
-            // every toggle.
+            // ONE map view for both SATELLITE modes, differing by `shape`.
+            // Two views in an if/else would give SwiftUI different structural
+            // identity, tearing down the MKMapView and re-firing the index
+            // refresh on every switch.
             //
             // No index tiles under the rectangles. Earth Engine clips each
             // tile to the TRUE parcel shape, so beneath a box the colour
@@ -177,9 +170,9 @@ struct ParcelMapView: View {
             // simplification.
             SatelliteParcelMap(
                 parcels: drawable,
-                region: mapRegion(simplified: simplified),
-                tileTemplate: simplified ? nil : indices.tiles?.tileUrl,
-                shape: simplified ? .boundingBoxes : .outlines,
+                region: mapRegion(for: mode),
+                tileTemplate: mode == .simplified ? nil : indices.tiles?.tileUrl,
+                shape: mode == .simplified ? .boundingBoxes : .outlines,
                 contrast: contrast,
                 camera: camera,
                 onTap: mayOperate ? { operating = $0 } : nil
@@ -189,7 +182,7 @@ struct ParcelMapView: View {
         }
     }
 
-    /// Switch modes, and move the camera to match.
+    /// Cycle to the next mode, and move the camera to match.
     ///
     /// THE CAMERA HAS TO BE TOLD. One map view serves both modes, so a
     /// toggle is not a rebuild, and `region` is read only when the view is
@@ -201,10 +194,10 @@ struct ParcelMapView: View {
     /// A method rather than a closure in the toolbar so that the action can
     /// be invoked from somewhere other than the button — which is the only
     /// way this path gets exercised outside a human thumb.
-    private func toggleMode() {
-        simplified.toggle()
+    private func cycleMode() {
+        mode = mode.next
         cameraTick += 1
-        camera = .init(tick: cameraTick, region: mapRegion(simplified: simplified))
+        camera = .init(tick: cameraTick, region: mapRegion(for: mode))
     }
 
     /// Where each mode opens.
@@ -220,10 +213,10 @@ struct ParcelMapView: View {
     /// number. Where a location has no server bounds the two are the same
     /// expression and the toggle will not appear to move the camera — that is
     /// honest rather than broken, since there is nothing else to frame.
-    private func mapRegion(simplified: Bool) -> MKCoordinateRegion {
+    private func mapRegion(for mode: ParcelMapMode) -> MKCoordinateRegion {
         let response = store.state.value
         let drawable = response?.parcels.filter(\.isDrawable) ?? []
-        if simplified, let fitted = MKCoordinateRegion(fitting: drawable) {
+        if mode == .simplified, let fitted = MKCoordinateRegion(fitting: drawable) {
             return fitted
         }
         return (response?.bounds ?? location.boundsJson)?.region

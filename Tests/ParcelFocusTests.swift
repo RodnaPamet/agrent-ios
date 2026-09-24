@@ -72,3 +72,54 @@ final class ParcelFocusTests: XCTestCase {
         XCTAssertNil(ParcelFocus.position(of: try parcel("x"), in: try parcels(["a"])))
     }
 }
+
+/// The three-way cycle. Pure, so it needs no view.
+final class ParcelMapModeTests: XCTestCase {
+
+    func testCyclesThroughAllThreeAndReturns() {
+        XCTAssertEqual(ParcelMapMode.precise.next, .simplified)
+        XCTAssertEqual(ParcelMapMode.simplified.next, .schematic)
+        XCTAssertEqual(ParcelMapMode.schematic.next, .precise)
+    }
+
+    /// Three presses from anywhere come home. If `allCases` ever grows a
+    /// case without the button being reconsidered, this still passes — but
+    /// the count assertion below fails, which is the point.
+    func testThreePressesReturnToTheStart() {
+        for mode in ParcelMapMode.allCases {
+            XCTAssertEqual(mode.next.next.next, mode)
+        }
+        XCTAssertEqual(ParcelMapMode.allCases.count, 3,
+                       "a fourth mode needs the button reconsidered, not just this test updated")
+    }
+
+    /// The sown/fallow key belongs on exactly the modes that draw it.
+    func testOnlyTheCropColouredModesShowTheLegend() {
+        XCTAssertFalse(ParcelMapMode.precise.showsSownFallow)
+        XCTAssertTrue(ParcelMapMode.simplified.showsSownFallow)
+        XCTAssertTrue(ParcelMapMode.schematic.showsSownFallow)
+    }
+
+    /// The schematic is a Canvas: no camera to command, no target to press.
+    func testOnlyTheSchematicIsNotSatellite() {
+        XCTAssertTrue(ParcelMapMode.precise.isSatellite)
+        XCTAssertTrue(ParcelMapMode.simplified.isSatellite)
+        XCTAssertFalse(ParcelMapMode.schematic.isSatellite)
+    }
+
+    /// Stored by raw value, so renaming a case silently changes what a
+    /// phone's saved preference means.
+    func testRawValuesArePinned() {
+        XCTAssertEqual(ParcelMapMode.precise.rawValue, "precise")
+        XCTAssertEqual(ParcelMapMode.simplified.rawValue, "simplified")
+        XCTAssertEqual(ParcelMapMode.schematic.rawValue, "schematic")
+    }
+
+    /// Every mode must have a distinct label and glyph, or the button lies
+    /// about where it is going.
+    func testLabelsAndIconsAreDistinct() {
+        XCTAssertEqual(Set(ParcelMapMode.allCases.map(\.label)).count, 3)
+        XCTAssertEqual(Set(ParcelMapMode.allCases.map(\.icon)).count, 3)
+        XCTAssertEqual(Set(ParcelMapMode.allCases.map(\.hint)).count, 3)
+    }
+}
