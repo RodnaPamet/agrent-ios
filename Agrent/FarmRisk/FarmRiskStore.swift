@@ -7,12 +7,32 @@ struct RiskRow: Identifiable, Equatable, Sendable {
     var risk: ParcelRisk?
     var failure: String?
 
+    /// THE READING'S OWN FRESHNESS, not the parcel list's.
+    ///
+    /// `staleDays` is `generatedAt − acquiredDate`, and BOTH are frozen
+    /// inside the payload — so an analysis fetched on Monday whose
+    /// acquisition was Monday still computes 0 on Thursday and says
+    /// «Заснето днес» over a three-day-old image. The parcel list's
+    /// freshness cannot correct it: the list and the readings are separate
+    /// requests with separate caches, and the list is routinely fresh while
+    /// the readings are not.
+    ///
+    /// This is the Тенденции July-price failure, which is the thing this
+    /// screen was built to avoid making again.
+    var freshness: Freshness?
+
     var id: String { parcel.id }
 
     /// Worst first, unread last, then by name so the order is stable
     /// between loads rather than shuffling as readings arrive.
-    var sortKey: (Int, String) {
-        ((risk?.overall ?? .unknown).severityOrder, parcel.name)
+    /// Worst first, unread last, then by name, then by ID.
+    ///
+    /// The ID is the third component because `sorted` is not guaranteed
+    /// stable and two parcels can share a name — the owner's farm numbers
+    /// several fields alike. Without it the list can reorder between two
+    /// renders of identical data.
+    var sortKey: (Int, String, String) {
+        ((risk?.overall ?? .unknown).severityOrder, parcel.name, parcel.id)
     }
 }
 
@@ -22,6 +42,16 @@ final class FarmRiskStore {
     private(set) var locations: LoadState<[Location]> = .loading
     private(set) var parcels: LoadState<[RiskRow]> = .loading
     private(set) var isReadingRisks = false
+
+    /// Bumped whenever the selection changes. `readRisks` abandons a loop
+    /// whose generation no longer matches, instead of the old flag, which
+    /// only ever asked "is A still running?" and answered "yes, so B must
+    /// not start" — stranding B's rows on «Изчисляване…» for ever while
+    /// A's publishes were dropped one by one against ids that no longer
+    /// existed. One request per parcel at up to fifteen seconds each makes
+    /// that window the whole load, not a race you have to be unlucky to
+    /// hit.
+    private var generation = 0
 
     var selected: Location?
 
@@ -106,6 +136,19 @@ final class FarmRiskStore {
             try await LocationsAPI.decodeList(from: data)
         } publish: { [weak self] in self?.locations = $0 }
         if selected == nil { selected = locations.value?.first }
+        // `loadParcels` returns without touching `parcels` when there is no
+        // selection, and `parcels` starts `.loading` — so a locations
+        // failure, or a tenant with no locations at all, left a spinner on
+        // a blank screen with no message and no retry. `content` switches
+        // on `parcels` alone, so a failure sitting in `locations` was never
+        // rendered anywhere.
+        if selected == nil {
+            switch locations {
+            case .failed(let message): parcels = .failed(message)
+            case .loaded: parcels = .loaded([], .fresh)
+            case .loading: break
+            }
+        }
     }
 
     func loadParcels() async {
@@ -142,22 +185,27 @@ final class FarmRiskStore {
     /// quickly even when the last never does, and the list visibly fills
     /// rather than sitting empty until all of them are in.
     func readRisks() async {
-        guard let rows = parcels.value, !isReadingRisks else { return }
+        guard let rows = parcels.value else { return }
+        generation += 1
+        let mine = generation
         isReadingRisks = true
-        defer { isReadingRisks = false }
+        defer { if generation == mine { isReadingRisks = false } }
 
         for row in rows {
+            guard generation == mine else { return }
             let path = FarmRiskAPI.analysisPath(row.parcel.id)
             await CachedResource.loadShowingCacheFirst(path) { data in
                 try await FarmRiskAPI.decodeAnalysis(from: data)
             } publish: { [weak self] state in
-                guard let self, case .loaded(var current, let freshness) = self.parcels,
+                guard let self, self.generation == mine,
+                      case .loaded(var current, let freshness) = self.parcels,
                       let index = current.firstIndex(where: { $0.id == row.parcel.id })
                 else { return }
                 switch state {
-                case .loaded(let risk, _):
+                case .loaded(let risk, let readingFreshness):
                     current[index].risk = risk
                     current[index].failure = nil
+                    current[index].freshness = readingFreshness
                 case .failed(let message):
                     // Keep the parcel; lose only its reading. A field that
                     // vanishes because its analysis failed is worse than a
@@ -166,14 +214,24 @@ final class FarmRiskStore {
                 case .loading:
                     return
                 }
-                self.parcels = .loaded(current.sorted { $0.sortKey < $1.sortKey }, freshness)
+                // NOT SORTED HERE. Every row starts unread, which is
+                // severity 3 and therefore bottom, so re-sorting inside
+                // this closure walked each row up the list as its reading
+                // landed — under a comment claiming the order was stable
+                // between loads. A farmer reads a moving list, and every
+                // row of it carries the irreversible ask button.
+                self.parcels = .loaded(current, freshness)
             }
         }
+
+        guard generation == mine, case .loaded(let done, let freshness) = parcels else { return }
+        parcels = .loaded(done.sorted { $0.sortKey < $1.sortKey }, freshness)
     }
 
     func select(_ location: Location) async {
         guard location.id != selected?.id else { return }
         selected = location
+        generation += 1
         parcels = .loading
         await loadParcels()
         await readRisks()

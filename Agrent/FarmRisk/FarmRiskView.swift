@@ -169,7 +169,7 @@ struct FarmRiskView: View {
             }
 
             if let risk = row.risk {
-                readings(risk)
+                readings(risk, row.freshness)
             } else if let failure = row.failure {
                 Text(failure)
                     .font(.footnote)
@@ -222,7 +222,7 @@ struct FarmRiskView: View {
     }
 
     @ViewBuilder
-    private func readings(_ risk: ParcelRisk) -> some View {
+    private func readings(_ risk: ParcelRisk, _ freshness: Freshness?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             // Two chips, stacked rather than side by side: at accessibility
             // sizes two labelled chips on one line reflow independently and
@@ -237,7 +237,7 @@ struct FarmRiskView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            acquisition(risk)
+            acquisition(risk, freshness)
         }
     }
 
@@ -276,20 +276,37 @@ struct FarmRiskView: View {
     /// with no date reads as today's, and the composite reaches back past
     /// cloud cover without saying so.
     @ViewBuilder
-    private func acquisition(_ risk: ParcelRisk) -> some View {
+    private func acquisition(_ risk: ParcelRisk, _ freshness: Freshness?) -> some View {
         if let date = risk.acquired {
             let days = risk.staleDays ?? 0
+            // A CACHED READING MAY NOT SAY «ДНЕС», OR COUNT DAYS.
+            //
+            // `staleDays` is `generatedAt − acquiredDate` and both are
+            // frozen inside the payload, so an analysis fetched on Monday
+            // whose acquisition was Monday still computes 0 on Thursday.
+            // Served from the cache it would print «Заснето днес» over a
+            // three-day-old image — and the parcel list above it can be
+            // perfectly fresh, so the stale banner says nothing.
+            //
+            // The absolute date is the part that stays true whatever the
+            // payload's age, so a stale reading shows that alone. The
+            // relative clause is dropped rather than guessed at: the cache
+            // knows when IT was written, not when the satellite passed.
+            let isCached = { if case .stale = freshness { return true } else { return false } }()
             Label(
-                days <= 0
-                    ? "Заснето днес"
-                    : "Заснето на \(BgDate.dayMonth(date)) · преди \(Plural.bg(days, "ден", "дни"))",
+                isCached
+                    ? "Заснето на \(BgDate.dayMonth(date))"
+                    : days <= 0
+                        ? "Заснето днес"
+                        : "Заснето на \(BgDate.dayMonth(date)) · преди \(Plural.bg(days, "ден", "дни"))",
                 systemImage: "camera.badge.clock"
             )
             .font(.caption)
             // NEVER `.secondary`, which is what this was. The parcel map
             // says it in its own comment: this line is the caveat on every
             // number above it, and it must not read as a footnote.
-            .foregroundStyle(days > Staleness.satellitePass ? Color.orange : Color.primary)
+            .foregroundStyle(
+                isCached || days > Staleness.satellitePass ? Color.orange : Color.primary)
             .fixedSize(horizontal: false, vertical: true)
         } else {
             // THE `else` THE PARCEL MAP ALREADY HAD.
