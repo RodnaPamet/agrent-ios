@@ -69,14 +69,7 @@ struct ParcelMapView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    simplified.toggle()
-                    // THE CAMERA HAS TO BE TOLD. One map view serves both
-                    // modes, so a toggle is not a rebuild and `region` is
-                    // read only when the view is first made — without this
-                    // the shapes would change under an unchanged camera and
-                    // "zoomed in versus zoomed out" would not happen at all.
-                    cameraTick += 1
-                    camera = .init(tick: cameraTick, region: mapRegion(simplified: simplified))
+                    toggleMode()
                 } label: {
                     Label(
                         simplified ? "Точни граници" : "Опростена",
@@ -194,6 +187,24 @@ struct ParcelMapView: View {
             .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
             .task { await indices.refreshIfNeeded() }
         }
+    }
+
+    /// Switch modes, and move the camera to match.
+    ///
+    /// THE CAMERA HAS TO BE TOLD. One map view serves both modes, so a
+    /// toggle is not a rebuild, and `region` is read only when the view is
+    /// first made — deliberately, since honouring it on every update would
+    /// undo the farmer's zoom each time they tapped an index chip. Without
+    /// this command the shapes would change under an unchanged camera and
+    /// "zoomed in versus zoomed out" would not happen at all.
+    ///
+    /// A method rather than a closure in the toolbar so that the action can
+    /// be invoked from somewhere other than the button — which is the only
+    /// way this path gets exercised outside a human thumb.
+    private func toggleMode() {
+        simplified.toggle()
+        cameraTick += 1
+        camera = .init(tick: cameraTick, region: mapRegion(simplified: simplified))
     }
 
     /// Where each mode opens.
