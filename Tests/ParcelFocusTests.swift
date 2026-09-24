@@ -123,3 +123,23 @@ final class ParcelMapModeTests: XCTestCase {
         XCTAssertEqual(Set(ParcelMapMode.allCases.map(\.hint)).count, 3)
     }
 }
+
+/// A command issued before the map view exists must be neither obeyed nor
+/// replayed. Obeying it pinned the farm to a fallback region; replaying it
+/// showed a second jump on every rebuild.
+@MainActor
+final class StaleCameraCommandTests: XCTestCase {
+
+    func testACommandFromBeforeTheViewExistedIsNeverApplied() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        // makeUIView opened on `region` and seeded this command's tick.
+        coordinator.seed(3)
+        XCTAssertFalse(coordinator.consume(3), "the stale command must not fire later")
+    }
+
+    func testTheNextRealPressStillWorks() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        coordinator.seed(3)
+        XCTAssertTrue(coordinator.consume(4))
+    }
+}

@@ -81,11 +81,26 @@ struct SatelliteParcelMap: UIViewRepresentable {
         view.mapType = .hybrid
         view.pointOfInterestFilter = .excludingAll
         view.showsCompass = false
-        // The opening camera. A command that arrived before the view existed
-        // is honoured here and marked as applied below, otherwise it would
-        // replay as a visible second jump the moment `updateUIView` first
-        // runs — which is what a teardown and rebuild looks like.
-        view.setRegion(camera?.region ?? region, animated: false)
+        // The opening camera is `region`, and a command that arrived before
+        // this view existed is DISCARDED rather than honoured.
+        //
+        // Honouring it was wrong in a way that stuck. The mode button lives
+        // on the screen's own toolbar, outside the `switch store.state`, so
+        // it is live while the parcels are still loading. Pressed then,
+        // `mapRegion` finds no response, no drawable parcels, and falls back
+        // to the location's bounds or — where the server sent none, which is
+        // one field away on this tenant — to `.bulgaria`, 3.6° by 7.5°. That
+        // command then beat the `region` computed from the loaded response,
+        // AND was seeded as applied, so `region` was never honoured again
+        // and the farm opened on a view of the whole country until something
+        // else moved the camera.
+        //
+        // Seeding the tick without obeying the command keeps the other half
+        // of the bargain: the stale command cannot replay as a second jump
+        // either. `region` is computed fresh here from whatever state the
+        // view is actually being built with, which is the better answer in
+        // every case.
+        view.setRegion(region, animated: false)
         context.coordinator.seed(camera?.tick)
         context.coordinator.shape = shape
         context.coordinator.contrast = contrast
