@@ -109,13 +109,27 @@ final class FarmRiskStore {
     /// deliberate tap into something they did not choose. A 409 on replay
     /// is success, so a manual retry is safe; an automatic one is still
     /// not offered.
-    func ask(_ parcelID: String) async {
+    /// `areaHa` is what the farmer typed, which may differ from the area
+    /// on record — it is the figure they want insured. It travels inside
+    /// `message`, because the server has no area column and adding one is a
+    /// migration; carried this way it reaches the operator's email today
+    /// rather than after a release on both sides.
+    func ask(_ parcelID: String, areaHa: Double? = nil) async {
         guard mayAsk, !asking.contains(parcelID) else { return }
+        let row = parcels.value?.first { $0.id == parcelID }
         asking.insert(parcelID)
         askFailure = nil
         defer { asking.remove(parcelID) }
         do {
-            try await FarmRiskAPI.createLead(parcelID: parcelID)
+            try await FarmRiskAPI.createLead(CreateLead(
+                parcelId: parcelID,
+                message: Self.leadMessage(row, areaHa: areaHa),
+                locationId: selected?.id,
+                risk: row?.risk.map {
+                    CreateLead.RiskSnapshot(
+                        overall: $0.overall.rawValue, ndvi: $0.ndvi, ndmi: $0.ndmi)
+                }
+            ))
             askedParcelIDs.insert(parcelID)
         } catch {
             if FarmRiskAPI.isAlreadyAsked(error) {
@@ -130,6 +144,38 @@ final class FarmRiskStore {
     }
 
     func clearAskFailure() { askFailure = nil }
+
+    /// What the operator reads in the email this becomes.
+    ///
+    /// Written for a person, in Bulgarian, and it names the area the FARMER
+    /// gave rather than the one on record when the two differ — that
+    /// difference is the point of asking them.
+    static func leadMessage(_ row: RiskRow?, areaHa: Double?) -> String {
+        let name = row?.parcel.name ?? "парцел"
+        var parts = ["Запитване за застрахователна оферта за парцел «\(name)»."]
+
+        if let areaHa {
+            parts.append("Площ за застраховане: \(Num.text(areaHa)) ха.")
+            if let recorded = row?.parcel.areaHa, abs(recorded - areaHa) > 0.005 {
+                parts.append("По регистър: \(Num.text(recorded)) ха.")
+            }
+        } else if let recorded = row?.parcel.areaHa {
+            parts.append("Площ по регистър: \(Num.text(recorded)) ха.")
+        }
+
+        if let crop = CommodityName.freeText(row?.parcel.cropType) {
+            parts.append("Култура: \(crop).")
+        }
+        if let risk = row?.risk, risk.overall.isReading {
+            parts.append("Сателитна оценка: \(risk.overall.label).")
+            if let date = risk.acquired {
+                parts.append("Заснето на \(BgDate.dayMonth(date)).")
+            }
+        }
+        // The server caps this at 2000 characters and rejects a longer one,
+        // which on a parcel with a very long name is reachable.
+        return String(parts.joined(separator: " ").prefix(2000))
+    }
 
     func loadLocations() async {
         await CachedResource.loadShowingCacheFirst(LocationsAPI.listPath) { data in

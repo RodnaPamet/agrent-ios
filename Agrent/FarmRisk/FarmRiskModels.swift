@@ -128,9 +128,9 @@ enum FarmRiskAPI {
     /// to. The (parcel, tenant) pair IS the natural key, so a replay
     /// returns 409 rather than creating a second lead — which is why the
     /// 409 is success-on-replay below and not a failure.
-    static func createLead(parcelID: String) async throws {
+    static func createLead(_ lead: CreateLead) async throws {
         _ = try await APIClient.shared.post(
-            leadsPath, body: CreateLead(parcelId: parcelID),
+            leadsPath, body: lead,
             as: EmptyResponse.self, idempotencyKey: UUID().uuidString
         )
     }
@@ -161,6 +161,39 @@ enum FarmRiskAPI {
 
 struct CreateLead: Encodable, Sendable {
     let parcelId: String
+
+    /// REQUIRED, 1–2000 characters, and its absence is why this feature has
+    /// never once reached the server.
+    ///
+    /// The app sent `{ parcelId }` alone from the day the ask shipped.
+    /// `CreateInsuranceLeadSchema` rejects that body outright —
+    /// `message invalid_type` — so every enquiry a farmer made 400'd. The
+    /// test that covered this encoded the struct and asserted its shape,
+    /// which pinned the app's wrong assumption rather than the server's
+    /// requirement, and the standing rule never to fire this POST at the
+    /// live tenant is what kept it from being found.
+    ///
+    /// It is a free-text body that reaches a human: the lead becomes an
+    /// email to an operator. So it carries what that operator needs to
+    /// answer — which field, how large, and what the satellite said.
+    let message: String
+
+    /// Optional. Sent when known, because a lead names a parcel and an
+    /// operator thinks in locations.
+    let locationId: String?
+
+    /// The reading AT ASK TIME, for the sales record. Optional server-side.
+    /// Sent rather than left out: a quote answered three weeks later
+    /// against a canopy that has changed is answered against the wrong
+    /// field, and this is the only place that moment is preserved.
+    let risk: RiskSnapshot?
+
+    struct RiskSnapshot: Encodable, Sendable {
+        /// Max 20 characters server-side — the raw level, not a sentence.
+        let overall: String?
+        let ndvi: Double?
+        let ndmi: Double?
+    }
 }
 
 /// Which parcels have already been asked about.

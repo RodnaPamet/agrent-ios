@@ -199,12 +199,72 @@ final class InsuranceAskTests: XCTestCase {
         XCTAssertEqual(Set(leads.parcelIds), ["a", "b"])
     }
 
-    func testTheCreatePayloadCarriesTheParcel() throws {
-        let data = try JSONEncoder().encode(CreateLead(parcelId: "cmr3vn01"))
+    /// THIS TEST USED TO PIN THE BUG. It asserted "the create sends exactly
+    /// one field", which was true of the app and rejected by the server:
+    /// `CreateInsuranceLeadSchema` requires `message`, so every enquiry a
+    /// farmer made 400'd from the day the feature shipped. A test that
+    /// encodes a struct and checks its own shape can only ever confirm what
+    /// the app believes.
+    func testTheCreatePayloadCarriesWhatTheServerRequires() throws {
+        let data = try JSONEncoder().encode(CreateLead(
+            parcelId: "cmr3vn01",
+            message: "Запитване за оферта.",
+            locationId: "loc1",
+            risk: CreateLead.RiskSnapshot(overall: "stress", ndvi: 0.21, ndmi: 0.14)))
         let json = try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any])
+
         XCTAssertEqual(json["parcelId"] as? String, "cmr3vn01")
-        XCTAssertEqual(json.keys.count, 1, "the create sends exactly one field")
+        let message = try XCTUnwrap(json["message"] as? String)
+        XCTAssertFalse(message.isEmpty, "the server rejects an empty message")
+        XCTAssertLessThanOrEqual(message.count, 2000, "the server caps it at 2000")
+        XCTAssertEqual(json["locationId"] as? String, "loc1")
+
+        let risk = try XCTUnwrap(json["risk"] as? [String: Any])
+        let overall = try XCTUnwrap(risk["overall"] as? String)
+        XCTAssertLessThanOrEqual(overall.count, 20, "the server caps overall at 20")
+    }
+
+    /// The message reaches a human, so it has to say which field, how
+    /// large, and what the satellite saw.
+    @MainActor
+    func testTheMessageNamesTheFieldAndTheAreaTheFarmerGave() throws {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"p1","name":"Нива 19","cropType":"WHEAT","areaHa":32.4,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: 30)
+
+        XCTAssertTrue(message.contains("Нива 19"))
+        XCTAssertTrue(message.contains("30"), "the area the farmer typed")
+        XCTAssertTrue(message.contains("32,4"), "and the one on record, since they differ")
+        XCTAssertTrue(message.contains("Пшеница"))
+        XCTAssertFalse(message.isEmpty)
+    }
+
+    /// No area typed, no invented one — the record's figure, labelled as
+    /// the record's.
+    @MainActor
+    func testTheMessageFallsBackToTheRecordedArea() throws {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"p1","name":"Нива 19","cropType":null,"areaHa":32.4,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: nil)
+        XCTAssertTrue(message.contains("по регистър"))
+        XCTAssertTrue(message.contains("32,4"))
+    }
+
+    /// The server rejects a body over 2000 characters.
+    @MainActor
+    func testTheMessageIsCappedAtTheServersLimit() throws {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"p1","name":"\(String(repeating: "Нива ", count: 600))","cropType":null,
+         "areaHa":1,"geometry":null,"soilType":null,"cadastralId":null,"ekatte":null,
+         "hasActiveLease":false}
+        """.utf8))
+        XCTAssertLessThanOrEqual(
+            FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: nil).count, 2000)
     }
 
     /// The source-level guarantees. These are the ones that protect a
