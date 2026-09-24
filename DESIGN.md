@@ -100,7 +100,25 @@ at `.headline`.
 turned down to fit, the layout is wrong, not the setting. Let rows grow and
 wrap; never truncate a journal title.
 
-**And never truncate a chip.** The device found category chips clipping at
+**### Bulgarian is measured before it is drawn
+
+On a device in the BG region, UIKit-drawn text truncates far short of its
+width — the confirmation button on the insurance ask drew «Изпрат...питване»
+in a button more than half empty, and an inline title «Ивова земя» drew
+«Ивова зе…». Not a length problem: a 27-character Bulgarian title rendered
+whole where a 10-character one did not, and a WIDER Latin string rendered
+whole.
+
+`BulgarianLayout.install()`, called from `AgrentApp.init()`, fixes it for
+the process. Do not work around it per string: shortening does not help
+(«Изпрати», seven characters, still truncated), and tagging text `en` to
+dodge the glyph substitution draws Russian letterforms at a Bulgarian
+farmer.
+
+SwiftUI-drawn text was never affected. Toolbar buttons, large titles,
+segmented pickers, menus and search prompts were all measured and are fine.
+
+### And never truncate a chip.** The device found category chips clipping at
 AX3 — `Внасяне на препар…`. A category label with its end cut off does not
 identify a category, and on a regulated diary that is the row type someone
 is most likely hunting for. The instinct is to let a small element clip;
