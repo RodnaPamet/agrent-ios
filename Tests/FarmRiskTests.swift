@@ -199,12 +199,72 @@ final class InsuranceAskTests: XCTestCase {
         XCTAssertEqual(Set(leads.parcelIds), ["a", "b"])
     }
 
-    func testTheCreatePayloadCarriesTheParcel() throws {
-        let data = try JSONEncoder().encode(CreateLead(parcelId: "cmr3vn01"))
+    /// THIS TEST USED TO PIN THE BUG. It asserted "the create sends exactly
+    /// one field", which was true of the app and rejected by the server:
+    /// `CreateInsuranceLeadSchema` requires `message`, so every enquiry a
+    /// farmer made 400'd from the day the feature shipped. A test that
+    /// encodes a struct and checks its own shape can only ever confirm what
+    /// the app believes.
+    func testTheCreatePayloadCarriesWhatTheServerRequires() throws {
+        let data = try JSONEncoder().encode(CreateLead(
+            parcelId: "cmr3vn01",
+            message: "Запитване за оферта.",
+            locationId: "loc1",
+            risk: CreateLead.RiskSnapshot(overall: "stress", ndvi: 0.21, ndmi: 0.14)))
         let json = try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any])
+
         XCTAssertEqual(json["parcelId"] as? String, "cmr3vn01")
-        XCTAssertEqual(json.keys.count, 1, "the create sends exactly one field")
+        let message = try XCTUnwrap(json["message"] as? String)
+        XCTAssertFalse(message.isEmpty, "the server rejects an empty message")
+        XCTAssertLessThanOrEqual(message.count, 2000, "the server caps it at 2000")
+        XCTAssertEqual(json["locationId"] as? String, "loc1")
+
+        let risk = try XCTUnwrap(json["risk"] as? [String: Any])
+        let overall = try XCTUnwrap(risk["overall"] as? String)
+        XCTAssertLessThanOrEqual(overall.count, 20, "the server caps overall at 20")
+    }
+
+    /// The message reaches a human, so it has to say which field, how
+    /// large, and what the satellite saw.
+    @MainActor
+    func testTheMessageNamesTheFieldAndTheAreaTheFarmerGave() throws {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"p1","name":"Нива 19","cropType":"WHEAT","areaHa":32.4,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: 30)
+
+        XCTAssertTrue(message.contains("Нива 19"))
+        XCTAssertTrue(message.contains("30"), "the area the farmer typed")
+        XCTAssertTrue(message.contains("32,4"), "and the one on record, since they differ")
+        XCTAssertTrue(message.contains("Пшеница"))
+        XCTAssertFalse(message.isEmpty)
+    }
+
+    /// No area typed, no invented one — the record's figure, labelled as
+    /// the record's.
+    @MainActor
+    func testTheMessageFallsBackToTheRecordedArea() throws {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"p1","name":"Нива 19","cropType":null,"areaHa":32.4,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+        let message = FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: nil)
+        XCTAssertTrue(message.contains("по регистър"))
+        XCTAssertTrue(message.contains("32,4"))
+    }
+
+    /// The server rejects a body over 2000 characters.
+    @MainActor
+    func testTheMessageIsCappedAtTheServersLimit() throws {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"p1","name":"\(String(repeating: "Нива ", count: 600))","cropType":null,
+         "areaHa":1,"geometry":null,"soilType":null,"cadastralId":null,"ekatte":null,
+         "hasActiveLease":false}
+        """.utf8))
+        XCTAssertLessThanOrEqual(
+            FarmRiskStore.leadMessage(RiskRow(parcel: parcel), areaHa: nil).count, 2000)
     }
 
     /// The source-level guarantees. These are the ones that protect a
@@ -224,28 +284,46 @@ final class InsuranceAskTests: XCTestCase {
             "Agrent/FarmRisk/FarmRiskStore.swift"), encoding: .utf8)) ?? ""
     }
 
+    private var formSource: String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        return (try? String(contentsOf: url.appendingPathComponent(
+            "Agrent/FarmRisk/InsuranceRequestForm.swift"), encoding: .utf8)) ?? ""
+    }
+
     func testTheSourcesAreRead() {
         XCTAssertTrue(viewSource.contains("struct FarmRiskView"), "positive control")
         XCTAssertTrue(storeSource.contains("final class FarmRiskStore"), "positive control")
+        XCTAssertTrue(formSource.contains("struct InsuranceRequestForm"), "positive control")
     }
 
-    /// The dialog NAMES the parcel. "Are you sure?" over an unnamed action
-    /// is a speed bump, not a confirmation — and with no undo, picking the
-    /// wrong field is unrecoverable.
-    func testTheConfirmationNamesTheParcel() {
-        XCTAssertTrue(viewSource.contains("confirming?.parcel.name"),
-                      "the dialog title does not name the parcel")
-        XCTAssertTrue(viewSource.contains("row.parcel.name"),
-                      "the dialog body does not name the parcel")
+    /// The form NAMES the parcel it is about. An enquiry over an unnamed
+    /// field is a speed bump, not a decision — and with no undo, sending it
+    /// about the wrong one is unrecoverable.
+    ///
+    /// These moved from the alert with the guarantee itself: the alert
+    /// became a form, because the AREA has to be settled before the single
+    /// irreversible write rather than after it.
+    func testTheFormNamesTheParcel() {
+        XCTAssertTrue(formSource.contains("parcel.name"),
+                      "the form does not name the parcel")
     }
 
     /// It says the ask cannot be withdrawn. After this there is nowhere
     /// left to say it.
-    func testTheConfirmationSaysItCannotBeTakenBack() {
-        XCTAssertTrue(viewSource.contains("не може да бъде оттеглено"),
-                      "the dialog does not state that the ask is irreversible")
-        XCTAssertTrue(viewSource.contains("само веднъж"),
-                      "the dialog does not state one ask per parcel")
+    func testTheFormSaysItCannotBeTakenBack() {
+        XCTAssertTrue(formSource.contains("не може да бъде оттеглено"),
+                      "the form does not state that the ask is irreversible")
+        XCTAssertTrue(formSource.contains("само веднъж"),
+                      "the form does not state one ask per parcel")
+    }
+
+    /// A parcel with a lead is never offered. The server 409s it, and
+    /// letting someone pick it, type an area and submit is the failure
+    /// `GET /insurance/leads` exists to prevent.
+    func testTheFormNeverOffersAParcelAlreadyAskedAbout() {
+        XCTAssertTrue(formSource.contains("alreadyAsked.contains"),
+                      "the form does not filter parcels that already have a lead")
     }
 
     /// NEVER retried automatically. A lost response on a bad connection
@@ -339,5 +417,74 @@ final class RiskOrderingTests: XCTestCase {
     func testUnreadSortsBelowEveryVerdict() throws {
         let rows = [try row("a", "Аaa", nil), try row("b", " Zzz", .good)]
         XCTAssertEqual(rows.sorted { $0.sortKey < $1.sortKey }.map(\.id), ["b", "a"])
+    }
+}
+
+/// The area field's parsing. It prefills from `Num.text`, which prints a
+/// comma, so a parser that only took a full stop would reject the app's
+/// own output the moment anyone edited it.
+final class InsuranceAreaParsingTests: XCTestCase {
+
+    func testACommaIsADecimalSeparator() {
+        XCTAssertEqual(InsuranceRequestForm.parse("32,4"), 32.4)
+    }
+
+    func testAFullStopStillWorks() {
+        XCTAssertEqual(InsuranceRequestForm.parse("32.4"), 32.4)
+    }
+
+    /// `Num.text` groups thousands with a non-breaking space on this locale.
+    func testAGroupedNumberParses() {
+        XCTAssertEqual(InsuranceRequestForm.parse("1\u{00A0}234,5"), 1234.5)
+        XCTAssertEqual(InsuranceRequestForm.parse("1 234,5"), 1234.5)
+    }
+
+    /// Nothing typed means nothing claimed — the message then names the
+    /// registered area instead of inventing one.
+    func testEmptyIsNil() {
+        XCTAssertNil(InsuranceRequestForm.parse(""))
+        XCTAssertNil(InsuranceRequestForm.parse("   "))
+    }
+
+    /// A field cannot be zero or negative hectares, and an enquiry that
+    /// said so would reach an operator as a number to phone about.
+    func testZeroAndNegativeAreRejected() {
+        XCTAssertNil(InsuranceRequestForm.parse("0"))
+        XCTAssertNil(InsuranceRequestForm.parse("-5"))
+    }
+
+    func testGarbageIsRejected() {
+        XCTAssertNil(InsuranceRequestForm.parse("много"))
+        XCTAssertNil(InsuranceRequestForm.parse("12,3,4"))
+    }
+}
+
+/// Number formatting must not follow the device's region.
+///
+/// These two failed on CI and passed here, which is the whole point: this
+/// machine reports en-BG and the runner does not. The app renders entirely
+/// in Bulgarian, and a String built outside SwiftUI does not see the
+/// environment locale `AgrentApp` sets.
+final class NumberLocaleTests: XCTestCase {
+
+    func testAreasUseTheBulgarianDecimalSeparator() {
+        XCTAssertEqual(Num.text(32.4), "32,4")
+        XCTAssertEqual(Num.text(0.5), "0,5")
+    }
+
+    func testWholeNumbersCarryNoDecimals() {
+        XCTAssertEqual(Num.text(324), "324")
+    }
+
+    func testMoneyUsesTheBulgarianSeparatorAndTwoPlaces() {
+        XCTAssertEqual(Money.text(51.1, "EUR"), "51,10 EUR")
+    }
+
+    /// The failure this guards is silent: the same number drawn two ways on
+    /// one screen, depending on whether it came through `Text` or through a
+    /// String interpolated into a sentence.
+    func testAGroupedThousandMatchesTheAppsOwnRendering() {
+        XCTAssertFalse(Num.text(1234.5).contains("."),
+                       "a full stop here means the process locale won")
     }
 }

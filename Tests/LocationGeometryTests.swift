@@ -407,3 +407,35 @@ final class GeometryValidityTests: XCTestCase {
         XCTAssertTrue(real.hasDrawableRing)
     }
 }
+
+/// The overlap chooser's identity, which decides whether a second tap on
+/// the same overlap re-presents a sheet that is already up.
+final class ParcelChoiceTests: XCTestCase {
+
+    private func parcel(_ id: String) throws -> Parcel {
+        try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"\(id)","name":"n","cropType":null,"areaHa":1,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+    }
+
+    func testTheSameOverlapHasTheSameIdentity() throws {
+        let a = ParcelChoice(parcels: [try parcel("x"), try parcel("y")])
+        let b = ParcelChoice(parcels: [try parcel("x"), try parcel("y")])
+        XCTAssertEqual(a.id, b.id)
+    }
+
+    /// Order carries meaning — smallest first is the likeliest intent — so
+    /// a different order is a different offer.
+    func testADifferentOrderIsADifferentChoice() throws {
+        let a = ParcelChoice(parcels: [try parcel("x"), try parcel("y")])
+        let b = ParcelChoice(parcels: [try parcel("y"), try parcel("x")])
+        XCTAssertNotEqual(a.id, b.id)
+    }
+
+    func testADifferentOverlapIsADifferentChoice() throws {
+        let a = ParcelChoice(parcels: [try parcel("x"), try parcel("y")])
+        let b = ParcelChoice(parcels: [try parcel("x"), try parcel("z")])
+        XCTAssertNotEqual(a.id, b.id)
+    }
+}

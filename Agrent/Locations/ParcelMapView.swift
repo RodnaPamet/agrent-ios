@@ -23,6 +23,10 @@ struct ParcelMapView: View {
     /// The parcel whose operation sheet is open.
     @State private var operating: Parcel?
 
+    /// The parcels under an ambiguous tap, offered for the farmer to
+    /// choose between.
+    @State private var choosing: ParcelChoice?
+
     /// Nil until resolved. The tap is offered meanwhile — see
     /// `CurrentUser.mayCreateOperations`, which fails open.
     @State private var me: CurrentUser?
@@ -63,6 +67,15 @@ struct ParcelMapView: View {
                     Label(mode.next.label, systemImage: mode.next.icon)
                 }
                 .accessibilityHint(mode.next.hint)
+            }
+        }
+        .sheet(item: $choosing) { choice in
+            ParcelChooser(parcels: choice.parcels) { picked in
+                choosing = nil
+                // Presenting one sheet from another's dismissal needs the
+                // first to be gone before the second is asked for, or the
+                // system drops it silently.
+                DispatchQueue.main.async { operating = picked }
             }
         }
         .sheet(item: $operating) { parcel in
@@ -171,7 +184,7 @@ struct ParcelMapView: View {
             // still frame itself from the parcels.
             SchematicParcelMap(
                 parcels: drawable, bounds: box,
-                onTap: mayOperate ? { operating = $0 } : nil
+                onTap: mayOperate ? { tapped($0) } : nil
             )
         } else {
             // ONE map view for both SATELLITE modes, differing by `shape`.
@@ -191,7 +204,7 @@ struct ParcelMapView: View {
                 shape: mode == .simplified ? .boundingBoxes : .outlines,
                 contrast: contrast,
                 camera: camera,
-                onTap: mayOperate ? { operating = $0 } : nil
+                onTap: mayOperate ? { tapped($0) } : nil
             )
             .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
             .task { await indices.refreshIfNeeded() }
@@ -238,6 +251,26 @@ struct ParcelMapView: View {
         return (response?.bounds ?? location.boundsJson)?.region
             ?? MKCoordinateRegion(fitting: drawable)
             ?? .bulgaria
+    }
+
+    // MARK: - Tap
+
+    /// The schematic hands over one parcel; it draws true outlines on a
+    /// flat ground and an overlap there means the fields really do overlap.
+    private func tapped(_ parcel: Parcel) { operating = parcel }
+
+    /// The satellite map hands over everything under the finger.
+    ///
+    /// One parcel opens straight through — an unambiguous tap must not cost
+    /// a farmer an extra screen. Several means the finger landed where two
+    /// shapes cross, which on the simplified map is ordinary, and the only
+    /// person who knows which field was meant is holding the phone.
+    private func tapped(_ parcels: [Parcel]) {
+        if parcels.count == 1 {
+            operating = parcels[0]
+        } else if parcels.count > 1 {
+            choosing = ParcelChoice(parcels: parcels)
+        }
     }
 
     // MARK: - Target
