@@ -39,7 +39,7 @@ struct ParcelChooser: View {
                             if let crop = CommodityName.freeText(parcel.cropType) { Text(crop) }
                             if let area = parcel.areaHa {
                                 if parcel.cropType != nil { Text("·") }
-                                Text("\(Num.text(area)) ха")
+                                Text(Area(hectares: area).text)
                             }
                             if parcel.hasActiveLease == true {
                                 Text("·"); Text("под аренда")
@@ -52,7 +52,7 @@ struct ParcelChooser: View {
                 .accessibilityLabel(A11y.sentence([
                     parcel.name,
                     CommodityName.freeText(parcel.cropType),
-                    parcel.areaHa.map { "\(Num.text($0)) хектара" },
+                    parcel.areaHa.map { Area(hectares: $0).spoken },
                 ]))
             }
             .inlineTitle("Кой парцел?")

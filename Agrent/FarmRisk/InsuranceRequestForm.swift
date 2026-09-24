@@ -28,7 +28,7 @@ import SwiftUI
 struct InsuranceRequestForm: View {
     let parcels: [Parcel]
     let alreadyAsked: Set<String>
-    let onSubmit: (Parcel, Double?) -> Void
+    let onSubmit: (Parcel, Area?) -> Void
 
     @State private var selectedID: String?
     @State private var areaText: String = ""
@@ -38,7 +38,7 @@ struct InsuranceRequestForm: View {
     /// button: whichever parcels can still be asked about.
     init(parcels: [Parcel], alreadyAsked: Set<String>,
          preselected: Parcel? = nil,
-         onSubmit: @escaping (Parcel, Double?) -> Void) {
+         onSubmit: @escaping (Parcel, Area?) -> Void) {
         self.parcels = parcels
         self.alreadyAsked = alreadyAsked
         self.onSubmit = onSubmit
@@ -65,7 +65,25 @@ struct InsuranceRequestForm: View {
         available.first { $0.id == selectedID }
     }
 
-    private var area: Double? { Self.parse(areaText) }
+    /// HECTARES, converted from what was typed in decares.
+    ///
+    /// The field shows decares because that is what a Bulgarian farm works
+    /// in; the wire is hectares and stays hectares. One conversion, here,
+    /// at the edge.
+    ///
+    /// An UNTOUCHED field submits the parcel's exact recorded area rather
+    /// than the round trip of its own prefill. `Num.text` shows at most two
+    /// decimals, so a parcel of 32,4567 ха prefills as «324,57 дка» and
+    /// parsing that back gives 32,457 ха — a silent 0,0007 ха edit by
+    /// somebody who typed nothing. Sending the original is the only honest
+    /// reading of "they left it alone".
+    private var area: Area? {
+        guard let typed = Area.parse(decares: areaText) else { return nil }
+        if let selected, areaText == Self.areaText(for: selected) {
+            return selected.areaHa.map(Area.init(hectares:))
+        }
+        return typed
+    }
 
     var body: some View {
         NavigationStack {
@@ -99,21 +117,22 @@ struct InsuranceRequestForm: View {
                             TextField("0", text: $areaText)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
-                            Text("ха").foregroundStyle(.secondary)
+                            Text("дка").foregroundStyle(.secondary)
                         }
-                        .accessibilityLabel("Площ за застраховане в хектари")
+                        .accessibilityLabel("Площ за застраховане в декари")
                     } header: {
                         Text("Площ за застраховане")
                     } footer: {
-                        if let recorded = selected?.areaHa, let area, abs(recorded - area) > 0.005 {
+                        if let recorded = selected?.areaHa.map(Area.init(hectares:)),
+                           let area, area.differs(from: recorded) {
                             // Said out loud rather than silently corrected.
                             // A deliberate difference is the reason this
                             // field exists; a typo looks identical, and only
                             // the farmer can tell them apart.
-                            Text("По регистър: \(Num.text(recorded)) ха.")
+                            Text("По регистър: \(recorded.text).")
                                 .foregroundStyle(.orange)
                         } else if let recorded = selected?.areaHa {
-                            Text("По регистър: \(Num.text(recorded)) ха.")
+                            Text("По регистър: \(Area(hectares: recorded).text).")
                         }
                     }
 
@@ -161,25 +180,9 @@ struct InsuranceRequestForm: View {
 
     // MARK: - The number
 
+    /// DECARES, which is what the field shows.
     private static func areaText(for parcel: Parcel?) -> String {
-        parcel?.areaHa.map { Num.text($0) } ?? ""
-    }
-
-    /// Accepts a comma as well as a full stop.
-    ///
-    /// The decimal pad on a Bulgarian keyboard gives a comma, and this app
-    /// PRINTS commas — `Num.text(32.4)` is «32,4», which is what prefills
-    /// this field. Parsing only a full stop would reject the app's own
-    /// output the moment anyone edited it.
-    static func parse(_ text: String) -> Double? {
-        let cleaned = text
-            .replacingOccurrences(of: ",", with: ".")
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "\u{00A0}", with: "")
-            .trimmingCharacters(in: .whitespaces)
-        guard !cleaned.isEmpty, let value = Double(cleaned), value > 0, value.isFinite
-        else { return nil }
-        return value
+        parcel?.areaHa.map { Area(hectares: $0).number } ?? ""
     }
 }
 

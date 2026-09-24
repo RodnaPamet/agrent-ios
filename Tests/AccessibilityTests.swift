@@ -142,7 +142,7 @@ final class SchematicAccessibilityTests: XCTestCase {
         // environment it does not control. Asserted through the same
         // formatter the view uses, so it checks the wiring rather than the
         // runner's locale.
-        XCTAssertTrue(label.contains("\(Num.text(12.4)) хектара"), label)
+        XCTAssertTrue(label.contains(Area(hectares: 12.4).spoken), label)
         XCTAssertTrue(label.contains("североизток"), label)
     }
 
@@ -162,7 +162,7 @@ final class SchematicAccessibilityTests: XCTestCase {
         let label = SchematicParcelMap.label(
             for: only, centre: CGPoint(x: 100, y: 100), count: 1
         )
-        XCTAssertEqual(label, "Единствен, угар, \(Num.text(1)) хектара.")
+        XCTAssertEqual(label, "Единствен, угар, \(Area(hectares: 1).spoken).")
     }
 
     /// A parcel genuinely in the middle gets told so, rather than being given
