@@ -75,9 +75,6 @@ struct ExchangeView: View {
             .padding(.horizontal)
             .padding(.bottom, 8)
 
-            if let age = currentFreshness?.ageDescription {
-                StaleBanner(age: age)
-            }
 
             switch tab {
             case .browse: browse

@@ -21,13 +21,8 @@ struct LocationsView: View {
             // arrangement, the one confirmed by use. See
             // `JournalListView` for why this is no longer a
             // `safeAreaInset(edge: .top)`.
-            VStack(spacing: 0) {
-                if let age = store.state.freshness?.ageDescription {
-                    StaleBanner(age: age)
-                }
-                content
-            }
-            .background(Palette.Surface.page)
+            content
+                .background(Palette.Surface.page)
             .navigationTitle("Локации")
             .appMenu()
             .task {

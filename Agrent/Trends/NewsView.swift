@@ -15,9 +15,6 @@ struct NewsView: View {
     var body: some View {
         NavigationStack {
         VStack(spacing: 0) {
-            if let age = store.news.freshness?.ageDescription {
-                StaleBanner(age: age)
-            }
             categories
             content
         }

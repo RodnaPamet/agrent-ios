@@ -54,9 +54,6 @@ struct TrendsView: View {
                 // the data had not been refreshed. On the one screen whose
                 // whole subject is how current a number is, that was the
                 // worst place to have left it out.
-                if let age = store.prices.freshness?.ageDescription {
-                    StaleBanner(age: age)
-                }
                 controls
                 content
             }

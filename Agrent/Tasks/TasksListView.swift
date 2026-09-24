@@ -17,17 +17,10 @@ struct TasksListView: View {
             // arrangement, the one confirmed by use. See
             // `JournalListView` for why this is no longer a
             // `safeAreaInset(edge: .top)`.
-            VStack(spacing: 0) {
-                if let age = store.state.freshness?.ageDescription {
-                    StaleBanner(age: age)
-                }
-                header
-                content
-            }
-            // The strip above the list draws nothing of its own.
-            .background(Palette.Surface.page)
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            // Борса's shape — see `JournalListView` for what it costs.
+            content
+                .background(Palette.Surface.page)
+            .navigationTitle("Задачи")
             .appMenu()
             .task { if store.state.value == nil { await store.load() } }
         }
@@ -36,21 +29,6 @@ struct TasksListView: View {
     /// In the CONTENT, not the navigation bar — the same reason as the
     /// journal's. A large navigation title truncates and cannot be told not
     /// to; as content it wraps.
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Задачи")
-                .font(.title.bold())
-                .fixedSize(horizontal: false, vertical: true)
-            if let page = store.state.value {
-                Text(Plural.bg(page.items.count, "задача", "задачи"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
-    }
 
     @ViewBuilder
     private var content: some View {
@@ -81,11 +59,13 @@ struct TasksListView: View {
                     )
                     .pageRow()
                 }
+                Section(Plural.bg(page.items.count, "задача", "задачи")) {
                 ForEach(page.items) { item in
                     NavigationLink { TaskDetailView(summary: item) } label: {
                         TaskRow(item: item)
                     }
                     .pageRow()
+                }
                 }
             }
             .listStyle(.plain)
