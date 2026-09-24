@@ -243,17 +243,35 @@ struct ParcelMapView: View {
         Button {
             focusNext(drawable)
         } label: {
+            // THE FRAME IS INSIDE THE LABEL, and it is a MINIMUM.
+            //
+            // Outside the label it sized the button while `.font(.title3)`
+            // sized the glyph — a scaled font against a fixed box. At an
+            // accessibility text size the material circle drew well outside
+            // the 44pt frame the hit test used, so a press on the visible
+            // ring missed the button and fell through to the map beneath,
+            // which has its own tap recogniser and would open an operation
+            // sheet for whatever parcel happened to be under that point.
+            //
+            // A minimum rather than a fixed size: 44 is the floor Apple
+            // asks for, and the control is allowed to grow with the type
+            // it contains so the circle and the target stay the same shape.
             Image(systemName: "dot.viewfinder")
                 .font(.title3)
                 .padding(11)
+                .frame(minWidth: 44, minHeight: 44)
                 .background(.thinMaterial, in: Circle())
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .frame(width: 44, height: 44)
-        .contentShape(Circle())
         .padding(16)
         .accessibilityLabel(drawable.count == 1 ? "Центрирай парцела" : "Следващ парцел")
-        .accessibilityHint("Центрира картата върху следващия парцел")
+        // Conditioned to match the label. On a one-parcel farm the pair read
+        // "Центрирай парцела. Центрира картата върху следващия парцел." —
+        // a promise of a next field that does not exist.
+        .accessibilityHint(drawable.count == 1
+            ? "Центрира картата върху парцела"
+            : "Центрира картата върху следващия парцел")
     }
 
     /// Camera only — no selection, no sheet — matching the web.

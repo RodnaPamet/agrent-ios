@@ -37,7 +37,7 @@ enum ParcelMapMode: String, CaseIterable, Sendable {
     /// destination.
     var label: String {
         switch self {
-        case .precise: return "Точни граници"
+        case .precise: return "Точни очертания"
         case .simplified: return "Опростена"
         case .schematic: return "Схема"
         }
