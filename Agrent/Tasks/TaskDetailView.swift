@@ -31,9 +31,6 @@ struct TaskDetailView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let age = store.state.freshness?.ageDescription {
-                StaleBanner(age: age)
-            }
             content
         }
         .inlineTitle(summary.key)

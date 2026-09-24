@@ -35,9 +35,6 @@ struct FarmRiskView: View {
             content
                 .safeAreaInset(edge: .top, spacing: 0) {
                     VStack(spacing: 0) {
-                        if let age = store.parcels.freshness?.ageDescription {
-                            StaleBanner(age: age)
-                        }
                         locationPicker
                     }
                     .background(.bar)

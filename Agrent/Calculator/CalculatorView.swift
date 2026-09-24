@@ -12,9 +12,6 @@ struct CalculatorView: View {
             // `JournalListView` for why this is no longer a
             // `safeAreaInset(edge: .top)`.
             VStack(spacing: 0) {
-                if let age = store.state.freshness?.ageDescription {
-                    StaleBanner(age: age)
-                }
                 content
             }
                 .safeAreaInset(edge: .bottom, spacing: 0) { newCostButton }

@@ -14,29 +14,24 @@ import SwiftUI
 /// This existed before as three different ad-hoc treatments: a yellow banner
 /// for staleness and orange text for refusals, both of which told an operator
 /// something was wrong while the app was working correctly.
-struct StaleBanner: View {
-    let age: String
-
-    var body: some View {
-        // Top-aligned: at large Dynamic Type the text wraps to three lines and
-        // a vertically-centred icon floats away from the sentence it belongs
-        // to.
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Image(systemName: "clock.arrow.circlepath")
-            Text("Последно обновено \(age)")
-            Spacer()
-        }
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity)
-        .background(Color(.secondarySystemBackground))
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
-    }
-}
+/// `StaleBanner` WAS HERE, and it is gone on the owner's instruction.
+///
+/// It drew "обновено преди N минути" above every cached screen. Its
+/// argument still stands — a screen rendering cached data without saying
+/// how old it is cannot be told from a live one — and `CachedResource`
+/// still marks a cached publish `.stale`, so the fact survives even though
+/// nothing displays it.
+///
+/// What it cost was the pull-to-refresh gesture. The band sat above the
+/// list, and three attempts at arranging it — a `safeAreaInset`, then a
+/// VStack, then a VStack with a background — all still dragged the title
+/// when the owner pulled. Борса was the one screen that behaved and the
+/// one screen whose refresh he confirmed, so Борса's shape became the rule
+/// and the band went with the rest of the chrome.
+///
+/// `Tests/StaleBannerCoverageTests.swift` went too. It asserted that every
+/// cached screen shows its age, which is now false by design rather than
+/// by accident — that is worth knowing if the question comes back.
 
 /// A refusal or a withheld value: stated plainly, in the same weight as any
 /// other row. Never red, never orange.

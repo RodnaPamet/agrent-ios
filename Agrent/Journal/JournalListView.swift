@@ -6,36 +6,28 @@ struct JournalListView: View {
 
     var body: some View {
         NavigationStack {
-            // CHROME IN A VSTACK ABOVE THE LIST — the arrangement Борса
-            // uses, which is the one screen whose pull-to-refresh the owner
-            // has confirmed behaves.
+            // БОРСА'S SHAPE, which the owner made canonical: the list is
+            // the only thing in the stack, and the title is a real
+            // navigation title rather than a block drawn inside the page.
             //
-            // This was a `safeAreaInset(edge: .top)`, on the theory that an
-            // inset is chrome and therefore stays put while the rows slide
-            // under it. That theory is wrong in practice: the owner
-            // reported the title still dragging afterwards, on every screen
-            // I had "fixed" — and Борса, the only screen I never touched,
-            // was the only one that worked. I had the cause backwards and
-            // shipped it.
+            // Two previous attempts put chrome above the list — first a
+            // `safeAreaInset`, then a VStack — and both still dragged the
+            // title on the pull. Борса has neither, and Борса is the one
+            // screen whose refresh has ever behaved. So the chrome is gone
+            // rather than rearranged for a third time.
             //
-            // So this copies a configuration confirmed by use rather than a
-            // mechanism argued from first principles. The bottom inset
-            // stays: it holds a floating button, nothing has been reported
-            // wrong with it, and it is not in the scroll path the drag
-            // follows.
-            VStack(spacing: 0) {
-                if let age = store.state.freshness?.ageDescription {
-                    StaleBanner(age: age)
-                }
-                header
-                content
-            }
-            // The strip above the list draws nothing of its own, so it
-            // stayed black while the rows went green.
-            .background(Palette.Surface.page)
-            .safeAreaInset(edge: .bottom, spacing: 0) { newEntryButton }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            // WHAT THIS COSTS: a large navigation title truncates at
+            // accessibility text sizes and cannot be told not to, which is
+            // why the in-content header existed — «Земеделски дневник»
+            // rendered as «Земеделски…» at accessibility3. That was a real
+            // finding and this overrides it knowingly, on the owner's
+            // instruction, because a refresh gesture that misbehaves on
+            // every screen costs more than a title that truncates on one
+            // text size.
+            content
+                .background(Palette.Surface.page)
+                .safeAreaInset(edge: .bottom, spacing: 0) { newEntryButton }
+            .navigationTitle("Земеделски дневник")
             .appMenu()
             .sheet(isPresented: $composing) {
                 NewEntryView(store: store)
@@ -44,37 +36,6 @@ struct JournalListView: View {
         }
     }
 
-    /// The title lives in the CONTENT, not the navigation bar.
-    ///
-    /// A large navigation title truncates and cannot be told not to: at
-    /// Dynamic Type accessibility3 "Земеделски дневник" rendered as
-    /// "Земеделски…", which is the app's own name for the screen, cut off, on
-    /// the screen the design document names as the acceptance test. As
-    /// content it simply wraps.
-    ///
-    /// This also matches the reference artboard, which draws the title as a
-    /// block inside the page rather than as chrome.
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Земеделски дневник")
-                .font(.title.bold())
-                .fixedSize(horizontal: false, vertical: true)
-            if let count = store.state.value?.count {
-                // "Показани N" once there is more, because "N записа"
-                // would be a claim about the tenant's history that the app
-                // cannot make from one page. The old copy said exactly
-                // that and was wrong for any farm past fifty entries.
-                Text(store.hasMore
-                     ? "Показани " + Plural.bg(count, "запис", "записа")
-                     : Plural.bg(count, "запис", "записа"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
-    }
 
     /// The primary action is a full-width target at the bottom of the screen,
     /// not a toolbar glyph. A gloved thumb reaches the bottom of a phone; the
@@ -116,6 +77,18 @@ struct JournalListView: View {
 
         case .loaded(let entries, _):
             List {
+                // THE COUNT MOVED HERE from the in-content header, which
+                // went with Борса's shape. It is a section header, so it
+                // scrolls with the rows and cannot be dragged the way a
+                // title block could.
+                //
+                // "Показани N" once there is more, because "N записа" is a
+                // claim about the tenant's whole history that one page
+                // cannot make. The old copy said exactly that and was wrong
+                // for any farm past fifty entries.
+                Section(store.hasMore
+                        ? "Показани " + Plural.bg(entries.count, "запис", "записа")
+                        : Plural.bg(entries.count, "запис", "записа")) {
                 ForEach(entries) { entry in
                     NavigationLink {
                         JournalDetailView(entry: entry)
@@ -126,6 +99,7 @@ struct JournalListView: View {
                 }
                 loadMoreRow
                     .pageRow()
+                }
             }
             .listStyle(.plain)
             .pageBackground()
