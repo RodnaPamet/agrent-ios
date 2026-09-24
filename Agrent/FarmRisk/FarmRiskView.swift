@@ -55,7 +55,7 @@ struct FarmRiskView: View {
                 .actionButton(
                     "Запитване за оферта",
                     systemImage: "envelope",
-                    isEnabled: store.mayAsk && !askableParcels.isEmpty
+                    isEnabled: store.mayAsk && !allParcels.isEmpty
                 ) {
                     requesting = RequestTarget(parcel: nil)
                 }
@@ -122,14 +122,16 @@ struct FarmRiskView: View {
         }
     }
 
-    /// Parcels a lead can still be created for. Read from the server on
-    /// load, never remembered locally — the web tracked this in component
-    /// state, it died on unmount, and an operator got a refusal for
-    /// retrying something they had no way to see they had done.
-    private var askableParcels: [Parcel] {
-        (store.parcels.value ?? [])
-            .map(\.parcel)
-            .filter { !store.askedParcelIDs.contains($0.id) }
+    /// EVERY parcel, including ones already asked about.
+    ///
+    /// This filtered out parcels with a lead, because the server refused a
+    /// second ask with 409 and letting someone type an area only to eat
+    /// that refusal was the failure `GET /insurance/leads` existed to
+    /// prevent. The constraint is gone, and that endpoint is now
+    /// informational — it says what has been asked, it does not say what
+    /// may be.
+    private var allParcels: [Parcel] {
+        (store.parcels.value ?? []).map(\.parcel)
     }
 
     // MARK: - Content
@@ -217,26 +219,47 @@ struct FarmRiskView: View {
     @ViewBuilder
     private func askControl(_ row: RiskRow) -> some View {
         if store.mayAsk {
-            if store.askedParcelIDs.contains(row.parcel.id) {
-                // State read from the server, not remembered locally.
-                Label("Заявено запитване", systemImage: "checkmark.seal")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if store.asking.contains(row.parcel.id) {
+            if store.asking.contains(row.parcel.id) {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
                     Text("Изпраща се…").font(.footnote).foregroundStyle(.secondary)
                 }
             } else {
-                Button {
-                    requesting = RequestTarget(parcel: row.parcel)
-                } label: {
-                    Label("Запитай за оферта", systemImage: "envelope")
-                        .font(.footnote.weight(.medium))
+                let asked = store.askedParcelIDs.contains(row.parcel.id)
+                VStack(alignment: .leading, spacing: 4) {
+                    // A NOTE BESIDE THE BUTTON, NOT INSTEAD OF IT.
+                    //
+                    // This used to replace the control entirely, which was
+                    // right against a server that answered a second ask
+                    // with 409. The constraint is gone (agri-saas
+                    // f98e39d2): several asks per parcel, no 409, and the
+                    // operator mail deduped on the lead id so a repeat
+                    // actually sends rather than vanishing.
+                    //
+                    // The change exists so a farmer can CORRECT an area
+                    // they got wrong. Refusing to reopen the form would
+                    // make the correction unreachable from the phone,
+                    // which is the one thing dropping the constraint was
+                    // for. State still read from the server, never
+                    // remembered locally.
+                    if asked {
+                        Label("Заявено запитване", systemImage: "checkmark.seal")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button {
+                        requesting = RequestTarget(parcel: row.parcel)
+                    } label: {
+                        Label(asked ? "Запитай отново" : "Запитай за оферта",
+                              systemImage: "envelope")
+                            .font(.footnote.weight(.medium))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Palette.accent)
+                    .accessibilityHint(asked
+                        ? "Изпраща ново запитване за този парцел, например с поправена площ"
+                        : "Изпраща запитване за застрахователна оферта")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(Palette.accent)
-                .accessibilityHint("Изпраща еднократно запитване за застрахователна оферта")
             }
         }
     }
