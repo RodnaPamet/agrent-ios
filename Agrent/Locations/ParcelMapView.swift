@@ -502,7 +502,7 @@ struct ParcelMapView: View {
             .font(.caption)
             // Never `.secondary`. This is the caveat on everything above it,
             // and the one line here that must not read as a footnote.
-            .foregroundStyle(days > 10 ? Color.orange : Color.primary)
+            .foregroundStyle(days > Staleness.satellitePass ? Color.orange : Color.primary)
         } else {
             // The server may omit the date. Saying so is the honest answer —
             // an undated overlay must not be allowed to pass as a dated one.

@@ -77,7 +77,33 @@ enum CommodityName {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        return table[trimmed.lowercased()] ?? trimmed
+        if let known = table[trimmed.lowercased()] { return known }
+        // AN UNMAPPED VALUE MUST NOT SHOUT IN ENGLISH.
+        //
+        // The table holds ten commodities and five inputs, copied from
+        // `trends.commodities.*` — a PRICE SERIES vocabulary. A parcel's
+        // `cropType` is not drawn from it, so anything a Bulgarian farm
+        // actually grows outside those ten arrives here unmapped and used
+        // to be printed raw: a row reading «Пшеница» above one reading
+        // `ALFALFA`, in an app with no other English on the screen.
+        //
+        // Title-casing only a SCREAMING_SNAKE token, because that shape is
+        // unmistakably a server enum. Free text is left alone — a farmer's
+        // own note is already written the way they wanted it, and
+        // title-casing a Bulgarian phrase would mangle it.
+        //
+        // This makes the failure quieter, NOT fixed. The real fix is the
+        // parcel crop enum from the server, which is not in this repo.
+        return isServerEnum(trimmed) ? titleCased(trimmed.lowercased()) : trimmed
+    }
+
+    /// `ALFALFA`, `SUGAR_BEET` — uppercase ASCII with underscores and no
+    /// spaces. Anything with a lowercase letter or a Cyrillic character is
+    /// somebody's own words.
+    private static func isServerEnum(_ value: String) -> Bool {
+        !value.isEmpty && value.allSatisfy {
+            ($0.isASCII && $0.isUppercase) || $0 == "_" || $0 == "-" || $0.isNumber
+        }
     }
 
     /// `ammonium-nitrate` → `Ammonium Nitrate`.

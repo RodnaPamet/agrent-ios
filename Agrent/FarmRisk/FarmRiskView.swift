@@ -279,7 +279,10 @@ struct FarmRiskView: View {
                 systemImage: "camera.badge.clock"
             )
             .font(.caption)
-            .foregroundStyle(days > Staleness.concerning ? Color.orange : Color.secondary)
+            // NEVER `.secondary`, which is what this was. The parcel map
+            // says it in its own comment: this line is the caveat on every
+            // number above it, and it must not read as a footnote.
+            .foregroundStyle(days > Staleness.satellitePass ? Color.orange : Color.primary)
             .fixedSize(horizontal: false, vertical: true)
         }
     }
