@@ -265,3 +265,28 @@ final class InsuranceAskTests: XCTestCase {
                        "a failure path empties the asked set")
     }
 }
+
+/// The once-only guard, against the error this client actually throws.
+final class AlreadyAskedTests: XCTestCase {
+
+    /// THE REGRESSION. `APIClient.send` intercepts 409 and throws
+    /// `.conflict`; it never builds `.http(409)`, so matching on `.http`
+    /// meant the guard could not fire.
+    func testAConflictIsRecognisedAsAlreadyAsked() {
+        let error = APIClient.APIError.conflict(currentVersion: 3, expectedVersion: 2)
+        XCTAssertTrue(FarmRiskAPI.isAlreadyAsked(error))
+    }
+
+    /// Kept working, for a server that ever answers 409 through the generic
+    /// path rather than the dedicated one.
+    func testAGenericHTTP409IsStillRecognised() {
+        let error = APIClient.APIError.http(status: 409, code: nil, message: nil, params: nil)
+        XCTAssertTrue(FarmRiskAPI.isAlreadyAsked(error))
+    }
+
+    func testOtherFailuresAreNotAlreadyAsked() {
+        XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(
+            APIClient.APIError.http(status: 500, code: nil, message: nil, params: nil)))
+        XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(URLError(.timedOut)))
+    }
+}

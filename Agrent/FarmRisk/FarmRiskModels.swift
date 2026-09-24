@@ -139,7 +139,21 @@ enum FarmRiskAPI {
     /// failed". Treating it as an error would tell a farmer their ask did
     /// not go through when it went through the first time — and then
     /// invite the retry that produces the same 409 forever.
+    /// MATCHES `.conflict`, NOT `.http(409)`.
+    ///
+    /// This read `.http(status:)` and compared it to 409, which cannot
+    /// happen: `APIClient.send` intercepts 409 two cases above its default
+    /// and throws `.conflict` instead, so the guard was dead the day it was
+    /// written and every test that covered it hand-built a value this
+    /// client never produces.
+    ///
+    /// What a farmer got instead of "already asked" was the stale-edit
+    /// sentence — «Записът е променен на сървъра, докато го редактирахте.»
+    /// — on a screen with no editing, for an ask that had succeeded, with
+    /// the button still live to retry the 409 forever.
     static func isAlreadyAsked(_ error: Error) -> Bool {
+        if case APIClient.APIError.conflict = error { return true }
+        // Kept for a server that ever answers 409 through the generic path.
         if case APIClient.APIError.http(let status, _, _, _) = error { return status == 409 }
         return false
     }

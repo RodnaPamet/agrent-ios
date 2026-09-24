@@ -121,7 +121,14 @@ struct FarmRiskView: View {
             ProgressView("Зареждане…").frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .failed(let message):
-            ErrorState(message: message) { await store.loadParcels() }
+            // BOTH. Reloading the parcels alone left every row on
+            // «Изчисляване…» for ever: `readRisks` is reachable only from
+            // this view's `.task`, which has already run, and from
+            // `select`. The screen looked like it was working.
+            ErrorState(message: message) {
+                await store.loadParcels()
+                await store.readRisks()
+            }
 
         case .loaded(let rows, _) where rows.isEmpty:
             EmptyState(
@@ -279,8 +286,25 @@ struct FarmRiskView: View {
                 systemImage: "camera.badge.clock"
             )
             .font(.caption)
-            .foregroundStyle(days > Staleness.concerning ? Color.orange : Color.secondary)
+            // NEVER `.secondary`, which is what this was. The parcel map
+            // says it in its own comment: this line is the caveat on every
+            // number above it, and it must not read as a footnote.
+            .foregroundStyle(days > Staleness.satellitePass ? Color.orange : Color.primary)
             .fixedSize(horizontal: false, vertical: true)
+        } else {
+            // THE `else` THE PARCEL MAP ALREADY HAD.
+            //
+            // Without it the whole line vanished and the row showed two
+            // coloured chips and two index numbers with no date and no
+            // caveat — an undated reading wearing the clothes of a current
+            // one. `acquiredDate` is optional on the wire, and the parcel
+            // map records for the SAME satellite data that the server may
+            // omit it; `BgDate.parseISODay` also returns nil for a full
+            // instant, which is the other shape this codebase has met.
+            Label("Датата на заснемане е неизвестна.", systemImage: "camera.badge.clock")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

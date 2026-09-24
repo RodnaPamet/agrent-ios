@@ -170,4 +170,15 @@ enum Staleness {
     /// 2026-09-22 — eighty-three days, sitting under a chart that otherwise
     /// looks entirely current.
     static let concerning = 21
+
+    /// A SATELLITE PASS ages on a different clock, and 21 days is far too
+    /// long for one.
+    ///
+    /// Sentinel-2 revisits every five days, so a gap past ten means cloud
+    /// has been sitting over the field for two passes running — and a
+    /// canopy decides a spray. The risk page was reading `concerning`
+    /// above, which is a GRAIN PRICE threshold: it called a twelve-day-old
+    /// image current while the parcel map, hard-coding ten, called the same
+    /// image stale in orange. One fact, two screens, two answers.
+    static let satellitePass = 10
 }

@@ -143,3 +143,30 @@ final class StaleCameraCommandTests: XCTestCase {
         XCTAssertTrue(coordinator.consume(4))
     }
 }
+
+/// A crop the price-series table has never heard of still has to read as
+/// Bulgarian-app text rather than as a server enum shouting in English.
+final class CommodityFallbackTests: XCTestCase {
+
+    func testKnownCropsStillTranslate() {
+        XCTAssertEqual(CommodityName.freeText("WHEAT"), "Пшеница")
+        XCTAssertEqual(CommodityName.freeText("wheat"), "Пшеница")
+    }
+
+    func testAnUnmappedServerEnumIsTitleCasedNotShouted() {
+        XCTAssertEqual(CommodityName.freeText("ALFALFA"), "Alfalfa")
+        XCTAssertEqual(CommodityName.freeText("SUGAR_BEET"), "Sugar Beet")
+    }
+
+    /// Somebody's own words are left exactly as they wrote them.
+    func testFreeTextIsNotMangled() {
+        XCTAssertEqual(CommodityName.freeText("люцерна"), "люцерна")
+        XCTAssertEqual(CommodityName.freeText("пшеница дурум"), "пшеница дурум")
+        XCTAssertEqual(CommodityName.freeText("Winter barley"), "Winter barley")
+    }
+
+    func testEmptyAndNilStayNil() {
+        XCTAssertNil(CommodityName.freeText(nil))
+        XCTAssertNil(CommodityName.freeText("   "))
+    }
+}
