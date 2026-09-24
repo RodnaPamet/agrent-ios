@@ -72,7 +72,15 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// `CurrentUser.mayCreateOperations`, which fails open. Passing nil
     /// removes the gesture rather than swallowing the tap, so a map that
     /// cannot act does not absorb touches pretending it might.
-    var onTap: ((Parcel) -> Void)?
+    ///
+    /// Receives EVERY parcel under the finger, smallest first — not a
+    /// winner. Picking one was a judgement this type is not in a position
+    /// to make: in simplified mode the shapes are bounding boxes, so two
+    /// fields whose true outlines merely touch have rectangles that
+    /// overlap, and resolving that by box area silently opened the
+    /// operation sheet for a field the farmer was not pointing at. On a
+    /// screen that writes real work records.
+    var onTap: (([Parcel]) -> Void)?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -182,7 +190,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         var hasOverlay = false
         var shape: ParcelShape = .outlines
         var contrast: ColorSchemeContrast = .standard
-        var onTap: ((Parcel) -> Void)?
+        var onTap: (([Parcel]) -> Void)?
         weak var tap: UITapGestureRecognizer?
 
         /// Whether the overlays on screen still describe the data.
@@ -316,17 +324,20 @@ struct SatelliteParcelMap: UIViewRepresentable {
         /// should select nothing, exactly as tapping the grass beside the
         /// field does.
         ///
-        /// SMALLEST WINS. Where
-        /// parcels overlap or nest, the small one is the one drawn on top
-        /// and the one under the finger, so the tap has to resolve the way
-        /// the eye does or an operator opens the parcel behind the one they
-        /// can see.
+        /// SMALLEST FIRST, AND ALL OF THEM. Where parcels overlap or nest,
+        /// the small one is drawn on top and is the likeliest intent, so it
+        /// leads — but the rest travel with it. On the simplified map an
+        /// overlap is routine rather than exceptional, because the shapes
+        /// are bounding boxes and two fields whose true outlines merely
+        /// touch have rectangles that cross. Choosing between them by box
+        /// area is a guess, and the thing being guessed at is which field a
+        /// work record gets written against.
         @objc func handleTap(_ recogniser: UITapGestureRecognizer) {
             guard let onTap, let view = recogniser.view as? MKMapView else { return }
             let coordinate = view.convert(recogniser.location(in: view), toCoordinateFrom: view)
             let mapPoint = MKMapPoint(coordinate)
 
-            var hit: (parcel: Parcel, area: Double)?
+            var hits: [(parcel: Parcel, area: Double)] = []
             for overlay in view.overlays {
                 guard let polygon = overlay as? MKPolygon,
                       let parcel = owners[ObjectIdentifier(polygon)],
@@ -343,9 +354,17 @@ struct SatelliteParcelMap: UIViewRepresentable {
 
                 let rect = polygon.boundingMapRect
                 let area = rect.size.width * rect.size.height
-                if hit == nil || area < hit!.area { hit = (parcel, area) }
+                // One parcel can contribute several polygons — `15655-19`
+                // is one polygon with five rings — so a parcel already hit
+                // keeps its smallest area instead of appearing twice.
+                if let seen = hits.firstIndex(where: { $0.parcel.id == parcel.id }) {
+                    hits[seen].area = min(hits[seen].area, area)
+                } else {
+                    hits.append((parcel, area))
+                }
             }
-            if let hit { onTap(hit.parcel) }
+            guard !hits.isEmpty else { return }
+            onTap(hits.sorted { $0.area < $1.area }.map(\.parcel))
         }
 
         func syncTiles(to template: String?, in view: MKMapView) {
