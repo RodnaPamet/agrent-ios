@@ -28,4 +28,39 @@ enum A11y {
         let joined = kept.joined(separator: ", ")
         return joined.hasSuffix(".") ? joined : joined + "."
     }
+
+    /// Where a parcel sits relative to the rest of the farm, in words.
+    ///
+    /// This exists because the schematic map's ONE piece of information that
+    /// no list beneath it carries is position — which field is north of which,
+    /// and how far apart. Shape is deliberately false there and absolute size
+    /// is five times life; position is the part still true, and until now it
+    /// reached exactly one sense. A single `accessibilityLabel` on the canvas
+    /// ("4 парцела, 2 засети") summarises the data the list already gives
+    /// better, and drops the only thing the map uniquely knows.
+    ///
+    /// Screen space, so `dy` grows SOUTHWARD — the sign flip is the whole
+    /// trap. The projection is linear, so a bearing taken here equals one
+    /// taken in degrees, and this needs no second coordinate system.
+    ///
+    /// Returns nil at the centre rather than inventing a direction: with one
+    /// parcel, or with a parcel genuinely in the middle, every answer is
+    /// wrong and "в средата" is the honest one. The caller decides how to say
+    /// that, because "the only parcel" and "the middle parcel" are different
+    /// sentences.
+    static func compass(dx: CGFloat, dy: CGFloat, deadband: CGFloat) -> String? {
+        let distance = (dx * dx + dy * dy).squareRoot()
+        guard distance.isFinite, distance > deadband, deadband.isFinite else { return nil }
+
+        // atan2 with dy NEGATED, because north is up and y is down.
+        let angle = atan2(-dy, dx)
+        let step = CGFloat.pi / 4
+        var sector = Int((angle / step).rounded()) % 8
+        if sector < 0 { sector += 8 }
+
+        return [
+            "изток", "североизток", "север", "северозапад",
+            "запад", "югозапад", "юг", "югоизток",
+        ][sector]
+    }
 }

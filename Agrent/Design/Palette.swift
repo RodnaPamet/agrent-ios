@@ -39,19 +39,22 @@ enum Palette {
         static let neutralFill = Color(.secondarySystemFill)
     }
 
-    /// Sown against fallow, on the simplified map's rectangles.
-    ///
-    /// These outlived the schematic they were mixed for. Nine values went
-    /// with it — a ground tone, three path and graticule greys, a label
-    /// white — because they described a hand-drawn canvas that no longer
-    /// exists. What is left is the one distinction the simplified map still
-    /// makes, now drawn over satellite imagery rather than over #6E6A52,
-    /// which is why the contrast ramp below matters more than it did.
+    /// The schematic map. Verified against the canvas value by value.
     enum Map {
+        static let ground = Color(hex: 0x6E6A52)
+        static let pathMajor = Color(hex: 0x8C8770)
+        static let pathMinor = Color(hex: 0x7E7A63)
         static let sownFill = Color(hex: 0x3E8E4F)
         static let sownStroke = Color(hex: 0x2C6E3A)
         static let fallowFill = Color(hex: 0x9A9560)
         static let fallowStroke = Color(hex: 0x6F6B3E)
+        static let label = Color.white
+        /// The coordinate grid. Shares the minor-path value deliberately —
+        /// same family, no new colour introduced into a closed palette — but
+        /// named separately because it means something else, and because
+        /// path strokes will want their own value the day there is path data.
+        static let graticule = Color(hex: 0x7E7A63)
+        static let graticuleLabel = Color(hex: 0xC9C4A8)
         static let fillOpacity: Double = 0.55
         static let strokeWidth: CGFloat = 2.5
         static let dash: [CGFloat] = [7, 5]
@@ -59,11 +62,9 @@ enum Palette {
         /// Increase Contrast is not a preference about taste. It is switched
         /// on by people who cannot reliably separate two mid-tone colours,
         /// and on this map the fill IS the data: #3E8E4F sown against
-        /// #9A9560 fallow, both at 0.55, are two muted earth tones within a
-        /// narrow band of each other. They sit over satellite imagery now
-        /// rather than over a flat ground, which is a BUSIER backdrop than
-        /// the one this was written for, so the case for the ramp is
-        /// stronger than it was, not weaker.
+        /// #9A9560 fallow, both at 0.55 over a #6E6A52 ground, is three
+        /// muted earth tones within a narrow band of each other. That is a
+        /// deliberate choice for direct sunlight and the wrong one here.
         ///
         /// So the fill goes near-solid and the stroke thickens — the parcel
         /// stops being a tint over the ground and becomes a bordered object.
