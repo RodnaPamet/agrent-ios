@@ -23,6 +23,7 @@ struct LocationsView: View {
                         StaleBanner(age: age)
                     }
                 }
+            .pageBackground()
             .navigationTitle("Локации")
             .appMenu()
             .task {
@@ -76,7 +77,10 @@ struct LocationsView: View {
                         location.parcelCount.map { Plural.bg($0, "парцел", "парцела") },
                     ]))
                 }
+                // On the ROW — see JournalListView.
+                .listRowBackground(Palette.Surface.card)
             }
+            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await store.refresh() } }
         }
     }

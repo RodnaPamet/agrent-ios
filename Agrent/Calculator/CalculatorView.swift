@@ -14,6 +14,7 @@ struct CalculatorView: View {
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) { newCostButton }
+            .pageBackground()
             .navigationTitle("Калкулатор")
             .appMenu()
             .sheet(isPresented: $addingCost) {

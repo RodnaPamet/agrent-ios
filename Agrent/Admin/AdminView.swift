@@ -53,9 +53,13 @@ struct AdminView: View {
 
         case .allowed:
             List {
+                // The bottom-row editor, moved off every screen's toolbar
+                // and into the one place that holds settings.
+                Section("Приложение") { TabCustomiserRow() }
                 membersSection
                 farmProfileSection
             }
+            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }

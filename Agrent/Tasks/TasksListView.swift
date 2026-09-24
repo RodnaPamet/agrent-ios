@@ -23,6 +23,7 @@ struct TasksListView: View {
                     }
                     .background(.bar)
                 }
+            .pageBackground()
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .appMenu()
@@ -76,14 +77,18 @@ struct TasksListView: View {
                         text: "Списъкът е съкратен от сървъра. Не всички задачи се показват.",
                         icon: "exclamationmark.triangle"
                     )
+                    .listRowBackground(Palette.Surface.card)
                 }
                 ForEach(page.items) { item in
                     NavigationLink { TaskDetailView(summary: item) } label: {
                         TaskRow(item: item)
                     }
+                    // On the ROW — see JournalListView.
+                    .listRowBackground(Palette.Surface.card)
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }
