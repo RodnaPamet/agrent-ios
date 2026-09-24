@@ -458,3 +458,33 @@ final class InsuranceAreaParsingTests: XCTestCase {
         XCTAssertNil(InsuranceRequestForm.parse("12,3,4"))
     }
 }
+
+/// Number formatting must not follow the device's region.
+///
+/// These two failed on CI and passed here, which is the whole point: this
+/// machine reports en-BG and the runner does not. The app renders entirely
+/// in Bulgarian, and a String built outside SwiftUI does not see the
+/// environment locale `AgrentApp` sets.
+final class NumberLocaleTests: XCTestCase {
+
+    func testAreasUseTheBulgarianDecimalSeparator() {
+        XCTAssertEqual(Num.text(32.4), "32,4")
+        XCTAssertEqual(Num.text(0.5), "0,5")
+    }
+
+    func testWholeNumbersCarryNoDecimals() {
+        XCTAssertEqual(Num.text(324), "324")
+    }
+
+    func testMoneyUsesTheBulgarianSeparatorAndTwoPlaces() {
+        XCTAssertEqual(Money.text(51.1, "EUR"), "51,10 EUR")
+    }
+
+    /// The failure this guards is silent: the same number drawn two ways on
+    /// one screen, depending on whether it came through `Text` or through a
+    /// String interpolated into a sentence.
+    func testAGroupedThousandMatchesTheAppsOwnRendering() {
+        XCTAssertFalse(Num.text(1234.5).contains("."),
+                       "a full stop here means the process locale won")
+    }
+}

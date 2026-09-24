@@ -326,8 +326,25 @@ private struct UncertaintyBadge: View {
 enum Num {
     /// Up to 2dp, trailing zeros dropped. The payload already rounds where it
     /// means to, so this must not round further and disagree with it.
+    ///
+    /// FORCED TO bg_BG, like every other formatter in this app.
+    ///
+    /// Without a locale this reads the PROCESS's, which is not the one the
+    /// app renders in. `AgrentApp` sets the SwiftUI environment to bg_BG,
+    /// but that reaches `Text`, not a String built here and interpolated
+    /// into a sentence — so «32,4 ха» became «32.4 ха» the moment the
+    /// device's region was not European, and the same number appeared with
+    /// two different separators on one screen depending on which of the two
+    /// paths drew it.
+    ///
+    /// Caught by CI rather than by me: two tests asserting «32,4» passed on
+    /// this machine, which reports en-BG, and failed on a runner that does
+    /// not. That is the same trap as the journal printing "11 September" —
+    /// a locale inherited rather than chosen. `BgDate.locale` is where this
+    /// app already decided the answer.
     static func text(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(0...2)).grouping(.automatic))
+        value.formatted(.number.precision(.fractionLength(0...2))
+            .grouping(.automatic).locale(BgDate.locale))
     }
 }
 
@@ -351,8 +368,11 @@ enum Money {
     /// against a ledger that is the difference between a number someone
     /// can check and one they have to think about.
     static func text(_ value: Double, _ currency: String?) -> String {
+        // bg_BG for the same reason as `Num.text` — a ledger figure must
+        // not change separator with the device's region.
         let amount = value.formatted(
             .number.precision(.fractionLength(2)).grouping(.automatic)
+                .locale(BgDate.locale)
         )
         guard let currency, !currency.isEmpty else { return amount }
         return "\(amount) \(currency)"
