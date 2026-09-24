@@ -157,7 +157,18 @@ struct Parcel: Decodable, Equatable, Hashable, Sendable, Identifiable {
     /// `{"NTP": "100000", "NAME": "19", "YEAR": 2026}` mixes String and Int in
     /// one object, so even `[String: String]` would fail the whole payload.
     /// That is the `netWorthUnavailableParams` situation again.
-    var isDrawable: Bool { geometry != nil }
+    var isDrawable: Bool { geometry?.hasDrawableRing == true }
+
+    /// Sown versus fallow is INFERRED from whether a crop is recorded — the
+    /// server has no such field. It is the only signal available and it
+    /// matches what the legend claims, but it is an inference: a parcel sown
+    /// with an unrecorded crop reads as fallow here.
+    ///
+    /// It lived in the schematic renderer's file until the simplified
+    /// satellite map needed it too. A fact about a parcel defined inside one
+    /// view is a fact that disappears when that view does, which is exactly
+    /// what was about to happen to it.
+    var isSown: Bool { !(cropType ?? "").isEmpty }
 
     /// Hashed on `id` alone rather than synthesised over every field.
     /// The id IS the identity — two values with the same id are the same

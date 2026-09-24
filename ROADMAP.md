@@ -101,7 +101,26 @@ Shipped and proven end to end on a device simulator (2026-09-21):
    will not look pixel-identical to the web, and Apple's rural Bulgarian
    imagery is weaker than the tile route the web uses.
 
-   **AMENDED 2026-09-21 — a second, schematic layer, toggled by one button.**
+   **AMENDED 2026-09-24 — THREE layers, cycled by one button.** The owner
+   saw the satellite view and asked for it in the schematic's place; asked
+   again, once the schematic was actually gone, to have it back as a third
+   option. The button therefore cycles rather than toggles:
+
+   1. **Точни очертания** — true outlines with holes, over imagery, with the
+      vegetation indices. The default, by the owner's choice.
+   2. **Опростена** — one rectangle per parcel, its bounding box, over
+      imagery, coloured sown or fallow. No index tiles: Earth Engine clips
+      them to the true shape, so under a box the colour stops short of the
+      corners and reads as missing data.
+   3. **Схема** — the 2026-09-21 layer below, unchanged.
+
+   The four bullets below still hold, and now hold for ONE of three modes
+   rather than for the default. That is the real change: a farmer with no
+   signal has to reach the schematic deliberately instead of opening onto
+   it. The stale banner is what speaks first, and it says the data is old
+   rather than that the map cannot draw.
+
+   **2026-09-21 — a second, schematic layer, toggled by one button.**
    Alongside the MapKit view, a *tileless* mode that draws the parcels
    directly from their coordinates: flat ground, minimal path strokes, parcel
    fills carrying state, labels. Rendered in SwiftUI (`Canvas` or `Path`) from
@@ -131,6 +150,11 @@ Shipped and proven end to end on a device simulator (2026-09-21):
    **The toggle is one button with two states, not a menu.** Two modes only;
    a third would make it a picker and it stops being simple. Remember the
    choice per user.
+
+   **REVERSED 2026-09-24 (owner): the PRECISE satellite map opens by
+   default.** The schematic is still available, third in the cycle, but it
+   is no longer what a farmer lands on. The paragraph below records what the
+   first frame used to guarantee and no longer does.
 
    **Schematic opens by default** (owner, 2026-09-21). The map's first frame
    is therefore the one that cannot fail: no tiles to fetch, nothing to time

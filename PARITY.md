@@ -173,19 +173,22 @@ accident while working through this list.
 
 Web `locations` (225) + `locations/[locationId]` (1342, with
 `apiPost`/`apiPatch`/`apiDelete`) · iOS `Locations/LocationsView.swift` (59)
-+ `ParcelMapView.swift` (218) + `SchematicParcelMap.swift`
++ `ParcelMapView.swift` + `SatelliteParcelMap.swift` (two modes, one map view)
 
 ### Gap 4 — read-only — CLOSED 2026-09-22 as a DECISION
 
 Recorded in `ROADMAP.md` rather than built. The geometry feeds subsidy
-and lease paperwork, and the schematic draws parcels as squares five
-times life size so they can be read in sun — the right instrument for
-finding a field and the wrong one for defining a boundary.
+and lease paperwork, and neither map is an instrument for defining a
+boundary — the simplified one draws a field as its bounding box, which
+is deliberately not its border.
 
 The gap was never "the app cannot edit"; it was that nobody had said so.
 
-The schematic renderer and the MapKit toggle are ahead of the web here,
-which has no schematic view at all.
+**Updated 2026-09-24.** Still ahead, and by more: three map modes where
+the web has one. The schematic survives as the third, and the simplified
+rectangles have no web counterpart either. Traffic runs the other way
+too — the target button that walks the parcels is the web's «Намери моето
+поле», adopted here.
 
 ---
 
@@ -306,8 +309,17 @@ failures are more instructive than the fixes:
 `.accessibilityLabel`, 2 `.accessibilityElement`, 1 `.accessibilityHint`,
 zero `colorSchemeContrast`. Done: every row speaks from its VALUES rather
 than its rendered text (a `·` separator was being read as "middle dot"),
-the schematic map exposes one element per parcel with a compass bearing,
 and `colorSchemeContrast` is honoured where colour carries meaning.
+
+**Narrowed 2026-09-24.** The schematic exposes one element per parcel
+with a compass bearing and still does — it is the third map mode. The two
+SATELLITE modes have no accessibility tree at all, because `MKMapView`
+builds none, so to VoiceOver they are one unlabelled rectangle. The
+target button announces the field it moves to, which is a button
+speaking rather than a map that can be explored.
+
+So a blind operator has a map that works, and has to know to cycle to it.
+Per-parcel elements over MapKit is owed work.
 
 **No `reduceMotion`**, deliberately: the app has zero animations, so
 reading the environment to gate nothing would be an accessibility feature

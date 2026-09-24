@@ -14,7 +14,42 @@ extension ParcelGeometry {
     /// rather than asserting that the code says what it says.
     static func coordinate(from point: [Double]) -> CLLocationCoordinate2D? {
         guard point.count >= 2 else { return nil }
-        return CLLocationCoordinate2D(latitude: point[1], longitude: point[0])
+        let coordinate = CLLocationCoordinate2D(latitude: point[1], longitude: point[0])
+        // A RANGE CHECK, because one bad vertex used to cost the whole map.
+        //
+        // `boundingMapPolygon` takes the extent of every point, so a single
+        // out-of-range value — a sentinel, a units mix-up, a NaN from a
+        // failed conversion upstream — turns a five-hectare field into a
+        // rectangle spanning a hemisphere, and `MKCoordinateRegion(fitting:)`
+        // frames the farm to match. `CLLocationCoordinate2DIsValid` rejects
+        // NaN as well as out-of-range, which is the case no bounds check
+        // written by hand remembers.
+        //
+        // Dropped rather than clamped: a clamped vertex is a shape the
+        // server never sent, drawn as if it had. A ring that loses points
+        // falls below three and is dropped whole, one field lost instead of
+        // every field misframed.
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        return coordinate
+    }
+
+    /// Whether anything would actually be drawn for this geometry.
+    ///
+    /// `Parcel.isDrawable` asked only whether geometry was non-nil, so a
+    /// parcel whose rings are all degenerate — two points, or points the
+    /// check above now rejects — counted as drawable, drew nothing, got no
+    /// «без очертание» marker, and was not counted by the note that exists
+    /// to say how many parcels are missing from the map. The target button
+    /// would fly to it as well.
+    ///
+    /// Counts points rather than building `MKPolygon`s: this is called once
+    /// per parcel per render, and the polygons would be allocated and thrown
+    /// away every time.
+    var hasDrawableRing: Bool {
+        coordinates.contains { polygon in
+            guard let outer = polygon.first else { return false }
+            return outer.filter { $0.count >= 2 }.count >= 3
+        }
     }
 
     /// One `MKPolygon` per GeoJSON polygon, with ring 0 as the outline and
@@ -45,6 +80,45 @@ extension ParcelGeometry {
                 interiorPolygons: holes.isEmpty ? nil : holes
             )
         }
+    }
+
+    /// ONE rectangle for the whole parcel — the simplified map's shape.
+    ///
+    /// Built by unioning what `mapPolygons` produces rather than by walking
+    /// the coordinates again. That is the point: the box then covers exactly
+    /// what the precise map draws, including its rule that a ring of fewer
+    /// than three points is dropped, and the two modes cannot come to
+    /// different conclusions about where a field is. Walking the raw
+    /// coordinates a second time would be one more place for the axes to
+    /// cross, and this file exists to have exactly one.
+    ///
+    /// The corners are taken in PROJECTED space, not in degrees. MapKit draws
+    /// a polygon's edges straight in the projection, so a box built from
+    /// min/max latitude would have edges that bow on screen; built from the
+    /// map rect it is a rectangle, which is what the owner asked to see.
+    ///
+    /// Holes do not survive, and that is the simplification, not a loss:
+    /// `15655-19` is one polygon with four holes across 32 hectares and its
+    /// box is a plain quadrilateral. What that costs is spelled out where it
+    /// costs something — see `Coordinator.handleTap`.
+    ///
+    /// Nil when there is nothing to draw, so the caller can tell "no shape"
+    /// from "a shape of zero size".
+    var boundingMapPolygon: MKPolygon? {
+        let polygons = mapPolygons
+        guard var union = polygons.first?.boundingMapRect else { return nil }
+        for polygon in polygons.dropFirst() {
+            union = union.union(polygon.boundingMapRect)
+        }
+
+        let corners = [
+            MKMapPoint(x: union.minX, y: union.minY),
+            MKMapPoint(x: union.maxX, y: union.minY),
+            MKMapPoint(x: union.maxX, y: union.maxY),
+            MKMapPoint(x: union.minX, y: union.maxY),
+        ].map(\.coordinate)
+
+        return MKPolygon(coordinates: corners, count: corners.count)
     }
 }
 

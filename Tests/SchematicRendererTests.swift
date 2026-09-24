@@ -187,14 +187,6 @@ final class SchematicRendererTests: XCTestCase {
         XCTAssertEqual(lineY, pointY, accuracy: 0.001)
     }
 
-    // MARK: - Sown inference
-
-    func testSownIsInferredFromCropAndIsNotAServerField() {
-        XCTAssertTrue(parcel(crop: "Wheat").isSown)
-        XCTAssertFalse(parcel(crop: nil).isSown)
-        XCTAssertFalse(parcel(crop: "").isSown, "an empty crop is not a crop")
-    }
-
     // MARK: - Helpers
 
     private func square(lonFrom: Double, lonTo: Double,

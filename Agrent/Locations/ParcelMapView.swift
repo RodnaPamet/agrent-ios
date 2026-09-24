@@ -6,19 +6,17 @@ struct ParcelMapView: View {
 
     @State private var store: ParcelsStore
 
-    /// Remembered per user, and SCHEMATIC BY DEFAULT.
+    /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
     ///
-    /// The default is the decision, not the toggle. Schematic's first frame
-    /// needs no network, so a farmer opening this with no coverage sees their
-    /// fields rather than grey tiles — and that is the situation this screen
-    /// exists for. MapKit is the deliberate second look, for geographic
-    /// context, which is when imagery is genuinely what you want. Neither is
-    /// a fallback for the other.
+    /// Three modes, one cycling button — see `ParcelMapMode`. The schematic
+    /// is among them, which is the only one of the three that draws a farm
+    /// with no signal at all.
     ///
-    /// One button, two states. MapKit offers standard/hybrid/satellite for
-    /// free and adding them would turn this into a picker, which is the one
-    /// thing it was asked not to become.
-    @AppStorage("locations.useSchematicMap") private var useSchematic = true
+    /// A NEW KEY, with `locations.useSchematicMap` left unread. That one
+    /// recorded an answer to a two-way question, and a boolean cannot say
+    /// which of three a person wanted. Everyone starts from the owner's
+    /// default and picks again once.
+    @AppStorage("locations.parcelMapMode") private var mode: ParcelMapMode = .precise
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -35,6 +33,13 @@ struct ParcelMapView: View {
 
     /// The index whose explainer is open.
     @State private var explaining: VegetationIndex?
+
+    /// The parcel the target button last jumped to, and the camera move that
+    /// took it there. The tick is what makes a second press on the same
+    /// parcel move again — see `SatelliteParcelMap.CameraCommand`.
+    @State private var focusedID: String?
+    @State private var cameraTick = 0
+    @State private var camera: SatelliteParcelMap.CameraCommand?
 
     init(location: Location) {
         self.location = location
@@ -53,16 +58,11 @@ struct ParcelMapView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    useSchematic.toggle()
+                    cycleMode()
                 } label: {
-                    Label(
-                        useSchematic ? "Сателит" : "Схема",
-                        systemImage: useSchematic ? "globe.europe.africa" : "square.on.square.dashed"
-                    )
+                    Label(mode.next.label, systemImage: mode.next.icon)
                 }
-                .accessibilityHint(useSchematic
-                    ? "Превключва към сателитна карта"
-                    : "Превключва към схематична карта")
+                .accessibilityHint(mode.next.hint)
             }
         }
         .sheet(item: $operating) { parcel in
@@ -92,8 +92,8 @@ struct ParcelMapView: View {
             VStack(spacing: 0) {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
-                if useSchematic && !drawable.isEmpty { legend }
-                if !useSchematic && !drawable.isEmpty { indexControls }
+                if mode.showsSownFallow && !drawable.isEmpty { legend }
+                if !mode.showsSownFallow && !drawable.isEmpty { indexControls }
                 parcelList(response, drawable: drawable)
             }
         }
@@ -101,9 +101,11 @@ struct ParcelMapView: View {
 
     // MARK: - Map
 
-    /// Only for the schematic view. On satellite the fills sit over imagery
-    /// and the colours are not the only cue, but here they carry the whole
-    /// meaning, so the key has to be on screen.
+    /// For the two modes that colour a parcel by crop state — simplified and
+    /// schematic — where the fill is the only thing on screen saying which
+    /// fields are sown. The precise view has the vegetation indices and their
+    /// own legend, and paints every parcel alike, so a sown/fallow key there
+    /// would explain a distinction it does not draw.
     private var legend: some View {
         HStack(spacing: 16) {
             swatch(Palette.Map.sownFill, "Засят", dashed: false)
@@ -125,13 +127,29 @@ struct ParcelMapView: View {
     private func swatch(_ color: Color, _ label: String, dashed: Bool) -> some View {
         HStack(spacing: 7) {
             RoundedRectangle(cornerRadius: 3)
-                .fill(color.opacity(contrast == .increased ? 0.95 : 0.85))
+                // THE SAME OPACITY THE MAP DRAWS. This was 0.85/0.95 against
+                // the map's 0.55/0.92 — a key showing a stronger tint than
+                // the picture it explains, which is the exact failure the
+                // comment above claims to prevent, with the exact number in
+                // it. It also ignored Increase Contrast entirely, so the one
+                // person relying on the key hardest got the worst match.
+                .fill(color.opacity(Palette.Map.fillOpacity(contrast)))
                 .frame(width: 14, height: 14)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3)
                         .strokeBorder(
                             dashed ? Palette.Map.fallowStroke : Palette.Map.sownStroke,
-                            style: StrokeStyle(lineWidth: 1.5, dash: dashed ? [3, 2] : [])
+                            // Width tracks the map. The DASH deliberately
+                            // does not: `Palette.Map.dash` is [7, 5], and a
+                            // 14pt swatch is 12 points of perimeter per side
+                            // — one dash and a gap, which reads as a solid
+                            // line and destroys the very distinction the
+                            // dash exists to carry. Scaled to keep the
+                            // MEANING, which is what the key is for.
+                            style: StrokeStyle(
+                                lineWidth: Palette.Map.strokeWidth(contrast) * 0.6,
+                                dash: dashed ? [3, 2] : []
+                            )
                         )
                 )
             Text(label).font(.footnote).foregroundStyle(.primary)
@@ -146,28 +164,158 @@ struct ParcelMapView: View {
                 icon: "map",
                 message: "Парцелите съществуват, но нямат географски очертания."
             )
-        } else if useSchematic, let box = response.bounds ?? location.boundsJson {
+        } else if mode == .schematic, let box = response.bounds ?? location.boundsJson {
+            // A Canvas, not MapKit. It needs a box to normalise into and has
+            // nothing to fall back on without one, so a location with neither
+            // bound falls through to the satellite branch below — which can
+            // still frame itself from the parcels.
             SchematicParcelMap(
                 parcels: drawable, bounds: box,
                 onTap: mayOperate ? { operating = $0 } : nil
             )
         } else {
-            // Camera from `bounds` when the server sent one, otherwise from
-            // the location's own boundsJson. Both are [minLon, minLat, …] and
-            // both are read through BoundingBox's NAMED fields — never
-            // positionally, which is how the camera ends up in the Red Sea.
-            // One MKPolygon per GeoJSON polygon, holes already carried as
-            // interiorPolygons — see ParcelGeometry.mapPolygons.
+            // ONE map view for both SATELLITE modes, differing by `shape`.
+            // Two views in an if/else would give SwiftUI different structural
+            // identity, tearing down the MKMapView and re-firing the index
+            // refresh on every switch.
+            //
+            // No index tiles under the rectangles. Earth Engine clips each
+            // tile to the TRUE parcel shape, so beneath a box the colour
+            // would stop at the field's real edge and the corners stay bare —
+            // which reads as "the data ends here" rather than as a
+            // simplification.
             SatelliteParcelMap(
                 parcels: drawable,
-                region: (response.bounds ?? location.boundsJson)?.region
-                    ?? MKCoordinateRegion(fitting: drawable)
-                    ?? .bulgaria,
-                tileTemplate: indices.tiles?.tileUrl,
+                region: mapRegion(for: mode),
+                tileTemplate: mode == .simplified ? nil : indices.tiles?.tileUrl,
+                shape: mode == .simplified ? .boundingBoxes : .outlines,
+                contrast: contrast,
+                camera: camera,
                 onTap: mayOperate ? { operating = $0 } : nil
             )
+            .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
             .task { await indices.refreshIfNeeded() }
         }
+    }
+
+    /// Cycle to the next mode, and move the camera to match.
+    ///
+    /// THE CAMERA HAS TO BE TOLD. One map view serves both modes, so a
+    /// toggle is not a rebuild, and `region` is read only when the view is
+    /// first made — deliberately, since honouring it on every update would
+    /// undo the farmer's zoom each time they tapped an index chip. Without
+    /// this command the shapes would change under an unchanged camera and
+    /// "zoomed in versus zoomed out" would not happen at all.
+    ///
+    /// A method rather than a closure in the toolbar so that the action can
+    /// be invoked from somewhere other than the button — which is the only
+    /// way this path gets exercised outside a human thumb.
+    private func cycleMode() {
+        mode = mode.next
+        cameraTick += 1
+        camera = .init(tick: cameraTick, region: mapRegion(for: mode))
+    }
+
+    /// Where each mode opens.
+    ///
+    /// PRECISE is unchanged: the server's bounds when it sent any, then the
+    /// location's own, then the parcels, then Bulgaria. Both boxes are
+    /// [minLon, minLat, …] and both are read through `BoundingBox`'s NAMED
+    /// fields — never positionally, which is how a camera ends up in the Red
+    /// Sea.
+    ///
+    /// SIMPLIFIED frames the parcels themselves, which is tighter than the
+    /// farm's holding bounds by construction and needs no invented zoom
+    /// number. Where a location has no server bounds the two are the same
+    /// expression and the toggle will not appear to move the camera — that is
+    /// honest rather than broken, since there is nothing else to frame.
+    private func mapRegion(for mode: ParcelMapMode) -> MKCoordinateRegion {
+        let response = store.state.value
+        let drawable = response?.parcels.filter(\.isDrawable) ?? []
+        if mode == .simplified, let fitted = MKCoordinateRegion(fitting: drawable) {
+            return fitted
+        }
+        return (response?.bounds ?? location.boundsJson)?.region
+            ?? MKCoordinateRegion(fitting: drawable)
+            ?? .bulgaria
+    }
+
+    // MARK: - Target
+
+    /// Walks the fields, one press at a time — the web's «Намери моето поле».
+    ///
+    /// ON THE MAP, not in the toolbar. The trailing bar slot already holds
+    /// the mode toggle, and the title beside it is a principal item put there
+    /// because Bulgarian titles truncate when the bar mis-measures them; a
+    /// second glyph would eat what is left of that budget. It is not in the
+    /// control bar under the map either, because that bar does not render at
+    /// all where Earth Engine is unconfigured, and this button has nothing to
+    /// do with the indices.
+    ///
+    /// Bottom-trailing because bottom-leading is Apple's attribution, which
+    /// must not be covered, and because that is where a thumb is.
+    @ViewBuilder
+    private func targetButton(_ drawable: [Parcel]) -> some View {
+        Button {
+            focusNext(drawable)
+        } label: {
+            // THE FRAME IS INSIDE THE LABEL, and it is a MINIMUM.
+            //
+            // Outside the label it sized the button while `.font(.title3)`
+            // sized the glyph — a scaled font against a fixed box. At an
+            // accessibility text size the material circle drew well outside
+            // the 44pt frame the hit test used, so a press on the visible
+            // ring missed the button and fell through to the map beneath,
+            // which has its own tap recogniser and would open an operation
+            // sheet for whatever parcel happened to be under that point.
+            //
+            // A minimum rather than a fixed size: 44 is the floor Apple
+            // asks for, and the control is allowed to grow with the type
+            // it contains so the circle and the target stay the same shape.
+            Image(systemName: "dot.viewfinder")
+                .font(.title3)
+                .padding(11)
+                .frame(minWidth: 44, minHeight: 44)
+                .background(.thinMaterial, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(16)
+        .accessibilityLabel(drawable.count == 1 ? "Центрирай парцела" : "Следващ парцел")
+        // Conditioned to match the label. On a one-parcel farm the pair read
+        // "Центрирай парцела. Центрира картата върху следващия парцел." —
+        // a promise of a next field that does not exist.
+        .accessibilityHint(drawable.count == 1
+            ? "Центрира картата върху парцела"
+            : "Центрира картата върху следващия парцел")
+    }
+
+    /// Camera only — no selection, no sheet — matching the web.
+    ///
+    /// Cycles the DRAWABLE parcels rather than all of them. A parcel with no
+    /// outline is in the list and not on the map, so a press that framed it
+    /// would move the camera to nothing.
+    private func focusNext(_ drawable: [Parcel]) {
+        guard let next = ParcelFocus.next(after: focusedID, in: drawable) else { return }
+        // Advance the focus even when the camera cannot be built, which is
+        // the web's behaviour and the right one: a parcel whose geometry is
+        // degenerate would otherwise trap the button on itself forever, and
+        // pressing again would keep failing on the same field.
+        focusedID = next.id
+        guard let region = MKCoordinateRegion(fitting: [next]) else { return }
+
+        cameraTick += 1
+        camera = .init(tick: cameraTick, region: region)
+
+        // The camera move IS the effect, and MKMapView exposes none of it to
+        // VoiceOver. Said in the same order and the same words as the
+        // parcel's own row, so the two do not describe one field differently.
+        AccessibilityNotification.Announcement(A11y.sentence([
+            ParcelFocus.position(of: next, in: drawable),
+            next.name,
+            CommodityName.freeText(next.cropType),
+            next.areaHa.map { "\(Num.text($0)) хектара" },
+        ])).post()
     }
 
     // MARK: - Vegetation indices

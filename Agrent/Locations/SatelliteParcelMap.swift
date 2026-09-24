@@ -8,9 +8,12 @@ import SwiftUI
 /// SwiftUI's MapKit has `MapPolygon`, `MapCircle` and friends, and no tile
 /// overlay of any kind. There is no `MapTileOverlay`, and `MKTileOverlay`
 /// cannot be reached through `MapContentBuilder`. Raster imagery from
-/// somewhere other than Apple means an `MKMapView`, so the satellite branch
-/// moves down a layer and the schematic branch — which is pure Canvas and
-/// touches no MapKit at all, deliberately — is untouched by this.
+/// somewhere other than Apple means an `MKMapView`, so the map moved down a
+/// layer. It serves the TWO SATELLITE modes of the three the button cycles —
+/// true outlines with index tiles, and simplified rectangles coloured sown or
+/// fallow — from one view, because a second representable in an if/else would
+/// tear this down on every switch. See `ParcelShape`. The third mode, the
+/// schematic, is pure Canvas and touches no MapKit at all, deliberately.
 ///
 /// ── Overlay order is the whole design ──
 ///
@@ -22,11 +25,48 @@ import SwiftUI
 /// parcels. Level, not insertion order, because MapKit is free to reorder
 /// within a level.
 struct SatelliteParcelMap: UIViewRepresentable {
+    /// What a parcel is drawn AS.
+    ///
+    /// Two modes on one `MKMapView`, not two views: a second
+    /// `UIViewRepresentable` in an `if`/`else` gives SwiftUI different
+    /// structural identity, which tears the map view down, re-runs
+    /// `makeUIView` and re-fires the index refresh on every toggle. A
+    /// property costs one overlay remount instead.
+    enum ParcelShape {
+        /// The true GeoJSON outline, holes and all.
+        case outlines
+        /// One rectangle per parcel — `ParcelGeometry.boundingMapPolygon`.
+        case boundingBoxes
+    }
+
     let parcels: [Parcel]
     let region: MKCoordinateRegion
 
     /// The XYZ template, or nil for imagery alone.
     let tileTemplate: String?
+
+    var shape: ParcelShape = .outlines
+
+    /// Passed in rather than read from the environment, because this is a
+    /// `UIViewRepresentable` and MapKit's renderers are not SwiftUI views —
+    /// nothing inside the coordinator would ever be re-evaluated when the
+    /// setting changes. See `Palette.Map.fillOpacity(_:)`: on the simplified
+    /// map the fill IS the data, which is the case that setting exists for.
+    var contrast: ColorSchemeContrast = .standard
+
+    /// A camera move to make ONCE.
+    ///
+    /// A COUNTER, not a region comparison, and the difference is the feature.
+    /// Pressing the target button again after panning away sends the same
+    /// region and must still move; on a one-parcel farm every press sends the
+    /// identical region and each one is a deliberate recentre. Comparing
+    /// regions would make both of those do nothing.
+    struct CameraCommand {
+        let tick: Int
+        let region: MKCoordinateRegion
+    }
+
+    var camera: CameraCommand?
 
     /// nil when the signed-in member may not create operations — see
     /// `CurrentUser.mayCreateOperations`, which fails open. Passing nil
@@ -42,9 +82,30 @@ struct SatelliteParcelMap: UIViewRepresentable {
         view.mapType = .hybrid
         view.pointOfInterestFilter = .excludingAll
         view.showsCompass = false
-        // The camera is set HERE and nowhere else. See updateUIView.
+        // The opening camera is `region`, and a command that arrived before
+        // this view existed is DISCARDED rather than honoured.
+        //
+        // Honouring it was wrong in a way that stuck. The mode button lives
+        // on the screen's own toolbar, outside the `switch store.state`, so
+        // it is live while the parcels are still loading. Pressed then,
+        // `mapRegion` finds no response, no drawable parcels, and falls back
+        // to the location's bounds or — where the server sent none, which is
+        // one field away on this tenant — to `.bulgaria`, 3.6° by 7.5°. That
+        // command then beat the `region` computed from the loaded response,
+        // AND was seeded as applied, so `region` was never honoured again
+        // and the farm opened on a view of the whole country until something
+        // else moved the camera.
+        //
+        // Seeding the tick without obeying the command keeps the other half
+        // of the bargain: the stale command cannot replay as a second jump
+        // either. `region` is computed fresh here from whatever state the
+        // view is actually being built with, which is the better answer in
+        // every case.
         view.setRegion(region, animated: false)
-        context.coordinator.syncParcels(parcels, in: view)
+        context.coordinator.seed(camera?.tick)
+        context.coordinator.shape = shape
+        context.coordinator.contrast = contrast
+        context.coordinator.syncParcels(parcels, shape: shape, in: view)
 
         let tap = UITapGestureRecognizer(
             target: context.coordinator,
@@ -64,27 +125,39 @@ struct SatelliteParcelMap: UIViewRepresentable {
     }
 
     func updateUIView(_ view: MKMapView, context: Context) {
-        // THE CAMERA IS NOT TOUCHED HERE.
+        // THE CAMERA IS NOT MOVED BY `region`, AND NEVER WILL BE.
         //
         // `updateUIView` runs on every state change, including each index
-        // selection. Calling setRegion in it would throw the farmer back to
+        // selection. Honouring `region` here would throw the farmer back to
         // the whole-farm view every time they switched index — so the one
         // gesture the screen exists for, zooming into a patch and comparing
         // NDVI against NDMI over it, would undo itself on each tap.
+        //
+        // `camera` is the deliberate exception, and is why it carries a tick:
+        // it moves the map when, and only when, something asked it to.
         context.coordinator.onTap = onTap
         // The gesture is removed rather than made a no-op, so the map does
         // not consume a touch it will do nothing with.
         context.coordinator.tap?.isEnabled = onTap != nil
 
-        context.coordinator.syncParcels(parcels, in: view)
-        context.coordinator.syncTiles(to: tileTemplate, in: view)
-
+        context.coordinator.shape = shape
+        context.coordinator.contrast = contrast
         // Solid fills hide the data underneath them, so a parcel is filled
         // only when there is nothing to hide. The outline stays either way.
         context.coordinator.hasOverlay = tileTemplate != nil
+
+        context.coordinator.syncParcels(parcels, shape: shape, in: view)
+        context.coordinator.syncTiles(to: tileTemplate, in: view)
+        context.coordinator.apply(camera, in: view)
+
+        // Repaint what MapKit has already drawn. `renderer(for:)` returns nil
+        // for anything not yet on screen, which is fine — those get their
+        // style from `rendererFor` when they are first drawn. Both routes go
+        // through the same `style` call so they cannot drift apart.
         for overlay in view.overlays where overlay is MKPolygon {
-            if let renderer = view.renderer(for: overlay) as? MKPolygonRenderer {
-                renderer.fillColor = context.coordinator.polygonFill
+            if let polygon = overlay as? MKPolygon,
+               let renderer = view.renderer(for: overlay) as? MKPolygonRenderer {
+                context.coordinator.style(renderer, for: polygon)
                 renderer.setNeedsDisplay()
             }
         }
@@ -96,7 +169,9 @@ struct SatelliteParcelMap: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var mountedTemplate: String?
-        private var mountedParcelIDs: [String] = []
+        private var mountedParcels: [Parcel] = []
+        private var mountedShape: ParcelShape?
+        private var appliedTick = 0
 
         /// Which parcel each `MKPolygon` came from. One parcel can produce
         /// several — `15655-19` is one polygon with five rings — and MapKit
@@ -105,27 +180,127 @@ struct SatelliteParcelMap: UIViewRepresentable {
         private var owners: [ObjectIdentifier: Parcel] = [:]
 
         var hasOverlay = false
+        var shape: ParcelShape = .outlines
+        var contrast: ColorSchemeContrast = .standard
         var onTap: ((Parcel) -> Void)?
         weak var tap: UITapGestureRecognizer?
 
-        var polygonFill: UIColor {
-            hasOverlay ? .clear : UIColor.systemGreen.withAlphaComponent(0.35)
+        /// Whether the overlays on screen still describe the data.
+        ///
+        /// COMPARES THE PARCELS THEMSELVES, not their ids, and this went
+        /// wrong twice in the same guard.
+        ///
+        /// First it compared ids alone, which are identical in both shapes —
+        /// same fields, drawn differently — so switching mode returned early
+        /// and left the old overlays mounted. A control that changes nothing
+        /// is indistinguishable from a broken one.
+        ///
+        /// Then, with the shape folded in, ids were still all it knew about
+        /// the parcels. `CachedResource.loadShowingCacheFirst` publishes
+        /// TWICE by design — the cached copy, then the fresh one — and those
+        /// two carry the same ids with different contents. A crop recorded
+        /// on the web, or a corrected boundary, arrives in the second publish
+        /// and was dropped: the simplified map would keep drawing a field
+        /// fallow-dashed while the list directly beneath it, reading the same
+        /// fresh response, named the crop.
+        ///
+        /// `Parcel`'s `==` is synthesised over every stored property,
+        /// geometry included. Its `hash(into:)` is NOT — it is narrowed to
+        /// `id` deliberately — so this must never become a hash comparison.
+        static func needsRemount(
+            _ parcels: [Parcel], _ shape: ParcelShape,
+            mountedParcels: [Parcel], mountedShape: ParcelShape?
+        ) -> Bool {
+            shape != mountedShape || parcels != mountedParcels
         }
 
-        func syncParcels(_ parcels: [Parcel], in view: MKMapView) {
-            let ids = parcels.map(\.id)
-            guard ids != mountedParcelIDs else { return }
-            mountedParcelIDs = ids
+        /// Records a command as already honoured, without moving anything.
+        func seed(_ tick: Int?) {
+            appliedTick = tick ?? 0
+        }
+
+        /// The bookkeeping, split from the camera move so the rule can be
+        /// tested — no test can drive an `MKMapView`'s camera, and both ways
+        /// of getting this wrong are invisible in a code review.
+        func consume(_ tick: Int) -> Bool {
+            guard tick > appliedTick else { return false }
+            appliedTick = tick
+            return true
+        }
+
+        func apply(_ command: CameraCommand?, in view: MKMapView) {
+            guard let command, consume(command.tick) else { return }
+            // Instant under Reduce Motion. A camera flight across a farm is
+            // precisely what someone turns that setting on to stop, and the
+            // destination is the point rather than the journey.
+            view.setRegion(command.region, animated: !UIAccessibility.isReduceMotionEnabled)
+        }
+
+        func syncParcels(_ parcels: [Parcel], shape: ParcelShape, in view: MKMapView) {
+            guard Self.needsRemount(parcels, shape,
+                                    mountedParcels: mountedParcels,
+                                    mountedShape: mountedShape) else { return }
+            mountedParcels = parcels
+            mountedShape = shape
 
             for overlay in view.overlays where overlay is MKPolygon {
                 view.removeOverlay(overlay)
             }
             owners.removeAll()
             for parcel in parcels {
-                for polygon in parcel.geometry?.mapPolygons ?? [] {
+                for polygon in Self.polygons(for: parcel, shape: shape) {
                     owners[ObjectIdentifier(polygon)] = parcel
                     view.addOverlay(polygon, level: .aboveLabels)
                 }
+            }
+        }
+
+        /// One parcel's overlays. A box is ONE rectangle for the parcel, not
+        /// one per polygon — the simplified map draws a field as a field.
+        static func polygons(for parcel: Parcel, shape: ParcelShape) -> [MKPolygon] {
+            switch shape {
+            case .outlines:
+                return parcel.geometry?.mapPolygons ?? []
+            case .boundingBoxes:
+                return [parcel.geometry?.boundingMapPolygon].compactMap { $0 }
+            }
+        }
+
+        /// The one place a parcel's colours are decided.
+        ///
+        /// On OUTLINES the fill is uniform green over imagery, because the
+        /// index tiles are the data there and a crop-coloured fill would
+        /// argue with them.
+        ///
+        /// On BOXES there are no tiles, so sown against fallow is what the
+        /// map has to say, in the schematic's own palette. The dash is the
+        /// non-colour channel and is what keeps the distinction alive in a
+        /// monochrome screenshot or for a red-green colour-blind operator —
+        /// it is not decoration.
+        func style(_ renderer: MKPolygonRenderer, for polygon: MKPolygon) {
+            switch shape {
+            case .outlines:
+                renderer.fillColor = hasOverlay
+                    ? .clear
+                    : UIColor.systemGreen.withAlphaComponent(0.35)
+                renderer.strokeColor = .systemGreen
+                renderer.lineWidth = 2
+                renderer.lineDashPattern = nil
+
+            case .boundingBoxes:
+                // Defaults to sown when the owner is unknown, which cannot
+                // happen through `syncParcels` but would otherwise paint an
+                // orphan overlay as fallow and assert something false.
+                let sown = owners[ObjectIdentifier(polygon)]?.isSown ?? true
+                let fill = sown ? Palette.Map.sownFill : Palette.Map.fallowFill
+                let stroke = sown ? Palette.Map.sownStroke : Palette.Map.fallowStroke
+                renderer.fillColor = UIColor(fill)
+                    .withAlphaComponent(Palette.Map.fillOpacity(contrast))
+                renderer.strokeColor = UIColor(stroke)
+                renderer.lineWidth = Palette.Map.strokeWidth(contrast)
+                renderer.lineDashPattern = sown
+                    ? nil
+                    : Palette.Map.dash.map { NSNumber(value: Double($0)) }
             }
         }
 
@@ -141,7 +316,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         /// should select nothing, exactly as tapping the grass beside the
         /// field does.
         ///
-        /// SMALLEST WINS, the same rule the schematic map uses. Where
+        /// SMALLEST WINS. Where
         /// parcels overlap or nest, the small one is the one drawn on top
         /// and the one under the finger, so the tap has to resolve the way
         /// the eye does or an operator opens the parcel behind the one they
@@ -217,9 +392,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
             }
             if let polygon = overlay as? MKPolygon {
                 let renderer = MKPolygonRenderer(polygon: polygon)
-                renderer.fillColor = polygonFill
-                renderer.strokeColor = .systemGreen
-                renderer.lineWidth = 2
+                style(renderer, for: polygon)
                 return renderer
             }
             return MKOverlayRenderer(overlay: overlay)

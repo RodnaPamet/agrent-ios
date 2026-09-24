@@ -99,6 +99,99 @@ final class LocationGeometryTests: XCTestCase {
         XCTAssertNil(polygons[0].interiorPolygons)
     }
 
+    // MARK: - The simplified map's rectangle
+
+    /// The box has to COVER the field, or the simplified map would show a
+    /// rectangle that the precise map's outline pokes out of.
+    func testBoundingBoxCoversTheWholeParcel() async throws {
+        let response = try await parcels()
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_holes" })
+        let geometry = try XCTUnwrap(parcel.geometry)
+
+        let box = try XCTUnwrap(geometry.boundingMapPolygon).boundingMapRect
+        var union = geometry.mapPolygons[0].boundingMapRect
+        for polygon in geometry.mapPolygons.dropFirst() {
+            union = union.union(polygon.boundingMapRect)
+        }
+
+        // Within a map point rather than exactly. The corners are built in
+        // projected space, handed to MapKit as coordinates, and projected
+        // back when MKPolygon recomputes its own rect — a round trip that
+        // costs a fraction of a map point, which is under 15cm on the
+        // ground. Asserting equality would fail on that and teach the next
+        // reader that the box is wrong when it is the assertion that is.
+        XCTAssertEqual(box.minX, union.minX, accuracy: 1)
+        XCTAssertEqual(box.minY, union.minY, accuracy: 1)
+        XCTAssertEqual(box.maxX, union.maxX, accuracy: 1)
+        XCTAssertEqual(box.maxY, union.maxY, accuracy: 1)
+    }
+
+    /// Four corners and no holes. `par_holes` has four interior rings across
+    /// 32 hectares; the simplification is precisely that they stop existing.
+    func testBoundingBoxIsFourCornersAndDropsHoles() async throws {
+        let response = try await parcels()
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_holes" })
+        let box = try XCTUnwrap(try XCTUnwrap(parcel.geometry).boundingMapPolygon)
+
+        XCTAssertEqual(box.pointCount, 4)
+        XCTAssertNil(box.interiorPolygons, "a box has no holes — that is the point")
+    }
+
+    /// Nil rather than a zero-sized rectangle, so a caller can tell "nothing
+    /// to draw" from "something of no size".
+    func testBoundingBoxIsNilWhenNothingIsDrawable() throws {
+        let degenerate = try JSONDecoder().decode(
+            ParcelGeometry.self,
+            from: Data(#"{"type":"Polygon","coordinates":[[[[25.1,42.5],[25.2,42.6]]]]}"#.utf8))
+        XCTAssertTrue(degenerate.mapPolygons.isEmpty, "two points is not a ring")
+        XCTAssertNil(degenerate.boundingMapPolygon)
+    }
+
+    /// The box lands on the farm. Same trap as everywhere else in this file:
+    /// crossed axes give a well-formed rectangle in the Red Sea.
+    func testBoundingBoxLandsInBulgaria() async throws {
+        let response = try await parcels()
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_simple" })
+        let box = try XCTUnwrap(try XCTUnwrap(parcel.geometry).boundingMapPolygon)
+        XCTAssertTrue(bgLat.contains(box.coordinate.latitude))
+        XCTAssertTrue(bgLon.contains(box.coordinate.longitude))
+    }
+
+    // MARK: - The two cameras
+
+    /// The whole point of the toggle: simplified opens TIGHTER than precise.
+    ///
+    /// Pins the direction rather than a number. If the two ever came out
+    /// equal the toggle would still change the shapes, and the camera not
+    /// moving would read as a half-broken button.
+    func testTheSimplifiedCameraIsTighterThanTheFarmCamera() async throws {
+        let response = try await parcels()
+        let drawable = response.parcels.filter(\.isDrawable)
+
+        let farm = try XCTUnwrap(response.bounds).region
+        let fitted = try XCTUnwrap(MKCoordinateRegion(fitting: drawable))
+
+        XCTAssertLessThan(fitted.span.latitudeDelta, farm.span.latitudeDelta)
+        XCTAssertLessThan(fitted.span.longitudeDelta, farm.span.longitudeDelta)
+    }
+
+    // MARK: - Sown inference
+
+    /// Moved here with `isSown` itself. It is a fact about a parcel, and it
+    /// outlives any one map that draws it.
+    func testSownIsInferredFromCropAndIsNotAServerField() throws {
+        func parcel(crop: String?) throws -> Parcel {
+            let cropJSON = crop.map { "\"\($0)\"" } ?? "null"
+            return try JSONDecoder().decode(Parcel.self, from: Data("""
+            {"id":"p","name":"n","cropType":\(cropJSON),"areaHa":1,"geometry":null,
+             "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+            """.utf8))
+        }
+        XCTAssertTrue(try parcel(crop: "Wheat").isSown)
+        XCTAssertFalse(try parcel(crop: nil).isSown)
+        XCTAssertFalse(try parcel(crop: "").isSown, "an empty crop is not a crop")
+    }
+
     // MARK: - Fail-soft geometry
 
     /// A parcel with null geometry EXISTS but cannot be drawn. It belongs in
@@ -150,5 +243,167 @@ final class LocationGeometryTests: XCTestCase {
         XCTAssertEqual(location.kind, "FIELD")
         let bounds = try XCTUnwrap(location.boundsJson, "boundsJson decodes as a BoundingBox")
         XCTAssertEqual(bounds.minLon, 25.1, accuracy: 0.0001)
+    }
+}
+
+/// The remount guard, which is the one part of the two-shape switch that can
+/// fail silently. Pure and static, so it needs no `MKMapView`.
+final class ParcelShapeMountKeyTests: XCTestCase {
+
+    private func parcel(_ id: String, crop: String? = nil) throws -> Parcel {
+        let cropJSON = crop.map { "\"\($0)\"" } ?? "null"
+        return try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"\(id)","name":"n","cropType":\(cropJSON),"areaHa":1,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+    }
+
+    /// THE regression this guards. The same fields drawn differently must
+    /// remount, or the mode switch returns early and nothing on screen moves.
+    @MainActor
+    func testSameParcelsInDifferentShapesRemount() throws {
+        let parcels = [try parcel("a"), try parcel("b")]
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            parcels, .boundingBoxes, mountedParcels: parcels, mountedShape: .outlines))
+    }
+
+    @MainActor
+    func testAnIdenticalUpdateDoesNotRemount() throws {
+        let parcels = [try parcel("a"), try parcel("b")]
+        XCTAssertFalse(SatelliteParcelMap.Coordinator.needsRemount(
+            parcels, .outlines, mountedParcels: parcels, mountedShape: .outlines),
+            "an identical update must not tear down a loaded overlay")
+    }
+
+    @MainActor
+    func testNothingMountedYetRemounts() throws {
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            [try parcel("a")], .outlines, mountedParcels: [], mountedShape: nil))
+    }
+
+    @MainActor
+    func testADifferentParcelSetRemounts() throws {
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            [try parcel("a")], .outlines,
+            mountedParcels: [try parcel("b")], mountedShape: .outlines))
+    }
+
+    /// THE SECOND REGRESSION. Cache-first publishes the cached parcels and
+    /// then the fresh ones; same ids, changed contents. An id-keyed guard
+    /// dropped the fresh copy and kept drawing the stale one.
+    @MainActor
+    func testSameIDsWithChangedContentRemount() throws {
+        let cached = [try parcel("a", crop: nil)]
+        let fresh = [try parcel("a", crop: "Wheat")]
+        XCTAssertEqual(cached[0].id, fresh[0].id)
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            fresh, .boundingBoxes, mountedParcels: cached, mountedShape: .boundingBoxes),
+            "a crop recorded elsewhere must reach the map, not just the list")
+    }
+
+    /// A box is ONE rectangle for the parcel, however many polygons it has.
+    @MainActor
+    func testBoxesAreOnePolygonPerParcelAndOutlinesAreNot() async throws {
+        let data = try Data(contentsOf: XCTUnwrap(
+            Bundle(for: Self.self).url(forResource: "locations-parcels", withExtension: "json")))
+        let response = try await APIClient.shared.decode(data, as: ParcelsResponse.self)
+        let parcel = try XCTUnwrap(response.parcels.first { $0.id == "par_holes" })
+
+        let outlines = SatelliteParcelMap.Coordinator.polygons(for: parcel, shape: .outlines)
+        let boxes = SatelliteParcelMap.Coordinator.polygons(for: parcel, shape: .boundingBoxes)
+        XCTAssertEqual(boxes.count, 1)
+        XCTAssertEqual(outlines[0].interiorPolygons?.count, 4, "the outline keeps its holes")
+        XCTAssertNil(boxes[0].interiorPolygons, "the box does not")
+    }
+
+    /// A parcel with no geometry contributes nothing in either shape, rather
+    /// than a zero-sized rectangle sitting invisibly on the map.
+    @MainActor
+    func testUndrawableParcelContributesNoOverlay() throws {
+        let bare = try parcel("nope")
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.polygons(for: bare, shape: .outlines).isEmpty)
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.polygons(for: bare, shape: .boundingBoxes).isEmpty)
+    }
+}
+
+/// The camera command's bookkeeping. Nothing here touches an `MKMapView` —
+/// that is the reason the rule was split out of `apply`.
+@MainActor
+final class CameraCommandTests: XCTestCase {
+
+    func testACommandIsObeyedOnceAndNotAgain() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        XCTAssertTrue(coordinator.consume(1), "the first sight of a tick moves the camera")
+        XCTAssertFalse(coordinator.consume(1), "every later update must not")
+    }
+
+    /// Pressing target again after panning away sends the SAME region. It is
+    /// the tick that makes that a second move rather than a no-op.
+    func testTheNextTickMovesAgain() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        XCTAssertTrue(coordinator.consume(1))
+        XCTAssertFalse(coordinator.consume(1))
+        XCTAssertTrue(coordinator.consume(2))
+    }
+
+    /// A command already honoured by `makeUIView` must not replay after a
+    /// teardown, or returning to the screen jumps twice.
+    func testASeededCommandDoesNotReplay() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        coordinator.seed(7)
+        XCTAssertFalse(coordinator.consume(7))
+        XCTAssertTrue(coordinator.consume(8))
+    }
+
+    func testNoCommandSeedsZeroAndStillAcceptsTheFirstPress() {
+        let coordinator = SatelliteParcelMap.Coordinator()
+        coordinator.seed(nil)
+        XCTAssertTrue(coordinator.consume(1))
+    }
+}
+
+/// Guards on the one place coordinates enter the app.
+final class GeometryValidityTests: XCTestCase {
+
+    private func geometry(_ json: String) throws -> ParcelGeometry {
+        try JSONDecoder().decode(ParcelGeometry.self, from: Data(json.utf8))
+    }
+
+    /// A single out-of-range vertex used to turn a field into a hemisphere,
+    /// because the bounding box takes the extent of every point.
+    func testAnOutOfRangeVertexIsDroppedNotSpread() throws {
+        let sane = try geometry(#"{"type":"Polygon","coordinates":[[[[25.10,42.50],[25.12,42.50],[25.12,42.52],[25.10,42.52],[25.10,42.50]]]]}"#)
+        let poisoned = try geometry(#"{"type":"Polygon","coordinates":[[[[25.10,42.50],[25.12,42.50],[25.12,42.52],[25.10,42.52],[999.0,999.0],[25.10,42.50]]]]}"#)
+
+        let saneBox = try XCTUnwrap(sane.boundingMapPolygon).boundingMapRect
+        let poisonedBox = try XCTUnwrap(poisoned.boundingMapPolygon).boundingMapRect
+        XCTAssertEqual(poisonedBox.size.width, saneBox.size.width, accuracy: 1,
+                       "the bad vertex must not widen the field")
+        XCTAssertEqual(poisonedBox.size.height, saneBox.size.height, accuracy: 1)
+    }
+
+    /// NaN is the case a hand-written range check forgets.
+    func testNaNIsRejected() {
+        XCTAssertNil(ParcelGeometry.coordinate(from: [Double.nan, 42.5]))
+        XCTAssertNil(ParcelGeometry.coordinate(from: [25.1, Double.nan]))
+    }
+
+    func testValidBulgarianCoordinateSurvives() throws {
+        let c = try XCTUnwrap(ParcelGeometry.coordinate(from: [25.1, 42.5]))
+        XCTAssertEqual(c.latitude, 42.5, accuracy: 0.0001)
+        XCTAssertEqual(c.longitude, 25.1, accuracy: 0.0001)
+    }
+
+    /// A parcel whose rings are all degenerate draws nothing, so it must be
+    /// reported as having no outline rather than counted among the drawn.
+    func testDegenerateGeometryIsNotDrawable() async throws {
+        let degenerate = try geometry(#"{"type":"Polygon","coordinates":[[[[25.1,42.5],[25.2,42.6]]]]}"#)
+        XCTAssertFalse(degenerate.hasDrawableRing)
+        XCTAssertTrue(degenerate.mapPolygons.isEmpty)
+    }
+
+    func testARealRingIsDrawable() async throws {
+        let real = try geometry(#"{"type":"Polygon","coordinates":[[[[25.10,42.50],[25.12,42.50],[25.12,42.52],[25.10,42.50]]]]}"#)
+        XCTAssertTrue(real.hasDrawableRing)
     }
 }

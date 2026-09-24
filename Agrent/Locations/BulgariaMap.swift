@@ -17,7 +17,8 @@ import Foundation
 ///    kind of difference nobody can explain later.
 /// 3. It is 41 KB against 66 KB, and it is BUNDLED — so the map draws with
 ///    no network, which is the same argument the schematic parcel map is
-///    built on. A border does not change between releases.
+///    built on — now one of three modes there rather than the default. A
+///    border does not change between releases.
 ///
 /// ── The projection is the file's own, verified rather than inferred ──
 ///
