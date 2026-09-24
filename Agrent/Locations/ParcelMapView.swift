@@ -127,13 +127,29 @@ struct ParcelMapView: View {
     private func swatch(_ color: Color, _ label: String, dashed: Bool) -> some View {
         HStack(spacing: 7) {
             RoundedRectangle(cornerRadius: 3)
-                .fill(color.opacity(contrast == .increased ? 0.95 : 0.85))
+                // THE SAME OPACITY THE MAP DRAWS. This was 0.85/0.95 against
+                // the map's 0.55/0.92 — a key showing a stronger tint than
+                // the picture it explains, which is the exact failure the
+                // comment above claims to prevent, with the exact number in
+                // it. It also ignored Increase Contrast entirely, so the one
+                // person relying on the key hardest got the worst match.
+                .fill(color.opacity(Palette.Map.fillOpacity(contrast)))
                 .frame(width: 14, height: 14)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3)
                         .strokeBorder(
                             dashed ? Palette.Map.fallowStroke : Palette.Map.sownStroke,
-                            style: StrokeStyle(lineWidth: 1.5, dash: dashed ? [3, 2] : [])
+                            // Width tracks the map. The DASH deliberately
+                            // does not: `Palette.Map.dash` is [7, 5], and a
+                            // 14pt swatch is 12 points of perimeter per side
+                            // — one dash and a gap, which reads as a solid
+                            // line and destroys the very distinction the
+                            // dash exists to carry. Scaled to keep the
+                            // MEANING, which is what the key is for.
+                            style: StrokeStyle(
+                                lineWidth: Palette.Map.strokeWidth(contrast) * 0.6,
+                                dash: dashed ? [3, 2] : []
+                            )
                         )
                 )
             Text(label).font(.footnote).foregroundStyle(.primary)

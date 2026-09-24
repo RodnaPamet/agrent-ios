@@ -361,3 +361,49 @@ final class CameraCommandTests: XCTestCase {
         XCTAssertTrue(coordinator.consume(1))
     }
 }
+
+/// Guards on the one place coordinates enter the app.
+final class GeometryValidityTests: XCTestCase {
+
+    private func geometry(_ json: String) throws -> ParcelGeometry {
+        try JSONDecoder().decode(ParcelGeometry.self, from: Data(json.utf8))
+    }
+
+    /// A single out-of-range vertex used to turn a field into a hemisphere,
+    /// because the bounding box takes the extent of every point.
+    func testAnOutOfRangeVertexIsDroppedNotSpread() throws {
+        let sane = try geometry(#"{"type":"Polygon","coordinates":[[[[25.10,42.50],[25.12,42.50],[25.12,42.52],[25.10,42.52],[25.10,42.50]]]]}"#)
+        let poisoned = try geometry(#"{"type":"Polygon","coordinates":[[[[25.10,42.50],[25.12,42.50],[25.12,42.52],[25.10,42.52],[999.0,999.0],[25.10,42.50]]]]}"#)
+
+        let saneBox = try XCTUnwrap(sane.boundingMapPolygon).boundingMapRect
+        let poisonedBox = try XCTUnwrap(poisoned.boundingMapPolygon).boundingMapRect
+        XCTAssertEqual(poisonedBox.size.width, saneBox.size.width, accuracy: 1,
+                       "the bad vertex must not widen the field")
+        XCTAssertEqual(poisonedBox.size.height, saneBox.size.height, accuracy: 1)
+    }
+
+    /// NaN is the case a hand-written range check forgets.
+    func testNaNIsRejected() {
+        XCTAssertNil(ParcelGeometry.coordinate(from: [Double.nan, 42.5]))
+        XCTAssertNil(ParcelGeometry.coordinate(from: [25.1, Double.nan]))
+    }
+
+    func testValidBulgarianCoordinateSurvives() throws {
+        let c = try XCTUnwrap(ParcelGeometry.coordinate(from: [25.1, 42.5]))
+        XCTAssertEqual(c.latitude, 42.5, accuracy: 0.0001)
+        XCTAssertEqual(c.longitude, 25.1, accuracy: 0.0001)
+    }
+
+    /// A parcel whose rings are all degenerate draws nothing, so it must be
+    /// reported as having no outline rather than counted among the drawn.
+    func testDegenerateGeometryIsNotDrawable() async throws {
+        let degenerate = try geometry(#"{"type":"Polygon","coordinates":[[[[25.1,42.5],[25.2,42.6]]]]}"#)
+        XCTAssertFalse(degenerate.hasDrawableRing)
+        XCTAssertTrue(degenerate.mapPolygons.isEmpty)
+    }
+
+    func testARealRingIsDrawable() async throws {
+        let real = try geometry(#"{"type":"Polygon","coordinates":[[[[25.10,42.50],[25.12,42.50],[25.12,42.52],[25.10,42.50]]]]}"#)
+        XCTAssertTrue(real.hasDrawableRing)
+    }
+}

@@ -157,7 +157,7 @@ struct Parcel: Decodable, Equatable, Hashable, Sendable, Identifiable {
     /// `{"NTP": "100000", "NAME": "19", "YEAR": 2026}` mixes String and Int in
     /// one object, so even `[String: String]` would fail the whole payload.
     /// That is the `netWorthUnavailableParams` situation again.
-    var isDrawable: Bool { geometry != nil }
+    var isDrawable: Bool { geometry?.hasDrawableRing == true }
 
     /// Sown versus fallow is INFERRED from whether a crop is recorded — the
     /// server has no such field. It is the only signal available and it

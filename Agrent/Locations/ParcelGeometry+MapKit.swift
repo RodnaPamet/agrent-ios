@@ -14,7 +14,42 @@ extension ParcelGeometry {
     /// rather than asserting that the code says what it says.
     static func coordinate(from point: [Double]) -> CLLocationCoordinate2D? {
         guard point.count >= 2 else { return nil }
-        return CLLocationCoordinate2D(latitude: point[1], longitude: point[0])
+        let coordinate = CLLocationCoordinate2D(latitude: point[1], longitude: point[0])
+        // A RANGE CHECK, because one bad vertex used to cost the whole map.
+        //
+        // `boundingMapPolygon` takes the extent of every point, so a single
+        // out-of-range value — a sentinel, a units mix-up, a NaN from a
+        // failed conversion upstream — turns a five-hectare field into a
+        // rectangle spanning a hemisphere, and `MKCoordinateRegion(fitting:)`
+        // frames the farm to match. `CLLocationCoordinate2DIsValid` rejects
+        // NaN as well as out-of-range, which is the case no bounds check
+        // written by hand remembers.
+        //
+        // Dropped rather than clamped: a clamped vertex is a shape the
+        // server never sent, drawn as if it had. A ring that loses points
+        // falls below three and is dropped whole, one field lost instead of
+        // every field misframed.
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+        return coordinate
+    }
+
+    /// Whether anything would actually be drawn for this geometry.
+    ///
+    /// `Parcel.isDrawable` asked only whether geometry was non-nil, so a
+    /// parcel whose rings are all degenerate — two points, or points the
+    /// check above now rejects — counted as drawable, drew nothing, got no
+    /// «без очертание» marker, and was not counted by the note that exists
+    /// to say how many parcels are missing from the map. The target button
+    /// would fly to it as well.
+    ///
+    /// Counts points rather than building `MKPolygon`s: this is called once
+    /// per parcel per render, and the polygons would be allocated and thrown
+    /// away every time.
+    var hasDrawableRing: Bool {
+        coordinates.contains { polygon in
+            guard let outer = polygon.first else { return false }
+            return outer.filter { $0.count >= 2 }.count >= 3
+        }
     }
 
     /// One `MKPolygon` per GeoJSON polygon, with ring 0 as the outline and
