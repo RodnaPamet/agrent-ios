@@ -153,9 +153,35 @@ final class CommodityFallbackTests: XCTestCase {
         XCTAssertEqual(CommodityName.freeText("wheat"), "Пшеница")
     }
 
+    /// Defensive only. No SCREAMING_SNAKE crop has ever existed in this
+    /// server's data — the one I thought I saw was my own fixture.
     func testAnUnmappedServerEnumIsTitleCasedNotShouted() {
-        XCTAssertEqual(CommodityName.freeText("ALFALFA"), "Alfalfa")
         XCTAssertEqual(CommodityName.freeText("SUGAR_BEET"), "Sugar Beet")
+    }
+
+    /// The five values production actually holds, plus the two catalogue
+    /// values no parcel carries yet. `Grass` is the live gap: one parcel,
+    /// and the web has the same hole, so the word is a vocabulary decision
+    /// rather than a translation this app should invent alone.
+    /// The price series keeps its canonical slug. An existing test says
+    /// inventing an alias there "is how a fourth vocabulary starts" — so
+    /// the parcel catalogue is a SEPARATE table rather than a fourth, and
+    /// `canonical` must not have moved.
+    func testTheCommodityVocabularyIsUntouched() {
+        XCTAssertEqual(CommodityName.canonical("rapeseed"), "Рапица")
+        XCTAssertEqual(CommodityName.canonical("canola"), "Canola")
+        XCTAssertEqual(CommodityName.table.count, 15)
+    }
+
+    func testTheCropsThisServerActuallyHolds() {
+        XCTAssertEqual(CommodityName.freeText("Wheat"), "Пшеница")
+        XCTAssertEqual(CommodityName.freeText("Barley"), "Ечемик")
+        XCTAssertEqual(CommodityName.freeText("Maize"), "Царевица")
+        XCTAssertEqual(CommodityName.freeText("Sunflower"), "Слънчоглед")
+        XCTAssertEqual(CommodityName.freeText("Canola"), "Рапица")
+        XCTAssertEqual(CommodityName.freeText("Peas"), "Грах")
+        XCTAssertEqual(CommodityName.freeText("Grass"), "Grass",
+                       "untranslated on purpose until the word is agreed")
     }
 
     /// Somebody's own words are left exactly as they wrote them.
