@@ -347,7 +347,7 @@ struct ParcelMapView: View {
             ParcelFocus.position(of: next, in: drawable),
             next.name,
             CommodityName.freeText(next.cropType),
-            next.areaHa.map { "\(Num.text($0)) хектара" },
+            next.areaHa.map { Area(hectares: $0).spoken },
         ])).post()
     }
 
@@ -557,7 +557,7 @@ struct ParcelMapView: View {
                     if let crop = CommodityName.freeText(parcel.cropType) { Text(crop) }
                     if let area = parcel.areaHa {
                         if parcel.cropType != nil { Text("·") }
-                        Text("\(Num.text(area)) ха")
+                        Text(Area(hectares: area).text)
                     }
                     if parcel.hasActiveLease == true {
                         Text("·"); Text("под аренда")
@@ -578,9 +578,9 @@ struct ParcelMapView: View {
             }
         }
         // Up to three `·` separators in one row, so this was the worst of
-        // them: "Пшеница middle dot 12,4 ха middle dot под аренда". Spoken
-        // from the values, with the units said in full — "ха" is read as a
-        // word, not as "хектара".
+        // them: "Пшеница middle dot 124 дка middle dot под аренда". Spoken
+        // from the values, with the unit said in full — «дка» is read out
+        // as three letters, so the audio channel gets «декара».
         .contentShape(Rectangle())
         .onTapGesture { if mayOperate { operating = parcel } }
         .accessibilityElement(children: .ignore)
@@ -589,7 +589,7 @@ struct ParcelMapView: View {
         .accessibilityLabel(A11y.sentence([
             parcel.name,
             CommodityName.freeText(parcel.cropType),
-            parcel.areaHa.map { "\(Num.text($0)) хектара" },
+            parcel.areaHa.map { Area(hectares: $0).spoken },
             parcel.hasActiveLease == true ? "под аренда" : nil,
             // The icon carried this and only as an icon label. It belongs in
             // the row's sentence: a parcel absent from the map is the thing

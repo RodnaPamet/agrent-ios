@@ -86,8 +86,8 @@ struct FarmRiskView: View {
                         parcels: (store.parcels.value ?? []).map(\.parcel),
                         alreadyAsked: store.askedParcelIDs,
                         preselected: target.parcel
-                    ) { parcel, areaHa in
-                        Task { await store.ask(parcel.id, areaHa: areaHa) }
+                    ) { parcel, area in
+                        Task { await store.ask(parcel.id, area: area) }
                     }
                 }
                 .alert("Запитването не беше изпратено", isPresented: Binding(
@@ -178,7 +178,7 @@ struct FarmRiskView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if let area = row.risk?.areaHa ?? row.parcel.areaHa {
-                    Text("\(Num.text(area)) ха")
+                    Text(Area(hectares: area).text)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
