@@ -184,11 +184,11 @@ is deliberately not its border.
 
 The gap was never "the app cannot edit"; it was that nobody had said so.
 
-**Updated 2026-09-24.** The claim that this app was ahead of the web
-here reversed with the schematic's deletion. The two clients converge
-instead: the target button that walks the parcels is the web's
-«Намери моето поле», adopted here, and the simplified/precise toggle has
-no web counterpart.
+**Updated 2026-09-24.** Still ahead, and by more: three map modes where
+the web has one. The schematic survives as the third, and the simplified
+rectangles have no web counterpart either. Traffic runs the other way
+too — the target button that walks the parcels is the web's «Намери моето
+поле», adopted here.
 
 ---
 
@@ -311,12 +311,15 @@ zero `colorSchemeContrast`. Done: every row speaks from its VALUES rather
 than its rendered text (a `·` separator was being read as "middle dot"),
 and `colorSchemeContrast` is honoured where colour carries meaning.
 
-**Regressed 2026-09-24.** The schematic map exposed one element per
-parcel with a compass bearing, and it has been deleted. `MKMapView`
-builds no accessibility tree, so both maps are now a single unlabelled
-rectangle to VoiceOver; the target button announces the field it moves
-to, which is a button speaking rather than a map that can be explored.
-Per-parcel elements over MapKit is owed work, not a closed gap.
+**Narrowed 2026-09-24.** The schematic exposes one element per parcel
+with a compass bearing and still does — it is the third map mode. The two
+SATELLITE modes have no accessibility tree at all, because `MKMapView`
+builds none, so to VoiceOver they are one unlabelled rectangle. The
+target button announces the field it moves to, which is a button
+speaking rather than a map that can be explored.
+
+So a blind operator has a map that works, and has to know to cycle to it.
+Per-parcel elements over MapKit is owed work.
 
 **No `reduceMotion`**, deliberately: the app has zero animations, so
 reading the environment to gate nothing would be an accessibility feature

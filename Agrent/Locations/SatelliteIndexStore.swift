@@ -8,7 +8,8 @@ final class SatelliteIndexStore {
     /// nil = no overlay, plain imagery. THE DEFAULT.
     ///
     /// The overlay is the deliberate second look — the same reasoning the
-    /// map's own default was once argued from, one level up. Opening a parcel should not spend a
+    /// map's own default is argued from, one level up. Opening a parcel
+    /// should not spend a
     /// round trip and a screenful of tiles on a question the farmer has not
     /// asked yet, and on a field with no signal it should not open onto a
     /// spinner.

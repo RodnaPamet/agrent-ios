@@ -9,10 +9,11 @@ import SwiftUI
 /// overlay of any kind. There is no `MapTileOverlay`, and `MKTileOverlay`
 /// cannot be reached through `MapContentBuilder`. Raster imagery from
 /// somewhere other than Apple means an `MKMapView`, so the map moved down a
-/// layer. It now serves BOTH modes the toggle offers — true outlines with
-/// index tiles, and simplified rectangles coloured sown or fallow — because
-/// a second representable in an if/else would tear this view down on every
-/// switch. See `ParcelShape`.
+/// layer. It serves the TWO SATELLITE modes of the three the button cycles —
+/// true outlines with index tiles, and simplified rectangles coloured sown or
+/// fallow — from one view, because a second representable in an if/else would
+/// tear this down on every switch. See `ParcelShape`. The third mode, the
+/// schematic, is pure Canvas and touches no MapKit at all, deliberately.
 ///
 /// ── Overlay order is the whole design ──
 ///

@@ -16,10 +16,9 @@ import Foundation
 ///    Two clients drawing the same country slightly differently is the
 ///    kind of difference nobody can explain later.
 /// 3. It is 41 KB against 66 KB, and it is BUNDLED — so the map draws with
-///    no network. That was also the schematic parcel map's whole argument,
-///    and the schematic has since been replaced by a second satellite map
-///    that does need tiles; this one still does not. A border does not
-///    change between releases.
+///    no network, which is the same argument the schematic parcel map is
+///    built on — now one of three modes there rather than the default. A
+///    border does not change between releases.
 ///
 /// ── The projection is the file's own, verified rather than inferred ──
 ///
@@ -31,10 +30,8 @@ import Foundation
 /// 10.0…590.0, matching to under a pixel. So a listing's lat/lon lands in
 /// exactly the same space as the polygons, with nothing guessed.
 ///
-/// `cos` is the latitude correction. `ParcelProjection` used the same trick
-/// at field scale until the schematic parcel map it served was replaced by a
-/// second satellite map; this is now the only place in the app that projects
-/// anything by hand, MapKit having taken the rest.
+/// `cos` is the latitude correction — the same trick `ParcelProjection`
+/// uses, at country scale instead of field scale.
 struct BulgariaMap {
     let width: CGFloat
     let height: CGFloat
