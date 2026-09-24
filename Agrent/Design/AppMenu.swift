@@ -92,35 +92,48 @@ struct AppMenuButton: View {
 }
 
 extension View {
-    /// Put the app menu in the leading slot of this screen's navigation bar.
+    /// Put the app menu in the TRAILING slot of this screen's navigation bar.
     ///
     /// An extension rather than five copies of the same `.toolbar` block, so
     /// placement cannot drift between tabs — the drift is silent, because
     /// nobody opens all five in a row.
+    ///
+    /// Moved from leading to trailing on the owner's instruction. The
+    /// bottom-row editor that used to sit in this slot has gone with it —
+    /// it now lives inside Админ, where the other settings are, rather than
+    /// riding along on every screen. That leaves one glyph in the bar
+    /// instead of two, which is also what gives a Bulgarian title back the
+    /// width it was losing.
     func appMenu() -> some View {
         toolbar {
-            ToolbarItem(placement: .topBarLeading) { AppMenuButton() }
-            // Top right, as asked. On Борса it joins the filter and the
-            // map toggle, which is three trailing glyphs — tight, and it
-            // fits, and consistency across the five tab roots is worth
-            // more than one uncrowded bar.
-            ToolbarItem(placement: .topBarTrailing) { TabCustomiserButton() }
+            ToolbarItem(placement: .topBarTrailing) { AppMenuButton() }
         }
     }
 }
 
 
-/// The top-right control that opens the bottom-row editor.
-struct TabCustomiserButton: View {
+/// The row inside Админ that opens the bottom-row editor.
+///
+/// This was a toolbar glyph on all five tab roots. It is a SETTING — which
+/// screens are in the bottom bar — and settings belong where the other
+/// settings are, not in the bar of every screen that has nothing to do
+/// with them.
+struct TabCustomiserRow: View {
     @State private var editing = false
 
     var body: some View {
         Button {
             editing = true
         } label: {
-            Label("Раздели", systemImage: "square.grid.2x2")
+            LabeledContent {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            } label: {
+                Label("Долна лента", systemImage: "square.grid.2x2")
+            }
         }
-        .accessibilityLabel("Раздели")
+        .buttonStyle(.plain)
         .accessibilityHint("Избира кои екрани са в долната лента")
         .sheet(isPresented: $editing) { TabCustomiserView() }
     }

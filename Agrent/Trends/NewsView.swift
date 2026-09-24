@@ -65,6 +65,7 @@ struct NewsView: View {
                         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                 }
                 .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             }
         }
     }

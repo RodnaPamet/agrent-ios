@@ -5,18 +5,6 @@ struct LocationsView: View {
 
     var body: some View {
         NavigationStack {
-            // `.safeAreaInset`, NOT a VStack.
-            //
-            // Wrapped in a VStack the List is no longer the scroll view the
-            // navigation bar tracks, so a pull-to-refresh drags the whole
-            // stack — banner, header and all — down the screen with the
-            // rows. The owner described it as pulling the page title along
-            // with the contents.
-            //
-            // As a safe-area inset the banner is chrome: it stays put, and
-            // the List underneath is the primary scrollable, which is what
-            // makes the refresh gesture behave the way every other iOS app
-            // does.
             // Chrome in a VStack above the scrollable — Борса's
             // arrangement, the one confirmed by use. See
             // `JournalListView` for why this is no longer a
@@ -27,6 +15,7 @@ struct LocationsView: View {
                 }
                 content
             }
+            .pageBackground()
             .navigationTitle("Локации")
             .appMenu()
             .task {
@@ -80,7 +69,10 @@ struct LocationsView: View {
                         location.parcelCount.map { Plural.bg($0, "парцел", "парцела") },
                     ]))
                 }
+                // On the ROW — see JournalListView.
+                .listRowBackground(Palette.Surface.card)
             }
+            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await store.refresh() } }
         }
     }

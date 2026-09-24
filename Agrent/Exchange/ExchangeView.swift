@@ -27,7 +27,8 @@ struct ExchangeView: View {
     var body: some View {
         NavigationStack {
             stack
-                .navigationTitle("Борса")
+                .pageBackground()
+            .navigationTitle("Борса")
                 .appMenu()
                 .toolbar {
                     if tab == .browse {
@@ -147,7 +148,8 @@ struct ExchangeView: View {
 
         case .loaded where showMap:
             ExchangeMapView(listings: listings.rows)
-                .refreshable { await PullToRefresh.bounded { await listings.load() } }
+                .scrollContentBackground(.hidden)
+            .refreshable { await PullToRefresh.bounded { await listings.load() } }
 
         case .loaded:
             List {
@@ -168,6 +170,7 @@ struct ExchangeView: View {
                     Text("Обявите са от всички стопанства в платформата.")
                 }
             }
+            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await listings.load() } }
         }
     }
@@ -276,6 +279,7 @@ struct ExchangeView: View {
                 }
                 .padding(.vertical, 2)
             }
+            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await mine.load() } }
         }
     }
@@ -300,7 +304,8 @@ struct ExchangeView: View {
 
         case .loaded(let rows, _):
             List(rows) { InquiryRow(inquiry: $0) }
-                .refreshable { await PullToRefresh.bounded { await inquiries.load() } }
+                .scrollContentBackground(.hidden)
+            .refreshable { await PullToRefresh.bounded { await inquiries.load() } }
         }
     }
 

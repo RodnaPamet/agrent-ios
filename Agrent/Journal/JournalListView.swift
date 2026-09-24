@@ -31,6 +31,7 @@ struct JournalListView: View {
                 content
             }
                 .safeAreaInset(edge: .bottom, spacing: 0) { newEntryButton }
+            .pageBackground()
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .appMenu()
@@ -119,10 +120,19 @@ struct JournalListView: View {
                     } label: {
                         JournalRow(entry: entry)
                     }
+                    // ON THE ROW, not on the List.
+                    //
+                    // `listRowBackground` looks like a List modifier and is
+                    // not: applied to the List it reaches nothing inside a
+                    // `ForEach`, which is why the bars went green twice
+                    // over and the rows stayed black both times.
+                    .listRowBackground(Palette.Surface.card)
                 }
                 loadMoreRow
+                    .listRowBackground(Palette.Surface.card)
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }
