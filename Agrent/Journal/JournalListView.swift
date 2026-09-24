@@ -6,20 +6,30 @@ struct JournalListView: View {
 
     var body: some View {
         NavigationStack {
-            // Chrome as safe-area insets, List as the scrollable. In a
-            // VStack the List is not what the navigation bar tracks, so a
-            // pull-to-refresh dragged the banner and the in-content title
-            // down the screen with the rows.
-            content
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    VStack(spacing: 0) {
-                        if let age = store.state.freshness?.ageDescription {
-                            StaleBanner(age: age)
-                        }
-                        header
-                    }
-                    .background(.bar)
+            // CHROME IN A VSTACK ABOVE THE LIST — the arrangement Борса
+            // uses, which is the one screen whose pull-to-refresh the owner
+            // has confirmed behaves.
+            //
+            // This was a `safeAreaInset(edge: .top)`, on the theory that an
+            // inset is chrome and therefore stays put while the rows slide
+            // under it. That theory is wrong in practice: the owner
+            // reported the title still dragging afterwards, on every screen
+            // I had "fixed" — and Борса, the only screen I never touched,
+            // was the only one that worked. I had the cause backwards and
+            // shipped it.
+            //
+            // So this copies a configuration confirmed by use rather than a
+            // mechanism argued from first principles. The bottom inset
+            // stays: it holds a floating button, nothing has been reported
+            // wrong with it, and it is not in the scroll path the drag
+            // follows.
+            VStack(spacing: 0) {
+                if let age = store.state.freshness?.ageDescription {
+                    StaleBanner(age: age)
                 }
+                header
+                content
+            }
                 .safeAreaInset(edge: .bottom, spacing: 0) { newEntryButton }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

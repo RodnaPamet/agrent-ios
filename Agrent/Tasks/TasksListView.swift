@@ -13,16 +13,17 @@ struct TasksListView: View {
 
     var body: some View {
         NavigationStack {
-            content
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    VStack(spacing: 0) {
-                        if let age = store.state.freshness?.ageDescription {
-                            StaleBanner(age: age)
-                        }
-                        header
-                    }
-                    .background(.bar)
+            // Chrome in a VStack above the scrollable — Борса's
+            // arrangement, the one confirmed by use. See
+            // `JournalListView` for why this is no longer a
+            // `safeAreaInset(edge: .top)`.
+            VStack(spacing: 0) {
+                if let age = store.state.freshness?.ageDescription {
+                    StaleBanner(age: age)
                 }
+                header
+                content
+            }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .appMenu()

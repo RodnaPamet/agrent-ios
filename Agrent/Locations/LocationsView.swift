@@ -17,12 +17,16 @@ struct LocationsView: View {
             // the List underneath is the primary scrollable, which is what
             // makes the refresh gesture behave the way every other iOS app
             // does.
-            content
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    if let age = store.state.freshness?.ageDescription {
-                        StaleBanner(age: age)
-                    }
+            // Chrome in a VStack above the scrollable — Борса's
+            // arrangement, the one confirmed by use. See
+            // `JournalListView` for why this is no longer a
+            // `safeAreaInset(edge: .top)`.
+            VStack(spacing: 0) {
+                if let age = store.state.freshness?.ageDescription {
+                    StaleBanner(age: age)
                 }
+                content
+            }
             .navigationTitle("Локации")
             .appMenu()
             .task {
