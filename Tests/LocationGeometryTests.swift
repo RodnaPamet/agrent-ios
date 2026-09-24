@@ -250,37 +250,55 @@ final class LocationGeometryTests: XCTestCase {
 /// fail silently. Pure and static, so it needs no `MKMapView`.
 final class ParcelShapeMountKeyTests: XCTestCase {
 
-    private func parcel(_ id: String) throws -> Parcel {
-        try JSONDecoder().decode(Parcel.self, from: Data("""
-        {"id":"\(id)","name":"n","cropType":null,"areaHa":1,"geometry":null,
+    private func parcel(_ id: String, crop: String? = nil) throws -> Parcel {
+        let cropJSON = crop.map { "\"\($0)\"" } ?? "null"
+        return try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"\(id)","name":"n","cropType":\(cropJSON),"areaHa":1,"geometry":null,
          "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
         """.utf8))
     }
 
-    /// THE regression this guards. The same fields drawn differently must not
-    /// compare equal, or the toggle returns early and nothing on screen moves.
+    /// THE regression this guards. The same fields drawn differently must
+    /// remount, or the mode switch returns early and nothing on screen moves.
     @MainActor
-    func testSameParcelsInDifferentShapesDoNotCompareEqual() throws {
+    func testSameParcelsInDifferentShapesRemount() throws {
         let parcels = [try parcel("a"), try parcel("b")]
-        XCTAssertNotEqual(
-            SatelliteParcelMap.Coordinator.mountKey(parcels, .outlines),
-            SatelliteParcelMap.Coordinator.mountKey(parcels, .boundingBoxes))
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            parcels, .boundingBoxes, mountedParcels: parcels, mountedShape: .outlines))
     }
 
     @MainActor
-    func testSameParcelsInTheSameShapeCompareEqual() throws {
+    func testAnIdenticalUpdateDoesNotRemount() throws {
         let parcels = [try parcel("a"), try parcel("b")]
-        XCTAssertEqual(
-            SatelliteParcelMap.Coordinator.mountKey(parcels, .outlines),
-            SatelliteParcelMap.Coordinator.mountKey(parcels, .outlines),
-            "an identical update must not remount a loaded overlay")
+        XCTAssertFalse(SatelliteParcelMap.Coordinator.needsRemount(
+            parcels, .outlines, mountedParcels: parcels, mountedShape: .outlines),
+            "an identical update must not tear down a loaded overlay")
+    }
+
+    @MainActor
+    func testNothingMountedYetRemounts() throws {
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            [try parcel("a")], .outlines, mountedParcels: [], mountedShape: nil))
     }
 
     @MainActor
     func testADifferentParcelSetRemounts() throws {
-        XCTAssertNotEqual(
-            SatelliteParcelMap.Coordinator.mountKey([try parcel("a")], .outlines),
-            SatelliteParcelMap.Coordinator.mountKey([try parcel("b")], .outlines))
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            [try parcel("a")], .outlines,
+            mountedParcels: [try parcel("b")], mountedShape: .outlines))
+    }
+
+    /// THE SECOND REGRESSION. Cache-first publishes the cached parcels and
+    /// then the fresh ones; same ids, changed contents. An id-keyed guard
+    /// dropped the fresh copy and kept drawing the stale one.
+    @MainActor
+    func testSameIDsWithChangedContentRemount() throws {
+        let cached = [try parcel("a", crop: nil)]
+        let fresh = [try parcel("a", crop: "Wheat")]
+        XCTAssertEqual(cached[0].id, fresh[0].id)
+        XCTAssertTrue(SatelliteParcelMap.Coordinator.needsRemount(
+            fresh, .boundingBoxes, mountedParcels: cached, mountedShape: .boundingBoxes),
+            "a crop recorded elsewhere must reach the map, not just the list")
     }
 
     /// A box is ONE rectangle for the parcel, however many polygons it has.

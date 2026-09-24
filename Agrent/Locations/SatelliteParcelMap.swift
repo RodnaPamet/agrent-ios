@@ -168,7 +168,8 @@ struct SatelliteParcelMap: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, MKMapViewDelegate {
         private var mountedTemplate: String?
-        private var mountedKey: String?
+        private var mountedParcels: [Parcel] = []
+        private var mountedShape: ParcelShape?
         private var appliedTick = 0
 
         /// Which parcel each `MKPolygon` came from. One parcel can produce
@@ -183,20 +184,33 @@ struct SatelliteParcelMap: UIViewRepresentable {
         var onTap: ((Parcel) -> Void)?
         weak var tap: UITapGestureRecognizer?
 
-        /// THE SHAPE IS IN THE KEY, and that is the whole of this function.
+        /// Whether the overlays on screen still describe the data.
         ///
-        /// The remount guard used to compare parcel ids alone. The ids are
-        /// identical in both modes — same fields, drawn differently — so
-        /// toggling would have been silently inert: the guard would return
-        /// early and the old overlays would stay mounted. A toggle that
-        /// changes nothing is indistinguishable from a broken button.
-        static func mountKey(_ parcels: [Parcel], _ shape: ParcelShape) -> String {
-            let marker: String
-            switch shape {
-            case .outlines: marker = "outline"
-            case .boundingBoxes: marker = "box"
-            }
-            return marker + ":" + parcels.map(\.id).joined(separator: ",")
+        /// COMPARES THE PARCELS THEMSELVES, not their ids, and this went
+        /// wrong twice in the same guard.
+        ///
+        /// First it compared ids alone, which are identical in both shapes —
+        /// same fields, drawn differently — so switching mode returned early
+        /// and left the old overlays mounted. A control that changes nothing
+        /// is indistinguishable from a broken one.
+        ///
+        /// Then, with the shape folded in, ids were still all it knew about
+        /// the parcels. `CachedResource.loadShowingCacheFirst` publishes
+        /// TWICE by design — the cached copy, then the fresh one — and those
+        /// two carry the same ids with different contents. A crop recorded
+        /// on the web, or a corrected boundary, arrives in the second publish
+        /// and was dropped: the simplified map would keep drawing a field
+        /// fallow-dashed while the list directly beneath it, reading the same
+        /// fresh response, named the crop.
+        ///
+        /// `Parcel`'s `==` is synthesised over every stored property,
+        /// geometry included. Its `hash(into:)` is NOT — it is narrowed to
+        /// `id` deliberately — so this must never become a hash comparison.
+        static func needsRemount(
+            _ parcels: [Parcel], _ shape: ParcelShape,
+            mountedParcels: [Parcel], mountedShape: ParcelShape?
+        ) -> Bool {
+            shape != mountedShape || parcels != mountedParcels
         }
 
         /// Records a command as already honoured, without moving anything.
@@ -222,9 +236,11 @@ struct SatelliteParcelMap: UIViewRepresentable {
         }
 
         func syncParcels(_ parcels: [Parcel], shape: ParcelShape, in view: MKMapView) {
-            let key = Self.mountKey(parcels, shape)
-            guard key != mountedKey else { return }
-            mountedKey = key
+            guard Self.needsRemount(parcels, shape,
+                                    mountedParcels: mountedParcels,
+                                    mountedShape: mountedShape) else { return }
+            mountedParcels = parcels
+            mountedShape = shape
 
             for overlay in view.overlays where overlay is MKPolygon {
                 view.removeOverlay(overlay)
