@@ -290,3 +290,54 @@ final class AlreadyAskedTests: XCTestCase {
         XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(URLError(.timedOut)))
     }
 }
+
+/// The ordering and the generation token — the two parts of the loading
+/// path that a screenshot cannot reach.
+final class RiskOrderingTests: XCTestCase {
+
+    private func row(_ id: String, _ name: String, _ level: RiskLevel?) throws -> RiskRow {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data("""
+        {"id":"\(id)","name":"\(name)","cropType":null,"areaHa":1,"geometry":null,
+         "soilType":null,"cadastralId":null,"ekatte":null,"hasActiveLease":false}
+        """.utf8))
+        var r = RiskRow(parcel: parcel)
+        if let level {
+            let d = JSONDecoder()
+            d.dateDecodingStrategy = .iso8601
+            r.risk = try d.decode(ParcelRisk.self, from: Data("""
+            {"parcelId":"\(id)","name":"\(name)","areaHa":1,"cropType":null,
+             "configured":true,"ndvi":0.5,"ndmi":0.5,
+             "vegetation":"\(level.rawValue)","moisture":"\(level.rawValue)",
+             "overall":"\(level.rawValue)","acquiredDate":"2026-09-20",
+             "generatedAt":"2026-09-24T06:00:00Z"}
+            """.utf8))
+        }
+        return r
+    }
+
+    func testWorstFirstThenUnread() throws {
+        let rows = [
+            try row("a", "Алфа", .good),
+            try row("b", "Бета", nil),
+            try row("c", "Гама", .stress),
+            try row("d", "Делта", .watch),
+        ]
+        let order = rows.sorted { $0.sortKey < $1.sortKey }.map(\.id)
+        XCTAssertEqual(order, ["c", "d", "a", "b"])
+    }
+
+    /// `sorted` is not guaranteed stable, and this farm numbers several
+    /// fields alike — without the id the same data can order two ways.
+    func testTwoParcelsWithTheSameNameOrderDeterministically() throws {
+        let rows = [try row("z", "Нива 19", .good), try row("a", "Нива 19", .good)]
+        XCTAssertEqual(rows.sorted { $0.sortKey < $1.sortKey }.map(\.id), ["a", "z"])
+        XCTAssertEqual(rows.reversed().sorted { $0.sortKey < $1.sortKey }.map(\.id), ["a", "z"])
+    }
+
+    /// An unread row sorts last whatever its name, so the list does not
+    /// claim a field is healthy before anything has been read about it.
+    func testUnreadSortsBelowEveryVerdict() throws {
+        let rows = [try row("a", "Аaa", nil), try row("b", " Zzz", .good)]
+        XCTAssertEqual(rows.sorted { $0.sortKey < $1.sortKey }.map(\.id), ["b", "a"])
+    }
+}
