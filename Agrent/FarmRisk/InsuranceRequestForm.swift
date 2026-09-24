@@ -49,17 +49,26 @@ struct InsuranceRequestForm: View {
         // left the area blank beside it — a named field with an empty area
         // and its registered size printed directly underneath, which reads
         // as the app having lost the number.
-        let opening = preselected ?? parcels.first { !alreadyAsked.contains($0.id) }
+        // Opens on a parcel with no lead when one exists, since a first
+        // ask is the likelier intent — but any parcel can be chosen.
+        let opening = preselected
+            ?? parcels.first { !alreadyAsked.contains($0.id) }
+            ?? parcels.first
         _selectedID = State(initialValue: opening?.id)
         _areaText = State(initialValue: Self.areaText(for: opening))
     }
 
-    private var available: [Parcel] {
-        // A parcel already asked about is not offered. The server 409s it,
-        // and letting someone pick it, type an area and submit is exactly
-        // the failure `GET /insurance/leads` exists to prevent.
-        parcels.filter { !alreadyAsked.contains($0.id) }
-    }
+    /// EVERY parcel. `alreadyAsked` marks, it no longer filters.
+    ///
+    /// This excluded parcels with a lead, because the server refused a
+    /// second ask with 409 and letting someone pick one, type an area and
+    /// submit was the failure `GET /insurance/leads` existed to prevent.
+    /// The constraint is gone (agri-saas f98e39d2) and that endpoint is
+    /// informational now — it says what HAS been asked, not what MAY be.
+    ///
+    /// Filtering here would make the correction the change was made for
+    /// unreachable from the phone.
+    private var available: [Parcel] { parcels }
 
     private var selected: Parcel? {
         available.first { $0.id == selectedID }
@@ -90,8 +99,8 @@ struct InsuranceRequestForm: View {
             Form {
                 if available.isEmpty {
                     RefusalNote(
-                        text: "За всички парцели вече е изпратено запитване.",
-                        icon: "checkmark.seal")
+                        text: "Тази локация няма парцели.",
+                        icon: "map")
                 } else {
                     Section {
                         if available.count == 1, let only = available.first {
@@ -102,7 +111,14 @@ struct InsuranceRequestForm: View {
                             // menu picker is the one place they get cut.
                             Picker("Парцел", selection: $selectedID) {
                                 ForEach(available) { parcel in
-                                    Text(parcel.name).tag(Optional(parcel.id))
+                                    // The marker travels with the name, so
+                                    // a farmer sees which fields they have
+                                    // already asked about while choosing,
+                                    // rather than after.
+                                    Text(alreadyAsked.contains(parcel.id)
+                                         ? "\(parcel.name) ✓"
+                                         : parcel.name)
+                                        .tag(Optional(parcel.id))
                                 }
                             }
                             .pickerStyle(.navigationLink)
@@ -137,9 +153,17 @@ struct InsuranceRequestForm: View {
                     }
 
                     Section {
+                        // The warning is now narrower and truer. A lead
+                        // still cannot be withdrawn — there is no DELETE
+                        // and no PATCH — but it is no longer one per
+                        // parcel, and saying so would misdescribe the
+                        // server and discourage the correction this form
+                        // exists to allow.
                         Label(
-                            "Запитването не може да бъде оттеглено и всеки парцел "
-                          + "може да бъде заявен само веднъж.",
+                            selected.map { alreadyAsked.contains($0.id) } == true
+                                ? "За този парцел вече има запитване. Това ще изпрати "
+                                + "ново, което не може да бъде оттеглено."
+                                : "Запитването не може да бъде оттеглено.",
                             systemImage: "exclamationmark.triangle")
                             .font(.footnote)
                             .foregroundStyle(.orange)

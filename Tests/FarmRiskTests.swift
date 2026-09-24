@@ -315,20 +315,42 @@ final class InsuranceAskTests: XCTestCase {
     }
 
     /// It says the ask cannot be withdrawn. After this there is nowhere
-    /// left to say it.
+    /// left to say it — there is still no DELETE and no PATCH.
     func testTheFormSaysItCannotBeTakenBack() {
         XCTAssertTrue(formSource.contains("не може да бъде оттеглено"),
                       "the form does not state that the ask is irreversible")
-        XCTAssertTrue(formSource.contains("само веднъж"),
-                      "the form does not state one ask per parcel")
     }
 
-    /// A parcel with a lead is never offered. The server 409s it, and
-    /// letting someone pick it, type an area and submit is the failure
-    /// `GET /insurance/leads` exists to prevent.
-    func testTheFormNeverOffersAParcelAlreadyAskedAbout() {
+    /// AND IT NO LONGER CLAIMS ONE ASK PER PARCEL. The server dropped that
+    /// constraint (agri-saas f98e39d2) so a farmer can correct an area they
+    /// got wrong; a form still saying «само веднъж» would misdescribe the
+    /// server and discourage the correction it exists to allow.
+    func testTheFormNoLongerClaimsOneAskPerParcel() {
+        XCTAssertFalse(formSource.contains("само веднъж"),
+                       "the form still claims a parcel can be asked about once")
+    }
+
+    /// A parcel that already has a lead is SAID SO, not hidden. The warning
+    /// is narrower for it than for a first ask.
+    func testTheFormSaysWhenAParcelAlreadyHasALead() {
+        XCTAssertTrue(formSource.contains("вече има запитване"),
+                      "the form does not warn that this is a repeat ask")
+    }
+
+    /// EVERY parcel is offered, and `alreadyAsked` marks rather than
+    /// filters.
+    ///
+    /// This asserted the opposite until the constraint was dropped, and it
+    /// was right then: a second POST 409'd, so letting someone pick a
+    /// parcel, type an area and submit was the failure
+    /// `GET /insurance/leads` existed to prevent. That endpoint is
+    /// informational now — it says what HAS been asked, not what MAY be —
+    /// and filtering would make the correction unreachable from the phone.
+    func testTheFormOffersEveryParcelAndOnlyMarksTheAskedOnes() {
+        XCTAssertTrue(formSource.contains("private var available: [Parcel] { parcels }"),
+                      "the form is filtering parcels again")
         XCTAssertTrue(formSource.contains("alreadyAsked.contains"),
-                      "the form does not filter parcels that already have a lead")
+                      "the form does not mark parcels that already have a lead")
     }
 
     /// NEVER retried automatically. A lost response on a bad connection
