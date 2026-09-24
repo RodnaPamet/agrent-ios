@@ -162,10 +162,11 @@ struct FarmRiskView: View {
         case .loaded(let rows, _):
             List(rows) { row in
                 parcelRow(row)
+                    .pageRow()
                     .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
             }
             .listStyle(.plain)
-            .scrollContentBackground(.hidden)
+            .pageBackground()
         }
     }
 

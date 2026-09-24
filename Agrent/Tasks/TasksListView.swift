@@ -24,7 +24,8 @@ struct TasksListView: View {
                 header
                 content
             }
-            .pageBackground()
+            // The strip above the list draws nothing of its own.
+            .background(Palette.Surface.page)
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .appMenu()
@@ -78,18 +79,17 @@ struct TasksListView: View {
                         text: "Списъкът е съкратен от сървъра. Не всички задачи се показват.",
                         icon: "exclamationmark.triangle"
                     )
-                    .listRowBackground(Palette.Surface.card)
+                    .pageRow()
                 }
                 ForEach(page.items) { item in
                     NavigationLink { TaskDetailView(summary: item) } label: {
                         TaskRow(item: item)
                     }
-                    // On the ROW — see JournalListView.
-                    .listRowBackground(Palette.Surface.card)
+                    .pageRow()
                 }
             }
             .listStyle(.plain)
-            .scrollContentBackground(.hidden)
+            .pageBackground()
             .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }

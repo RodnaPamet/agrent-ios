@@ -20,34 +20,45 @@ import SwiftUI
 enum Palette {
     /// Ochre in light, GOLD in dark. Tabs, buttons, links.
     ///
-    /// Gold is the web's brand colour — `--brand-default #D4AF37` — and the
-    /// owner asked for the phone's dark mode to match. It keeps the rule
-    /// that made the light accent ochre: the accent must not be a colour
-    /// the parcel map uses for DATA, and gold is not green.
+    /// The gold is the web's `--brand-default #D4AF37`, and it is ALL that
+    /// survived a dark theme that also took the web's green surfaces. That
+    /// theme shipped half-finished — three screens had green rows and four
+    /// still drew black ones — and the owner's call was to put the system's
+    /// dark appearance back and keep only the gold. A half-themed app is
+    /// worse than an unthemed one.
+    ///
+    /// It keeps the rule that made the light accent ochre in the first
+    /// place: the accent must not be a colour the parcel map uses for DATA.
+    /// Green on that map means "this field is sown", and gold is not green.
     static let accent = Color(light: 0xA04E1B, dark: 0xD4AF37)
 
     /// Pressed, and text on the accent chip. `--brand-emphasis` in dark.
     static let accentDeep = Color(light: 0x7A3A12, dark: 0xB8860B)
 
-    /// The dark theme's ground, from the web's `--bg-page` / `--bg-default`.
+    /// The page, in dark only: a very dark green instead of pure black.
     ///
-    /// GREEN AS SURFACE IS THE WEB'S RULE, AND IT COLLIDES WITH THIS APP'S.
-    /// There, green is the page and never a signal; here, green on the
-    /// parcel map means "this field is sown". Dropping a saturated green
-    /// ground under that would dissolve the signal into the surface.
+    /// ONE COLOUR, not a page/card pair. The first attempt at a dark theme
+    /// had a #05231B page under #0A3327 cards, and getting that right meant
+    /// touching every list in the app — I reached three of seven, so three
+    /// screens had green rows and four still had black ones. A half-themed
+    /// app is worse than an unthemed one, and the owner said so.
     ///
-    /// What transfers is not the hexes but the pair of moves the web made:
-    /// pull the ground down in saturation and lightness until it recedes,
-    /// and push the signal up until it out-luminates the ground. So these
-    /// are their values — #05231B and #0A3327, the flag's green taken far
-    /// down — and `Map.sownFill` brightens in dark to stay above them.
+    /// A single value is much harder to get half-right: every surface that
+    /// was black becomes the same green, and a screen I miss is obviously
+    /// wrong rather than subtly inconsistent.
     ///
-    /// Light is untouched. The web's light palette is a different palette
-    /// rather than the same hues relit, and this app's light mode is
-    /// shipped and was not asked about.
+    /// LIGHT IS UNTOUCHED — this resolves to `systemBackground` there, so
+    /// the shipped light appearance is byte-for-byte what it was.
+    ///
+    /// Dark enough to read as "not quite black": at #0A1712 the hue is
+    /// visible against true black but it never competes with the map's
+    /// sown-green, which is the one green in this app that carries meaning.
     enum Surface {
-        static let page = Color(light: 0xF2F2F7, dark: 0x05231B)
-        static let card = Color(light: 0xFFFFFF, dark: 0x0A3327)
+        static let page = Color(UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(Color(hex: 0x0A1712))
+                : .systemBackground
+        })
     }
 
     /// #B4472A. The ONLY colour that means "something is broken". Reserved:
@@ -58,10 +69,10 @@ enum Palette {
     /// Entry-type chips. Two families so a glance separates an input
     /// application from an observation without reading.
     enum Chip {
-        static let inputText = Color(light: 0x7A3A12, dark: 0xE4C55C)
-        static let inputFill = Color(light: 0xF6EBE2, dark: 0x1F2A16)
-        static let activityText = Color(light: 0x274A6D, dark: 0x9FC6F5)
-        static let activityFill = Color(light: 0xE7EFF7, dark: 0x13263A)
+        static let inputText = Color(hex: 0x7A3A12)
+        static let inputFill = Color(hex: 0xF6EBE2)
+        static let activityText = Color(hex: 0x274A6D)
+        static let activityFill = Color(hex: 0xE7EFF7)
         static let neutralText = Color.secondary
         static let neutralFill = Color(.secondarySystemFill)
     }
@@ -71,19 +82,10 @@ enum Palette {
         static let ground = Color(hex: 0x6E6A52)
         static let pathMajor = Color(hex: 0x8C8770)
         static let pathMinor = Color(hex: 0x7E7A63)
-        // BRIGHTENED IN DARK so the signal stays above the ground.
-        //
-        // #3E8E4F over a #0A3327 page is two greens within a narrow band of
-        // each other, which is the failure the web names in its own token
-        // file: "a success badge on a success-coloured page says nothing".
-        // Their answer is to push the signal past stock emerald; #5FE39B is
-        // their `--content-success`, and the sown fill takes the same step.
-        static let sownFill = Color(light: 0x3E8E4F, dark: 0x5FE39B)
-        static let sownStroke = Color(light: 0x2C6E3A, dark: 0x8FF3BE)
-        // Fallow moves the other way — away from green entirely, so the two
-        // states cannot converge on a green ground.
-        static let fallowFill = Color(light: 0x9A9560, dark: 0xD8CE92)
-        static let fallowStroke = Color(light: 0x6F6B3E, dark: 0xEFE8BE)
+        static let sownFill = Color(hex: 0x3E8E4F)
+        static let sownStroke = Color(hex: 0x2C6E3A)
+        static let fallowFill = Color(hex: 0x9A9560)
+        static let fallowStroke = Color(hex: 0x6F6B3E)
         static let label = Color.white
         /// The coordinate grid. Shares the minor-path value deliberately —
         /// same family, no new colour introduced into a closed palette — but
@@ -121,11 +123,10 @@ extension Color {
     /// One colour, two appearances — resolved by the system rather than by
     /// anything reading `@Environment(\.colorScheme)`.
     ///
-    /// A literal cannot answer "which appearance is this?", and a value
-    /// read from the environment cannot reach a `UIColor` inside a MapKit
+    /// A literal cannot answer "which appearance is this?", and a value read
+    /// from the environment cannot reach a `UIColor` inside a MapKit
     /// renderer or a UIKit appearance proxy. A dynamic `UIColor` answers in
-    /// both places, which is why the bridge is here rather than at each
-    /// call site.
+    /// both places.
     init(light: UInt32, dark: UInt32) {
         self.init(UIColor { traits in
             UIColor(Color(hex: traits.userInterfaceStyle == .dark ? dark : light))

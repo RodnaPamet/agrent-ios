@@ -10,7 +10,6 @@ struct AgrentApp: App {
     /// `BulgarianLayout`.
     init() {
         BulgarianLayout.install()
-        Appearance.install()
     }
 
     var body: some Scene {
