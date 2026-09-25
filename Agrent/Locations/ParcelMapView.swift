@@ -4,6 +4,7 @@ import SwiftUI
 struct ParcelMapView: View {
     let location: Location
 
+    @State private var importing = false
     @State private var store: ParcelsStore
 
     /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
@@ -56,6 +57,32 @@ struct ParcelMapView: View {
             content
         }
         .inlineTitle(location.name)
+        // IN THE MENU, not the bar. The trailing slot holds the mode toggle,
+        // and the note further down explains why a second glyph there costs
+        // the Bulgarian title the width it has left — while an import is
+        // monthly work, which is what that menu was described as being for.
+        .appMenu {
+            Button {
+                importing = true
+            } label: {
+                Label("Импорт на граници", systemImage: "square.and.arrow.down")
+            }
+        }
+        .sheet(isPresented: $importing) {
+            SpatialImportView(
+                locationID: location.id,
+                locationName: location.name,
+                // The real number, so the warning names what is there rather
+                // than "your parcels". Zero while the list is still loading,
+                // which says only that the import adds — true either way.
+                existingParcelCount: store.state.value?.parcels.count ?? 0
+            ) {
+                // Runs when the JOB reports finished, never on the 202 — the
+                // parse does not run on the request thread and the parcels do
+                // not exist until the worker says so.
+                Task { await store.load() }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

@@ -90,16 +90,26 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         // not offered the ask — which is the right division. Knowing a
         // field is stressed is field work; contacting an insurer is not.
         case .locations, .tasks, .farmRisk: true
-        // NOT VERIFIED EITHER WAY, and false is the conservative reading of
-        // an unverified prefix rather than a finding. Whether `/dashboard` is
-        // in the server's operator allowlist is not something this app has
-        // been told, and six of the nine surfaces are already false — so this
-        // matches the majority rather than inventing a permission.
+        // VERIFIED 2026-09-26, and the guess was right for the role this
+        // actually gates.
         //
-        // The cost of being wrong here is a screen an operator could have used
-        // and does not see, which is reversible in one line. The cost the other
-        // way is four requests that 403 on a screen built to show four blocks.
-        // Asked of the server session.
+        // This flag is consulted ONLY when `isOperator` is true, and
+        // `CurrentUser.isOperator` is MECHANISATOR alone — so `false` here
+        // hides «Табло» from MECHANISATOR and from nobody else. READER and
+        // AUDITOR have never been affected by it, which is a thing I said
+        // wrongly to the owner before reading this function.
+        //
+        // The server agrees, traced in its source: the path lockdown tests
+        // `role === 'MECHANISATOR'` and no other role, and the operator API
+        // allowlist is `(farm-tasks|field-operations|tasks|locations|agro)`.
+        // Neither `dashboard` nor `reports` is in it, so a MECHANISATOR 403s on
+        // all four of the screen's requests — including `/reports/field-briefing`,
+        // which is not under `/dashboard` and would have needed `reports`
+        // listed separately even if it were.
+        //
+        // READER and AUDITOR pass: every one of the four gates on
+        // `assertCanRead` or weaker, and `canRead` is `level >= 1` with READER
+        // at 1 and AUDITOR at 2.
         case .dashboard: false
         case .journal, .calculator, .exchange, .trends, .news: false
         }
