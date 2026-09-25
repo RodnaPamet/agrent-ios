@@ -123,10 +123,27 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     /// itself. NOT the same as `id`, which identifies the line.
     let taskId: String
     let operationType: FieldOperationType?
-    let title: String
-    let productName: String
     let doseUnit: String
     let targetNote: String?
+
+    /// EMPTY means "not recorded", and all three of these can be empty.
+    ///
+    /// `title`, `productName` and `doseUnit` are each a `?? ''` collapse of an
+    /// absent relation on the server — `line.task?.title`,
+    /// `line.product?.name`, `line.doseUnit?.symbol` — and the spec now says
+    /// so in this schema's description. They are `required` and `type: string`
+    /// truthfully, because a string is what arrives; it is just sometimes the
+    /// empty one. See `String.recorded`.
+    ///
+    /// Found on the server side by grep, not here: this client had already
+    /// shipped the `doseUnit` case as a trailing space and would have shipped
+    /// the other two the same way, because an empty title renders as a blank
+    /// row rather than as an error.
+    var title: String? { titleRaw.recorded }
+    var productName: String? { productNameRaw.recorded }
+
+    private let titleRaw: String
+    private let productNameRaw: String
 
     /// A decimal STRING on the wire, and the server says what happens if
     /// that is ignored: "parsing it as a float rounds the dose". `л/дка` on
@@ -136,8 +153,9 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     let completedAtRaw: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, taskId, operationType, title, productName, doseUnit
-        case targetNote, doseValue
+        case id, taskId, operationType, doseUnit, targetNote, doseValue
+        case titleRaw = "title"
+        case productNameRaw = "productName"
         case completedAtRaw = "completedAt"
     }
 
@@ -168,8 +186,8 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     var doseText: String {
         let fraction = doseValue.raw.split(separator: ".").dropFirst().first?.count ?? 0
         let number = doseValue.text(scale: fraction)
-        guard !doseUnit.isEmpty else { return number }
-        return "\(number) \(doseUnit)"
+        guard let unit = doseUnit.recorded else { return number }
+        return "\(number) \(unit)"
     }
 }
 

@@ -234,6 +234,43 @@ final class ParcelHistoryTests: XCTestCase {
         XCTAssertEqual(unrecognised.operationType, .unknown)
     }
 
+    /// All THREE of these are `?? ''` collapses on the server — `task?.title`,
+    /// `product?.name`, `doseUnit?.symbol` — so each can arrive empty while
+    /// being `required` and `type: string` truthfully. Nothing in the contract
+    /// distinguishes "not recorded" from "recorded", which is why this needed
+    /// a grep on the server side to find at all.
+    ///
+    /// Empty means NOT RECORDED, never "unknown", so each reads as nil and the
+    /// view leaves the part out rather than apologising for it.
+    func testTheThreeCollapsedFieldsReadAsNotRecordedWhenEmpty() async throws {
+        let bare = #"""
+        {"id":"l","taskId":"t","operationType":null,"title":"",
+         "completedAt":null,"productName":"","doseValue":"1","doseUnit":"",
+         "targetNote":null}
+        """#
+        let line = try await decode(bare, as: ParcelHistoryOperation.self)
+        XCTAssertNil(line.title)
+        XCTAssertNil(line.productName)
+        XCTAssertNil(line.doseUnit.recorded)
+        XCTAssertEqual(line.doseText, "1")
+    }
+
+    /// Whitespace is not something a farmer typed on purpose, and it renders
+    /// identically to empty while defeating an `isEmpty` check.
+    func testWhitespaceCountsAsNotRecorded() async throws {
+        let padded = Self.sprayLine
+            .replacingOccurrences(of: #""Хербицид""#, with: #""   ""#)
+        let line = try await decode(padded, as: ParcelHistoryOperation.self)
+        XCTAssertNil(line.title)
+    }
+
+    /// And a recorded value survives the same path untrimmed of meaning.
+    func testARecordedTitleAndProductSurvive() async throws {
+        let line = try await decode(Self.sprayLine, as: ParcelHistoryOperation.self)
+        XCTAssertEqual(line.title, "Хербицид")
+        XCTAssertEqual(line.productName, "Раундъп")
+    }
+
     // MARK: - Weeds: the server's split, kept
 
     private static let observation = #"""
