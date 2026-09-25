@@ -266,9 +266,19 @@ actor APIClient {
     /// before it models, which is the order that has been right every time
     /// today and wrong every time it was reversed.
     /// `idempotencyKey` is OPTIONAL, and nil is a statement rather than an
-    /// omission: the grain routes ignore the header entirely, and sending
-    /// one that is ignored would read, to the next person, as protection
-    /// that is not there.
+    /// omission.
+    ///
+    /// It used to say "the grain routes ignore the header entirely", which is
+    /// wrong: `POST /grain/costs` and `POST /grain/yield-records` honour it,
+    /// `POST /grain/contracts` does not (traced in agri-saas source
+    /// 2026-09-25 — see `CostsAPI.create` for the chain). The rule is
+    /// per-ROUTE, not per-area, and a comment that generalises to an area is
+    /// how this one came to be wrong twice.
+    ///
+    /// nil still means something, and it is no longer "the server would
+    /// ignore it": it means NOTHING HERE REUSES A KEY. A key sent once, never
+    /// replayed, protects against nothing — so passing one would read as
+    /// protection that is not there just as much as the old claim did.
     func postReturningData<B: Encodable>(
         _ path: String, body: B, idempotencyKey: String?
     ) async throws -> Data {
