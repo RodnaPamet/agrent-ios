@@ -26,14 +26,42 @@ import Foundation
 struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let id: String
 
-    /// The human-facing reference, e.g. the thing an operator reads out on
-    /// the phone. Non-null on every row measured.
-    let key: String
+    /// The human-facing reference — the thing an operator reads out on the
+    /// phone. NULLABLE, and this said "Non-null on every row measured"
+    /// until the generated spec was read on 2026-09-25.
+    ///
+    /// `FarmTaskListItem.key` is declared `["string","null"]`. Measured
+    /// non-null on the eight rows that existed is not the same as contracted
+    /// non-null, and this is the second time that distinction has cost
+    /// something here — the first was reporting `ALFALFA` as a server defect
+    /// when it was this repo's own fixture.
+    ///
+    /// Declared non-optional it was worse than a wrong label: a single null
+    /// throws, and because the list decodes `[WorkItemSummary]` inside its
+    /// envelope, ONE row would take the whole Задачи tab with it. That is
+    /// the tab an operator opens many times a day, and it would have failed
+    /// with a server error on a payload that was perfectly valid.
+    let key: String?
 
     let title: String
     let type: WorkItemType
     let status: WorkItemStatus
-    let severity: WorkItemSeverity
+
+    /// NULLABLE on the wire, non-optional here — `null` becomes `.unknown`.
+    ///
+    /// `FarmTaskListItem.severity` is declared `["string","null"]` too, and a
+    /// null is worse here than on `key` because `LenientDecodable` looks like
+    /// it already covers this and does not: it is lenient about an
+    /// unrecognised STRING, decoding one through a single-value container,
+    /// and that container THROWS on null. So the enum designed for "no
+    /// usable value" could not receive the commonest way of saying it.
+    ///
+    /// `.unknown` is exactly the right landing place and needs no call site
+    /// to change: `severityText` already returns nil for it, so the row shows
+    /// no urgency signal, and the detail screen already prints «—».
+    var severity: WorkItemSeverity { severityRaw ?? .unknown }
+
+    private let severityRaw: WorkItemSeverity?
 
     /// Null on all eight production rows today, so the overdue and
     /// due-date paths below are MODELLED, NOT VERIFIED. First task with a
@@ -44,6 +72,15 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let assigneeUserId: String?
     let createdAt: Date
     let updatedAt: Date
+
+    /// Spelled out because `severityRaw` is renamed, and a synthesised
+    /// `CodingKeys` would have looked for a `severityRaw` key that no server
+    /// sends. Every other name is its own.
+    private enum CodingKeys: String, CodingKey {
+        case id, key, title, type, status, dueAt
+        case assignee, assigneeUserId, createdAt, updatedAt
+        case severityRaw = "severity"
+    }
 
     /// A person, which makes this the first PERSONAL DATA the app models.
     ///

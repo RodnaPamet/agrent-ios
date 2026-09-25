@@ -106,6 +106,65 @@ final class WorkItemSummaryTests: XCTestCase {
         let page = try await WorkItemAPI.decodeList(from: Data(json.utf8))
         XCTAssertTrue(page.truncated)
     }
+
+    // MARK: - The two nullable fields the spec declares and this model did not
+
+    /// `FarmTaskListItem.key` and `.severity` are both `["string","null"]` in
+    /// the generated spec. Declared non-optional here, a single null threw —
+    /// and because the list decodes an ARRAY, one row would have taken the
+    /// whole Задачи tab with it, on a payload the server considers valid.
+    ///
+    /// The comment on `key` said "Non-null on every row measured", which was
+    /// true of the eight rows that existed and is not what the contract says.
+    func testARowWithANullKeyAndNullSeverityStillDecodes() async throws {
+        let row = try await APIClient.shared.decode(Data(#"""
+        {"id":"t1","key":null,"title":"Пръскане","type":"FIELD_OPERATION",
+         "status":"OPEN","severity":null,"dueAt":null,"assignee":null,
+         "assigneeUserId":null,"createdAt":"2026-09-01T10:00:00.000Z",
+         "updatedAt":"2026-09-01T10:00:00.000Z"}
+        """#.utf8), as: WorkItemSummary.self)
+
+        XCTAssertNil(row.key)
+        XCTAssertEqual(row.severity, .unknown)
+    }
+
+    /// THE one that matters: a whole list must survive one such row. This is
+    /// the blast radius the old declaration had, not the missing label.
+    func testOneNullRowDoesNotTakeTheWholeListWithIt() async throws {
+        let rows = try await APIClient.shared.decode(Data(#"""
+        [{"id":"a","key":"AGT-1","title":"Едно","type":"FIELD_OPERATION",
+          "status":"OPEN","severity":"HIGH","dueAt":null,"assignee":null,
+          "assigneeUserId":null,"createdAt":"2026-09-01T10:00:00.000Z",
+          "updatedAt":"2026-09-01T10:00:00.000Z"},
+         {"id":"b","key":null,"title":"Две","type":"FIELD_OPERATION",
+          "status":"OPEN","severity":null,"dueAt":null,"assignee":null,
+          "assigneeUserId":null,"createdAt":"2026-09-01T10:00:00.000Z",
+          "updatedAt":"2026-09-01T10:00:00.000Z"}]
+        """#.utf8), as: [WorkItemSummary].self)
+
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0].severity, .high)
+        XCTAssertEqual(rows[1].severity, .unknown)
+    }
+
+    /// `LenientDecodable` looks like it already covered a null severity and
+    /// did not: it is lenient about an unrecognised STRING, decoded through a
+    /// single-value container that throws on null. Both paths now land on
+    /// `.unknown`, which is what the case was for.
+    func testAnUnrecognisedSeverityAndANullOneBothLandOnUnknown() async throws {
+        func severity(_ value: String) async throws -> WorkItemSeverity {
+            try await APIClient.shared.decode(Data(#"""
+            {"id":"t","key":"AGT-9","title":"Т","type":"FIELD_OPERATION",
+             "status":"OPEN","severity":\#(value),"dueAt":null,"assignee":null,
+             "assigneeUserId":null,"createdAt":"2026-09-01T10:00:00.000Z",
+             "updatedAt":"2026-09-01T10:00:00.000Z"}
+            """#.utf8), as: WorkItemSummary.self).severity
+        }
+        let fromNull = try await severity("null")
+        let fromNonsense = try await severity(#""CATASTROPHIC""#)
+        XCTAssertEqual(fromNull, .unknown)
+        XCTAssertEqual(fromNonsense, .unknown)
+    }
 }
 
 /// Decodes with the app's own date strategy, so a test cannot pass against a
@@ -127,4 +186,5 @@ enum APIClientTestDecoder {
         }
         return try d.decode(T.self, from: Data(json.utf8))
     }
+
 }
