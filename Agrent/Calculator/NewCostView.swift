@@ -87,12 +87,28 @@ struct NewCostView: View {
             category: category,
             amount: amount,
             currency: currency.trimmingCharacters(in: .whitespaces).uppercased(),
-            // yyyy-mm-dd, which is what a `min(8)` string field means here.
-            incurredOn: incurredOn.formatted(
-                .iso8601.year().month().day().dateSeparator(.dash)
-            ),
-            supplier: supplier.isEmpty ? nil : supplier,
-            description: notes.isEmpty ? nil : notes
+            // yyyy-mm-dd, IN THE DEVICE'S ZONE.
+            //
+            // This was `.formatted(.iso8601.year().month().day()…)`, which
+            // defaults to GMT. Bulgaria is UTC+3 in summer, so a cost the
+            // farmer dated 25.09 went to the server as 2026-09-24 — measured:
+            //
+            //     picked  25.09.2026 г., 0:30
+            //     sent    2026-09-24
+            //
+            // A `DatePicker` in `.date` mode keeps the time of day it opened
+            // with, so every cost entered between midnight and 03:00 local was
+            // booked to the previous day. In the farm's BOOKS. See
+            // `BgDate.isoDay`, which is the write side of the parser that has
+            // always pinned this contract.
+            incurredOn: BgDate.isoDay(incurredOn),
+            // `.recorded`, not `.isEmpty`. These mapped only EXACTLY empty, so
+            // a supplier of three spaces went to the books as "   " — and,
+            // because the idempotency key is a hash of this payload, it also
+            // minted a different key from the omitted one, so editing a field
+            // to whitespace and back would write a second row.
+            supplier: supplier.recorded,
+            description: notes.recorded
         )
     }
 

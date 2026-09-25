@@ -98,4 +98,42 @@ final class CipherEnvelopeTests: XCTestCase {
         XCTAssertFalse(Assignee.isCipherEnvelope(":abc"))
         XCTAssertFalse(Assignee.isCipherEnvelope("Иван Петров"))
     }
+    // MARK: - The write side, and the off-by-one-day it fixes
+
+    /// A DAY PICKED IS THE DAY SENT, at every hour of it.
+    ///
+    /// Two forms formatted a picked day with
+    /// `date.formatted(.iso8601.year().month().day()…)`, which defaults to
+    /// `timeZone: .gmt`. Bulgaria is UTC+3 in summer and a `DatePicker` in
+    /// `.date` mode keeps the time of day it opened with, so a cost dated 25.09
+    /// at 00:30 went to the server as 2026-09-24 — into the farm's books, and
+    /// into an exchange listing's expiry.
+    ///
+    /// Written against `Calendar.current` rather than a pinned zone, so the
+    /// assertion is the INVARIANT and not this machine's offset: whatever zone
+    /// the runner is in, the day that was constructed is the day that comes out.
+    /// A test pinning Europe/Sofia would pass on CI while proving nothing there.
+    func testTheDayPickedIsTheDaySent() throws {
+        let calendar = Calendar.current
+        for hour in [0, 1, 2, 3, 12, 22, 23] {
+            let picked = try XCTUnwrap(calendar.date(from: DateComponents(
+                year: 2026, month: 9, day: 25, hour: hour, minute: 30)))
+            XCTAssertEqual(BgDate.isoDay(picked), "2026-09-25",
+                           "a day picked at \(hour):30 local")
+        }
+    }
+
+    /// And it round-trips through the parser that has always owned this format,
+    /// which is the reason the write side belongs on the same type: a reader and
+    /// a writer that disagreed about the zone was the same bug from the other
+    /// direction.
+    func testTheWriteSideRoundTripsThroughTheParser() throws {
+        let calendar = Calendar.current
+        let picked = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 1, day: 1, hour: 0, minute: 5)))
+        let back = try XCTUnwrap(BgDate.parseISODay(BgDate.isoDay(picked)))
+        XCTAssertTrue(calendar.isDate(back, inSameDayAs: picked))
+        XCTAssertEqual(BgDate.isoDay(back), BgDate.isoDay(picked))
+    }
+
 }

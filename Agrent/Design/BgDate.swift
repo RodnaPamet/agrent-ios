@@ -62,6 +62,48 @@ enum BgDate {
         isoDay.date(from: string)
     }
 
+    /// A calendar day as `yyyy-MM-dd`, IN THE DEVICE'S ZONE — the write side of
+    /// `parseISODay`, and the fix for a real off-by-one-day.
+    ///
+    /// ── What it replaces, and what that cost ──
+    ///
+    /// Two forms sent a picked day with
+    /// `date.formatted(.iso8601.year().month().day()…)`. `ISO8601FormatStyle`
+    /// defaults to `timeZone: .gmt`, and Bulgaria is UTC+3 in summer. Measured
+    /// with a probe:
+    ///
+    ///     picked in the DatePicker   25.09.2026 г., 0:30
+    ///     sent on the wire           2026-09-24
+    ///
+    /// A `DatePicker` in `.date` mode keeps the time of day it started with, so
+    /// any cost or listing filled in between midnight and 03:00 local was
+    /// booked to the PREVIOUS day. On a farm that is the end of a long day, not
+    /// an edge case, and on `NewCostView` it is the farm's books.
+    ///
+    /// ── Why here and not a local formatter ──
+    ///
+    /// `parseISODay` already pins this exact contract for READING, and its
+    /// header explains why both ends must use `.current`: parsing a day as UTC
+    /// midnight and rendering it in the device's zone silently loses a day west
+    /// of Greenwich. A write side that disagreed with it was the same bug from
+    /// the other direction. One type owns the day format in both directions
+    /// now, so they cannot drift again.
+    static func isoDay(_ date: Date) -> String {
+        isoDayWriter.string(from: date)
+    }
+
+    /// Separate from `isoDay` the parser only because a `DateFormatter` is
+    /// cheap to hold and sharing one mutable instance across read and write
+    /// invites somebody to set `dateFormat` on it.
+    private static let isoDayWriter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     /// An agro timestamp whose RESPONSE schema does not pin a format.
     ///
     /// ── Why this is not `parseISODay`, and not a `Date` property either ──
