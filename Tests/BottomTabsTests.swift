@@ -47,16 +47,35 @@ final class BottomTabsTests: XCTestCase {
 
     /// An order saved on the web will contain surfaces this app does not
     /// have. They drop out; they do not fail the load.
+    ///
+    /// `/dashboard` USED TO BE THE EXAMPLE HERE and is now drawable — «Табло»
+    /// shipped. Which is the good failure: this test went red the moment the
+    /// app grew the surface, rather than quietly asserting a capability gap
+    /// that had closed. The web still offers twenty-two surfaces to this app's
+    /// nine, so there is no shortage of genuinely undrawable suffixes.
     func testUnknownSurfacesFromTheWebAreIgnored() {
-        let tabs = store(["/dashboard", "/journal", "/rent", "/exchange"]).bottomTabs
+        let tabs = store(["/inventory", "/journal", "/rent", "/exchange"]).bottomTabs
         XCTAssertEqual(tabs, [.journal, .exchange])
     }
 
     /// …but an order containing ONLY surfaces this app lacks would leave
     /// an empty tab bar, which is not a preference anyone expressed.
     func testAnOrderThisAppCannotDrawFallsBack() {
-        XCTAssertEqual(store(["/dashboard", "/rent", "/schemes"]).bottomTabs,
+        XCTAssertEqual(store(["/inventory", "/rent", "/schemes"]).bottomTabs,
                        AppSurface.fallback)
+    }
+
+    /// AND `/dashboard` IS NO LONGER ONE OF THEM.
+    ///
+    /// It is the first entry in the web's default order, so every order ever
+    /// saved from a laptop carries it. Before «Табло» those orders silently
+    /// dropped their first entry; now they resolve. Pinned because it is the
+    /// visible consequence of adding a surface, and because the previous
+    /// version of these tests treated it as permanently undrawable.
+    func testTheWebsDashboardNowResolves() {
+        XCTAssertEqual(store(["/dashboard", "/journal"]).bottomTabs,
+                       [.dashboard, .journal])
+        XCTAssertEqual(AppSurface(rawValue: "/dashboard"), .dashboard)
     }
 
     /// iOS collapses a sixth tab into "More". The cap is enforced on read
@@ -77,7 +96,7 @@ final class BottomTabsTests: XCTestCase {
     func testEverySurfaceIsReachable() {
         for isOperator in [false, true] {
             for order in [nil, ["/trends"], ["/journal", "/news"],
-                          ["/dashboard"], []] as [[String]?] {
+                          ["/dashboard"], ["/inventory"], []] as [[String]?] {
                 let s = store(order, isOperator: isOperator)
                 let reachable = Set(s.bottomTabs.map(\.id)).union(s.overflow.map(\.id))
                 XCTAssertEqual(reachable, Set(s.permitted.map(\.id)),
@@ -91,7 +110,7 @@ final class BottomTabsTests: XCTestCase {
         let s = store(["/journal", "/news"])
         XCTAssertEqual(Set(s.overflow.map(\.id)),
                        Set([AppSurface.calculator, .exchange, .locations, .tasks,
-                            .trends, .farmRisk].map(\.id)))
+                            .trends, .farmRisk, .dashboard].map(\.id)))
     }
 
     /// An empty array is a deliberate clear, and distinct from nil in the
