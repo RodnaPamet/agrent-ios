@@ -13,16 +13,39 @@ enum DashboardAPI {
 
     static var agPath: String { "\(base)/dashboard/ag" }
 
-    /// `days` is the requested window. The answer may cover FEWER — see
+    /// `days` is the REQUESTED window. The answer may cover fewer — see
     /// `TrendPayload.isPartial`.
+    ///
+    /// ── The two defaults differ, and a bad value is silent ──
+    ///
+    /// Omitting `days` is not one behaviour: `/dashboard/trends` defaults to
+    /// **90** and `/dashboard/task-trend` to **14**. Two sibling routes, two
+    /// windows — so a screen that omits the parameter on both is comparing a
+    /// quarter against a fortnight, which is exactly the sort of thing that
+    /// looks like a data story.
+    ///
+    /// And the spec says a non-numeric value "falls back to the default rather
+    /// than erroring, so a malformed client cannot break the chart — it
+    /// silently gets the default window". Silently is the operative word: a
+    /// client that sent nonsense would draw a perfectly convincing chart of the
+    /// wrong period. `exclusiveMinimum: 0`, so zero and negatives are out of
+    /// range; clamped here rather than sent, because a request this client
+    /// KNOWS is invalid should not be made.
     static func trendsPath(days: Int? = nil) -> String {
         guard let days else { return "\(base)/dashboard/trends" }
-        return "\(base)/dashboard/trends?days=\(days)"
+        return "\(base)/dashboard/trends?days=\(max(days, 1))"
     }
 
     static func taskTrendPath(days: Int? = nil) -> String {
         guard let days else { return "\(base)/dashboard/task-trend" }
-        return "\(base)/dashboard/task-trend?days=\(days)"
+        return "\(base)/dashboard/task-trend?days=\(max(days, 1))"
+    }
+
+    /// The server's own defaults, named so a caller can pass the SAME window to
+    /// both rather than inheriting two different ones by omission.
+    enum DefaultWindow {
+        static let metrics = 90
+        static let tasks = 14
     }
 
     /// Under `/reports`, not `/dashboard`. The prefix is not cosmetic: the

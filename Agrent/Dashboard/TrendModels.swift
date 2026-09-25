@@ -42,10 +42,14 @@ struct TrendPayload: Decodable, Equatable, Sendable {
 
 /// One day of counts.
 ///
-/// TEN required integers and not one of them nullable, which is unusual in
-/// this API and is the reason this type has no leniency in it: a missing
-/// counter here would be a genuine server defect rather than an absent
+/// NINE required integers plus a required `date`, none of them nullable —
+/// unusual in this API, and the reason this type has no leniency in it: a
+/// missing counter here would be a genuine server defect rather than an absent
 /// relation, and swallowing it would draw a zero that is a lie about the day.
+///
+/// (It said "TEN required integers". Ten is the length of `required`, one of
+/// which is the date string. A small thing to get wrong in a file whose whole
+/// claim is that its comments were measured rather than remembered.)
 struct TrendDataPoint: Decodable, Equatable, Identifiable, Sendable {
     let dateRaw: String
 
@@ -190,10 +194,16 @@ struct BriefingAction: Decodable, Equatable, Identifiable, Sendable {
     let action: String
     let priority: Priority
 
-    /// Actions have no id on the wire. The text is what distinguishes them on
-    /// screen, so it is what `ForEach` keys on — and two identical actions on
-    /// the same field would be the same row anyway.
-    var id: String { "\(fieldRaw ?? "")|\(action)" }
+    /// Actions have no id on the wire, so the resolved scope plus the text is
+    /// what `ForEach` keys on — two identical actions on the same field would
+    /// be the same row anyway.
+    ///
+    /// BUILT FROM `field`, NOT `fieldRaw`. Keying on the raw value made the two
+    /// spellings of "whole farm" disagree about identity: `null` and `"   "`
+    /// both resolve to nil and both mean the whole farm, yet produced the ids
+    /// `"|action"` and `"   |action"`. The same row, twice, wherever a server
+    /// sent whitespace instead of null.
+    var id: String { "\(field ?? "")|\(action)" }
 
     enum CodingKeys: String, CodingKey {
         case fieldRaw = "field"

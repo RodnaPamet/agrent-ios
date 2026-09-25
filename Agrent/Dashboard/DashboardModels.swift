@@ -13,17 +13,29 @@ import Foundation
 ///         …where FieldBriefing itself is  {type: ["object","null"]}
 ///
 /// I read the second as non-nullable and reported it to the server session as
-/// a contract defect. It is not one. In OpenAPI 3.1 a `$ref` to a schema whose
-/// own `type` admits null admits null, and the difference between the two
-/// idioms is whether the target type is REUSED: `UserRef` appears in five
-/// payloads and cannot bake a null into itself, while `FieldBriefing` and
-/// `AgDashboardAchievements` are single-use and can.
+/// a contract defect. It is not one: in OpenAPI 3.1 a `$ref` to a schema whose
+/// own `type` admits null admits null.
 ///
-/// So the rule for reading this file's source is: check the TARGET schema's
-/// own `type`, not only the reference site. Two fields here are optional for
-/// exactly that reason and would otherwise have been declared non-optional —
-/// which, inside an envelope, is the defect that has cost this repo a whole
-/// screen four times.
+/// THE RULE IS SIMPLY: CHECK THE TARGET SCHEMA'S OWN `type`, not only the
+/// reference site. Two fields here are optional for exactly that reason and
+/// would otherwise have been declared non-optional — which, inside an
+/// envelope, is the defect that has cost this repo a whole screen four times.
+///
+/// ── And the tidy explanation I first wrote for it was also wrong ──
+///
+/// This comment claimed the two idioms differ by whether the target is REUSED:
+/// that `UserRef` appears in several payloads and so cannot bake a null into
+/// itself, while single-use types can. That reads well and it is false.
+/// `BottomTabOrder` is `{type: ["array","null"]}` and is referenced at THREE
+/// sites, so a reused target does bake null in. (`UserRef` is referenced ten
+/// times, not five, which is what happens when a number is remembered rather
+/// than counted.)
+///
+/// Twice in one paragraph, then: once reading a nullability, once inventing
+/// the reason for it. The second is the worse habit, because a plausible
+/// causal story is what a reader reasons FROM — somebody applying the reuse
+/// rule would conclude a three-times-referenced schema cannot be nullable,
+/// and be wrong about `BottomTabOrder` specifically.
 
 // MARK: - GET /dashboard/ag
 
@@ -71,9 +83,20 @@ struct AgDashboard: Decodable, Equatable, Sendable {
 
     struct JournalItem: Decodable, Equatable, Identifiable, Sendable {
         let id: String
-        /// The existing `LogEntryType`, not a second copy of that vocabulary.
-        /// It is `LenientDecodable`, so a kind this build has not heard of
-        /// becomes `.unknown` rather than failing the dashboard.
+        /// `LogEntryType`, and THIS IS AN ASSUMPTION RATHER THAN A CONTRACT.
+        ///
+        /// `AgDashboardJournalItem.type` is a bare `{type: string}` with no
+        /// enum. The only place this spec enumerates journal kinds is
+        /// `LogEntryCreateRequest.type`, on a different resource, so reusing
+        /// that vocabulary here is inference — and reusing the app's existing
+        /// enum is still better than a second copy of a guess.
+        ///
+        /// The risk is specific and quiet: because the enum is lenient, a
+        /// WHOLE-VOCABULARY mismatch does not fail: every row decodes to
+        /// `.unknown` and renders «—», on every row, forever, with nothing red
+        /// anywhere. Leniency protects against one unknown value and hides a
+        /// wrong assumption. Asked of the server session; until it answers,
+        /// this is a question in a comment rather than a fact.
         let type: LogEntryType
         let title: String
 
@@ -98,33 +121,70 @@ struct AgDashboard: Decodable, Equatable, Sendable {
         /// what that type exists to keep out of it.
         let quantityOnHand: WireDecimal
 
-        /// Through `.recorded`, because a unit symbol read off an optional
-        /// relation is exactly the `?? ''` collapse that shipped twice here as
-        /// a trailing space. Required and `type: string` is true of an empty
-        /// string too.
-        var unitSymbol: String? { unitSymbolRaw.recorded }
-        private let unitSymbolRaw: String
-
-        enum CodingKeys: String, CodingKey {
-            case id, name, quantityOnHand
-            case unitSymbolRaw = "unitSymbol"
-        }
+        /// NON-OPTIONAL, and this one was CHECKED rather than assumed.
+        ///
+        /// I had it going through `String.recorded`, on the reasoning that a
+        /// unit symbol is exactly the kind of `?? ''` collapse that shipped
+        /// twice here as a trailing space. Traced in agri-saas source at my
+        /// request, it is not one:
+        ///
+        ///     inventory.prisma:77  unit Unit @relation(...)   // no `?`
+        ///     ag-dashboard.ts:117  unitSymbol: l.unit.symbol  // no `?.`, no `?? ''`
+        ///
+        /// The relation is required, `listLots` types the symbol non-optional,
+        /// and the projection reads it straight through. So the collapse list
+        /// stays at four sites rather than five, and this is a plain string.
+        ///
+        /// `quantityText` still declines to print a separator for an empty one.
+        /// Not defence against this field — defence costs nothing here and the
+        /// asymmetry that justified keeping the parcel dose optional does not
+        /// apply: a null dose THREW and cost a whole envelope, while a blank
+        /// unit would only ever cost a trailing space.
+        let unitSymbol: String
 
         /// « 12,5 л », or the number alone when no unit was recorded. Never a
         /// placeholder and never a dangling separator.
+        ///
+        /// ── THE SCALE IS TAKEN FROM THE VALUE, AGAINST `WireDecimal`'S RULE ──
+        ///
+        /// That type's own header says the opposite, under the heading "Scale
+        /// comes from the COLUMN, not the value": `1.00` arrives as `1`, and
+        /// rendering it through gives «1 лв» where the books say «1,00».
+        ///
+        /// It is right about money and this route publishes no scale at all.
+        /// So the choice is between padding to a scale I would be inventing
+        /// and showing the digits that arrived. For the parcel-history dose
+        /// the server answered that question directly — `Decimal(14,4)`, and
+        /// «do NOT pad to it», because `2,5000 л/дка` is worse than `2,5`. A
+        /// reorder quantity is the same kind of number, so the same choice is
+        /// made here.
+        ///
+        /// The cost is real and worth naming: a column of scale 3 sending
+        /// 12.500, 12.000 and 12.125 renders «12,5», «12» and «12,125» in one
+        /// list. Asked of the server session; if it names a scale AND says to
+        /// pad, this becomes one line.
         var quantityText: String {
             let fraction = quantityOnHand.raw.split(separator: ".").dropFirst().first?.count ?? 0
             let number = quantityOnHand.text(scale: fraction)
-            guard let unitSymbol else { return number }
-            return "\(number) \(unitSymbol)"
+            guard let unit = unitSymbol.recorded else { return number }
+            return "\(number) \(unit)"
         }
     }
 
     struct TaskItem: Decodable, Equatable, Identifiable, Sendable {
         let id: String
         let title: String
-        /// The existing `WorkItemStatus`, lenient, so a new status does not
-        /// fail the dashboard.
+        /// `WorkItemStatus`, and the SAME ASSUMPTION as `JournalItem.type`,
+        /// with a sharper reason to doubt it.
+        ///
+        /// `AgDashboardTaskItem.status` is a bare `{type: string}`. And
+        /// `FarmTaskListItem.type` is documented «FARM_TASK or FIELD_OPERATION
+        /// — the queue merges both», while a field operation's status
+        /// vocabulary in this same spec is `[PENDING, DONE, SKIPPED]`, none of
+        /// which `WorkItemStatus` contains. So if `myTasks` merges operations,
+        /// those rows all decode to `.unknown` and show «—» silently.
+        ///
+        /// Asked. Not asserted.
         let status: WorkItemStatus
 
         let dueAtRaw: String?
@@ -156,6 +216,20 @@ struct AgDashboard: Decodable, Equatable, Sendable {
             let key: Key
             let earned: Bool
 
+            /// THE KEY AS SENT, kept because the enum throws it away.
+            ///
+            /// `LenientDecodable` maps anything unrecognised to `.unknown`, so
+            /// `key.rawValue` is the literal "UNKNOWN" for every new milestone
+            /// the server adds. `id` was built from that — which means two
+            /// server-added milestones share one id, and a SwiftUI `ForEach`
+            /// silently drops all but the first.
+            ///
+            /// So the comment promising that "a farmer who earned something
+            /// should not see a gap" was producing exactly that gap as soon as
+            /// there were two of them. The test only ever injected one unknown
+            /// key, so the collision could not fail.
+            let keyRaw: String
+
             /// Null EXACTLY when `earned` is false — the server says so, and
             /// `wasEarned` prefers the flag over the date for the same reason
             /// the exchange tombstone reads `deleted` rather than `body ==
@@ -163,11 +237,37 @@ struct AgDashboard: Decodable, Equatable, Sendable {
             let earnedAtRaw: String?
             var earnedAt: Date? { BgDate.parseInstantOrDay(earnedAtRaw) }
 
-            var id: String { key.rawValue }
+            /// The WIRE key, never the enum's — see `keyRaw`.
+            var id: String { keyRaw }
 
-            enum CodingKeys: String, CodingKey {
-                case key, earned
-                case earnedAtRaw = "earnedAt"
+            /// What to call it: the mapped label for a key this build knows,
+            /// and the server's own key for one it does not. Same shape as
+            /// `WeedCatalogue.name(for:)` — an unmapped value is shown as
+            /// stored rather than hidden or renamed.
+            var label: String {
+                key == .unknown ? keyRaw : key.label
+            }
+
+            /// AN EXPLICIT INIT, because `key` is read TWICE — once through
+            /// `LenientDecodable` for the enum and once as the raw string. Two
+            /// `CodingKeys` cases cannot share a raw value ("raw value for enum
+            /// case is not unique"), and a keyed container is perfectly happy
+            /// to be asked for the same key twice.
+            ///
+            /// Reading it through `Key.self` rather than matching by hand keeps
+            /// the case-insensitivity that `LenientDecodable` gives every other
+            /// enum in the app, instead of quietly introducing a stricter rule
+            /// here.
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                key = try c.decode(Key.self, forKey: .key)
+                keyRaw = try c.decode(String.self, forKey: .key)
+                earned = try c.decode(Bool.self, forKey: .earned)
+                earnedAtRaw = try c.decodeIfPresent(String.self, forKey: .earnedAt)
+            }
+
+            private enum CodingKeys: String, CodingKey {
+                case key, earned, earnedAt
             }
 
             /// A milestone's identity, and THIS ONE THE SPEC PINS.

@@ -54,7 +54,7 @@ final class DashboardTests: XCTestCase {
     {"enabledModules":["agro"],
      "recentJournal":[{"id":"j1","type":"HARVEST","title":"Жътва",
                        "occurredAt":"2026-07-02T09:00:00.000Z"}],
-     "lowStock":[{"id":"s1","name":"Раундъп","quantityOnHand":12.5,"unitSymbol":"л"}],
+     "lowStock":[{"id":"s1","name":"Раундъп","quantityOnHand":1.15,"unitSymbol":"л"}],
      "myTasks":[{"id":"t1","title":"Пръскане","status":"OPEN","dueAt":null}],
      "achievements":{"milestones":[{"key":"first-harvest","earned":true,
                                     "earnedAt":"2026-07-02T09:00:00.000Z"},
@@ -74,21 +74,44 @@ final class DashboardTests: XCTestCase {
     /// `quantityOnHand` is `type: number`, and `WireDecimal` takes the number
     /// branch straight to `Decimal` without going through `Double`. This is a
     /// quantity a farmer reorders against.
+    /// 1,15 AND NOT 12,5. The first version of this test used 12.5, which is
+    /// 25/2 and therefore exact in binary floating point — so it would have
+    /// passed just as well through a `Double` and proved nothing about the one
+    /// thing it exists to prove. 1.15 is not representable, so this fails if
+    /// the value ever goes via `Double`.
     func testAStockQuantityKeepsItsDigits() async throws {
         let d = try await decode(Self.fullAg, as: AgDashboard.self)
-        XCTAssertEqual(d.lowStock.first?.quantityOnHand.value, Decimal(string: "12.5"))
-        XCTAssertEqual(d.lowStock.first?.quantityText, "12,5 л")
+        XCTAssertEqual(d.lowStock.first?.quantityOnHand.value, Decimal(string: "1.15"))
+        XCTAssertEqual(d.lowStock.first?.quantityText, "1,15 л")
     }
 
-    /// A unit symbol read off an optional relation is the `?? ''` collapse
-    /// that shipped twice here as a trailing space. Empty means NOT RECORDED,
-    /// so the number stands alone with no separator hanging off it.
-    func testAStockRowWithNoUnitShowsTheNumberAlone() async throws {
+    /// AND a value `Double` could not hold.
+    ///
+    /// The previous attempt at this asserted `value != Decimal(1.15)`, which
+    /// fails — `Decimal(_: Double)` rounds to the same decimal, so the
+    /// assertion could not distinguish the two paths it was written to
+    /// distinguish. Nineteen significant digits can: a `Double` carries about
+    /// fifteen to seventeen, so the trailing .5 would be gone.
+    func testAQuantityWiderThanADoubleSurvives() async throws {
+        let json = Self.fullAg.replacingOccurrences(
+            of: #""quantityOnHand":1.15"#, with: #""quantityOnHand":123456789012345678.5"#)
+        let d = try await decode(json, as: AgDashboard.self)
+        XCTAssertEqual(d.lowStock.first?.quantityOnHand.value,
+                       Decimal(string: "123456789012345678.5"))
+    }
+
+    /// `unitSymbol` is NOT one of the `?? ''` collapses — the relation is
+    /// required and the projection reads it straight through, traced in source.
+    /// So it is a plain `String`, and this test is about the RENDERING rather
+    /// than about the field's type: a blank one still must not leave a
+    /// separator hanging off the number, because that costs nothing to prevent
+    /// and was the exact shape of two shipped defects.
+    func testABlankUnitStillLeavesNoTrailingSeparator() async throws {
         let json = Self.fullAg.replacingOccurrences(of: #""unitSymbol":"л""#,
                                                     with: #""unitSymbol":"""#)
         let d = try await decode(json, as: AgDashboard.self)
-        XCTAssertNil(d.lowStock.first?.unitSymbol)
-        XCTAssertEqual(d.lowStock.first?.quantityText, "12,5")
+        XCTAssertEqual(d.lowStock.first?.unitSymbol, "")
+        XCTAssertEqual(d.lowStock.first?.quantityText, "1,15")
         XCTAssertFalse(d.lowStock.first?.quantityText.hasSuffix(" ") ?? true)
     }
 
@@ -130,6 +153,43 @@ final class DashboardTests: XCTestCase {
         let d = try await decode(json, as: AgDashboard.self)
         XCTAssertEqual(d.achievements?.milestones.first?.key, .unknown)
         XCTAssertFalse(d.achievements?.milestones.first?.key.label.isEmpty ?? true)
+    }
+
+    /// TWO server-added milestones must be TWO rows.
+    ///
+    /// `LenientDecodable` discards the wire value, so `key.rawValue` is the
+    /// literal "UNKNOWN" for every one of them. Keying `Identifiable` off that
+    /// gave them one shared id, and a SwiftUI `ForEach` silently drops all but
+    /// the first — so the comment promising "a farmer who earned something
+    /// should not see a gap" was producing exactly that gap. The original test
+    /// injected ONE unknown key, which is why it could not fail.
+    func testTwoUnknownMilestonesRemainTwoDistinctRows() async throws {
+        let d = try await decode(#"""
+        {"enabledModules":[],"recentJournal":[],"lowStock":[],"myTasks":[],
+         "achievements":{"milestones":[
+            {"key":"first-drone-flight","earned":true,"earnedAt":"2026-09-01T09:00:00.000Z"},
+            {"key":"first-soil-scan","earned":true,"earnedAt":"2026-09-02T09:00:00.000Z"}],
+          "streak":{"current":1,"best":1}}}
+        """#, as: AgDashboard.self)
+
+        let milestones = try XCTUnwrap(d.achievements?.milestones)
+        XCTAssertEqual(milestones.count, 2)
+        XCTAssertEqual(Set(milestones.map(\.id)).count, 2, "two rows, not one")
+        XCTAssertEqual(milestones.map(\.key), [.unknown, .unknown])
+
+        // And each is NAMED by what the server sent rather than by a shared
+        // placeholder — same rule as an unmapped weed showing its binomial.
+        XCTAssertEqual(milestones.first?.label, "first-drone-flight")
+        XCTAssertNotEqual(milestones.first?.label, milestones.last?.label)
+    }
+
+    /// A known key still gets its Bulgarian label rather than the raw slug.
+    func testAKnownMilestoneKeepsItsLabel() async throws {
+        let d = try await decode(Self.fullAg, as: AgDashboard.self)
+        let first = try XCTUnwrap(d.achievements?.milestones.first)
+        XCTAssertEqual(first.key, .firstHarvest)
+        XCTAssertEqual(first.label, "Първа реколта")
+        XCTAssertEqual(first.id, "first-harvest")
     }
 
     // MARK: - Two sibling endpoints, two envelopes
@@ -308,6 +368,41 @@ final class DashboardTests: XCTestCase {
     }
 
     // MARK: - Paths
+
+    /// `null` and `"   "` both mean THE WHOLE FARM, so they must not be two
+    /// different rows. The id was built from the raw value, so whitespace and
+    /// null produced different ids for the same meaning.
+    func testTheTwoSpellingsOfWholeFarmShareOneIdentity() async throws {
+        let payload = try await briefing(
+            ai: true, configured: true, available: true,
+            body: #"""
+            {"headline":"h","summary":"s",
+             "actions":[{"field":null,"action":"Едно","priority":"low"},
+                        {"field":"   ","action":"Едно","priority":"low"}]}
+            """#)
+        let actions = try XCTUnwrap(payload.briefing?.actions)
+        XCTAssertEqual(actions.first?.id, actions.last?.id,
+                       "same scope, same action, same row")
+    }
+
+    /// `days` is `exclusiveMinimum: 0`, and a non-numeric value makes the
+    /// server fall back to its default SILENTLY — drawing a convincing chart of
+    /// the wrong period. A request this client knows to be invalid is not made.
+    func testAnOutOfRangeWindowIsClampedRatherThanSent() {
+        XCTAssertTrue(DashboardAPI.trendsPath(days: 0).hasSuffix("days=1"))
+        XCTAssertTrue(DashboardAPI.trendsPath(days: -30).hasSuffix("days=1"))
+        XCTAssertTrue(DashboardAPI.taskTrendPath(days: 0).hasSuffix("days=1"))
+    }
+
+    /// The two routes DEFAULT to different windows — 90 and 14 — so omitting
+    /// the parameter on both compares a quarter against a fortnight. Named
+    /// constants exist so a caller can pass one window to both deliberately.
+    func testTheTwoRoutesDefaultToDifferentWindows() {
+        XCTAssertEqual(DashboardAPI.DefaultWindow.metrics, 90)
+        XCTAssertEqual(DashboardAPI.DefaultWindow.tasks, 14)
+        XCTAssertNotEqual(DashboardAPI.DefaultWindow.metrics,
+                          DashboardAPI.DefaultWindow.tasks)
+    }
 
     func testThePathsMatchTheSpec() {
         XCTAssertTrue(DashboardAPI.agPath.hasSuffix("/dashboard/ag"))
