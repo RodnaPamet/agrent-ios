@@ -124,6 +124,77 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     let taskId: String
     let operationType: FieldOperationType?
     let doseUnit: String
+
+    /// WHAT THE PRODUCT WAS, which is the harder signal about what the dose is.
+    ///
+    /// Added server-side on 2026-09-25 at this client's request, after I asked
+    /// which input pair a line's `doseValue` came from. `operationType` answers
+    /// that most of the time and is NOT an invariant — the server derives it
+    /// from the collapsed pair only when the caller sends none, and an explicit
+    /// caller value wins, so a fertiliser recorded as `SPRAY` is possible.
+    ///
+    /// This is derived from the product's own category, so it is right even
+    /// when `operationType` is null or was overridden, and it works
+    /// retroactively on rows written before the field existed.
+    ///
+    /// NULLABLE and lenient: `["string","null"]` with seven values, and the key
+    /// is `required` so only the VALUE can be absent. A line whose product
+    /// relation is gone has no category, which is a real state rather than a
+    /// defect.
+    let productCategory: ProductCategory?
+
+    /// The seven the spec pins, plus a sentinel.
+    ///
+    /// `AMENDMENT` is a soil improver — lime, gypsum — which is neither a spray
+    /// nor a fertiliser in the sense the operation types mean, so it gets its
+    /// own word rather than being folded into «Торене».
+    enum ProductCategory: String, LenientDecodable, Sendable {
+        case seed = "SEED"
+        case pesticide = "PESTICIDE"
+        case fertilizer = "FERTILIZER"
+        case amendment = "AMENDMENT"
+        case fuel = "FUEL"
+        case harvestedProduce = "HARVESTED_PRODUCE"
+        case other = "OTHER"
+        case unknown = "UNKNOWN"
+
+        static var unknownCase: Self { .unknown }
+
+        /// NIL where the category says nothing useful about the work done.
+        ///
+        /// `OTHER` and an unrecognised value are not kinds of operation, and
+        /// `FUEL` and `HARVESTED_PRODUCE` are not applications to a field at
+        /// all — a line carrying one is something other than a spray or a
+        /// spread, and naming it «Друга» would be inventing a classification
+        /// the data does not make.
+        var operationLabel: String? {
+            switch self {
+            case .seed: "Сеитба"
+            case .pesticide: "Пръскане"
+            case .fertilizer: "Торене"
+            case .amendment: "Подобрител"
+            case .fuel, .harvestedProduce, .other, .unknown: nil
+            }
+        }
+    }
+
+    /// What kind of work this was, in words, or nil when nothing says.
+    ///
+    /// `operationType` FIRST, because it is what the operator recorded and a
+    /// farmer reading his own archive should see his own classification.
+    /// `productCategory` second, because it is derived rather than recorded —
+    /// but it is the only thing left when `operationType` is null, which is the
+    /// gap this closes: such a row previously said nothing at all about what
+    /// had been done to the field.
+    ///
+    /// Deliberately NOT a disagreement check. When the two differ — a
+    /// fertiliser recorded as a spray — this shows what was recorded, because
+    /// correcting a farmer's own entry from a derived field is a bigger
+    /// decision than a row label, and one nobody has asked for.
+    var recordedKind: String? {
+        if let operationType, operationType != .unknown { return operationType.label }
+        return productCategory?.operationLabel
+    }
     let targetNote: String?
 
     /// EMPTY means "not recorded", and all three of these can be empty.
@@ -206,6 +277,7 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, taskId, operationType, doseUnit, targetNote, doseValue
+        case productCategory
         case titleRaw = "title"
         case productNameRaw = "productName"
         case completedAtRaw = "completedAt"
