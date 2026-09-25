@@ -343,6 +343,28 @@ actor APIClient {
                        idempotencyKey: idempotencyKey)
     }
 
+    /// A DELETE, with its response bytes handed back.
+    ///
+    /// ── The 404 is NOT swallowed here ──
+    ///
+    /// A delete whose row is already gone has achieved what the caller
+    /// wanted, and several routes want that treated as success. It is still
+    /// not this verb's decision: the server's 404 means "not found, OR not
+    /// visible to this tenant", and those are the same status with different
+    /// meanings. A route where the id came out of a list this client just
+    /// fetched can read it as already-deleted; a route where the id was
+    /// constructed cannot.
+    ///
+    /// So the status arrives as `APIError.http(status: 404, …)` like any
+    /// other, and the API layer that knows where its ids came from decides —
+    /// see `ParcelHistoryAPI.deleteCropSeason`.
+    ///
+    /// No `Idempotency-Key`: nothing documents the header on a DELETE, and
+    /// sending one that is ignored reads as protection that is not there.
+    func deleteReturningData(_ path: String) async throws -> Data {
+        try await send(path: path, method: "DELETE", body: nil, idempotencyKey: nil)
+    }
+
     // MARK: - internals
 
     private func send(
