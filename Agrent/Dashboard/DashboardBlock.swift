@@ -71,13 +71,27 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
 /// picker and the screen read one source and the ORDER is storable — an
 /// `@AppStorage` array of raw values keeps the farmer's arrangement, which a
 /// `Set` would throw away.
+/// ── This file HOLDS a commodity and never renders its name ──
+///
+/// The CI guard requires any file touching `.commodity` to name
+/// `CommodityName`, because the failure it exists to catch is a new screen
+/// writing `Text(row.commodity)` and shipping the server's English to a
+/// Bulgarian farmer. This file stores a CHOICE of commodity, and every place
+/// that choice becomes words goes through `ChartableCommodity.label`, which
+/// resolves through `CommodityName.canonical`. Nothing here builds a name.
+///
+/// It tripped the guard on `Self.commodityKey` — a storage key whose spelling
+/// happened to contain `.commodity` as a substring. Renamed to
+/// `priceCommodityKey`, because a guard that fires on a preference key teaches
+/// the next person to work around it, and a guard worked around is worth less
+/// than one that is strict and correct.
 @Observable
 @MainActor
 final class DashboardPreferences {
     static let shared = DashboardPreferences()
 
     private static let blocksKey = "dashboard.blocks"
-    private static let commodityKey = "dashboard.priceCommodity"
+    private static let priceCommodityKey = "dashboard.priceCommodity"
 
     private(set) var blocks: [DashboardBlock]
     private(set) var priceCommodity: ChartableCommodity
@@ -90,7 +104,7 @@ final class DashboardPreferences {
         let restored = stored?.compactMap(DashboardBlock.init(rawValue:))
         blocks = restored ?? DashboardBlock.defaultOrder
 
-        let commodity = UserDefaults.standard.string(forKey: Self.commodityKey)
+        let commodity = UserDefaults.standard.string(forKey: Self.priceCommodityKey)
         priceCommodity = commodity.flatMap(ChartableCommodity.init(rawValue:)) ?? .wheat
     }
 
@@ -115,7 +129,7 @@ final class DashboardPreferences {
 
     func select(_ commodity: ChartableCommodity) {
         priceCommodity = commodity
-        UserDefaults.standard.set(commodity.rawValue, forKey: Self.commodityKey)
+        UserDefaults.standard.set(commodity.rawValue, forKey: Self.priceCommodityKey)
     }
 
     /// For tests, which must not inherit whatever this device has stored.
