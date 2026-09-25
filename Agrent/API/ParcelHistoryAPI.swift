@@ -36,6 +36,52 @@ enum ParcelHistoryAPI {
         let id: String
     }
 
+    // MARK: - The archive
+
+    /// `GET /history`, with each list paged independently.
+    ///
+    /// ── The query is built here, and percent-encoding is this function's job
+    ///
+    /// `APIClient` takes a query string VERBATIM — it must, because
+    /// `URL.appending(path:)` percent-encodes a `?` into `%3F` and turns the
+    /// whole thing into a path segment, which 404'd every journal load on
+    /// 2026-09-21. So a caller that interpolates a value owns encoding it, and
+    /// a cursor is base64url, which can carry `=` padding. Unencoded that
+    /// terminates the value in a way no server can recover.
+    ///
+    /// ── `limit` is clamped HERE as well as on the server ──
+    ///
+    /// The server clamps above 100 rather than rejecting, so a large value is
+    /// harmless. Below 1 it is out of the documented range and this client
+    /// should not construct a request it knows to be invalid — a `limit=0`
+    /// would be the client asking for a 400.
+    static func historyPath(
+        parcelID: String,
+        limit: Int? = nil,
+        seasonsBefore: String? = nil,
+        operationsBefore: String? = nil,
+        weedsBefore: String? = nil
+    ) -> String {
+        var query: [String] = []
+        if let limit { query.append("limit=\(min(max(limit, 1), 100))") }
+        for (name, value) in [
+            ("seasonsBefore", seasonsBefore),
+            ("operationsBefore", operationsBefore),
+            ("weedsBefore", weedsBefore),
+        ] {
+            guard let value, let encoded = value.addingPercentEncoding(
+                withAllowedCharacters: .alphanumerics
+            ) else { continue }
+            query.append("\(name)=\(encoded)")
+        }
+        let base = "\(Self.base)/\(parcelID)/history"
+        return query.isEmpty ? base : "\(base)?\(query.joined(separator: "&"))"
+    }
+
+    static func decodeHistory(from data: Data) async throws -> ParcelHistory {
+        try await APIClient.shared.decode(data, as: ParcelHistory.self)
+    }
+
     // MARK: - Writes
 
     static func createCropSeason(

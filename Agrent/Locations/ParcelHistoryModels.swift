@@ -123,10 +123,27 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     /// itself. NOT the same as `id`, which identifies the line.
     let taskId: String
     let operationType: FieldOperationType?
-    let title: String
-    let productName: String
     let doseUnit: String
     let targetNote: String?
+
+    /// EMPTY means "not recorded", and all three of these can be empty.
+    ///
+    /// `title`, `productName` and `doseUnit` are each a `?? ''` collapse of an
+    /// absent relation on the server — `line.task?.title`,
+    /// `line.product?.name`, `line.doseUnit?.symbol` — and the spec now says
+    /// so in this schema's description. They are `required` and `type: string`
+    /// truthfully, because a string is what arrives; it is just sometimes the
+    /// empty one. See `String.recorded`.
+    ///
+    /// Found on the server side by grep, not here: this client had already
+    /// shipped the `doseUnit` case as a trailing space and would have shipped
+    /// the other two the same way, because an empty title renders as a blank
+    /// row rather than as an error.
+    var title: String? { titleRaw.recorded }
+    var productName: String? { productNameRaw.recorded }
+
+    private let titleRaw: String
+    private let productNameRaw: String
 
     /// A decimal STRING on the wire, and the server says what happens if
     /// that is ignored: "parsing it as a float rounds the dose". `л/дка` on
@@ -136,8 +153,9 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     let completedAtRaw: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, taskId, operationType, title, productName, doseUnit
-        case targetNote, doseValue
+        case id, taskId, operationType, doseUnit, targetNote, doseValue
+        case titleRaw = "title"
+        case productNameRaw = "productName"
         case completedAtRaw = "completedAt"
     }
 
@@ -168,8 +186,8 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     var doseText: String {
         let fraction = doseValue.raw.split(separator: ".").dropFirst().first?.count ?? 0
         let number = doseValue.text(scale: fraction)
-        guard !doseUnit.isEmpty else { return number }
-        return "\(number) \(doseUnit)"
+        guard let unit = doseUnit.recorded else { return number }
+        return "\(number) \(unit)"
     }
 }
 
@@ -327,5 +345,66 @@ struct NewWeedObservation: Encodable, Equatable, Sendable {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { seen.insert($0.lowercased()).inserted }
+    }
+}
+
+// MARK: - The whole archive, in one answer
+
+/// `GET /history` — three lists, three cursors, one request.
+///
+/// ── Why this was not modelled with the item schemas ──
+///
+/// It was the part still moving. The route answered with the entire archive
+/// unbounded, a cap was with the owner, and a client built on that envelope
+/// would have been built on the shape expected to change. The items shipped
+/// first (2026-09-25), the cap landed the same day, and the screen is now a
+/// store and a view over models that already existed. That ordering was the
+/// right one and is worth repeating: build against the settled half, and the
+/// moving half costs a day rather than a rewrite.
+///
+/// ── Three cursors, because there is no single position ──
+///
+/// The sections sort by three different keys — harvest YEAR, completion date,
+/// observation date — so there is nothing to page from in common. Each list
+/// carries its own cursor, null when that list has no older rows, and each is
+/// paged independently: a parcel with 200 operations and 3 crop seasons
+/// returns a cursor for the operations only.
+///
+/// ── Cursors are OPAQUE. Do not parse one. ──
+///
+/// They happen to be base64url of `<sortKey>|<rowId>`, which the server
+/// states so that nobody believes a cursor keeps ids out of a URL — it does
+/// not, it encodes one. But the encoding is explicitly NOT a contract, and
+/// the reason is specific: `cropSeasonsCursor` keys on an integer YEAR while
+/// the other two key on timestamps. A client that parsed and rebuilt one
+/// would paginate on a value the `ORDER BY` never uses, which SKIPS ROWS
+/// rather than failing — and a short archive looks exactly like a young farm.
+struct ParcelHistory: Decodable, Equatable, Sendable {
+    let parcel: ParcelRef
+    let cropSeasons: [CropSeason]
+    let operations: [ParcelHistoryOperation]
+    let weedObservations: [WeedObservation]
+
+    /// Null means that list has nothing older. Non-null does NOT guarantee
+    /// more rows exist — see `ParcelHistoryStore.Section.exhausted` for why a
+    /// client cannot trust it as a "has more" flag.
+    let cropSeasonsCursor: String?
+    let operationsCursor: String?
+    let weedObservationsCursor: String?
+
+    /// The parcel this archive belongs to, as the route projects it.
+    struct ParcelRef: Decodable, Equatable, Sendable {
+        let id: String
+        let name: String
+
+        /// The CURRENT crop, and a single overwritten field.
+        ///
+        /// It carries no year and no history, which is the entire reason
+        /// `cropSeasons` exists. The server is explicit that a client must
+        /// not infer this year from here and the rest from the archive: the
+        /// archive is the record, and this is a label on the parcel.
+        let cropType: String?
+
+        var cropLabel: String? { CommodityName.freeText(cropType) }
     }
 }

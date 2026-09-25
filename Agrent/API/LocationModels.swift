@@ -78,12 +78,7 @@ struct Location: Decodable, Equatable, Sendable, Identifiable {
     /// — and no schema can carry that, since both are `type: string`. The
     /// same collapse is known to exist elsewhere in this API. So a blank is
     /// treated as no value rather than rendered as one.
-    var kind: String? {
-        guard let trimmed = kindRaw?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty
-        else { return nil }
-        return trimmed
-    }
+    var kind: String? { kindRaw?.recorded }
 
     private let kindRaw: String?
 
