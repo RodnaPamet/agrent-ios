@@ -56,4 +56,23 @@ enum LoadState<T: Equatable & Sendable>: Equatable, Sendable {
         if case .loaded(_, let freshness) = self { return freshness }
         return nil
     }
+
+    /// For a screen whose SECTIONS fail independently.
+    ///
+    /// Every existing caller switches over the whole state, which is right when
+    /// one state owns one screen. «Табло» holds four — the ag payload, the task
+    /// trend, the briefing and a price series — and a block has to ask "did
+    /// mine fail" without a switch that must also handle `.loading` and
+    /// `.loaded` it has already handled elsewhere.
+    var isFailed: Bool {
+        if case .failed = self { return true }
+        return false
+    }
+
+    /// The message, for a section that reports its own failure beside the
+    /// sections that loaded. Nil when nothing failed.
+    var failureText: String? {
+        if case .failed(let message) = self { return message }
+        return nil
+    }
 }

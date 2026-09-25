@@ -113,20 +113,11 @@ final class TrendsStore {
         guard !seriesChosenByHand else { return }
         var hidden: Set<String> = []
         for group in groups {
-            let preferred = group.series.filter {
-                ["BG", "GLOBAL"].contains($0.region.uppercased())
-            }
-            let candidates = preferred.isEmpty ? group.series : preferred
-            // Freshest first, then the longest history — a series observed
-            // last week says more about today than one that stopped in
-            // spring, and between two equally current ones the longer
-            // record is the better line.
-            let ranked = candidates.sorted { left, right in
-                let l = left.lastObservedAt ?? ""
-                let r = right.lastObservedAt ?? ""
-                if l != r { return l > r }
-                return left.points.count > right.points.count
-            }
+            // The rule now lives on the array, so the dashboard's price block
+            // ranks identically instead of answering "the price of wheat"
+            // differently from this screen. Ranked WITHIN the group, which is
+            // keyed by (unit, currency) — see `SeriesGroup`.
+            let ranked = group.series.rankedForDefaultDisplay()
             let shownIDs = Set(ranked.prefix(Self.defaultSeriesCap).map(\.id))
             for series in group.series where !shownIDs.contains(series.id) {
                 hidden.insert(series.id)

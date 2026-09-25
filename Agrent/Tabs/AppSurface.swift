@@ -14,10 +14,17 @@ import SwiftUI
 ///
 /// ── Unknown ids are ignored, not errors ──
 ///
-/// The web offers twenty-two surfaces and this app has seven of them. An
-/// order saved from a laptop will contain `/dashboard`, which iOS cannot
-/// draw — that is normal and must degrade to "not shown", never to a
-/// failed load or a refused save.
+/// The web offers twenty-two surfaces and this app has nine of them. An
+/// order saved from a laptop will contain suffixes iOS cannot draw — that is
+/// normal and must degrade to "not shown", never to a failed load or a refused
+/// save.
+///
+/// `/dashboard` USED TO BE ONE OF THOSE and no longer is. It is the first
+/// entry in the web's default order, so every order ever saved from a laptop
+/// already carries it, and adding the case means those orders resolve rather
+/// than silently dropping an entry. A farmer who arranged their bar on the web
+/// gets what they arranged; nobody's existing iOS order changes, because
+/// `fallback` is untouched.
 enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     case journal = "/journal"
     case calculator = "/grain/calculator"
@@ -27,6 +34,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     case trends = "/trends"
     case news = "/news"
     case farmRisk = "/farm-risk"
+    case dashboard = "/dashboard"
 
     var id: String { rawValue }
 
@@ -40,6 +48,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .trends: "Тенденции"
         case .news: "Новини"
         case .farmRisk: "Риск"
+        case .dashboard: "Табло"
         }
     }
 
@@ -53,6 +62,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .trends: "chart.line.uptrend.xyaxis"
         case .news: "newspaper"
         case .farmRisk: "exclamationmark.shield"
+        case .dashboard: "square.grid.2x2"
         }
     }
 
@@ -80,6 +90,17 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         // not offered the ask — which is the right division. Knowing a
         // field is stressed is field work; contacting an insurer is not.
         case .locations, .tasks, .farmRisk: true
+        // NOT VERIFIED EITHER WAY, and false is the conservative reading of
+        // an unverified prefix rather than a finding. Whether `/dashboard` is
+        // in the server's operator allowlist is not something this app has
+        // been told, and six of the nine surfaces are already false — so this
+        // matches the majority rather than inventing a permission.
+        //
+        // The cost of being wrong here is a screen an operator could have used
+        // and does not see, which is reversible in one line. The cost the other
+        // way is four requests that 403 on a screen built to show four blocks.
+        // Asked of the server session.
+        case .dashboard: false
         case .journal, .calculator, .exchange, .trends, .news: false
         }
     }
@@ -87,10 +108,11 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     /// Today's bottom row, in today's order.
     ///
     /// NOT the web's default, which is `/dashboard /farm-tasks /locations
-    /// /journal /exchange` — this app has no dashboard, and reordering the
-    /// four it shares on the day a customiser ships would move things
-    /// under a farmer who never asked for that. The default is what is
-    /// already on their phone; the customiser is how it changes.
+    /// /journal /exchange`. This app now HAS a dashboard, and it still does not
+    /// go in the default row: reordering somebody's bar on the day a screen
+    /// ships would move things under a farmer who never asked for that. The
+    /// default is what is already on their phone; the customiser is how it
+    /// changes, and «Табло» is one of the nine it offers.
     static let fallback: [AppSurface] = [.journal, .calculator, .exchange, .locations, .tasks]
 
     static func fallback(isOperator: Bool) -> [AppSurface] {
@@ -112,6 +134,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .trends: TrendsView()
         case .news: NewsView()
         case .farmRisk: FarmRiskView()
+        case .dashboard: DashboardView()
         }
     }
 }
