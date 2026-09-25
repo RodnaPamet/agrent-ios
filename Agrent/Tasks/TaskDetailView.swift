@@ -33,7 +33,11 @@ struct TaskDetailView: View {
         VStack(spacing: 0) {
             content
         }
-        .inlineTitle(summary.key)
+        // `key` is nullable on the wire — see `WorkItemSummary.key`. «Задача»
+        // rather than the title: the title is already the first thing in the
+        // content underneath, and a navigation bar repeating it says nothing
+        // while costing the width that made `inlineTitle` necessary.
+        .inlineTitle(summary.key ?? "Задача")
         .toolbar {
             if let item = store.state.value, !item.status.allowedNext.isEmpty {
                 ToolbarItem(placement: .primaryAction) { statusMenu(item) }
