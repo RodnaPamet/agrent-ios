@@ -346,6 +346,53 @@ final class ParcelHistoryTests: XCTestCase {
         XCTAssertEqual(WeedCatalogue.name(for: "Lolium perenne"), "Lolium perenne")
     }
 
+    /// THE TABLE AGAINST THE CONTRACT, which was unverifiable until today.
+    ///
+    /// `ParcelWeedObservation.weedKeys` is a closed enum in the generated spec.
+    /// I had been checking `CreateParcelWeedObservation.weeds` — the WRITE side
+    /// — which is `{type: "string"}` and deliberately unconstrained, and
+    /// concluded twice that the catalogue was pinned nowhere. Wrong half of an
+    /// asymmetry.
+    ///
+    /// The server's `partitionWeeds` is what makes the pair work: a submitted
+    /// entry matching the catalogue lands in `weedKeys`, everything else in
+    /// `otherWeeds`, so the read enum holds whatever a client sends.
+    ///
+    /// Transcribed from `openapi.json` on agri-saas main, 2026-09-25. It cannot
+    /// notice the SERVER adding a fourteenth — nothing client-side can, short
+    /// of fetching at build time, and the binomial fallback covers that. What
+    /// it catches is THIS TABLE drifting, which is the half I own.
+    func testTheCatalogueMatchesTheSpecExactly() {
+        let contract = [
+            "Sorghum halepense",
+            "Echinochloa crus-galli",
+            "Setaria viridis",
+            "Avena fatua",
+            "Cynodon dactylon",
+            "Cirsium arvense",
+            "Convolvulus arvensis",
+            "Chenopodium album",
+            "Amaranthus retroflexus",
+            "Sinapis arvensis",
+            "Raphanus raphanistrum",
+            "Papaver rhoeas",
+            "Galium aparine",
+        ]
+        XCTAssertEqual(WeedCatalogue.binomials, contract,
+                       "same values AND same order as the spec's enum")
+    }
+
+    /// AND EVERY ONE HAS A BULGARIAN NAME. A key in the contract with no entry
+    /// here would render as its binomial — correct, and not what the owner
+    /// confirmed thirteen names for.
+    func testEveryCatalogueKeyIsNamedInBulgarian() {
+        for key in WeedCatalogue.binomials {
+            let name = WeedCatalogue.name(for: key)
+            XCTAssertNotEqual(name, key, "\(key) fell back to its binomial")
+            XCTAssertTrue(name.hasSuffix("(\(key))"), name)
+        }
+    }
+
     /// The Latin stays beside the Bulgarian: it is what the server stores,
     /// what a spray label says, and the half of the pair this client did not
     /// write itself.

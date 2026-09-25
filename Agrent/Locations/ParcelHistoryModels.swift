@@ -364,28 +364,38 @@ struct WeedObservation: Decodable, Identifiable, Equatable, Sendable {
 /// The weed catalogue, as a DISPLAY TABLE and a picker suggestion — never as
 /// a validator.
 ///
-/// ── Why this cannot be treated as the truth ──
+/// ── Pinned on the READ side, open on the WRITE side, and that is the design ──
 ///
-/// The catalogue is the one thing in this feature that the generated spec
-/// does NOT pin. `Sorghum halepense` appears exactly once in
-/// `openapi.json`, as an `example`; there is no enum, and no endpoint serves
-/// the list. So these thirteen were relayed by hand, and the server's real
-/// catalogue is a list this client cannot see and cannot verify.
+/// This said the catalogue was "the one thing the generated spec does NOT
+/// pin". That was true when written and I then kept checking the wrong half
+/// of an asymmetry. Corrected 2026-09-25:
 ///
-/// That is the shape of every contract defect this repo has hit: a declared
-/// list that nothing checks against reality. So nothing here decides
-/// anything. The server splits `weeds` into keys and free text; this table
-/// only answers "what do we call this one in Bulgarian", and its fallback is
-/// the binomial itself — so a fourteenth weed added server-side shows up as
-/// `Lolium perenne` rather than as a blank, a crash, or a wrong name.
+///     ParcelWeedObservation.weedKeys        items: { enum: [ …13 binomials ] }
+///     CreateParcelWeedObservation.weeds     items: { type: "string" }
 ///
-/// ── The Bulgarian names want a farmer's eye ──
+/// The READ is a closed enum. The WRITE is deliberately unconstrained, and the
+/// server is what makes the pair honest: `partitionWeeds` splits every
+/// submitted entry, so anything matching the catalogue lands in `weedKeys` and
+/// everything else in `otherWeeds`. `weedKeys` therefore CANNOT hold a
+/// non-catalogue value whatever a client sends — which is what makes the read
+/// enum enforceable rather than aspirational — while a farmer can still record
+/// a weed the catalogue does not carry instead of being refused.
 ///
-/// They are the standard agronomic names, written here by the client. They
-/// are not from the server and not from a translation file, so they are the
-/// weakest thing in this file. Wrong is worse than Latin: a farmer acting on
-/// «балур» when the row means something else is a real cost. Being asked to
-/// confirm.
+/// The thirteen here were relayed by hand and now match that enum exactly,
+/// same values and same order, checked. `ParcelHistoryTests` pins it, so this
+/// table drifting from the contract is a red test rather than a wrong name on
+/// a screen.
+///
+/// ── The Bulgarian names are still mine ──
+///
+/// The enum pins the KEYS. What to call them in Bulgarian is not in any
+/// contract and was written here. Confirmed by the farm owner on 2026-09-25,
+/// which is the only verification available for that half and is a better one
+/// than a schema would be.
+///
+/// The fallback stays regardless: an unmapped key renders as its binomial, so
+/// a fourteenth weed shows as `Lolium perenne` rather than as a blank, a
+/// crash, or a wrong name.
 enum WeedCatalogue {
     /// Binomial → Bulgarian, in the order the catalogue was relayed in.
     /// A `KeyValuePairs` rather than a dictionary so the picker's order is
@@ -406,7 +416,17 @@ enum WeedCatalogue {
         "Galium aparine": "лепка",
     ]
 
-    /// The binomials, for a picker. NOT for validation — see the header.
+    /// The binomials, for a picker. NOT for validation, and the reason is
+    /// sharper than "the list might be wrong".
+    ///
+    /// Constraining a write UI to these thirteen would make `otherWeeds`
+    /// UNREACHABLE FROM THE PHONE. The write side is open precisely so a
+    /// farmer can record a weed the catalogue does not carry; a picker that
+    /// only offered the catalogue would quietly remove that, and the
+    /// half of the feature that exists for the unusual case would be
+    /// reachable only from the web.
+    ///
+    /// So: offer these, accept anything.
     static var binomials: [String] { entries.map(\.key) }
 
     /// «балур (Sorghum halepense)» for a known one, the binomial verbatim
