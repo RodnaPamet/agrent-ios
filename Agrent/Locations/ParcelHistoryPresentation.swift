@@ -37,6 +37,19 @@ enum ParcelHistoryCopy {
     /// disabled button.
     static let emptySection = "Няма записи"
 
+    /// TITLE CASE, for a navigation bar. The ALL-CAPS forms above are SECTION
+    /// HEADERS, where capitals are the platform idiom — reused as a navigation
+    /// title they read as shouting, and all-caps Cyrillic is the shape VoiceOver
+    /// is likeliest to spell out letter by letter, which is the same audio-only
+    /// defect `A11y` and `Plural` were both written to close.
+    static func drillInTitle(_ part: ParcelHistoryStore.Part) -> String {
+        switch part {
+        case .seasons: "Реколти"
+        case .operations: "Дейности"
+        case .weeds: "Плевели"
+        }
+    }
+
     static let loadOlder = "Покажи по-стари"
 
     /// Shown INSTEAD of the button once a paging attempt has ended a section.

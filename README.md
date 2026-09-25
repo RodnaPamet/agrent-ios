@@ -104,8 +104,17 @@ build — there is no macOS on the machine this was written on:
 
 ## Writes, and why they are shaped this way
 
-Every create sends an **`Idempotency-Key`**. The server dedupes on it
-(`LogEntry.clientMutationId`, unique per tenant), so a request whose *response*
+**Six writes send an `Idempotency-Key`**, and this said "every create" — which
+was aspirational and journal-scoped, and is contradicted by five `nil` call
+sites. The ones that send it: journal create, journal edit, farm-task,
+field-operation, task status, the exchange message send, and the grain cost
+create. The ones that do not: the parcel-history creates, exchange listings,
+admin, `POST /grain/contracts` and `POST /locations/:id/parcels` — the last of
+which says outright that a replayed create draws a second parcel. The rule is
+per ROUTE; see `ROADMAP.md` for the table.
+
+Where it is sent, the server dedupes on it
+(`clientMutationId`, unique per tenant), so a request whose *response*
 was lost — the ordinary case on a tractor — replays without writing a second
 entry. The key is minted once per logical create and reused across retries;
 minting it per attempt would defeat the whole mechanism.
@@ -144,7 +153,8 @@ Read from the server source, current as of this writing:
 
 The wire contract is **settled**; what is still moving is client-side only.
 
-- **`Idempotency-Key` on every write**, minted *before the first attempt* and
+- **`Idempotency-Key` on the writes that honour it** (not on every write — see
+  above), minted *before the first attempt* and
   reused for every retry of that same write. Mint it per attempt instead and a
   response lost after the server committed creates a **second record** —
   traced, two rows every time, on all three create routes.

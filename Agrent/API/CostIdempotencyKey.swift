@@ -138,11 +138,24 @@ enum CostIdempotencyKey {
             return UUID().uuidString.lowercased()
         }
 
-        // NUL as the separator between the two halves. A UUID string cannot
-        // contain one, so no nonce-and-content pair can be confused with a
-        // different pair that happens to concatenate the same way.
-        var material = Data(nonce.utf8)
-        material.append(0x00)
+        // LENGTH-PREFIXED, not merely NUL-separated.
+        //
+        // The separator argument used to read "a UUID string cannot contain a
+        // NUL, so no nonce-and-content pair can be confused with another" —
+        // which is true of the only caller and NOT of the signature. `mint`
+        // takes an arbitrary `String`, and the tests say so out loud: "any
+        // fixed string does — `mint` treats it as opaque". An argument that
+        // holds because of who happens to call it is the same shape as a guard
+        // that cannot fire: correct today, quietly wrong the day somebody
+        // passes something else.
+        //
+        // The byte count makes the framing unambiguous whatever the nonce
+        // contains, so nothing downstream depends on a claim about its
+        // alphabet.
+        var material = Data()
+        var length = UInt32(Data(nonce.utf8).count).littleEndian
+        withUnsafeBytes(of: &length) { material.append(contentsOf: $0) }
+        material.append(Data(nonce.utf8))
         material.append(body)
 
         return Self.uuidString(from: SHA256.hash(data: material))
