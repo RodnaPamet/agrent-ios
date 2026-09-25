@@ -67,8 +67,21 @@ where Item.ID == String {
                         .pageRow()
                 }
 
-                footer(current)
-                    .pageRow()
+                // ONLY WHEN THERE IS SOMETHING TO SAY.
+                //
+                // `footer` returned an `EmptyView` for `.nothing` — the
+                // ORDINARY case for a section that arrived whole — but it was
+                // still added as a List row, inside a VStack with
+                // `frame(maxWidth: .infinity)` and vertical padding. So every
+                // complete section ended with a padded, full-width,
+                // contentless row and its `.plain` separator: a blank row that
+                // looks like data, which is the defect the house conventions
+                // name outright, plus a VoiceOver stop after the last real row
+                // with nothing to read.
+                if ParcelHistoryPaging(current) != .nothing || current.failure != nil {
+                    footer(current)
+                        .pageRow()
+                }
             }
         }
         .listStyle(.plain)
@@ -161,6 +174,12 @@ where Item.ID == String {
 
             case .end:
                 Text(ParcelHistoryCopy.noOlder)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+            case .noneShown:
+                Text(ParcelHistoryCopy.noneShown)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

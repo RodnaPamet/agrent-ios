@@ -260,10 +260,22 @@ struct FarmRiskView: View {
                     .font(.caption2)
             }
             .font(.footnote.weight(.medium))
-            // The hit area is the label and nothing more. Without it the
-            // Button's tappable region is the text's glyphs, and beside
-            // another control in the same row that is a target too small to
-            // be found reliably in a field.
+            // 44pt, WHICH IS THE POINT — `contentShape` alone was not.
+            //
+            // `contentShape(Rectangle())` on an unframed HStack makes the gap
+            // between the text and the chevron hit-testable instead of just
+            // the glyphs. It does not ENLARGE anything. That left a footnote
+            // plus a caption chevron, roughly 18pt tall, sitting 8pt above
+            // `askControl` — which sends an insurance enquiry that has no
+            // DELETE, no PATCH and no withdraw.
+            //
+            // Two sub-44pt targets 8pt apart, one of them irreversible, is
+            // the same mis-tap this control was carefully shaped to avoid by
+            // not being a NavigationLink wrapping a Button — the ambiguity
+            // arriving by a different route. In a field, on a phone, in
+            // gloves. `ParcelMapView` already uses this frame for the same
+            // reason.
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

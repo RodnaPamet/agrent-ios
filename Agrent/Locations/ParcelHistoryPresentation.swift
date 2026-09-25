@@ -44,6 +44,14 @@ enum ParcelHistoryCopy {
     /// cannot tell "that was the end" from "that did not work".
     static let noOlder = "Няма по-стари записи."
 
+    /// A claim about the SCREEN, not about the archive — see
+    /// `ParcelHistoryPaging.noneShown`. Used where a page arrived carrying
+    /// nothing new, which is either an exact-divide ending or a stale-cursor
+    /// restart, and nothing here can tell those apart. «Няма по-стари записи»
+    /// would be false in the second case, on an agronomic record, with the
+    /// control gone so the reader could not ask again.
+    static let noneShown = "Няма повече записи за показване."
+
     static let loading = "Зареждане…"
 }
 
@@ -99,10 +107,16 @@ struct ParcelHistoryLine: Equatable {
     /// which carries typography the audio channel has no business hearing.
     var spoken: String { A11y.sentence(parts) }
 
-    /// Nothing was recorded at all. Possible in principle — a completed line
-    /// whose task, product and date are all absent — and the row then shows
-    /// what little it has rather than a placeholder, so the view uses this to
-    /// decide whether it has a label worth declaring.
+    /// Nothing was recorded at all, and this is REACHABLE for an operation.
+    ///
+    /// It was not when this was written: `doseValue` was non-optional, so
+    /// `details` always held a dose and the branch could never fire — a guard
+    /// that cannot fire, which is the defect this repo has shipped three times
+    /// (`FarmRiskModels.isAlreadyAsked` against a 409 the client never threw,
+    /// and twice since). Making `doseValue` optional turned it live: a line
+    /// with no completion date, an unrecorded task title, an unrecorded
+    /// product and no dose now has nothing to say, and the view declares no
+    /// accessibility label rather than an empty one.
     var isBlank: Bool { lead == nil && headline == nil && details.isEmpty }
 
     /// Joins what was recorded with « · », and draws NO separator for what
@@ -128,6 +142,28 @@ extension CropSeason {
     var historyLine: ParcelHistoryLine {
         ParcelHistoryLine(lead: String(year), headline: cropLabel)
     }
+
+    /// The drill-in row, which carries what the card cannot fit.
+    ///
+    /// The summary card is `historyLine`; if the full list showed only that,
+    /// a reader who tapped a card learned nothing except that there were more
+    /// rows. Sowing and harvest dates and the farmer's own note are all
+    /// decoded by the model and were rendered by nothing.
+    ///
+    /// Each is prefixed, because two bare dates side by side are
+    /// indistinguishable and the pair is the whole point — «сято 14 октомври»
+    /// against «прибрано 30 септември» is the shape of an autumn crop.
+    var historyDetailLine: ParcelHistoryLine {
+        ParcelHistoryLine(
+            lead: String(year),
+            headline: cropLabel,
+            details: [
+                sownAt.map { "сято \(BgDate.dayMonth($0))" },
+                harvestedAt.map { "прибрано \(BgDate.dayMonth($0))" },
+                notes,
+            ]
+        )
+    }
 }
 
 extension ParcelHistoryOperation {
@@ -139,11 +175,15 @@ extension ParcelHistoryOperation {
     /// and `doseUnit` is an empty string that MEANS "no unit". Every one of
     /// them is simply left out, with no placeholder and no separator — see
     /// `ParcelHistoryLine`.
+    /// `targetNote` is on the row on purpose: it is the agronomic REASON the
+    /// spray happened — production's own example is «балур на петна» — and it
+    /// is the thing somebody opening "what was applied here" came to read.
+    /// It was decoded by the model and rendered by nothing.
     var historyLine: ParcelHistoryLine {
         ParcelHistoryLine(
             lead: completedAt.map(BgDate.dayMonth),
             headline: title,
-            details: [productName, doseText]
+            details: [productName, doseText, targetNote]
         )
     }
 }
@@ -193,13 +233,41 @@ enum ParcelHistoryPaging: Equatable {
     /// fetches pages nobody asked for on a connection this app assumes is bad.
     case button
 
-    /// «Няма по-стари записи.» — the end, stated.
+    /// «Няма по-стари записи.» — the end, and it is TRUE.
     ///
     /// A control that vanishes when tapped reads as a bug: the reader cannot
-    /// tell "that was the end" from "that did not work". This is what replaces
-    /// the button once a paging attempt has ended the section, which includes
-    /// the case where the server answered with a page carrying nothing new.
+    /// tell "that was the end" from "that did not work". So the button is
+    /// replaced rather than removed.
+    ///
+    /// Reached only when the server said so — `cursor == nil` means that list
+    /// has nothing older. This is a claim about the ARCHIVE.
     case end
+
+    /// «Няма повече записи за показване.» — a claim about the SCREEN.
+    ///
+    /// ── Why this is not `.end` ──
+    ///
+    /// `Section.exhausted` is set whenever a page arrives carrying nothing
+    /// new, and TWO different things produce that, which a client cannot tell
+    /// apart from outside:
+    ///
+    ///   · the list divided exactly by the page size, so the next page is
+    ///     genuinely empty — the archive really is complete;
+    ///   · the cursor was stale, and the server RESTARTS a list on a stale or
+    ///     malformed cursor rather than erroring, answering 200 with page one.
+    ///
+    /// The store loads cache-first, so opening this screen on an archive
+    /// cached days ago and tapping «Покажи по-стари» is the ordinary path to
+    /// the second. Saying «Няма по-стари записи.» there tells a farmer his
+    /// field has no earlier record when it does, on an agronomic archive,
+    /// with the control gone so he cannot ask again.
+    ///
+    /// One sentence is true under both: nothing further can be SHOWN. It does
+    /// not claim the archive is complete, and it does not claim a failure
+    /// either — because in the empty-page case there was none. Refresh, which
+    /// lives one screen back, mints fresh cursors and is what actually clears
+    /// the stale case.
+    case noneShown
 
     init<Item: Identifiable & Equatable & Sendable>(
         _ section: ParcelHistoryStore.Section<Item>
@@ -212,7 +280,11 @@ enum ParcelHistoryPaging: Equatable {
         } else if section.canLoadOlder {
             self = .button
         } else if section.exhausted {
-            self = .end
+            // THE CURSOR DECIDES WHICH SENTENCE IS HONEST. Nil means the
+            // server said there is nothing older; a surviving cursor means a
+            // page arrived with nothing new, which is either an exact-divide
+            // ending or a stale-cursor restart and cannot be told apart here.
+            self = section.cursor == nil ? .end : .noneShown
         } else {
             self = .nothing
         }

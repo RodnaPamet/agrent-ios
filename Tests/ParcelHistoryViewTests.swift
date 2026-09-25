@@ -452,22 +452,55 @@ final class ParcelHistoryViewTests: XCTestCase {
 
     /// A tap that makes the control silently vanish reads as a bug: the reader
     /// cannot tell "that was the end" from "that did not work". So the button
-    /// is REPLACED by one line saying there is nothing older.
+    /// is REPLACED rather than removed — but by WHICH sentence depends on
+    /// whether the archive really is finished, and this test asserted the
+    /// wrong one.
     ///
-    /// Driven through `appendOlder` rather than by setting `exhausted` by hand,
-    /// so this covers the way a section really ends — including the case where
-    /// a stale cursor made the server answer with the page the reader already
-    /// had.
-    func testAPagingAttemptThatEndsTheSectionSaysSoRatherThanVanishing() {
+    /// It pinned `.end` for both endings, including the stale-cursor restart.
+    /// That told a farmer his field had no earlier record when it did, on an
+    /// agronomic archive, with the control gone so he could not ask again —
+    /// and the test made it look deliberate.
+    ///
+    /// The cursor is what decides. Nil means the SERVER said there is nothing
+    /// older, which is a claim about the archive. A surviving cursor means a
+    /// page arrived carrying nothing new, which is either an exact-divide
+    /// ending or a restart, and nothing here can tell those apart — so the
+    /// sentence narrows to a claim about the screen.
+    func testTheEndingSentenceMatchesWhichEndingItWas() {
         var ended = seasonSection([season("a", year: 2026)], cursor: "c1")
         ended.appendOlder([season("b", year: 2025)], cursor: nil)
         XCTAssertEqual(ParcelHistoryPaging(ended), .end)
 
+        // The server RESTARTS a list on a stale cursor and answers 200 with
+        // page one. The store loads cache-first, so an archive cached days ago
+        // makes this the ordinary path rather than a corner.
         var restarted = seasonSection([season("a", year: 2026)], cursor: "c1")
         restarted.appendOlder([season("a", year: 2026)], cursor: "c1")
-        XCTAssertEqual(ParcelHistoryPaging(restarted), .end)
+        XCTAssertEqual(ParcelHistoryPaging(restarted), .noneShown)
 
+        // The distinction is in the words, not only in the enum.
         XCTAssertEqual(ParcelHistoryCopy.noOlder, "Няма по-стари записи.")
+        XCTAssertEqual(ParcelHistoryCopy.noneShown, "Няма повече записи за показване.")
+        XCTAssertNotEqual(ParcelHistoryCopy.noOlder, ParcelHistoryCopy.noneShown)
+    }
+
+    /// The blank footer row: `footer` returns an `EmptyView` for `.nothing`,
+    /// the ORDINARY case for a section that arrived whole — and it was still
+    /// added as a List row inside a padded, full-width VStack. Every complete
+    /// section ended with a contentless row, its separator, and a VoiceOver
+    /// stop with nothing to read.
+    ///
+    /// Asserted on the condition the view now guards with, since the row's
+    /// absence is not observable from here.
+    func testACompleteSectionDrawsNoFooterRowAtAll() {
+        let whole = seasonSection([season("a", year: 2026)], cursor: nil)
+        XCTAssertEqual(ParcelHistoryPaging(whole), .nothing)
+        XCTAssertNil(whole.failure)
+
+        var failed = seasonSection([season("a", year: 2026)], cursor: nil)
+        failed.failure = "Няма връзка."
+        XCTAssertEqual(ParcelHistoryPaging(failed), .nothing)
+        XCTAssertNotNil(failed.failure, "a failure still earns a footer")
     }
 
     /// A failed page must not take the rows with it. Every row on screen is
@@ -486,4 +519,72 @@ final class ParcelHistoryViewTests: XCTestCase {
         XCTAssertEqual(ParcelHistoryPaging(failed), .button)
         XCTAssertEqual(card(failed).newest?.text, "2026 · Пшеница")
     }
+    // MARK: - What the rows were dropping
+
+    /// `targetNote` is the agronomic REASON a spray happened — production's
+    /// own example is «балур на петна» — and it is what somebody opening
+    /// "what was applied here" came to read. It was decoded by the model and
+    /// rendered by nothing.
+    func testTheReasonForASprayReachesTheRow() async throws {
+        let line = try await decode(#"""
+        {"id":"op9","taskId":"t","operationType":"SPRAY","title":"Хербицид",
+         "completedAt":null,"productName":"Раундъп","doseValue":"2.5",
+         "doseUnit":"л/дка","targetNote":"балур на петна"}
+        """#, as: ParcelHistoryOperation.self).historyLine
+
+        // `text` is the first line (« 3 май · Хербицид »); the reason lands
+        // on the second, with the product and the dose.
+        XCTAssertTrue(line.detailText.contains("балур на петна"), line.detailText)
+        XCTAssertTrue(line.detailText.contains("Раундъп"), line.detailText)
+        XCTAssertTrue(line.spoken.contains("балур на петна"), line.spoken)
+    }
+
+    /// The РЕКОЛТИ drill-in carried nothing the card did not: a reader who
+    /// tapped a card with three seasons learned only that there were three.
+    /// Sowing and harvest dates and the farmer's own note were all decoded
+    /// and rendered nowhere.
+    ///
+    /// Each date is prefixed because the pair is the point — two bare dates
+    /// side by side are indistinguishable, and «сято … / прибрано …» is the
+    /// shape of an autumn crop.
+    func testTheSeasonDrillInCarriesMoreThanItsCard() async throws {
+        let season = try await decode(#"""
+        {"id":"cs9","year":2026,"cropType":"Wheat",
+         "sownAt":"2025-10-14T11:00:00.000Z","harvestedAt":"2026-07-02T11:00:00.000Z",
+         "notes":"късна сеитба"}
+        """#, as: CropSeason.self)
+
+        let card = season.historyLine
+        let detail = season.historyDetailLine
+
+        // Both share the first line — « 2026 · Пшеница ». The drill-in adds a
+        // second one the card does not have at all.
+        XCTAssertEqual(card.text, detail.text)
+        XCTAssertTrue(card.detailText.isEmpty, card.detailText)
+        XCTAssertTrue(detail.detailText.contains("сято"), detail.detailText)
+        XCTAssertTrue(detail.detailText.contains("прибрано"), detail.detailText)
+        XCTAssertTrue(detail.detailText.contains("късна сеитба"), detail.detailText)
+    }
+
+    /// `isBlank` could not fire when it was written: `doseValue` was
+    /// non-optional, so `details` always held a dose. That made it a guard
+    /// that cannot fire — the defect this repo has shipped three times.
+    ///
+    /// Making `doseValue` optional turned it live, so it now gets the test it
+    /// never had: a line with no date, no recorded title, no recorded product
+    /// and no dose has nothing to say, and declares no label rather than an
+    /// empty one.
+    func testAnOperationWithNothingRecordedDeclaresNoLabel() async throws {
+        let line = try await decode(#"""
+        {"id":"op0","taskId":"t","operationType":null,"title":"",
+         "completedAt":null,"productName":"","doseValue":null,
+         "doseUnit":"","targetNote":null}
+        """#, as: ParcelHistoryOperation.self).historyLine
+
+        XCTAssertTrue(line.isBlank)
+        XCTAssertEqual(line.text, "")
+        XCTAssertEqual(line.detailText, "")
+        XCTAssertEqual(line.spoken, "")
+    }
+
 }
