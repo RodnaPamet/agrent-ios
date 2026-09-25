@@ -108,6 +108,11 @@ enum CostIdempotencyKey {
     /// Pure: same nonce and same content give the same key, always, with no
     /// stored state anywhere. That is what makes the invariant testable
     /// without a network seam — and the invariant is the whole feature.
+    ///
+    /// The single exception is the encode-failure branch below, which is
+    /// unreachable and says so. Naming it here rather than letting the word
+    /// "always" stand unqualified: an absolute in a doc comment is the thing
+    /// this repo keeps discovering to be false.
     static func mint(nonce: String, draft: CreateCostEntry) -> String {
         // A local, synchronous encoder — see the header on why not
         // `APIClient.encodeBody`. `.sortedKeys` is REQUIRED, not tidiness:
@@ -120,10 +125,17 @@ enum CostIdempotencyKey {
             // Unreachable: `CreateCostEntry.encode(to:)` writes strings, a
             // `Decimal` and nothing else, and none of those throw. Kept
             // total anyway, and the fallback leans the SAFE way: a fresh
-            // UUID is deduped against nothing, which is exactly the
+            // value is deduped against nothing, which is exactly the
             // behaviour this screen had before today. Never a stale key —
-            // a stale key is the one outcome that loses a correction.
-            return UUID().uuidString
+            // a stale key is the one outcome that loses a correction, and
+            // deriving one from the nonce alone would produce exactly that.
+            //
+            // LOWERCASED, because `UUID().uuidString` is UPPERCASE and this
+            // function's whole contract with the server is a lowercase
+            // 8-4-4-4-12 value. The unreachable branch was the one place that
+            // broke the shape the reachable branch is careful to produce, and
+            // the tests assert the shape only on the reachable one.
+            return UUID().uuidString.lowercased()
         }
 
         // NUL as the separator between the two halves. A UUID string cannot

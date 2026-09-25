@@ -75,12 +75,27 @@ enum CostsAPI {
     ///
     /// Three consequences, all still deliberate:
     ///
-    /// 1. **Nothing retries this automatically** — not the caller, not a
-    ///    queue, not a pull-to-refresh. The key makes a retry SAFE; it does
-    ///    not make one exist, and the owner chose the key without one.
-    ///    `setTaskStatus`'s retry design must NOT be carried across: it is
-    ///    safe there because the server compares state, and a create has no
-    ///    prior state to compare with.
+    /// 1. **ONE path replays this automatically, and it is the one the key
+    ///    actually protects.** `APIClient.send` retries the POST on a 401:
+    ///    it refreshes the token and calls `perform` a second time with the
+    ///    SAME body and the SAME `Idempotency-Key`. An access token expiring
+    ///    between the tap and the write is ordinary, so this is not a corner
+    ///    — it is the commonest way the same key reaches the server twice,
+    ///    and before today it was the commonest way the books gained a
+    ///    duplicate row.
+    ///
+    ///    This comment said "nothing retries this automatically — not the
+    ///    caller, not a queue, not a pull-to-refresh" and was wrong for the
+    ///    same reason three earlier versions of it were wrong: it described
+    ///    the caller's intent instead of reading `send`. A reader who
+    ///    believed it could move the 401 replay, or simplify the key away,
+    ///    without knowing either touches the other.
+    ///
+    ///    Nothing ELSE retries: no queue, no pull-to-refresh, no button. The
+    ///    key makes a retry safe; it does not make one exist, and the owner
+    ///    chose the key without adding one. `setTaskStatus`'s design must NOT
+    ///    be carried across — it is safe there because the server compares
+    ///    STATE, and a create has no prior state to compare with.
     /// 2. **A transport failure is reported as UNKNOWN, not as "not
     ///    saved".** After a timeout the app genuinely does not know whether
     ///    the row exists, and telling an operator it failed invites them to

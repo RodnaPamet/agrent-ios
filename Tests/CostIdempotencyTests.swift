@@ -236,4 +236,59 @@ final class CostIdempotencyTests: XCTestCase {
         XCTAssertEqual(characters[14], "4", minted)
         XCTAssertTrue("89ab".contains(characters[19]), minted)
     }
+    // MARK: - The call site, which nine pure tests cannot see
+
+    /// NINE TESTS PROVE THE FUNCTION AND NONE PROVE IT IS CALLED.
+    ///
+    /// Replace the argument in `NewCostView.save()` with `UUID().uuidString`
+    /// and every test above still passes while the feature is silently
+    /// inverted: a fresh key per attempt is deduped against nothing, and the
+    /// 401 replay that `CalculatorAPI` documents starts writing a second row
+    /// again. That is not hypothetical — `ItemCatalogue.create` and
+    /// `FarmRiskAPI.createLead` ship exactly that mistake today, and the
+    /// comment above `CostsAPI.create` warns against it by name.
+    ///
+    /// There is no `URLProtocol` seam in this suite, so the outgoing header
+    /// cannot be observed. `OutboxTests.testOnlyFieldOperationsCanBeQueued`
+    /// has the same problem and solves it by reading the source text through
+    /// `#filePath`; this is that idiom, used for the same reason.
+    func testTheViewActuallyMintsTheKeyItWasGiven() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Agrent/Calculator/NewCostView.swift"),
+            encoding: .utf8)
+
+        XCTAssertTrue(source.contains("CostIdempotencyKey.mint"),
+                      "positive control: the view mints the key")
+        XCTAssertTrue(source.contains("CostsAPI.create"),
+                      "positive control: the view is still the call site")
+
+        // The mistake this guards against, spelled exactly as the two routes
+        // that still make it spell it.
+        XCTAssertFalse(
+            source.contains("idempotencyKey: UUID()"),
+            "the cost create mints a fresh key per attempt, which dedupes nothing")
+    }
+
+    /// The nonce must be per PRESENTATION, not per attempt and not global.
+    ///
+    /// Per attempt and identical figures mint different keys, so the 401
+    /// replay duplicates. Global — a `static let` — and a cost typed an hour
+    /// later with the same figures reuses a key the server already has, so
+    /// the second, legitimate row is deduped away and never written. The
+    /// diesel bought twice in one day is the case that breaks.
+    func testTheNonceIsHeldByTheViewAndNotMintedPerAttempt() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Agrent/Calculator/NewCostView.swift"),
+            encoding: .utf8)
+
+        XCTAssertTrue(source.contains("@State private var nonce"),
+                      "the nonce is view state, minted once per presentation")
+        XCTAssertFalse(source.contains("static let nonce"),
+                       "a global nonce would dedupe a legitimate second purchase away")
+    }
+
 }
