@@ -29,6 +29,20 @@ struct FarmRiskView: View {
     /// the lead cannot be revised once it is sent.
     @State private var requesting: RequestTarget?
 
+    /// The parcel whose archive is being pushed, or nil.
+    ///
+    /// A PROGRAMMATIC PUSH RATHER THAN A `NavigationLink`, and the reason is
+    /// the row it lives in: `parcelRow` already contains a Button — the
+    /// insurance ask — and a `NavigationLink` inside a List row makes the
+    /// WHOLE row tappable. The two controls would then overlap, and which one
+    /// a tap reached would depend on where in the row it landed. The insurance
+    /// ask writes something that cannot be withdrawn, so an ambiguous tap
+    /// there is not a cosmetic problem.
+    ///
+    /// A Button that sets this, plus one `navigationDestination`, keeps each
+    /// control's hit area its own.
+    @State private var history: Parcel?
+
 
     var body: some View {
         NavigationStack {
@@ -57,6 +71,12 @@ struct FarmRiskView: View {
                     requesting = RequestTarget(parcel: nil)
                 }
                 .inlineTitle("Риск по парцели")
+                // Declared ONCE for the whole list rather than per row: a
+                // destination inside a row is scoped to that row's lifetime,
+                // and rows here are rebuilt every time a reading arrives.
+                .navigationDestination(item: $history) { parcel in
+                    ParcelHistoryView(parcelID: parcel.id, parcelName: parcel.name)
+                }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Затвори") { dismiss() }
@@ -205,8 +225,51 @@ struct FarmRiskView: View {
                 }
             }
 
+            historyControl(row)
+
             askControl(row)
         }
+    }
+
+    /// THE ARCHIVE, as its own control — never the whole row.
+    ///
+    /// This row is where the archive belongs: it is the one list of parcels
+    /// every role can open, and the map tap that looks like the obvious home
+    /// for it opens `ParcelOperationSheet` — a form to RECORD an operation,
+    /// gated on `mayCreateOperations`, which is false for MECHANISATOR, READER
+    /// and AUDITOR. The archive would have been invisible to the operator who
+    /// sprayed the field.
+    ///
+    /// Shown for EVERY role, and not gated on anything. `GET /history` is a
+    /// READ under `/api/t/{slug}/agro/…`, and `agro` is one of the five
+    /// prefixes the server's operator lockdown lets through — see
+    /// `CurrentUser.isOperator`. So this is not the `/insurance` division that
+    /// hides `askControl` from a MECHANISATOR, and it is not a write, so
+    /// `mayCreateOperations` has nothing to say about it either.
+    ///
+    /// The label is spoken with the parcel's name in it. "История" alone is
+    /// unambiguous on screen, where it sits inside a named row, and useless to
+    /// someone swiping between elements one at a time.
+    private func historyControl(_ row: RiskRow) -> some View {
+        Button {
+            history = row.parcel
+        } label: {
+            HStack(spacing: 4) {
+                Text("История")
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+            }
+            .font(.footnote.weight(.medium))
+            // The hit area is the label and nothing more. Without it the
+            // Button's tappable region is the text's glyphs, and beside
+            // another control in the same row that is a target too small to
+            // be found reliably in a field.
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.accent)
+        .accessibilityLabel("История на парцел \(row.parcel.name)")
+        .accessibilityHint("Отваря записаните реколти, дейности и плевели за този парцел")
     }
 
     /// Ask, already asked, or nothing at all.
