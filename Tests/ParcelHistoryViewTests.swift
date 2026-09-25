@@ -296,15 +296,76 @@ final class ParcelHistoryViewTests: XCTestCase {
     }
 
     /// `title` is `line.task?.title ?? ''` on the server, so an empty string is
-    /// a REAL shape and it means NOT RECORDED. The part is left out, and the
-    /// separator that would have followed it goes with it.
-    func testAnOperationWithNoTitleLeavesItOutWithNoSeparator() async throws {
+    /// a REAL shape and it means NOT RECORDED — and the row now says what KIND
+    /// of work it was instead of leaving the slot bare.
+    ///
+    /// This asserted `headline == nil`, which was the honest rendering while
+    /// nothing better existed. `productCategory` arrived on 2026-09-25 and
+    /// `recordedKind` fills exactly this slot: such a row previously said
+    /// nothing about what had been DONE to the field, only what was applied to
+    /// it. Assert the fallback, not the gap.
+    func testAnOperationWithNoTitleFallsBackToWhatKindItWas() async throws {
         let line = try await operation(title: "").historyLine
+
+        XCTAssertEqual(line.headline, "Пръскане")
+        XCTAssertEqual(line.text, "3 май · Пръскане")
+        XCTAssertFalse(line.text.hasSuffix(" "), "«\(line.text)»")
+    }
+
+    /// AND NOTHING when neither says. No title, no `operationType`, no product
+    /// category — the slot stays empty rather than inventing «Друга», which
+    /// would be a classification the data does not make.
+    func testAnOperationWithNoTitleAndNoKindLeavesTheSlotEmpty() async throws {
+        let line = try await decode(#"""
+        {"id":"x","taskId":"t","operationType":null,"title":"",
+         "completedAt":"2026-05-03T11:00:00.000Z","productName":"Раундъп",
+         "doseValue":"2.5","doseUnit":"л/дка","targetNote":null,
+         "productCategory":null}
+        """#, as: ParcelHistoryOperation.self).historyLine
 
         XCTAssertNil(line.headline)
         XCTAssertEqual(line.text, "3 май")
         XCTAssertFalse(line.text.contains("·"), "«\(line.text)»")
-        XCTAssertFalse(line.text.hasSuffix(" "), "«\(line.text)»")
+    }
+
+    /// The category is the HARDER signal and the fallback uses it: a line whose
+    /// operator recorded no type still names the work, retroactively, from what
+    /// the product was.
+    func testTheProductCategoryNamesTheWorkWhenNoTypeWasRecorded() async throws {
+        let line = try await decode(#"""
+        {"id":"x","taskId":"t","operationType":null,"title":"",
+         "completedAt":null,"productName":"NPK","doseValue":"15",
+         "doseUnit":"кг/дка","targetNote":null,"productCategory":"FERTILIZER"}
+        """#, as: ParcelHistoryOperation.self).historyLine
+
+        XCTAssertEqual(line.headline, "Торене")
+    }
+
+    /// A category that is not a kind of field work names nothing. `FUEL` and
+    /// `HARVESTED_PRODUCE` are not applications to a parcel at all, and `OTHER`
+    /// is not a classification — «Друга» there would be invented.
+    func testACategoryThatIsNotFieldWorkNamesNothing() async throws {
+        for category in ["FUEL", "HARVESTED_PRODUCE", "OTHER", "NEW_THING"] {
+            let line = try await decode("""
+            {"id":"x","taskId":"t","operationType":null,"title":"",
+             "completedAt":null,"productName":"x","doseValue":"1",
+             "doseUnit":"","targetNote":null,"productCategory":"\(category)"}
+            """, as: ParcelHistoryOperation.self).historyLine
+            XCTAssertNil(line.headline, category)
+        }
+    }
+
+    /// The recorded type WINS over the derived category, even when they
+    /// disagree. Correcting a farmer's own entry from a derived field is a
+    /// bigger decision than a row label, and nobody has asked for it.
+    func testWhatWasRecordedBeatsWhatWasDerived() async throws {
+        let line = try await decode(#"""
+        {"id":"x","taskId":"t","operationType":"SPRAY","title":"",
+         "completedAt":null,"productName":"NPK","doseValue":"15",
+         "doseUnit":"кг/дка","targetNote":null,"productCategory":"FERTILIZER"}
+        """#, as: ParcelHistoryOperation.self).historyLine
+
+        XCTAssertEqual(line.headline, "Пръскане", "recorded, not derived")
     }
 
     /// The mirror image, and the one this app has actually shipped: an absent
@@ -336,8 +397,8 @@ final class ParcelHistoryViewTests: XCTestCase {
     /// identically to empty while defeating an `isEmpty` check.
     func testAWhitespaceOnlyTitleCountsAsNotRecorded() async throws {
         let line = try await operation(title: "   ").historyLine
-        XCTAssertNil(line.headline)
-        XCTAssertEqual(line.text, "3 май")
+        // Not recorded, so the kind stands in — same as an empty one.
+        XCTAssertEqual(line.headline, "Пръскане")
     }
 
     /// `completedAt` is optional on the wire. No date, no date — and no
@@ -359,10 +420,12 @@ final class ParcelHistoryViewTests: XCTestCase {
             title: "", productName: "", doseValue: "1", doseUnit: "", completedAt: nil
         ).historyLine
 
-        XCTAssertEqual(line.text, "")
+        // «Пръскане» from the recorded type, because the title is not
+        // recorded — the thinnest possible row still says what was done.
+        XCTAssertEqual(line.text, "Пръскане")
         XCTAssertEqual(line.detailText, "1")
         XCTAssertFalse(line.isBlank)
-        XCTAssertEqual(line.spoken, "1.")
+        XCTAssertEqual(line.spoken, "Пръскане, 1.")
     }
 
     // MARK: - ПЛЕВЕЛИ rows

@@ -195,7 +195,20 @@ extension ParcelHistoryOperation {
     var historyLine: ParcelHistoryLine {
         ParcelHistoryLine(
             lead: completedAt.map(BgDate.dayMonth),
-            headline: title,
+            // `recordedKind` as a FALLBACK, not an addition.
+            //
+            // The headline answers "what was this", and the title answers it
+            // best — «Хербицид» says more than «Пръскане», and putting both on
+            // every row is noise for a benefit that only applies to the rows
+            // that lack one.
+            //
+            // `title` is a `?? ''` collapse, so a line whose task relation is
+            // gone has none — and such a row previously said NOTHING about
+            // what had been done to the field, only what was applied to it.
+            // `recordedKind` fills exactly that slot: `operationType` where the
+            // operator recorded one, and `productCategory` where they did not,
+            // which is the half that works retroactively.
+            headline: title ?? recordedKind,
             details: [productName, doseText, targetNote]
         )
     }
