@@ -30,6 +30,12 @@ struct ParcelHistorySectionList<Item: Identifiable & Equatable & Sendable>: View
 where Item.ID == String {
     let title: String
 
+    /// THE PARCEL, because this screen is two pushes deep and its entire
+    /// meaning is per-parcel. The summary screen carries the name in its first
+    /// row; from here that row is one push back, so a reader arriving at a list
+    /// of sprays had nothing on screen saying whose field they were.
+    let parcelName: String
+
     /// Which list a "load older" is for. Not an index — the three sections
     /// hold different types and nothing generic can dispatch between them.
     let part: ParcelHistoryStore.Part
@@ -42,11 +48,25 @@ where Item.ID == String {
 
     var body: some View {
         List {
-            // No `else`: the archive is present because a card built from it
-            // is what pushed this screen. If a reload ever emptied it while
-            // this list was open, an empty list is the honest rendering —
-            // there is nothing to report and nothing to retry from here.
+            // Reads the LIVE section off the store rather than taking a
+            // snapshot, so rows appended by «Покажи по-стари» appear here.
+            //
+            // The empty branch is currently unreachable: nothing can move the
+            // store off `.loaded` while this screen is pushed — `refreshable`
+            // is on the summary only, `.task` has already run, and `loadOlder`
+            // never assigns `.loading` or `.failed`. It is kept with WORDS
+            // rather than as a blank view, because "unreachable today" is how
+            // every dead branch in this repo started, and a future delete or
+            // tenant switch that clears the archive would otherwise leave a
+            // white list with no message and no way out.
             if let archive = store.state.value {
+                // WHOSE FIELD. Two pushes deep — Риск → История → Дейности —
+                // and until now nothing on screen said.
+                Text(parcelName)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .pageRow()
+
                 let current = section(archive)
 
                 // SERVER ORDER, NEWEST FIRST, FLAT.
@@ -82,11 +102,19 @@ where Item.ID == String {
                     footer(current)
                         .pageRow()
                 }
+            } else {
+                // Unreachable today — see above. Words rather than a blank
+                // list, because a white screen with no message and no way out
+                // is the worst rendering of any state, reachable or not.
+                RefusalNote(
+                    text: "Архивът не е зареден. Върнете се и опреснете.",
+                    icon: "arrow.clockwise")
+                    .pageRow()
             }
         }
         .listStyle(.plain)
         .pageBackground()
-        .inlineTitle(title)
+        .inlineTitle(ParcelHistoryCopy.drillInTitle(part))
     }
 
     // MARK: - A row

@@ -147,6 +147,7 @@ struct ParcelHistoryView: View {
         ) {
             ParcelHistorySectionList(
                 title: ParcelHistoryCopy.seasons,
+                parcelName: parcelName,
                 part: .seasons,
                 store: store,
                 section: { $0.seasons },
@@ -163,6 +164,7 @@ struct ParcelHistoryView: View {
         ) {
             ParcelHistorySectionList(
                 title: ParcelHistoryCopy.operations,
+                parcelName: parcelName,
                 part: .operations,
                 store: store,
                 section: { $0.operations },
@@ -179,6 +181,7 @@ struct ParcelHistoryView: View {
         ) {
             ParcelHistorySectionList(
                 title: ParcelHistoryCopy.weeds,
+                parcelName: parcelName,
                 part: .weeds,
                 store: store,
                 section: { $0.weeds },

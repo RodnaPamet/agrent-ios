@@ -541,7 +541,7 @@ That failure — document corrected, comment beside the call missed — has now
 happened twice (#71, then #73). So the key change swept every claim with it
 rather than only the two files it touched: `CostsAPI.create`, `NewCostView`,
 `CalculatorView`, `OperationModels`, `ParcelOperationSheet`, `APIClient`,
-`CostEntryTests` and this section. The `ParcelOperationSheet` one was the
+`CostEntryTests`, `OutboxTests` and this section. The `ParcelOperationSheet` one was the
 dangerous direction: it read as a standing licence for the outbox to replay
 that write *and no other*, resting on a claim about the cost row that had
 stopped being true. `README.md`'s overclaim predates all of this and is

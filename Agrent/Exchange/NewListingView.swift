@@ -67,11 +67,21 @@ struct NewListingView: View {
             description: descriptionText.isEmpty ? nil : descriptionText,
             sellerDisplayName: sellerDisplayName.isEmpty ? nil : sellerDisplayName,
             sellerContact: sellerContact.isEmpty ? nil : sellerContact,
-            expiresAt: hasExpiry
-                ? expiresAt.formatted(.iso8601.year().month().day()
-                    .dateSeparator(.dash).timeSeparator(.colon)
-                    .timeZone(separator: .omitted))
-                : nil
+            // THE SAME GMT SHIFT, and the shape is kept deliberately.
+            //
+            // The old expression emitted `2026-09-24Z` for an expiry the seller
+            // picked as 25.09 — the wrong day, from `ISO8601FormatStyle`'s
+            // `.gmt` default, so a listing created after midnight expired up to
+            // a day early. The day is corrected.
+            //
+            // The trailing `Z` on a date-only value is preserved rather than
+            // cleaned up. `POST /exchange/listings` is one of the routes with no
+            // documented request shape, so what the server does with this string
+            // cannot be read anywhere — it has been accepting this exact form,
+            // and the smallest change that fixes the day is to change only the
+            // day. Asked; if it wants a plain day or a full instant, this
+            // becomes one line either way.
+            expiresAt: hasExpiry ? "\(BgDate.isoDay(expiresAt))Z" : nil
         )
     }
 
