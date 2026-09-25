@@ -384,19 +384,103 @@ actor APIClient {
         try await send(path: path, method: "DELETE", body: nil, idempotencyKey: nil)
     }
 
+    /// A `multipart/form-data` POST — the only one in this app.
+    ///
+    /// ── Why bytes and not a file URL ──
+    ///
+    /// The caller has already read the file: it has to, because the byte cap
+    /// is per-format and is checked BEFORE anything is sent (see
+    /// `SpatialImportFormat`). Taking `Data` keeps document-picker scope,
+    /// security-scoped URLs and `NSFileCoordinator` out of the networking
+    /// layer, where none of them belong.
+    ///
+    /// ── The boundary ──
+    ///
+    /// A UUID, so it cannot occur in the payload by accident. A shapefile zip
+    /// is arbitrary binary and a boundary collision would truncate the body at
+    /// whatever byte happened to match — silently, with a 400 that says
+    /// nothing useful. 122 bits of randomness is the cheap way not to think
+    /// about it again.
+    ///
+    /// No `Idempotency-Key`: the import routes document none, and the upload
+    /// stages bytes and queues a job rather than writing a row, so a replay
+    /// makes a second job rather than a duplicate record.
+    func postMultipart(
+        _ path: String,
+        file: Data,
+        fileName: String,
+        mimeType: String,
+        fields: [String: String] = [:]
+    ) async throws -> Data {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        let body = Self.multipartBody(
+            boundary: boundary, file: file, fileName: fileName,
+            mimeType: mimeType, fields: fields)
+
+        return try await send(
+            path: path, method: "POST", body: body, idempotencyKey: nil,
+            contentType: "multipart/form-data; boundary=\(boundary)"
+        )
+    }
+
+    /// The body bytes, PURE so the framing can be tested.
+    ///
+    /// Multipart fails silently when it fails: a missing CRLF or a mis-spelled
+    /// disposition gives a 400 that names nothing, and there is no seam in
+    /// this suite to observe an outgoing request. Building the bytes in a
+    /// function that takes its boundary as an argument makes the one part that
+    /// can be wrong checkable without a network.
+    ///
+    /// TEXT FIELDS FIRST, and sorted. First because the server validates the
+    /// extension and the declared size before buffering, so a streaming parser
+    /// reaches the cheap fields without waiting for the file. Sorted because
+    /// dictionary order is not stable across runs, and a body that differs
+    /// between two identical calls is untestable and unreviewable.
+    static func multipartBody(
+        boundary: String,
+        file: Data,
+        fileName: String,
+        mimeType: String,
+        fields: [String: String]
+    ) -> Data {
+        var body = Data()
+        func append(_ text: String) { body.append(Data(text.utf8)) }
+
+        for (name, value) in fields.sorted(by: { $0.key < $1.key }) {
+            append("--\(boundary)\r\n")
+            append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+            append("\(value)\r\n")
+        }
+
+        append("--\(boundary)\r\n")
+        append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n")
+        append("Content-Type: \(mimeType)\r\n\r\n")
+        body.append(file)
+        append("\r\n--\(boundary)--\r\n")
+        return body
+    }
+
     // MARK: - internals
 
+    /// `contentType` OVERRIDES the `application/json` default.
+    ///
+    /// Every other body in this app is JSON, so `perform` has always set that
+    /// header whenever a body existed. A multipart body must declare its
+    /// boundary in the header or the server cannot split the parts at all —
+    /// so the one route that is not JSON has to be able to say so.
     private func send(
         path: String, method: String, body: Data?, idempotencyKey: String?,
-        ifMatch: String? = nil
+        ifMatch: String? = nil, contentType: String? = nil
     ) async throws -> Data {
         var tokens = try currentTokens()
         if tokens.isExpired { tokens = try await refresh(tokens) }
 
-        var (data, http) = try await perform(path, method, body, idempotencyKey, ifMatch, tokens)
+        var (data, http) = try await perform(
+            path, method, body, idempotencyKey, ifMatch, tokens, contentType)
         if http.statusCode == 401 {
             tokens = try await refresh(tokens)
-            (data, http) = try await perform(path, method, body, idempotencyKey, ifMatch, tokens)
+            (data, http) = try await perform(
+                path, method, body, idempotencyKey, ifMatch, tokens, contentType)
         }
 
         switch http.statusCode {
@@ -463,14 +547,15 @@ actor APIClient {
 
     private func perform(
         _ path: String, _ method: String, _ body: Data?, _ key: String?,
-        _ ifMatch: String?, _ tokens: Tokens
+        _ ifMatch: String?, _ tokens: Tokens, _ contentType: String? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         var req = URLRequest(url: try Self.url(for: path))
         req.httpMethod = method
         req.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
         if let body {
             req.httpBody = body
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue(contentType ?? "application/json",
+                         forHTTPHeaderField: "Content-Type")
         }
         if let key { req.setValue(key, forHTTPHeaderField: "Idempotency-Key") }
         if let ifMatch { req.setValue(ifMatch, forHTTPHeaderField: "If-Match") }

@@ -23,8 +23,20 @@ import SwiftUI
 /// that do not exist reads as a broken app rather than a planned one. It
 /// carries what is true today: who you are signed in as, and the way out.
 /// Items get added when the screens behind them exist.
-struct AppMenuButton: View {
+struct AppMenuButton<Extra: View>: View {
     @Environment(AuthClient.self) private var auth
+
+    /// SCREEN-SPECIFIC ITEMS, above the global ones.
+    ///
+    /// The menu was deliberately "nothing speculative" — what is true today
+    /// and no padding. A per-screen action is not padding: boundary import
+    /// belongs to one location and nowhere else, and it is monthly work,
+    /// which is exactly what this menu was described as being for.
+    ///
+    /// In its own `Section` so the two kinds never read as one list. A farmer
+    /// scanning for «Изход» must not have to step over an action that only
+    /// exists on this screen.
+    @ViewBuilder var extra: Extra
 
     @State private var tabs = BottomTabsStore.shared
     @State private var showingAdmin = false
@@ -41,6 +53,10 @@ struct AppMenuButton: View {
             // thing a menu is asked most often on a multi-tenant app, and
             // getting it wrong means filing a record against the wrong
             // holding — which for a regulatory diary is not a small mistake.
+            if !(Extra.self == EmptyView.self) {
+                Section { extra }
+            }
+
             Section(Config.tenantSlug) {
                 // EVERY surface not in the bottom row, always.
                 //
@@ -106,7 +122,14 @@ extension View {
     /// width it was losing.
     func appMenu() -> some View {
         toolbar {
-            ToolbarItem(placement: .topBarTrailing) { AppMenuButton() }
+            ToolbarItem(placement: .topBarTrailing) { AppMenuButton(extra: { EmptyView() }) }
+        }
+    }
+
+    /// The menu, plus items belonging to THIS screen.
+    func appMenu<Extra: View>(@ViewBuilder extra: @escaping () -> Extra) -> some View {
+        toolbar {
+            ToolbarItem(placement: .topBarTrailing) { AppMenuButton(extra: extra) }
         }
     }
 }
