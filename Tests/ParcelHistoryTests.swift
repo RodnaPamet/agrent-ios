@@ -273,18 +273,18 @@ final class ParcelHistoryTests: XCTestCase {
         XCTAssertEqual(line.productName, "Раундъп")
     }
 
-    /// THE test this model needed and did not have.
+    /// A null dose the server does not currently send, decoded anyway.
     ///
-    /// Every operation fixture in this suite was a SPRAY, with
-    /// `"doseValue":"2.5"` — and that is why a non-optional `WireDecimal`
-    /// survived review. This app's OWN write path proves the column is
-    /// nullable: `ParcelOperationSheet` sends `doseValue: spraying ? dose :
-    /// nil` and puts a fertiliser dose in `fertilizerDoseValue`, which this
-    /// projection does not carry.
+    /// The column is `Decimal(14,4) NOT NULL` and the fertiliser request pair
+    /// collapses into it, so this shape does not arrive today — see
+    /// `ParcelHistoryOperation.doseValue` for the correction to the reasoning
+    /// that first made this optional. The test stays because the cost of being
+    /// wrong is asymmetric: a null here fails the `[ParcelHistoryOperation]`
+    /// decode, which fails the whole `ParcelHistory` envelope, so crop seasons
+    /// and weed observations vanish over a dose nobody came to read.
     ///
-    /// Non-optional, the null threw inside `WireDecimal` and took the WHOLE
-    /// archive envelope with it — crop seasons and weed observations included,
-    /// over a fertiliser line nobody opened the screen to read.
+    /// Pinning a shape the contract forbids is only worth it where the blast
+    /// radius is the whole screen. It is here.
     func testAFertiliserLineWithNoDoseDoesNotFailTheArchive() async throws {
         let ploughing = #"""
         {"id":"l2","taskId":"t2","operationType":"FERTILIZE","title":"Торене",
@@ -297,8 +297,8 @@ final class ParcelHistoryTests: XCTestCase {
         XCTAssertEqual(line.title, "Торене")
     }
 
-    /// And a whole envelope survives one of them beside a spray — the blast
-    /// radius, which is the part that mattered.
+    /// And a whole envelope survives one beside a spray — the blast radius,
+    /// which is the only reason either of these tests exists.
     func testAnArchiveWithOneDoselessLineDecodesWhole() async throws {
         let lines = #"""
         [{"id":"a","taskId":"t","operationType":"SPRAY","title":"Хербицид",
