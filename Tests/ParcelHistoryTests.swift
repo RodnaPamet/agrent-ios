@@ -168,8 +168,8 @@ final class ParcelHistoryTests: XCTestCase {
     /// sets a boom to.
     func testTheDoseKeepsItsDigitsExactly() async throws {
         let line = try await decode(Self.sprayLine, as: ParcelHistoryOperation.self)
-        XCTAssertEqual(line.doseValue.value, Decimal(string: "2.5"))
-        XCTAssertEqual(line.doseValue.raw, "2.5")
+        XCTAssertEqual(line.doseValue?.value, Decimal(string: "2.5"))
+        XCTAssertEqual(line.doseValue?.raw, "2.5")
     }
 
     /// A dose with more decimals than any money column would carry must not
@@ -177,8 +177,9 @@ final class ParcelHistoryTests: XCTestCase {
     func testAFinerDoseIsNotRoundedForDisplay() async throws {
         let json = Self.sprayLine.replacingOccurrences(of: #""2.5""#, with: #""0.125""#)
         let line = try await decode(json, as: ParcelHistoryOperation.self)
-        XCTAssertEqual(line.doseValue.value, Decimal(string: "0.125"))
-        XCTAssertTrue(line.doseText.hasPrefix("0,125"), line.doseText)
+        XCTAssertEqual(line.doseValue?.value, Decimal(string: "0.125"))
+        let shown = try XCTUnwrap(line.doseText)
+        XCTAssertTrue(shown.hasPrefix("0,125"), shown)
     }
 
     /// The server's own digits, localised — NOT padded to a scale nobody
@@ -204,8 +205,9 @@ final class ParcelHistoryTests: XCTestCase {
         let json = Self.sprayLine.replacingOccurrences(of: #""л/дка""#, with: #""""#)
         let line = try await decode(json, as: ParcelHistoryOperation.self)
         XCTAssertEqual(line.doseUnit, "")
-        XCTAssertEqual(line.doseText, "2,5")
-        XCTAssertFalse(line.doseText.hasSuffix(" "), "«\(line.doseText)»")
+        let shown = try XCTUnwrap(line.doseText)
+        XCTAssertEqual(shown, "2,5")
+        XCTAssertFalse(shown.hasSuffix(" "), "«\(shown)»")
     }
 
     /// The dose column is `Decimal(14,4)`, which bounds how many places can
@@ -269,6 +271,47 @@ final class ParcelHistoryTests: XCTestCase {
         let line = try await decode(Self.sprayLine, as: ParcelHistoryOperation.self)
         XCTAssertEqual(line.title, "Хербицид")
         XCTAssertEqual(line.productName, "Раундъп")
+    }
+
+    /// A null dose the server does not currently send, decoded anyway.
+    ///
+    /// The column is `Decimal(14,4) NOT NULL` and the fertiliser request pair
+    /// collapses into it, so this shape does not arrive today — see
+    /// `ParcelHistoryOperation.doseValue` for the correction to the reasoning
+    /// that first made this optional. The test stays because the cost of being
+    /// wrong is asymmetric: a null here fails the `[ParcelHistoryOperation]`
+    /// decode, which fails the whole `ParcelHistory` envelope, so crop seasons
+    /// and weed observations vanish over a dose nobody came to read.
+    ///
+    /// Pinning a shape the contract forbids is only worth it where the blast
+    /// radius is the whole screen. It is here.
+    func testAFertiliserLineWithNoDoseDoesNotFailTheArchive() async throws {
+        let ploughing = #"""
+        {"id":"l2","taskId":"t2","operationType":"FERTILIZE","title":"Торене",
+         "completedAt":"2026-04-02T07:00:00.000Z","productName":"NPK",
+         "doseValue":null,"doseUnit":"","targetNote":null}
+        """#
+        let line = try await decode(ploughing, as: ParcelHistoryOperation.self)
+        XCTAssertNil(line.doseValue)
+        XCTAssertNil(line.doseText)
+        XCTAssertEqual(line.title, "Торене")
+    }
+
+    /// And a whole envelope survives one beside a spray — the blast radius,
+    /// which is the only reason either of these tests exists.
+    func testAnArchiveWithOneDoselessLineDecodesWhole() async throws {
+        let lines = #"""
+        [{"id":"a","taskId":"t","operationType":"SPRAY","title":"Хербицид",
+          "completedAt":null,"productName":"Раундъп","doseValue":"2.5",
+          "doseUnit":"л/дка","targetNote":null},
+         {"id":"b","taskId":"t","operationType":"FERTILIZE","title":"Торене",
+          "completedAt":null,"productName":"NPK","doseValue":null,
+          "doseUnit":"","targetNote":null}]
+        """#
+        let rows = try await decode(lines, as: [ParcelHistoryOperation].self)
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0].doseText, "2,5 л/дка")
+        XCTAssertNil(rows[1].doseText)
     }
 
     // MARK: - Weeds: the server's split, kept

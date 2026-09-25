@@ -148,7 +148,59 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     /// A decimal STRING on the wire, and the server says what happens if
     /// that is ignored: "parsing it as a float rounds the dose". `л/дка` on
     /// a spray sheet is the number an operator sets a boom to.
-    let doseValue: WireDecimal
+    ///
+    /// ── OPTIONAL AS DEFENCE, NOT BECAUSE A NULL ARRIVES TODAY ──
+    ///
+    /// This was written non-optional from the schema, then made optional on a
+    /// reading of THIS CLIENT'S write path that turned out to be inverted. The
+    /// correction is worth keeping in full, because the wrong version of it was
+    /// nearly this file's own contribution to the defect class it complains
+    /// about.
+    ///
+    /// What I argued: `ParcelOperationSheet` sends `doseValue: spraying ? dose
+    /// : nil` and puts a fertiliser dose in `fertilizerDoseValue`, so every
+    /// fertiliser line must have a null in the column this projection reads.
+    ///
+    /// What is actually true (agri-saas source, 2026-09-25) — there is ONE
+    /// dose column and no fertiliser columns exist at all:
+    ///
+    ///     model OperationParcel {
+    ///       doseValue   Decimal  @db.Decimal(14, 4)   // NOT NULL
+    ///       doseUnitId  String                        // NOT NULL
+    ///     }
+    ///
+    /// `fertilizerItemId` / `fertilizerDoseValue` / `fertilizerDoseUnitId` are
+    /// REQUEST fields — an XOR alternative to product-plus-dose — and the
+    /// usecase collapses whichever pair arrived into that single stored pair. A
+    /// fertiliser with no dose is REFUSED with `FERTILIZER_DOSE_REQUIRED`, not
+    /// stored as zero. So the two fields on the sheet are a client-side shape,
+    /// the write must carry one complete pair, and no line has ever stored
+    /// nothing here.
+    ///
+    /// The optional STAYS, on the grounds that made the dates lenient rather
+    /// than on the grounds I first gave: a schema promising non-null cannot
+    /// stop a future handler sending one, and a throw here fails the
+    /// `[ParcelHistoryOperation]` decode, which fails the whole `ParcelHistory`
+    /// envelope — crop seasons and weed observations included, over a dose
+    /// nobody opened the screen to read. Cheap insurance against an expensive
+    /// blast radius. What it is NOT is a fix for a live defect.
+    ///
+    /// ── The dose is the dose, whichever input recorded it ──
+    ///
+    /// Because the pairs collapse, `doseValue` carries a fertiliser
+    /// application's dose exactly as it carries a spray's. There is no
+    /// narrowing in the projection: one dose per line is all the data model
+    /// has.
+    ///
+    /// `operationType` is what tells them apart — the server derives it from
+    /// the collapsed pair (`input.operationType ?? (isFertilizer ? FERTILIZE :
+    /// SPRAY)`) and `isFertilizer` is computed, never persisted, so
+    /// `operationType` is the only carrier. But AN EXPLICIT VALUE FROM THE
+    /// CALLER WINS, so a fertiliser recorded as `SPRAY` is possible. It is a
+    /// reliable default, not an enforced invariant: read it as "what this was
+    /// recorded as", which is what a farmer means by it anyway, and never as
+    /// proof of which column a number came from.
+    let doseValue: WireDecimal?
 
     let completedAtRaw: String?
 
@@ -183,7 +235,12 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     ///
     /// Interpolating it regardless left a trailing space on every such line,
     /// which is invisible in a diff and visible in a right-aligned column.
-    var doseText: String {
+    /// NIL when no dose was recorded, so a caller leaves the part out rather
+    /// than printing a dose this line does not have. A ploughing has no dose
+    /// and inventing «0 л/дка» for it would put a number on a spray sheet
+    /// that nobody set a boom to.
+    var doseText: String? {
+        guard let doseValue else { return nil }
         let fraction = doseValue.raw.split(separator: ".").dropFirst().first?.count ?? 0
         let number = doseValue.text(scale: fraction)
         guard let unit = doseUnit.recorded else { return number }
