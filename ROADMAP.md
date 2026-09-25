@@ -335,6 +335,46 @@ collapses the rest into "More", and Админ was spending the most valuable
 one on a placeholder that said "use the web app". Shipped: task list,
 task detail, status change, and cost entry on the calculator.
 
+### The contract is a FILE, and this repo can fetch it
+
+    https://raw.githubusercontent.com/RodnaPamet/agri-saas/main/src/generated/openapi.json
+
+Committed on `main`, regenerated on every contract change, with a pre-commit
+hook that fails the commit if it drifts from the source modules. It is the
+contract. Read it before modelling a route.
+
+**This was not known here until 2026-09-25**, and the cost of not knowing it
+is written all over this file. Every shape below was measured against a live
+tenant or relayed by hand, and four of them were wrong:
+
+| | |
+|---|---|
+| `ALFALFA` reported as a server defect | it was this repo's own fixture — production has five TitleCase crop values and has never sent SCREAMING_SNAKE |
+| the insurance `message` field | declared, never reached the server; the feature had not worked since #53 |
+| a 409 guard on an already-asked lead | the client throws `.conflict`, never `.http(409)`, so the arm could not fire |
+| the idempotency list | wrong in both directions (#71) |
+
+A relayed DTO is a copy of that file with one more chance to be mistyped, and
+the peer session said so itself when it sent the link: *"I am a worse channel
+than the file."* Fetch it. Then, where it is silent, say so out loud rather
+than filling the gap in — the parcel-history weed catalogue is in no enum and
+on no endpoint, so `WeedCatalogue` is a display table with a
+render-the-binomial fallback rather than a list this client pretends to know.
+
+Two things the spec settled that nothing here had right:
+
+* **`Idempotency-Key` is documented on six writes**, not four — journal create
+  and edit, farm-task, field-operation, task status, and the new exchange
+  message send, which carries an explicit `replayed: true`. And its *absence*
+  is documented where absence bites: `POST /locations/:id/parcels` says "a
+  replayed create draws a SECOND parcel".
+* **Grain is not mentioned either way.** The note below says the server has
+  since added exactly-once to both grain creates; the spec's grain routes say
+  nothing about the header, and `APIClient.postReturningData` says they ignore
+  it entirely. Absence of prose is weak evidence — the hook guards schema
+  shape, not description completeness — so the client's caution stays and the
+  question is with the peer.
+
 ### Response shapes are PER-ROUTE. There is no house style.
 
 Everything below was measured on this tenant, not inferred:
