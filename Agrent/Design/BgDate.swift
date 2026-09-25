@@ -62,6 +62,55 @@ enum BgDate {
         isoDay.date(from: string)
     }
 
+    /// An agro timestamp whose RESPONSE schema does not pin a format.
+    ///
+    /// ── Why this is not `parseISODay`, and not a `Date` property either ──
+    ///
+    /// The parcel-history contract is asymmetric, and deliberately read from
+    /// the generated spec rather than from anybody's memory of it
+    /// (`src/generated/openapi.json`, fetched 2026-09-25):
+    ///
+    ///     CreateParcelCropSeason.sownAt        string, format: date-time
+    ///     ParcelCropSeason.sownAt              string, NO format
+    ///     CreateParcelWeedObservation.observedAt   string, format: date-time
+    ///     ParcelWeedObservation.observedAt     string, NO format
+    ///
+    /// The writes are pinned to an instant. The reads are pinned to nothing
+    /// at all — so a full instant is what the server sends today, and a bare
+    /// `2026-09-19` is what its own published contract still permits.
+    ///
+    /// Declaring these as `Date` properties would decode them through
+    /// `APIClient`'s strategy, which accepts ISO 8601 instants and THROWS on
+    /// anything else. One season with a date-only `sownAt` would then fail
+    /// the whole archive payload — every season, every operation, every weed
+    /// observation, on a screen where the dates are the least of what the
+    /// farmer came for.
+    ///
+    /// So both shapes are accepted here, and the models keep the string
+    /// beside the parsed value for the case where neither matches.
+    static func parseInstantOrDay(_ string: String?) -> Date? {
+        guard let string, !string.isEmpty else { return nil }
+        return instantWithFraction.date(from: string)
+            ?? instant.date(from: string)
+            ?? parseISODay(string)
+    }
+
+    /// Two formatters, because `ISO8601DateFormatter` does not make
+    /// fractional seconds optional — `.withFractionalSeconds` REQUIRES them
+    /// and its absence REFUSES them. The same pair exists in `APIClient`'s
+    /// decoder for the same reason; this is that lesson, not a new one.
+    private static let instantWithFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let instant: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
     private static let isoDay: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
