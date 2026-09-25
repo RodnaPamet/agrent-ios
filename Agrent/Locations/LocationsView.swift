@@ -54,10 +54,16 @@ struct LocationsView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(location.name).font(.headline)
+                        // `kind` is nil when the server omitted it or sent
+                        // it blank — see `Location.kind`. The separator is
+                        // conditional on BOTH sides, so an absent kind does
+                        // not leave a leading «·» in front of the count, the
+                        // way an absent dose unit left a trailing space on
+                        // the operation lines.
                         HStack(spacing: 8) {
-                            Text(location.kind)
+                            if let kind = location.kind { Text(kind) }
                             if let count = location.parcelCount {
-                                Text("·")
+                                if location.kind != nil { Text("·") }
                                 Text(Plural.bg(count, "парцел", "парцела"))
                             }
                         }
