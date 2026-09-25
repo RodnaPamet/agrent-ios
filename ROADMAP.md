@@ -390,14 +390,36 @@ find out WHY before believing what it shows.
 
 ### Writes: the rule is per-usecase, not global
 
-Idempotency is honoured by four usecases — journal, farm-task,
-field-operation, inventory. Grain was not one, so a cost create could not
-be safely retried at all: POST twice and the books carry two rows. The
-client therefore never auto-retries a cost, and reports a TIMEOUT as
+**CORRECTED 2026-09-25, measured server-side against the route files.**
+The list below was wrong in both directions, and it had been quoted from
+this document into commit messages and into conversation all day.
+
+Honouring `Idempotency-Key`: journal (plus `[id]` and `[id]/files`),
+farm-tasks, `locations/[id]/operations` — the field operations — and
+grain's two creates, `grain/costs` and `grain/yield-records`.
+
+NOT honouring it: **inventory**, exchange, insurance.
+
+Two errors, and the inventory one is the dangerous direction. Inventory
+was listed as safe to retry and is not: a POST that times out and is sent
+again writes a second item. Nothing in this client auto-retries one — the
+outbox carries field operations only — so there is no live defect, but
+the belief was one refactor away from becoming one.
+
+Grain was listed as unsafe and its two creates now are safe; the
+parenthetical below already suspected as much and the client's caution
+can now be lifted deliberately rather than left as a hedge.
+
+`ItemCatalogue.create` and `FarmRiskAPI.createLead` both send a FRESH
+UUID per call. Against a route that ignores the header that is merely
+inert; against one that honoured it, a new key per attempt would defeat
+the mechanism entirely, because the key IS the identity of the attempt.
+A header that looks like protection and is not is worse than no header,
+and these two should either carry a stable key or stop pretending.
+
+The client never auto-retries a grain cost, and reports a TIMEOUT as
 *unknown* rather than as failure — telling an operator it failed invites
-the one action that makes it worse. (The server has since added
-exactly-once to both grain creates; the client's caution stays until that
-is verified from here.)
+the one action that makes it worse.
 
 `setTaskStatus` is the opposite: a replay returns 200 because the server
 compares STATE. The `Idempotency-Key` is not the mechanism there — a
