@@ -33,8 +33,20 @@ final class DashboardStore {
 
     private let preferences: DashboardPreferences
 
-    init(preferences: DashboardPreferences = .shared) {
-        self.preferences = preferences
+    /// NIL DEFAULT, resolved inside the initialiser — not `= .shared`.
+    ///
+    /// A default argument is evaluated AT THE CALL SITE, which is outside this
+    /// class's `@MainActor` isolation, so `= .shared` warns: "main
+    /// actor-isolated static property 'shared' can not be referenced from a
+    /// nonisolated context; this is an error in the Swift 6 language mode".
+    /// Resolved in the body instead, where the isolation already holds.
+    ///
+    /// It did not warn locally and did on CI — the runner is on an older Xcode
+    /// than this machine, which the workflow prints a notice about for exactly
+    /// this reason. It failed the warnings gate rather than the tests, which is
+    /// the gate earning its keep: three source warnings against two known.
+    init(preferences: DashboardPreferences? = nil) {
+        self.preferences = preferences ?? .shared
     }
 
     /// Everything the current block selection needs, concurrently.
