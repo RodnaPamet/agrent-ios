@@ -74,10 +74,12 @@ struct CalculatorView: View {
             // a broken screen.
             //
             // The costs list sits below it even here, and that placement is
-            // load-bearing rather than tidy: the grain routes have no
-            // idempotency, so `NewCostView` tells an operator whose save
-            // timed out to CHECK THIS LIST before entering it again. Advice
-            // to look somewhere that does not exist is worse than no advice.
+            // load-bearing rather than tidy: `NewCostView` does not retry, so
+            // it tells an operator whose save timed out to CHECK THIS LIST
+            // before entering it again. Advice to look somewhere that does
+            // not exist is worse than no advice. The `Idempotency-Key` added
+            // 2026-09-25 does not change that — it dedupes a replay of one
+            // attempt, and re-typing the cost is not a replay.
             List {
                 // NOT the `EmptyState` component. It is built to fill a
                 // screen — centred, with a large icon — and a List row
@@ -123,10 +125,15 @@ struct CalculatorView: View {
 
     /// What has been entered, so a save can be CHECKED.
     ///
-    /// Without idempotency a duplicate is permanent, so an operator whose
-    /// save timed out must be able to see whether it landed before deciding
-    /// to try again. That makes this list part of the write path rather
-    /// than a nice-to-have beside it.
+    /// A duplicate cost row is permanent and nothing here retries, so an
+    /// operator whose save timed out must be able to see whether it landed
+    /// before deciding to enter it again. That makes this list part of the
+    /// write path rather than a nice-to-have beside it.
+    ///
+    /// The cost create does send an `Idempotency-Key` (2026-09-25), and it
+    /// does not remove the need for this list: the key dedupes a REPLAY of
+    /// one attempt, while an operator re-typing the cost is a new draft in a
+    /// new sheet and writes a second row.
     @ViewBuilder
     private var costsSection: some View {
         switch costs.state {

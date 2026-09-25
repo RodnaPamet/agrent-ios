@@ -106,10 +106,21 @@ final class PendingOperationTests: XCTestCase {
         XCTAssertTrue(op.isRefused)
     }
 
-    /// The outbox is ONLY for the usecases that honour `Idempotency-Key`.
-    /// Field operations do. The exchange listing create does not, and has
-    /// no natural key — a replay would put a second offer on a public
-    /// board. This asserts the app has no way to queue one.
+    /// The outbox carries FIELD OPERATIONS and nothing else. This asserts
+    /// the app has no way to queue anything else, and the reasons differ per
+    /// route — which is why the loop below no longer states one reason for
+    /// all of them:
+    ///
+    ///   - the exchange listing and the inquiry honour no `Idempotency-Key`
+    ///     and have no natural key. A replay puts a second offer on a public
+    ///     board. They must never be queued, at all.
+    ///   - `CostsAPI` is different since 2026-09-25: `POST /grain/costs` DOES
+    ///     honour the header and the app sends a key. A replay would be
+    ///     deduped correctly, so queueing one is no longer UNSAFE — it is
+    ///     merely undecided. That key is minted per draft, and nobody has
+    ///     worked out what a queued cost means after the operator has moved
+    ///     on and possibly re-entered it by hand. Until someone does, the
+    ///     outbox stays out of the books.
     func testOnlyFieldOperationsCanBeQueued() {
         let source = try? String(
             contentsOf: URL(fileURLWithPath: #filePath)
@@ -120,10 +131,14 @@ final class PendingOperationTests: XCTestCase {
         XCTAssertNotNil(text)
         XCTAssertTrue(text?.contains("operationsPath") == true,
                       "positive control: the outbox posts to the operations path")
-        for forbidden in ["listingsPath", "inquiriesPath", "CostsAPI", "createListing"] {
+        for forbidden in ["listingsPath", "inquiriesPath", "createListing"] {
             XCTAssertFalse(text?.contains(forbidden) == true,
                            "the outbox can replay \(forbidden), which honours no key")
         }
+        XCTAssertFalse(
+            text?.contains("CostsAPI") == true,
+            "the outbox can replay a grain cost; the route dedupes, but the key is "
+                + "minted per draft and queueing one has not been designed")
     }
 }
 

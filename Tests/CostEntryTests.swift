@@ -1,9 +1,15 @@
 import XCTest
 @testable import Agrent
 
-/// A cost is a line on a farm's books, and the grain routes honour NO
-/// idempotency — POST twice, with any key or none, and there are two rows.
+/// A cost is a line on a farm's books, and nothing in this app retries the
+/// write: a second POST is a second row, whatever the route would tolerate.
 /// So every guard that can be applied before the request is worth applying.
+///
+/// The old wording here — "the grain routes honour NO idempotency" — was
+/// false. `POST /grain/costs` does honour `Idempotency-Key` and this client
+/// sends one (see `CostIdempotencyTests`). That does not weaken a single
+/// assertion below: the key dedupes a replay of one attempt, and these tests
+/// are about the values the operator is allowed to submit at all.
 final class CreateCostEntryTests: XCTestCase {
 
     private func entry(
