@@ -361,6 +361,55 @@ than filling the gap in — the parcel-history weed catalogue is in no enum and
 on no endpoint, so `WeedCatalogue` is a display table with a
 render-the-binomial fallback rather than a list this client pretends to know.
 
+### Where the spec CANNOT check us — 23 of 82 operations
+
+The spec is the contract, and it has holes. An **empty** success schema and a
+**wrong** one are indistinguishable to a client, and only one of them can be
+caught by reading — so the list matters more than the count. Enumerated
+server-side 2026-09-25:
+
+| family | operations with no documented 2xx shape |
+|---|---|
+| Grain (13) | `GET calculator` · `GET`+`POST contracts` · `GET`, `GET {id}`, `POST`, `PATCH`, `DELETE costs` · `GET`, `GET {id}`, `POST`, `PATCH`, `DELETE yield-records` |
+| Tasks (9) | `GET tasks` · `GET tasks/{id}` · `GET`+`POST tasks/{id}/comments` · `POST tasks` · `POST assign` · `POST status` · `PATCH tasks/{id}` · `DELETE tasks/{id}` |
+| Journal (1) | `GET /journal` |
+
+Everything else is fully described. The gap is three whole FAMILIES rather than
+scattered operations, which says these predate the `op()` helper that made a
+success schema mandatory — legacy, not oversight.
+
+**So "measured, not contracted" still applies to exactly these.** `CostEntry`'s
+seven fields cannot be checked against anything, and grain is the family that
+matters most: it is the calculator's input and the only surface here handling
+money. Treat every model over these routes the way this repo treated all of
+them before today.
+
+The other 59 can now be checked mechanically, and doing so found two live
+latent defects in one pass — `WorkItemSummary.key`/`.severity` (#74) and
+`Location.kind`/`.createdAt`. Both were fields the client declared
+non-optional that the contract does not require.
+
+### Three ways a string field goes missing, and they are NOT the same
+
+The cross-check above only works if all three are read as signals. Getting
+this wrong is what made the second defect look like an under-declared schema:
+
+| in the spec | means | example |
+|---|---|---|
+| `["string","null"]` | can be PRESENT AND NULL | `FarmTaskListItem.severity` |
+| plain `string`, not in `required` | can be ABSENT ENTIRELY | `LocationListItem.kind` |
+| plain `string`, in `required` | can still be PRESENT AND BLANK | `ParcelHistoryOperation.doseUnit` |
+
+The third is invisible to any schema, because a server that collapses a
+nullable relation with `?? ''` at the response boundary produces `""` and
+`type: string` is true of it. It is known to occur in more than one place in
+this API. So a required string is not the same as a string with a value, and a
+field that is displayed needs the blank folded in with the absent.
+
+`A11y.sentence` already filters empties, so the VoiceOver path was never
+exposed to any of this. Visual concatenation was, in both directions: an absent
+dose unit left a trailing space, an absent location kind left a leading «·».
+
 Two things the spec settled that nothing here had right:
 
 * **`Idempotency-Key` is documented on six writes**, not four — journal create
