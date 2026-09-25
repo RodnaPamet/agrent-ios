@@ -33,17 +33,45 @@ enum CostsAPI {
         )
     }
 
-    /// ── THERE IS NO IDEMPOTENCY ON THIS ROUTE ──
+    /// ── THIS ROUTE DOES HONOUR IDEMPOTENCY. THIS CLIENT DOES NOT USE IT. ──
     ///
-    /// Measured server-side rather than inferred: idempotency here is
-    /// per-usecase, not middleware, and exactly four usecases honour the
-    /// header — journal, farm-task, field-operation, inventory. **Grain is
-    /// not one of them**, and there is no natural-key pre-check either.
+    /// Corrected 2026-09-25. `ROADMAP.md` was fixed in #71 and THIS COMMENT
+    /// WAS MISSED — the document and the code beside the call disagreed for
+    /// four days, and the comment is the one a person reads while changing
+    /// this function. So here is the chain rather than the conclusion, traced
+    /// in agri-saas source by the server session at my request, after the
+    /// generated spec turned out to be SILENT on grain while emphatic about
+    /// six other writes:
     ///
-    /// So POST twice, with any key or none, and you get TWO ROWS. On a
-    /// farm's books a lost response followed by a retry is a duplicated
-    /// cost that silently changes net worth, and nothing on the server
-    /// stops it.
+    ///     route reads `Idempotency-Key`
+    ///       → passes it to `createCostEntry`
+    ///       → usecase pre-checks `findByClientMutationId`
+    ///       → plus a P2002 race backstop
+    ///       → `clientMutationId` column, unique index
+    ///
+    /// `POST /grain/costs` and `POST /grain/yield-records` honour it today.
+    /// `POST /grain/contracts` does NOT. Two yes, one no — not "grain" as a
+    /// group, and generalising to the area is exactly how this comment came
+    /// to be wrong.
+    ///
+    /// Worth knowing how the wrong answer was produced, because it looked
+    /// like evidence: a `grep -l "Idempotency-Key"` over the route files.
+    /// That matches a file which merely MENTIONS the header — including one
+    /// whose comment says it is ignored. A grep that cannot tell a use from a
+    /// denial of use.
+    ///
+    /// ── So why is `nil` still below? ──
+    ///
+    /// Because a key is only protection if a RETRY REUSES IT, and reusing one
+    /// is not free here. Send the same key after the operator corrects the
+    /// amount and the server returns the ORIGINAL row: the edit is silently
+    /// dropped and the books keep the wrong figure. So the key has to be
+    /// minted per logical write and re-minted whenever the draft changes,
+    /// which is a decision about a money screen rather than a header.
+    ///
+    /// Put to the owner 2026-09-25. Until then this sends none and the
+    /// caution below stands unchanged — it costs nothing, because the
+    /// protection is worthless without the retry it would enable.
     ///
     /// Three consequences, all deliberate:
     ///
@@ -55,8 +83,9 @@ enum CostsAPI {
     ///    saved".** After a timeout the app genuinely does not know whether
     ///    the row exists, and telling an operator it failed invites them to
     ///    enter it again — the one action that makes it worse.
-    /// 3. **No `Idempotency-Key` is sent.** Sending one that is ignored
-    ///    would read as protection that is not there.
+    /// 3. **No `Idempotency-Key` is sent** — see above. Not because the
+    ///    server would ignore it (it would not), but because nothing here
+    ///    reuses a key, and a key used once protects against nothing.
     static func create(_ entry: CreateCostEntry) async throws -> Data {
         try await APIClient.shared.postReturningData(
             base, body: entry, idempotencyKey: nil

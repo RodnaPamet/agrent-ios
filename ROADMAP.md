@@ -438,7 +438,15 @@ Honouring `Idempotency-Key`: journal (plus `[id]` and `[id]/files`),
 farm-tasks, `locations/[id]/operations` — the field operations — and
 grain's two creates, `grain/costs` and `grain/yield-records`.
 
-NOT honouring it: **inventory**, exchange, insurance.
+NOT honouring it: **inventory**, insurance, and `grain/contracts` — the
+third grain create, which is why "grain" is never the right unit for this
+answer.
+
+**Exchange moved after this list was written.** `POST
+/exchange/threads/[id]/messages` honours the header and returns an explicit
+`replayed: true`, so the line above is no longer true of exchange as a whole
+and the messaging client must send a key minted before the first attempt. The
+rest of exchange still does not.
 
 Two errors, and the inventory one is the dangerous direction. Inventory
 was listed as safe to retry and is not: a POST that times out and is sent
@@ -446,9 +454,28 @@ again writes a second item. Nothing in this client auto-retries one — the
 outbox carries field operations only — so there is no live defect, but
 the belief was one refactor away from becoming one.
 
-Grain was listed as unsafe and its two creates now are safe; the
-parenthetical below already suspected as much and the client's caution
-can now be lifted deliberately rather than left as a hedge.
+Grain was listed as unsafe and its two creates now are safe. Re-confirmed in
+source on 2026-09-25 — route reads the header, passes it to
+`createCostEntry`, the usecase pre-checks `findByClientMutationId` with a
+P2002 race backstop, `clientMutationId` carries a unique index — after the
+generated spec turned out to say nothing about grain while being emphatic
+about six other writes. The first server-side answer had come from a `grep -l
+"Idempotency-Key"`, which matches a file that merely mentions the header,
+including in a comment saying it is ignored; right conclusion, instrument that
+could not support it.
+
+The client's caution can now be lifted deliberately, and has NOT been:
+sending a key is protection only if a retry reuses it, and reuse is not free.
+Send the same key after the operator corrects the amount and the server
+returns the ORIGINAL row — the edit is silently dropped and the books keep the
+wrong figure. So the key must be minted per logical write and re-minted when
+the draft changes, which is a decision about a money screen rather than a
+header. With the owner since 2026-09-25.
+
+`ROADMAP.md` was corrected in #71 and the comment on `CostsAPI.create` was
+not, so the document and the code beside the call disagreed for four days.
+The comment is what a person reads while changing that function. Corrected
+2026-09-25.
 
 `ItemCatalogue.create` and `FarmRiskAPI.createLead` both send a FRESH
 UUID per call. Against a route that ignores the header that is merely

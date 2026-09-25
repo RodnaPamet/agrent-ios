@@ -194,6 +194,32 @@ final class ParcelHistoryTests: XCTestCase {
         XCTAssertEqual(rounded.doseText, "3 л/дка")
     }
 
+    /// An empty `doseUnit` is the server saying NO UNIT WAS RECORDED — it
+    /// falls back to "" rather than to null, so it is a meaning and not a
+    /// missing value. The number is shown alone: a placeholder would invent
+    /// an uncertainty the data does not have, and interpolating the empty
+    /// string regardless left a trailing space that a diff cannot show and a
+    /// right-aligned column can.
+    func testALineWithNoUnitShowsTheNumberAloneWithNoTrailingSpace() async throws {
+        let json = Self.sprayLine.replacingOccurrences(of: #""л/дка""#, with: #""""#)
+        let line = try await decode(json, as: ParcelHistoryOperation.self)
+        XCTAssertEqual(line.doseUnit, "")
+        XCTAssertEqual(line.doseText, "2,5")
+        XCTAssertFalse(line.doseText.hasSuffix(" "), "«\(line.doseText)»")
+    }
+
+    /// The dose column is `Decimal(14,4)`, which bounds how many places can
+    /// arrive and is deliberately NOT used as a format — four places padded
+    /// would read `2,5000 л/дка` where the sheet says `2,5`.
+    func testTheFullFourPlacesSurviveWithoutBeingImposed() async throws {
+        let fine = Self.sprayLine.replacingOccurrences(of: #""2.5""#, with: #""0.0625""#)
+        let line = try await decode(fine, as: ParcelHistoryOperation.self)
+        XCTAssertEqual(line.doseText, "0,0625 л/дка")
+
+        let plain = try await decode(Self.sprayLine, as: ParcelHistoryOperation.self)
+        XCTAssertEqual(plain.doseText, "2,5 л/дка")
+    }
+
     /// `operationType` is nullable, and an unrecognised value must not fail
     /// the payload — `FieldOperationType` is `LenientDecodable` for exactly
     /// that, and reusing it here is what keeps this projection from growing

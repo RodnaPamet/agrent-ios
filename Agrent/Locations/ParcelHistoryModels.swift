@@ -143,19 +143,33 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
 
     var completedAt: Date? { BgDate.parseInstantOrDay(completedAtRaw) }
 
-    /// THE SERVER'S OWN DIGITS, localised — not padded to a scale.
+    /// THE SERVER'S OWN DIGITS, localised — deliberately NOT padded.
     ///
-    /// `WireDecimal.text(scale:)` pads, and padding is only honest when the
-    /// column's scale is known: `1234.5` at scale 2 is `1234,50` because the
-    /// money column IS `Decimal(14,2)`. The parcel-history spec publishes no
-    /// scale for the dose column, so a scale chosen here would be invented,
-    /// and an invented one shows `2,50 л/дка` where the operation sheet says
-    /// `2,5`. The fraction length comes from what arrived instead, which
-    /// round-trips exactly. (Asked of the peer; tighten this if the column
-    /// scale comes back.)
+    /// `WireDecimal.text(scale:)` pads, and padding is right for money:
+    /// `1234.5` becomes `1234,50` because the column IS `Decimal(14,2)` and
+    /// `1234,50` is how money is written. A dose is not written that way.
+    ///
+    /// The column is `Decimal(14,4)` — asked, and answered 2026-09-25. That
+    /// is a BOUND, not a format: at most four places can ever arrive, and
+    /// padding to it would print `2,5000 л/дка` where the operation sheet
+    /// says `2,5`. So the fraction length comes from what arrived, which
+    /// round-trips exactly.
+    ///
+    /// ── An empty unit is a MEANING, not a missing value ──
+    ///
+    /// `doseUnit` is the unit's SYMBOL — `л/дка`, already Bulgarian and
+    /// display-ready — and it falls back to an EMPTY STRING rather than to
+    /// null when a line has no unit recorded. So empty means "no unit", never
+    /// "unit unknown", and a placeholder here would invent an uncertainty the
+    /// data does not have. The number is shown alone.
+    ///
+    /// Interpolating it regardless left a trailing space on every such line,
+    /// which is invisible in a diff and visible in a right-aligned column.
     var doseText: String {
         let fraction = doseValue.raw.split(separator: ".").dropFirst().first?.count ?? 0
-        return "\(doseValue.text(scale: fraction)) \(doseUnit)"
+        let number = doseValue.text(scale: fraction)
+        guard !doseUnit.isEmpty else { return number }
+        return "\(number) \(doseUnit)"
     }
 }
 
