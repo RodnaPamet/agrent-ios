@@ -438,4 +438,52 @@ final class ParcelChoiceTests: XCTestCase {
         let b = ParcelChoice(parcels: [try parcel("x"), try parcel("z")])
         XCTAssertNotEqual(a.id, b.id)
     }
+    // MARK: - The keys the mapper may simply not send
+
+    /// `LocationListItem` requires only `id`, `tenantId`, `name` and
+    /// `status`. `kind` and `createdAt` are typed plain `string` and left out
+    /// of `required` because the server's mapper copies a field only `if
+    /// (field in row)` — so which keys appear depends on the caller's Prisma
+    /// selection, not on the contract.
+    ///
+    /// Declared non-optional, one absent key would have thrown and taken the
+    /// whole Локации list with it, because the list decodes `[Location]`.
+    func testALocationRowMissingKindAndCreatedAtStillDecodes() async throws {
+        let row = try await APIClient.shared.decode(Data(#"""
+        {"id":"loc1","tenantId":"t","name":"Стопанство","status":"ACTIVE"}
+        """#.utf8), as: Location.self)
+
+        XCTAssertEqual(row.name, "Стопанство")
+        XCTAssertNil(row.kind)
+        XCTAssertNil(row.createdAt)
+    }
+
+    /// And a list survives one such row beside a complete one — the blast
+    /// radius, not the missing label.
+    func testOneProjectedRowDoesNotTakeTheListWithIt() async throws {
+        let rows = try await APIClient.shared.decode(Data(#"""
+        [{"id":"a","tenantId":"t","name":"Пълен","status":"ACTIVE",
+          "kind":"FIELD","createdAt":"2026-09-01T10:00:00.000Z"},
+         {"id":"b","tenantId":"t","name":"Проектиран","status":"ACTIVE"}]
+        """#.utf8), as: [Location].self)
+
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0].kind, "FIELD")
+        XCTAssertNil(rows[1].kind)
+    }
+
+    /// A BLANK kind reads as no kind, not as a kind that is blank.
+    ///
+    /// The server collapses a nullable relation with `?? ''` at the response
+    /// boundary in at least one other place — that is what made `doseUnit`
+    /// arrive as `""` — and no schema can carry the difference, since absent
+    /// and empty are both `type: string`. So the row must not render a
+    /// separator for a value that is not there.
+    func testABlankKindIsNoKindAtAll() async throws {
+        let row = try await APIClient.shared.decode(Data(#"""
+        {"id":"c","tenantId":"t","name":"Празен","status":"ACTIVE","kind":"   "}
+        """#.utf8), as: Location.self)
+        XCTAssertNil(row.kind)
+    }
+
 }

@@ -29,10 +29,63 @@ struct Location: Decodable, Equatable, Sendable, Identifiable {
     let name: String
     let description: String?
     let status: String
-    let kind: String
     let capacityTonnes: Double?
-    let createdAt: Date
+
+    /// OPTIONAL, and this was `Date` until 2026-09-25. Nothing in the app
+    /// reads it — so non-optional, it could only ever have thrown.
+    let createdAt: Date?
+
     let updatedAt: Date?
+
+    /// ABSENT, EMPTY, or a word. All three are handled, because the schema
+    /// distinguishes the first two and the mapper produces both.
+    ///
+    /// ── Why absent is real, and is not an under-declared schema ──
+    ///
+    /// `LocationListItem` requires only `id`, `tenantId`, `name` and
+    /// `status`. `kind` is typed plain `string` and left out of `required`
+    /// deliberately, because the server's mapper is PROJECTION-DRIVEN
+    /// (traced in agri-saas source at this repo's request, 2026-09-25):
+    ///
+    ///     for (const field of LOCATION_LIST_ITEM_FIELDS) {
+    ///         if (field in row) out[field] = row[field]
+    ///     }
+    ///
+    /// It copies a field only if the row HAS it, so which keys appear depends
+    /// entirely on what the caller's Prisma query selected. A schema that
+    /// declared `kind` required would be a promise the mapper cannot keep.
+    ///
+    /// It has arrived on every row for days only because the one caller uses
+    /// `include:` rather than a narrowing `select:`, so Prisma returns every
+    /// scalar column. That is a property of TODAY'S QUERY, not of the
+    /// contract. The day someone adds a `select` to make that list cheaper —
+    /// an ordinary optimisation, not a mistake — a non-optional declaration
+    /// here starts throwing, and because the list decodes `[Location]`, the
+    /// tab that dies is Локации.
+    ///
+    /// ── Two different lost distinctions, and this schema uses both ──
+    ///
+    ///     ["string","null"]          can be PRESENT AND NULL
+    ///     plain string, not required  can be ABSENT ENTIRELY
+    ///
+    /// `capacityTonnes` is the first. `kind` is the second. Reading the
+    /// explicit nullability as the only signal — which is what I did first —
+    /// treats an absent key as impossible because it is not spelled `null`.
+    ///
+    /// Empty is folded in too. `doseUnit` on the parcel-history projection
+    /// arrives as `""` rather than null when its relation is missing, because
+    /// the server collapses a nullable relation with `?? ''` at the boundary
+    /// — and no schema can carry that, since both are `type: string`. The
+    /// same collapse is known to exist elsewhere in this API. So a blank is
+    /// treated as no value rather than rendered as one.
+    var kind: String? {
+        guard let trimmed = kindRaw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty
+        else { return nil }
+        return trimmed
+    }
+
+    private let kindRaw: String?
 
     /// `[minLon, minLat, maxLon, maxLat]` — see `BoundingBox`.
     let boundsJson: BoundingBox?
@@ -49,8 +102,9 @@ struct Location: Decodable, Equatable, Sendable, Identifiable {
     var parcelCount: Int? { counts?.parcels }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, description, status, kind, capacityTonnes
+        case id, name, description, status, capacityTonnes
         case createdAt, updatedAt, boundsJson
+        case kindRaw = "kind"
         case counts = "_count"
     }
 }
