@@ -417,4 +417,160 @@ final class ParcelHistoryTests: XCTestCase {
             ParcelHistoryAPI.weedObservationsPath("p1")
         )
     }
+
+    // MARK: - The envelope, and paging three lists independently
+
+    private static let archiveJSON = #"""
+    {"parcel":{"id":"p1","name":"Долен блок","cropType":"Wheat"},
+     "cropSeasons":[{"id":"cs1","year":2026,"cropType":"Wheat","sownAt":null,
+                     "harvestedAt":null,"notes":null}],
+     "operations":[{"id":"op1","taskId":"t1","operationType":"SPRAY","title":"Хербицид",
+                    "completedAt":"2026-05-03T06:12:00.000Z","productName":"Раундъп",
+                    "doseValue":"2.5","doseUnit":"л/дка","targetNote":null}],
+     "weedObservations":[{"id":"wo1","observedAt":"2026-06-11T05:40:00.000Z",
+                          "weedKeys":["Galium aparine"],"otherWeeds":[],"notes":null}],
+     "cropSeasonsCursor":null,
+     "operationsCursor":"b3AxfDIwMjYtMDUtMDM=",
+     "weedObservationsCursor":null}
+    """#
+
+    func testTheEnvelopeDecodesWithItsThreeCursors() async throws {
+        let page = try await decode(Self.archiveJSON, as: ParcelHistory.self)
+        XCTAssertEqual(page.parcel.name, "Долен блок")
+        XCTAssertEqual(page.parcel.cropLabel, "Пшеница")
+        XCTAssertEqual(page.cropSeasons.count, 1)
+        XCTAssertNil(page.cropSeasonsCursor)
+        XCTAssertEqual(page.operationsCursor, "b3AxfDIwMjYtMDUtMDM=")
+        XCTAssertNil(page.weedObservationsCursor)
+    }
+
+    /// A parcel with 200 operations and 3 crop seasons returns a cursor for the
+    /// operations only — so only that section may offer a load-older control.
+    func testOnlyTheSectionWithACursorCanLoadOlder() async throws {
+        let archive = ParcelHistoryStore.Archive(
+            try await decode(Self.archiveJSON, as: ParcelHistory.self))
+        XCTAssertFalse(archive.seasons.canLoadOlder)
+        XCTAssertTrue(archive.operations.canLoadOlder)
+        XCTAssertFalse(archive.weeds.canLoadOlder)
+        XCTAssertFalse(archive.isEmpty)
+    }
+
+    /// THE test on this type. "A stale or malformed cursor RESTARTS that list
+    /// rather than erroring" — so a request for OLDER rows can answer with the
+    /// NEWEST ones, 200 and a valid body.
+    ///
+    /// Appended blindly that is an infinite list: page 1 arrives, its cursor
+    /// goes back, page 1 arrives. Nothing errors; the screen shows one spray
+    /// recorded forty times. A page carrying nothing new ends the section.
+    func testARestartedListDoesNotAppendForever() {
+        var section = ParcelHistoryStore.Section(
+            items: [row("a"), row("b")], cursor: "cursor-1")
+
+        // The server ignores the stale cursor and answers with page 1 again.
+        section.appendOlder([row("a"), row("b")], cursor: "cursor-1")
+
+        XCTAssertEqual(section.items.map(\.id), ["a", "b"])
+        XCTAssertTrue(section.exhausted)
+        XCTAssertFalse(section.canLoadOlder)
+    }
+
+    func testAnOlderPageAppendsAndAdvancesTheCursor() {
+        var section = ParcelHistoryStore.Section(
+            items: [row("a")], cursor: "c1")
+        section.appendOlder([row("b"), row("c")], cursor: "c2")
+        XCTAssertEqual(section.items.map(\.id), ["a", "b", "c"])
+        XCTAssertEqual(section.cursor, "c2")
+        XCTAssertFalse(section.exhausted)
+    }
+
+    /// Partial overlap is the ordinary case when a row was written between two
+    /// pages: keep what is new, drop what is already shown, do not stop.
+    func testAPartiallyOverlappingPageKeepsOnlyWhatIsNew() {
+        var section = ParcelHistoryStore.Section(
+            items: [row("a"), row("b")], cursor: "c1")
+        section.appendOlder([row("b"), row("c")], cursor: "c2")
+        XCTAssertEqual(section.items.map(\.id), ["a", "b", "c"])
+        XCTAssertFalse(section.exhausted)
+    }
+
+    /// A cursor is NOT a "has more" flag: the server hands back one for the
+    /// last row it sent, so a list whose length divides by the page size
+    /// returns a cursor for a page that turns out to be empty.
+    func testAnEmptyOlderPageEndsTheSection() {
+        var section = ParcelHistoryStore.Section(items: [row("a")], cursor: "c1")
+        section.appendOlder([], cursor: "c2")
+        XCTAssertTrue(section.exhausted)
+        XCTAssertFalse(section.canLoadOlder)
+    }
+
+    func testANullCursorEndsTheSectionEvenWhenRowsArrived() {
+        var section = ParcelHistoryStore.Section(items: [row("a")], cursor: "c1")
+        section.appendOlder([row("b")], cursor: nil)
+        XCTAssertEqual(section.items.count, 2)
+        XCTAssertTrue(section.exhausted)
+    }
+
+    func testASectionInFlightDoesNotOfferAnotherLoad() {
+        var section = ParcelHistoryStore.Section(items: [row("a")], cursor: "c1")
+        XCTAssertTrue(section.canLoadOlder)
+        section.isLoadingOlder = true
+        XCTAssertFalse(section.canLoadOlder)
+    }
+
+    /// A season that exists only to have an id. The paging logic is generic
+    /// over `Identifiable`, so the item type is incidental to these tests —
+    /// what matters is which ids come back.
+    private func row(_ id: String) -> CropSeason {
+        CropSeason(id: id, year: 2026, cropType: "Wheat",
+                   notes: nil, sownAtRaw: nil, harvestedAtRaw: nil)
+    }
+
+    // MARK: - The query
+
+    func testTheFirstPageAsksForNoQueryAtAll() {
+        XCTAssertFalse(ParcelHistoryAPI.historyPath(parcelID: "p1").contains("?"))
+        XCTAssertTrue(ParcelHistoryAPI.historyPath(parcelID: "p1")
+            .hasSuffix("/agro/parcels/p1/history"))
+    }
+
+    /// The server clamps above 100 rather than rejecting, so a large value is
+    /// harmless — but below 1 is outside the documented range and this client
+    /// should not build a request it knows to be a 400.
+    func testTheLimitIsClampedToTheDocumentedRange() {
+        XCTAssertTrue(ParcelHistoryAPI.historyPath(parcelID: "p", limit: 0)
+            .contains("limit=1"))
+        XCTAssertTrue(ParcelHistoryAPI.historyPath(parcelID: "p", limit: 500)
+            .contains("limit=100"))
+        XCTAssertTrue(ParcelHistoryAPI.historyPath(parcelID: "p", limit: 25)
+            .contains("limit=25"))
+    }
+
+    /// A cursor is base64url and can carry `=` padding. `APIClient` takes the
+    /// query VERBATIM — it must, because `URL.appending(path:)` turns a `?`
+    /// into `%3F` and 404'd every journal load on 2026-09-21 — so encoding is
+    /// this function's job and an unencoded `=` would truncate the value.
+    func testACursorIsPercentEncodedIntoTheQuery() throws {
+        let path = ParcelHistoryAPI.historyPath(
+            parcelID: "p", operationsBefore: "b3AxfDIwMjY=")
+
+        // The `=` after the NAME is the separator and stays. The one inside
+        // the VALUE is base64 padding and must not — asserted on the value
+        // rather than on the whole path, which is what the first version of
+        // this test got wrong: it forbade every `=` and failed on the
+        // separator it needed.
+        let value = try XCTUnwrap(path.split(separator: "=").last).description
+        XCTAssertFalse(value.contains("="), value)
+        XCTAssertTrue(value.hasSuffix("%3D"), value)
+        XCTAssertTrue(path.contains("operationsBefore="), path)
+    }
+
+    /// Each list pages on its own query parameter, and asking about one must
+    /// not send the others.
+    func testEachSectionPagesOnItsOwnParameter() {
+        let seasons = ParcelHistoryAPI.historyPath(parcelID: "p", seasonsBefore: "abc")
+        XCTAssertTrue(seasons.contains("seasonsBefore"), seasons)
+        XCTAssertFalse(seasons.contains("operationsBefore"), seasons)
+        XCTAssertFalse(seasons.contains("weedsBefore"), seasons)
+    }
+
 }

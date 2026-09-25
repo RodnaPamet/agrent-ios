@@ -347,3 +347,64 @@ struct NewWeedObservation: Encodable, Equatable, Sendable {
             .filter { seen.insert($0.lowercased()).inserted }
     }
 }
+
+// MARK: - The whole archive, in one answer
+
+/// `GET /history` — three lists, three cursors, one request.
+///
+/// ── Why this was not modelled with the item schemas ──
+///
+/// It was the part still moving. The route answered with the entire archive
+/// unbounded, a cap was with the owner, and a client built on that envelope
+/// would have been built on the shape expected to change. The items shipped
+/// first (2026-09-25), the cap landed the same day, and the screen is now a
+/// store and a view over models that already existed. That ordering was the
+/// right one and is worth repeating: build against the settled half, and the
+/// moving half costs a day rather than a rewrite.
+///
+/// ── Three cursors, because there is no single position ──
+///
+/// The sections sort by three different keys — harvest YEAR, completion date,
+/// observation date — so there is nothing to page from in common. Each list
+/// carries its own cursor, null when that list has no older rows, and each is
+/// paged independently: a parcel with 200 operations and 3 crop seasons
+/// returns a cursor for the operations only.
+///
+/// ── Cursors are OPAQUE. Do not parse one. ──
+///
+/// They happen to be base64url of `<sortKey>|<rowId>`, which the server
+/// states so that nobody believes a cursor keeps ids out of a URL — it does
+/// not, it encodes one. But the encoding is explicitly NOT a contract, and
+/// the reason is specific: `cropSeasonsCursor` keys on an integer YEAR while
+/// the other two key on timestamps. A client that parsed and rebuilt one
+/// would paginate on a value the `ORDER BY` never uses, which SKIPS ROWS
+/// rather than failing — and a short archive looks exactly like a young farm.
+struct ParcelHistory: Decodable, Equatable, Sendable {
+    let parcel: ParcelRef
+    let cropSeasons: [CropSeason]
+    let operations: [ParcelHistoryOperation]
+    let weedObservations: [WeedObservation]
+
+    /// Null means that list has nothing older. Non-null does NOT guarantee
+    /// more rows exist — see `ParcelHistoryStore.Section.exhausted` for why a
+    /// client cannot trust it as a "has more" flag.
+    let cropSeasonsCursor: String?
+    let operationsCursor: String?
+    let weedObservationsCursor: String?
+
+    /// The parcel this archive belongs to, as the route projects it.
+    struct ParcelRef: Decodable, Equatable, Sendable {
+        let id: String
+        let name: String
+
+        /// The CURRENT crop, and a single overwritten field.
+        ///
+        /// It carries no year and no history, which is the entire reason
+        /// `cropSeasons` exists. The server is explicit that a client must
+        /// not infer this year from here and the rest from the archive: the
+        /// archive is the record, and this is a label on the parcel.
+        let cropType: String?
+
+        var cropLabel: String? { CommodityName.freeText(cropType) }
+    }
+}
