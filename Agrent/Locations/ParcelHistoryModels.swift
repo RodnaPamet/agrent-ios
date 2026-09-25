@@ -148,7 +148,39 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     /// A decimal STRING on the wire, and the server says what happens if
     /// that is ignored: "parsing it as a float rounds the dose". `л/дка` on
     /// a spray sheet is the number an operator sets a boom to.
-    let doseValue: WireDecimal
+    ///
+    /// ── OPTIONAL, and the spec says otherwise ──
+    ///
+    /// `ParcelHistoryOperation.doseValue` is declared `type: string` and
+    /// `required`. This was modelled as a non-optional `WireDecimal` on that
+    /// basis, and THIS APP'S OWN WRITE PATH proves the column underneath is
+    /// nullable:
+    ///
+    ///     ParcelOperationSheet:  doseValue: spraying ? dose : nil
+    ///                            fertilizerDoseValue: spraying ? nil : dose
+    ///     OperationParcel:       let doseValue: Decimal?
+    ///
+    /// A fertiliser application writes NO `doseValue` — the dose goes to
+    /// `fertilizerDoseValue`, which this projection does not carry at all. So
+    /// every ploughing and every fertiliser line in the archive has a null in
+    /// the column the projection reads.
+    ///
+    /// Non-optional, a null throws inside `WireDecimal.init(from:)`: the
+    /// `try?` for the string branch returns nil, and `decode(Decimal.self)`
+    /// then throws. That fails the `[ParcelHistoryOperation]` decode, which
+    /// fails the WHOLE `ParcelHistory` envelope — so ONE fertiliser line
+    /// replaces crop seasons, operations and weed observations together with
+    /// an error, on a payload the server considers valid.
+    ///
+    /// Fifth instance of that shape this week, and the first one in code I
+    /// wrote rather than inherited. Every fixture in the suite was a SPRAY,
+    /// which is why nothing caught it: `"doseValue":"2.5"` on every line.
+    ///
+    /// Whether the server echoes the null, coalesces it to `0`, or maps
+    /// `fertilizerDoseValue` into this field is asked and unanswered. Optional
+    /// is correct under all three, and a coalesced `0` is its own problem —
+    /// see `doseText`.
+    let doseValue: WireDecimal?
 
     let completedAtRaw: String?
 
@@ -183,7 +215,12 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     ///
     /// Interpolating it regardless left a trailing space on every such line,
     /// which is invisible in a diff and visible in a right-aligned column.
-    var doseText: String {
+    /// NIL when no dose was recorded, so a caller leaves the part out rather
+    /// than printing a dose this line does not have. A ploughing has no dose
+    /// and inventing «0 л/дка» for it would put a number on a spray sheet
+    /// that nobody set a boom to.
+    var doseText: String? {
+        guard let doseValue else { return nil }
         let fraction = doseValue.raw.split(separator: ".").dropFirst().first?.count ?? 0
         let number = doseValue.text(scale: fraction)
         guard let unit = doseUnit.recorded else { return number }
