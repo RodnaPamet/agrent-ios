@@ -513,18 +513,39 @@ about six other writes. The first server-side answer had come from a `grep -l
 including in a comment saying it is ignored; right conclusion, instrument that
 could not support it.
 
-The client's caution can now be lifted deliberately, and has NOT been:
-sending a key is protection only if a retry reuses it, and reuse is not free.
-Send the same key after the operator corrects the amount and the server
-returns the ORIGINAL row — the edit is silently dropped and the books keep the
-wrong figure. So the key must be minted per logical write and re-minted when
-the draft changes, which is a decision about a money screen rather than a
-header. With the owner since 2026-09-25.
+The client's caution has now been lifted, deliberately. **The owner decided on
+2026-09-25: a key per draft, re-minted whenever the draft's content changes**,
+and `NewCostView` sends one.
+
+The hazard being avoided was reuse, not the header. Send the same key after
+the operator corrects the amount and the server returns the ORIGINAL row — the
+edit is silently dropped and the books keep the wrong figure. Mint it fresh
+every time instead and the farm's two identical diesel purchases in one day
+collapse to one row. So the key is a nonce held for one sheet presentation
+plus a hash of the draft's canonical encoding: a retry of the SAME figures is
+deduped, a corrected figure lands as a new row, and a second sheet with
+identical content still writes. Derivation and the full reasoning live in
+`Agrent/API/CostIdempotencyKey.swift`, including why the value is UUID-shaped
+— the server's accepted shape for that header is recorded nowhere, and every
+key this app has ever sent successfully was a UUID.
+
+There is still NO retry and no retry button: the owner chose the key without
+one. A key makes a replay safe; it does not make one exist.
 
 `ROADMAP.md` was corrected in #71 and the comment on `CostsAPI.create` was
 not, so the document and the code beside the call disagreed for four days.
 The comment is what a person reads while changing that function. Corrected
 2026-09-25.
+
+That failure — document corrected, comment beside the call missed — has now
+happened twice (#71, then #73). So the key change swept every claim with it
+rather than only the two files it touched: `CostsAPI.create`, `NewCostView`,
+`CalculatorView`, `OperationModels`, `ParcelOperationSheet`, `APIClient`,
+`CostEntryTests` and this section. The `ParcelOperationSheet` one was the
+dangerous direction: it read as a standing licence for the outbox to replay
+that write *and no other*, resting on a claim about the cost row that had
+stopped being true. `README.md`'s overclaim predates all of this and is
+untouched.
 
 `ItemCatalogue.create` and `FarmRiskAPI.createLead` both send a FRESH
 UUID per call. Against a route that ignores the header that is merely

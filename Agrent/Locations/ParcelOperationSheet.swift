@@ -22,13 +22,26 @@ import SwiftUI
 /// button from somebody who could have used it is worse than showing one
 /// that might be refused.
 ///
-/// ── SAFE TO RETRY, and it is the first write in this app that is ──
+/// ── SAFE TO RETRY, and the only write this app DOES retry ──
 ///
-/// `field-operation` is one of the four usecases honouring
-/// `Idempotency-Key`, so a replay produces one operation. The cost row,
-/// the exchange listing and the deactivation are all the other way, and
-/// this sheet is therefore the one place an outbox could replay without
-/// thinking. The key is minted once and held across attempts.
+/// `field-operation` honours `Idempotency-Key`, so a replay produces one
+/// operation. The key is minted ONCE and held across attempts — that is
+/// what makes the outbox legitimate here, and a fresh key per attempt
+/// would defeat the dedupe entirely.
+///
+/// Read the licence narrowly. It is for THIS write, and the reason is not
+/// "this is the only route that dedupes":
+///
+///   - The exchange listing and the deactivation honour no key at all. A
+///     replay puts a second offer on a public board. Never queue them.
+///   - `POST /grain/costs` DOES honour the header, and has sent a key since
+///     2026-09-25 — so the old wording here ("the cost row is the other
+///     way", "the one place an outbox could replay") is wrong twice over.
+///     But its key is minted PER DRAFT and re-minted when the content
+///     changes, and nothing replays it. Queueing a cost would mean deciding
+///     what a queued row means after the operator has moved on and possibly
+///     re-entered it by hand, and nobody has decided that. Route safety is
+///     a precondition for a queue, not a licence for one.
 struct ParcelOperationSheet: View {
     let locationID: String
     let parcel: Parcel

@@ -276,9 +276,18 @@ actor APIClient {
     /// how this one came to be wrong twice.
     ///
     /// nil still means something, and it is no longer "the server would
-    /// ignore it": it means NOTHING HERE REUSES A KEY. A key sent once, never
-    /// replayed, protects against nothing — so passing one would read as
-    /// protection that is not there just as much as the old claim did.
+    /// ignore it": it means THIS CALLER HAS NO KEY WORTH SENDING. Two
+    /// different reasons, and both are live:
+    ///
+    ///   - the route reads no header — parcel crop-seasons, weed
+    ///     observations, the exchange listing create, admin; or
+    ///   - it reads one but nothing here would ever send the same value
+    ///     twice, so a key would read as protection that is not there.
+    ///
+    /// The grain cost create left this second group on 2026-09-25 and now
+    /// passes a key derived from the draft's content — see
+    /// `CostIdempotencyKey` and `CostsAPI.create`. So nil no longer means
+    /// "nothing here reuses a key"; one write does.
     func postReturningData<B: Encodable>(
         _ path: String, body: B, idempotencyKey: String?
     ) async throws -> Data {

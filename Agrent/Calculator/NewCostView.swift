@@ -2,14 +2,17 @@ import SwiftUI
 
 /// Add a cost to the farm's books.
 ///
-/// ── This form does NOT retry, and that is the whole design ──
+/// ── This form does NOT retry, and that is still the whole design ──
 ///
-/// The grain routes honour no idempotency: POST twice, with any key or
-/// none, and there are two rows. So a duplicate here is a duplicated
-/// financial record that silently changes net worth, and nothing upstream
-/// will catch it.
+/// `POST /grain/costs` DOES honour `Idempotency-Key` (chain traced in
+/// agri-saas source — see `CostsAPI.create`), and since 2026-09-25 this
+/// form sends one. What the key buys is that a REPLAY of the same figures
+/// cannot become a second row; what it does not buy is a replay. There is
+/// none, by the owner's choice, so a duplicate here would still be a
+/// duplicated financial record that silently changes net worth, and
+/// nothing upstream would catch it.
 ///
-/// Everything below follows from that:
+/// Everything below therefore stands unchanged:
 ///
 ///   - No automatic retry, no queue, no pull-to-refresh on a failed save.
 ///   - The button disables the instant it is pressed and does not come
@@ -17,11 +20,35 @@ import SwiftUI
 ///   - A TIMEOUT is reported as unknown rather than as failure. After one
 ///     the app genuinely does not know whether the row was written, and
 ///     "не бе записан" invites the operator to enter it again — the single
-///     action that makes it worse.
+///     action that makes it worse. Re-typing it into a fresh sheet is a
+///     fresh nonce, so the key would NOT dedupe it; the dedupe covers a
+///     replay of one attempt, not a human doing the work twice.
 struct NewCostView: View {
     let onSaved: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+
+    /// ── THE IDEMPOTENCY NONCE: one per sheet presentation ──
+    ///
+    /// Half of the key. The other half is a hash of the draft's content —
+    /// `CostIdempotencyKey` holds the reasoning for both, and it is worth
+    /// reading before touching either.
+    ///
+    /// NEVER REASSIGNED. `@State` with an initialiser evaluates it once per
+    /// view identity, so this is minted when the sheet appears and is stable
+    /// for as long as it is on screen, however many times `body` runs. It
+    /// would be a `let` if property wrappers allowed one.
+    ///
+    /// The two things it must not become:
+    ///
+    ///   - Re-minted on edit (an `.onChange`): edit-and-revert then produces
+    ///     a THIRD value, so the figures that may already have landed are no
+    ///     longer deduped against. The content hash handles edits; this does
+    ///     not.
+    ///   - Shared or global: two sheets with identical content — 200 L of
+    ///     diesel bought twice in a day — must mint different keys, or the
+    ///     second legitimate cost is deduped away and never written.
+    @State private var nonce = UUID().uuidString
 
     @State private var category: CostCategory = .fuel
     @State private var amountText = ""
@@ -136,8 +163,15 @@ struct NewCostView: View {
             }
         case .unknown(let message):
             // The honest answer, and it is deliberately not a retry button.
-            // Without idempotency, a second attempt after a lost response
-            // is how one cost becomes two.
+            //
+            // The key would make a button SAFE — a replay of this draft with
+            // this nonce cannot write a second row. The owner chose the key
+            // without the button anyway, on 2026-09-25: after a lost response
+            // the app still does not know whether the row exists, and the
+            // useful action is to LOOK at the list, which the text below
+            // says. A button that quietly succeeds by replaying would teach
+            // an operator to press it, and the next screen to grow one may
+            // not be a route that dedupes.
             VStack(alignment: .leading, spacing: 6) {
                 Label("Неясен резултат", systemImage: "questionmark.circle")
                     .foregroundStyle(Palette.error)
@@ -174,7 +208,13 @@ struct NewCostView: View {
         defer { saving = false }
 
         do {
-            _ = try await CostsAPI.create(draft)
+            // Minted HERE, from the draft being sent, not held in state. The
+            // key is a function of content by construction, so it cannot go
+            // stale behind an edit — which is the failure that would drop a
+            // correction and leave the books wrong.
+            _ = try await CostsAPI.create(
+                draft, idempotencyKey: CostIdempotencyKey.mint(nonce: nonce, draft: draft)
+            )
             onSaved()
             dismiss()
         } catch let error as URLError {

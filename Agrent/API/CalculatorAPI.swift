@@ -33,15 +33,11 @@ enum CostsAPI {
         )
     }
 
-    /// ── THIS ROUTE DOES HONOUR IDEMPOTENCY. THIS CLIENT DOES NOT USE IT. ──
+    /// ── THIS ROUTE HONOURS IDEMPOTENCY, AND THIS CLIENT NOW USES IT. ──
     ///
-    /// Corrected 2026-09-25. `ROADMAP.md` was fixed in #71 and THIS COMMENT
-    /// WAS MISSED — the document and the code beside the call disagreed for
-    /// four days, and the comment is the one a person reads while changing
-    /// this function. So here is the chain rather than the conclusion, traced
-    /// in agri-saas source by the server session at my request, after the
-    /// generated spec turned out to be SILENT on grain while emphatic about
-    /// six other writes:
+    /// The chain rather than the conclusion, traced in agri-saas source by
+    /// the server session at my request, after the generated spec turned out
+    /// to be SILENT on grain while emphatic about six other writes:
     ///
     ///     route reads `Idempotency-Key`
     ///       → passes it to `createCostEntry`
@@ -52,7 +48,7 @@ enum CostsAPI {
     /// `POST /grain/costs` and `POST /grain/yield-records` honour it today.
     /// `POST /grain/contracts` does NOT. Two yes, one no — not "grain" as a
     /// group, and generalising to the area is exactly how this comment came
-    /// to be wrong.
+    /// to be wrong before (#71, then again #73).
     ///
     /// Worth knowing how the wrong answer was produced, because it looked
     /// like evidence: a `grep -l "Idempotency-Key"` over the route files.
@@ -60,35 +56,60 @@ enum CostsAPI {
     /// whose comment says it is ignored. A grep that cannot tell a use from a
     /// denial of use.
     ///
-    /// ── So why is `nil` still below? ──
+    /// ── So why is a key sent now? ──
     ///
-    /// Because a key is only protection if a RETRY REUSES IT, and reusing one
-    /// is not free here. Send the same key after the operator corrects the
-    /// amount and the server returns the ORIGINAL row: the edit is silently
-    /// dropped and the books keep the wrong figure. So the key has to be
-    /// minted per logical write and re-minted whenever the draft changes,
-    /// which is a decision about a money screen rather than a header.
+    /// Because the caller can finally mint one that is safe to send. The
+    /// hazard was never the header, it was reuse: send the SAME key after the
+    /// operator corrects the amount and the server returns the ORIGINAL row,
+    /// so the correction is silently dropped and the books keep the wrong
+    /// figure. The owner decided on 2026-09-25 how to resolve that — a key
+    /// per draft, RE-MINTED whenever the draft's content changes.
     ///
-    /// Put to the owner 2026-09-25. Until then this sends none and the
-    /// caution below stands unchanged — it costs nothing, because the
-    /// protection is worthless without the retry it would enable.
+    /// `CostIdempotencyKey` is that key, and its header carries the full
+    /// reasoning, including why the value is UUID-shaped. The rule for anyone
+    /// calling this function: the key must be a function of the CONTENT being
+    /// written. Never a fresh UUID per attempt (that defeats the dedupe
+    /// entirely, which is what `ItemCatalogue.create` and
+    /// `FarmRiskAPI.createLead` still do), and never a key held across a
+    /// content change (that drops the change).
     ///
-    /// Three consequences, all deliberate:
+    /// Three consequences, all still deliberate:
     ///
-    /// 1. **Nothing retries this automatically** — not the caller, not a
-    ///    queue, not a pull-to-refresh. `setTaskStatus`'s retry design must
-    ///    NOT be carried across: it is safe there because the server
-    ///    compares state, and a create has no prior state to compare with.
+    /// 1. **ONE path replays this automatically, and it is the one the key
+    ///    actually protects.** `APIClient.send` retries the POST on a 401:
+    ///    it refreshes the token and calls `perform` a second time with the
+    ///    SAME body and the SAME `Idempotency-Key`. An access token expiring
+    ///    between the tap and the write is ordinary, so this is not a corner
+    ///    — it is the commonest way the same key reaches the server twice,
+    ///    and before today it was the commonest way the books gained a
+    ///    duplicate row.
+    ///
+    ///    This comment said "nothing retries this automatically — not the
+    ///    caller, not a queue, not a pull-to-refresh" and was wrong for the
+    ///    same reason three earlier versions of it were wrong: it described
+    ///    the caller's intent instead of reading `send`. A reader who
+    ///    believed it could move the 401 replay, or simplify the key away,
+    ///    without knowing either touches the other.
+    ///
+    ///    Nothing ELSE retries: no queue, no pull-to-refresh, no button. The
+    ///    key makes a retry safe; it does not make one exist, and the owner
+    ///    chose the key without adding one. `setTaskStatus`'s design must NOT
+    ///    be carried across — it is safe there because the server compares
+    ///    STATE, and a create has no prior state to compare with.
     /// 2. **A transport failure is reported as UNKNOWN, not as "not
     ///    saved".** After a timeout the app genuinely does not know whether
     ///    the row exists, and telling an operator it failed invites them to
-    ///    enter it again — the one action that makes it worse.
-    /// 3. **No `Idempotency-Key` is sent** — see above. Not because the
-    ///    server would ignore it (it would not), but because nothing here
-    ///    reuses a key, and a key used once protects against nothing.
-    static func create(_ entry: CreateCostEntry) async throws -> Data {
+    ///    enter it again by hand — which, typed afresh into a NEW sheet, is a
+    ///    new nonce and therefore a new key, and writes a second row.
+    /// 3. **The key does not license an outbox here.** A replay would be
+    ///    deduped correctly, but nothing has been built to decide what a
+    ///    queued cost means once the operator has moved on, and the queue
+    ///    carries field operations only.
+    static func create(
+        _ entry: CreateCostEntry, idempotencyKey: String
+    ) async throws -> Data {
         try await APIClient.shared.postReturningData(
-            base, body: entry, idempotencyKey: nil
+            base, body: entry, idempotencyKey: idempotencyKey
         )
     }
 }

@@ -171,10 +171,17 @@ enum ApplicationTechnique: String, CaseIterable, Identifiable, Sendable {
 ///
 /// ── AND THIS ONE IS GENUINELY IDEMPOTENT ──
 ///
-/// `field-operation` is one of the four usecases that honour
-/// `Idempotency-Key`. So unlike the cost row, the exchange listing and
-/// the deactivation, a retry here is SAFE — which makes it the first
-/// write in this app that an outbox could replay without thinking.
+/// `field-operation` honours `Idempotency-Key`, so a retry here is SAFE
+/// and the outbox may replay it. Unlike the exchange listing and the
+/// deactivation, which honour no key and must never be queued.
+///
+/// NOT unlike the cost row any more: `POST /grain/costs` honours the header
+/// too and has sent a key since 2026-09-25 (see `CostIdempotencyKey`). The
+/// difference left is that this write has a QUEUE behind it — a key minted
+/// once and held across attempts, replayed by `OutboxStore` — whereas the
+/// cost sheet mints a key per draft and never replays anything. Safe to
+/// retry is a property of the route; actually retrying is a separate
+/// decision, and only this write has had it made.
 struct CreateFieldOperation: Encodable, Sendable {
     let operationType: String
     let parcelIds: [String]
