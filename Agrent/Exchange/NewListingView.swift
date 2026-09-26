@@ -67,21 +67,26 @@ struct NewListingView: View {
             description: descriptionText.isEmpty ? nil : descriptionText,
             sellerDisplayName: sellerDisplayName.isEmpty ? nil : sellerDisplayName,
             sellerContact: sellerContact.isEmpty ? nil : sellerContact,
-            // THE SAME GMT SHIFT, and the shape is kept deliberately.
+            // A FULL ISO INSTANT, which is what the route actually wants.
             //
-            // The old expression emitted `2026-09-24Z` for an expiry the seller
-            // picked as 25.09 — the wrong day, from `ISO8601FormatStyle`'s
-            // `.gmt` default, so a listing created after midnight expired up to
-            // a day early. The day is corrected.
+            // This has been through three shapes. It began as
+            // `.formatted(.iso8601.year().month().day()…)`, which defaults to
+            // `.gmt` — so an expiry picked as 25.09 went out as `2026-09-24Z`,
+            // the wrong DAY, because Bulgaria is UTC+3 and a `DatePicker` in
+            // `.date` mode keeps the time of day it opened with.
             //
-            // The trailing `Z` on a date-only value is preserved rather than
-            // cleaned up. `POST /exchange/listings` is one of the routes with no
-            // documented request shape, so what the server does with this string
-            // cannot be read anywhere — it has been accepting this exact form,
-            // and the smallest change that fixes the day is to change only the
-            // day. Asked; if it wants a plain day or a full instant, this
-            // becomes one line either way.
-            expiresAt: hasExpiry ? "\(BgDate.isoDay(expiresAt))Z" : nil
+            // I fixed the day and kept the `…Z` shape, on the grounds that
+            // `POST /exchange/listings` had no documented request schema and it
+            // had been accepting that form. Answered 2026-09-26: the column is
+            // a plain `DateTime` and the read side returns `format: date-time`,
+            // and `2026-09-25Z` is NOT a valid ISO instant — it has no time
+            // component. It parsed by luck of the parser rather than by
+            // contract, which is exactly the kind of thing that works until a
+            // library is upgraded.
+            //
+            // So: the instant. `BgDate.isoDay` still decides WHICH DAY, in the
+            // device's zone, because that is the part a seller picked.
+            expiresAt: hasExpiry ? "\(BgDate.isoDay(expiresAt))T00:00:00.000Z" : nil
         )
     }
 
