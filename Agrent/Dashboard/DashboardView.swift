@@ -314,22 +314,77 @@ struct DashboardView: View {
                                 x: .value("Дата", day),
                                 y: .value("Брой", point.created))
                             .foregroundStyle(by: .value("Серия", "създадени"))
+                            .symbol(by: .value("Серия", "създадени"))
                             .interpolationMethod(.monotone)
 
                             LineMark(
                                 x: .value("Дата", day),
                                 y: .value("Брой", point.completed))
                             .foregroundStyle(by: .value("Серия", "завършени"))
+                            .symbol(by: .value("Серия", "завършени"))
+                            // DASHED, because the two colours are 1.47:1
+                            // apart from each other.
+                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 3]))
                             .interpolationMethod(.monotone)
                         }
                     }
                 }
+                // COLOUR WAS THE ONLY DIFFERENCE between these two lines, and
+                // the two colours are the accent and its pressed state —
+                // #A04E1B and #7A3A12 in light, #D4AF37 and #B8860B in dark.
+                // Against each other they measure 1.47:1 and 1.55:1. That is
+                // not a distinction anyone makes; it is two shades of one
+                // brown, and this chart's entire claim is "these two lines
+                // are different things".
+                //
+                // Both are legible against the page — 5.83:1 and 8.60:1 — so
+                // nothing was wrong with either colour. They were only ever
+                // wrong as a PAIR, which is the same mistake as the neutral
+                // chip: two values chosen separately and never compared.
+                //
+                // The non-colour channel is a dash on one line and a distinct
+                // symbol per series. The symbol is the one that reaches the
+                // LEGEND — a dash applied to a mark does not — so circle
+                // against square is what tells a reader which line is which
+                // when the two browns look identical to them.
                 .chartForegroundStyleScale([
                     "създадени": Palette.accent,
                     "завършени": Palette.accentDeep,
                 ])
-                .chartYAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
-                .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
+                .chartSymbolScale([
+                    "създадени": BasicChartSymbolShape.circle,
+                    "завършени": BasicChartSymbolShape.square,
+                ])
+                .chartYAxis {
+                    AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                        AxisGridLine()
+                        if let count = value.as(Int.self) {
+                            AxisValueLabel {
+                                Text("\(count)").font(.caption2).axisLabelScaling()
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    // THIS AXIS WAS PRINTING ENGLISH. A bare `AxisMarks` over
+                    // a `Date` lets Swift Charts format it from the locale,
+                    // the device reports en_BG, and a Bulgarian farmer's
+                    // dashboard read "Sep 14". Тенденции goes through
+                    // `BgDate` for exactly this reason and says so; this
+                    // chart was written later and did not.
+                    //
+                    // The CI guard could not catch it. It rejects the
+                    // `.dateTime` spelling, and the defect here is the
+                    // ABSENCE of any format at all.
+                    AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                        AxisGridLine()
+                        if let date = value.as(Date.self) {
+                            AxisValueLabel {
+                                Text(BgDate.dayMonth(date)).font(.caption2).axisLabelScaling()
+                            }
+                        }
+                    }
+                }
                 .frame(height: 140)
                 // Counts, so ZERO IS MEANINGFUL and the axis keeps it — unlike
                 // the price chart, where anchoring at zero flattened a year of

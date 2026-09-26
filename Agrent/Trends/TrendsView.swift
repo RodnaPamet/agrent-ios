@@ -2,33 +2,7 @@ import Charts
 import SwiftUI
 
 /// Price history, one chart per unit-and-currency.
-private extension View {
-    /// Axis labels stop growing at `.large`.
-    ///
-    /// ── Measured, not assumed ──
-    ///
-    /// At AX3 the x axis rendered «1 октом18нуар1апр…» — three date
-    /// labels overlapping into one unreadable string. A chart axis has a
-    /// fixed width that text does not get to negotiate with, so labels
-    /// that scale without limit do not become more readable, they become
-    /// illegible in a different way.
-    ///
-    /// ── Why this is not a loss of accessibility ──
-    ///
-    /// The chart was never the accessible surface. It is one opaque
-    /// element to VoiceOver by construction, and the legend beneath it
-    /// carries every series' name, latest price, date and age AS TEXT —
-    /// which does scale to AX5, and which is the path somebody reading at
-    /// AX3 is actually using. Capping the axis makes the chart remain a
-    /// picture of the shape; the numbers live below it and always did.
-    ///
-    /// Clamping the whole screen would be the wrong fix: it would shrink
-    /// the legend too, which is the part that must grow.
-    func axisLabelScaling() -> some View {
-        dynamicTypeSize(...DynamicTypeSize.large)
-    }
-}
-
+///
 /// Every commodity name on this screen comes from
 /// `ChartableCommodity.label`, which resolves through `CommodityName` —
 /// there is no path here that can print a raw slug, because `commodity` is
