@@ -118,8 +118,13 @@ struct ExchangeMapView: View {
                     x: centre.x - radius, y: centre.y - radius,
                     width: radius * 2, height: radius * 2)
                 context.fill(Path(ellipseIn: rect), with: .color(Palette.accent))
+                // The outline is what separates one marker from another and
+                // from the oblast beneath, so it is a graphical object and
+                // wants 3:1. White on the dark accent is 2.10:1 and fails even
+                // that lower bar. See `Palette.onAccent`.
                 context.stroke(
-                    Path(ellipseIn: rect), with: .color(.white), lineWidth: 1.5)
+                    Path(ellipseIn: rect), with: .color(Palette.onAccent),
+                    lineWidth: 1.5)
             }
         }
         .background(Color(.systemBackground))

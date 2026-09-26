@@ -203,8 +203,33 @@ struct AdminView: View {
             // The number itself is never in the label. VoiceOver reads
             // aloud, and a national ID spoken in a shared space is the
             // same exposure this masking exists to avoid.
+            //
+            // ── AND `children: .ignore` SWALLOWED THE ONLY CONTROL ──
+            //
+            // Collapsing the row to one element discarded the «Покажи»
+            // Button with everything else, so the hint promised a double tap
+            // that did nothing: the element carried no action. The ЕГН could
+            // not be revealed by VoiceOver at all, the button was absent from
+            // the Switch Control and Full Keyboard focus order, and Voice
+            // Control had no element named «Покажи» to act on. Reachable only
+            // by a finger on the exact glyphs.
+            //
+            // Found by two independent lenses of an accessibility audit, which
+            // is the corroboration that made it worth trusting: the privacy
+            // instinct was right and the side effect was invisible from
+            // either one alone.
+            //
+            // The action restores it without putting the digits back into
+            // speech — the label still says only whether it is shown.
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(revealEGN ? "ЕГН, показано" : "ЕГН, скрито")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { revealEGN.toggle() }
+            // What a Voice Control user SEES on the button, so «Покажи» works
+            // as spoken. The visible word is not in the accessibility label
+            // and would otherwise match nothing.
+            .accessibilityInputLabels(
+                revealEGN ? ["Скрий", "ЕГН"] : ["Покажи", "ЕГН"])
             .accessibilityHint(revealEGN ? "Двоен допир, за да скриете" : "Двоен допир, за да покажете")
         }
     }

@@ -456,9 +456,15 @@ struct ParcelMapView: View {
                 .font(.footnote.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(isSelected ? Color.accentColor : Color(.secondarySystemFill),
+                // `Palette.accent` rather than `Color.accentColor`, which is
+                // the same colour — `AgrentApp` sets `.tint(Palette.accent)` —
+                // but says so, and pairs with the foreground below.
+                .background(isSelected ? Palette.accent : Color(.secondarySystemFill),
                             in: Capsule())
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                // White on the DARK accent is 2.10:1. A selected index chip
+                // in dark mode was the least readable text on a screen used
+                // outdoors. See `Palette.onAccent`.
+                .foregroundStyle(isSelected ? Palette.onAccent : Color.primary)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)

@@ -35,6 +35,27 @@ enum Palette {
     /// Pressed, and text on the accent chip. `--brand-emphasis` in dark.
     static let accentDeep = Color(light: 0x7A3A12, dark: 0xB8860B)
 
+    /// WHAT TO WRITE ON TOP OF `accent`. Never `.white` directly.
+    ///
+    /// Measured, because the dark accent is gold and gold is bright:
+    ///
+    ///     white on #D4AF37 (dark)    2.10:1   fails 4.5:1, and 3:1 for large
+    ///     near-black on #D4AF37      8.73:1
+    ///     white on #A04E1B (light)   5.83:1   passes
+    ///
+    /// So the light accent takes white and the dark one cannot. Three sites
+    /// wrote `.foregroundStyle(.white)` over an accent fill — the floating
+    /// action button, the map's index chips and the exchange map's region
+    /// fills — and in dark mode a farmer was reading white on gold at 2.10:1,
+    /// outdoors, which is where this app is used.
+    ///
+    /// Fixed HERE rather than at the three call sites, on the skill's
+    /// design-system rule: a pair defined together cannot drift apart, and
+    /// the next accent-filled control gets it for free. The dark value is the
+    /// page colour rather than pure black, so the text reads as ink on the
+    /// surface rather than as a hole in it.
+    static let onAccent = Color(light: 0xFFFFFF, dark: 0x0A1712)
+
     /// The page, in dark only: a very dark green instead of pure black.
     ///
     /// ONE COLOUR, not a page/card pair. The first attempt at a dark theme
@@ -61,10 +82,23 @@ enum Palette {
         })
     }
 
-    /// #B4472A. The ONLY colour that means "something is broken". Reserved:
-    /// staleness, refusals and withheld data are not errors and must not
-    /// borrow it.
-    static let error = Color(hex: 0xB4472A)
+    /// The ONLY colour that means "something is broken". Reserved: staleness,
+    /// refusals and withheld data are not errors and must not borrow it.
+    ///
+    /// A PAIR NOW, and it was one literal. #B4472A is 5.42:1 on white and
+    /// passes — but `pageBackground()` puts `Surface.page` (#0A1712) behind it
+    /// in dark mode, where the same red measures 3.39:1 and fails 4.5:1 for
+    /// body text. That is the colour every failure message in the app is
+    /// written in: a failed cost save, a refused operation, a listing that
+    /// would not post. The message a farmer most needs to read was the least
+    /// readable one on the screen.
+    ///
+    ///     #B4472A on #0A1712   3.39:1   fails
+    ///     #E8705A on #0A1712   6.03:1
+    ///
+    /// Light keeps #B4472A, which is measured and passing; only the dark side
+    /// changes, so nothing moves on a screen that was already correct.
+    static let error = Color(light: 0xB4472A, dark: 0xE8705A)
 
     /// Entry-type chips. Two families so a glance separates an input
     /// application from an observation without reading.

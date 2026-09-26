@@ -41,7 +41,9 @@ struct ActionButton: View {
                     // sitting in a bar, so it is hit while walking, and the
                     // minimum is a floor for controls that hold still.
                     .frame(minHeight: 52)
-                    .foregroundStyle(.white)
+                    // `Palette.onAccent`, never `.white`: the dark accent is gold
+                    // and white on it measures 2.10:1. See the pair's header.
+                    .foregroundStyle(Palette.onAccent)
                     .background(Palette.accent, in: Capsule())
                     // The shadow is what separates it from whatever it
                     // floats over — a satellite photograph, in this app,
