@@ -107,7 +107,29 @@ enum Palette {
         static let inputFill = Color(hex: 0xF6EBE2)
         static let activityText = Color(hex: 0x274A6D)
         static let activityFill = Color(hex: 0xE7EFF7)
-        static let neutralText = Color.secondary
+        /// EXPLICIT, because two semantic colours drift against each other.
+        ///
+        /// This was `Color.secondary` — `secondaryLabel`, #3C3C43 at 60% —
+        /// over `secondarySystemFill`, #787880 at 16%. Both system-resolved,
+        /// neither chosen with the other in mind:
+        ///
+        ///     secondaryLabel on secondarySystemFill, light   3.19:1   fails
+        ///     secondaryLabel on secondarySystemFill, dark    4.88:1
+        ///     #4A4A4F on the light fill                      7.29:1
+        ///     #D8D8DC on the dark fill                       8.73:1
+        ///
+        /// A chip's text is `.caption` at 11pt, which is normal-size text and
+        /// needs 4.5:1, so LIGHT MODE IS THE ONE THAT FAILS here — the
+        /// opposite of `onAccent` and `error`, which both fail only in dark.
+        /// A grey label at 60% opacity over a grey fill at 16% is two washes
+        /// of the same thing, and that is exactly as legible as it sounds.
+        ///
+        /// The other two chip families were picked as pairs and measure
+        /// 7.33:1 and 7.91:1. This one inherited its halves from different
+        /// places, so nobody ever put the two numbers next to each other.
+        /// The values here land in the same band, which is the point: the
+        /// three chip families should not differ in how readable they are.
+        static let neutralText = Color(light: 0x4A4A4F, dark: 0xD8D8DC)
         static let neutralFill = Color(.secondarySystemFill)
     }
 
