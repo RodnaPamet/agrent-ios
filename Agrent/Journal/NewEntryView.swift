@@ -37,7 +37,9 @@ struct NewEntryView: View {
                 }
                 if let error {
                     Section {
-                        Text(error).foregroundStyle(.red)
+                        // `Palette.error`, not `.red` — 5.42:1 against
+                        // 3.55:1, and the app has one colour for a failure.
+                        Text(error).foregroundStyle(Palette.error)
                     }
                 }
             }

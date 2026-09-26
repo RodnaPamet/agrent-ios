@@ -434,13 +434,18 @@ struct SchematicParcelMap: View {
                 style: major ? majorStroke : minorStroke
             )
 
-            let label = gridLabel(value, step: lonStep)
-            let width = context.resolve(label).measure(in: size).width
+            let label = context.resolve(gridLabel(value, step: lonStep))
+            let width = label.measure(in: size).width
             if x + 4 > lastLabelEnd + 8, x + 4 + width < size.width {
-                context.draw(
-                    label,
+                drawHaloed(
+                    ink: label,
+                    halo: context.resolve(
+                        gridLabel(value, step: lonStep, in: Palette.Map.labelHalo)
+                    ),
                     at: CGPoint(x: x + 4, y: size.height - 8),
-                    anchor: .bottomLeading
+                    anchor: .bottomLeading,
+                    width: haloWidth(for: chromeSize),
+                    in: &context
                 )
                 lastLabelEnd = x + 4 + width
             }
@@ -457,18 +462,29 @@ struct SchematicParcelMap: View {
                 with: .color(major ? majorColour : minorColour),
                 style: major ? majorStroke : minorStroke
             )
-            context.draw(
-                gridLabel(value, step: latStep),
+            drawHaloed(
+                ink: context.resolve(gridLabel(value, step: latStep)),
+                halo: context.resolve(
+                    gridLabel(value, step: latStep, in: Palette.Map.labelHalo)
+                ),
                 at: CGPoint(x: 6, y: y - 4),
-                anchor: .bottomLeading
+                anchor: .bottomLeading,
+                width: haloWidth(for: chromeSize),
+                in: &context
             )
         }
     }
 
-    private func gridLabel(_ value: Double, step: Double) -> Text {
+    /// The coordinate, in the grid's own tan — or in the halo colour, which
+    /// is the same text drawn underneath it. #C9C4A8 on the #6E6A52 ground
+    /// measures 3.11:1, and these are digits: a misread coordinate is not a
+    /// softer version of the right one.
+    private func gridLabel(
+        _ value: Double, step: Double, in colour: Color = Palette.Map.graticuleLabel
+    ) -> Text {
         Text(Self.formatDegrees(value, step: step))
             .font(.system(size: chromeSize, weight: .medium).monospacedDigit())
-            .foregroundStyle(Palette.Map.graticuleLabel)
+            .foregroundStyle(colour)
     }
 
     /// Which way is up. Cheap, and the first question anyone asks of a map
@@ -540,10 +556,12 @@ struct SchematicParcelMap: View {
         var placed: [CGRect] = []
 
         for label in labels {
-            let text = Text(label.name)
-                .font(.system(size: labelSize, weight: .semibold))
-                .foregroundStyle(Palette.Map.label)
-            let measured = context.resolve(text).measure(in: size)
+            let font = Font.system(size: labelSize, weight: .semibold)
+            let text = Text(label.name).font(font).foregroundStyle(Palette.Map.label)
+            let halo = Text(label.name).font(font).foregroundStyle(Palette.Map.labelHalo)
+            let resolved = context.resolve(text)
+            let resolvedHalo = context.resolve(halo)
+            let measured = resolved.measure(in: size)
 
             var point = label.at
             var box = CGRect(
@@ -558,9 +576,41 @@ struct SchematicParcelMap: View {
             }
 
             placed.append(box)
-            context.draw(text, at: point)
+            drawHaloed(
+                ink: resolved, halo: resolvedHalo, at: point,
+                width: haloWidth(for: labelSize), in: &context
+            )
         }
     }
+
+    /// Text with an outline under it, so it survives whatever it lands on.
+    ///
+    /// Eight offset copies rather than a blurred `.shadow` filter: a blur
+    /// radius is a number that looks right at one text size and washes out at
+    /// another, and this text scales from 14pt to 26pt. Eight hard copies
+    /// give a known outline width at every size, and at seven parcels plus a
+    /// dozen coordinates the cost is not measurable.
+    private func drawHaloed(
+        ink: GraphicsContext.ResolvedText,
+        halo: GraphicsContext.ResolvedText,
+        at point: CGPoint,
+        anchor: UnitPoint = .center,
+        width: CGFloat,
+        in context: inout GraphicsContext
+    ) {
+        for dx in [-width, 0, width] {
+            for dy in [-width, 0, width] where !(dx == 0 && dy == 0) {
+                context.draw(
+                    halo, at: CGPoint(x: point.x + dx, y: point.y + dy), anchor: anchor
+                )
+            }
+        }
+        context.draw(ink, at: point, anchor: anchor)
+    }
+
+    /// Proportional to the text, so the outline neither disappears at 14pt
+    /// nor eats the counters of the glyphs at 26pt.
+    private func haloWidth(for size: CGFloat) -> CGFloat { max(1, size / 14) }
 
     // NOTE: outline rendering was removed with the move to squares. Hole
     // handling still matters and still lives on the MapKit path, in

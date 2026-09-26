@@ -240,7 +240,7 @@ struct CalculatorView: View {
             if let cover = row.breakEven.coverPercent {
                 LabeledContent("Покритие") {
                     Text("\(Num.text(cover))%")
-                        .foregroundStyle(row.breakEven.covered == true ? .green : .orange)
+                        .foregroundStyle(row.breakEven.covered == true ? Palette.success : Palette.warning)
                 }
             }
 

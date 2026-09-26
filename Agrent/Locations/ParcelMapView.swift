@@ -2,6 +2,8 @@ import MapKit
 import SwiftUI
 
 struct ParcelMapView: View {
+    @ScaledMetric(relativeTo: .body) private var scaledParcelListHeight: CGFloat = 260
+
     let location: Location
 
     @State private var importing = false
@@ -465,6 +467,13 @@ struct ParcelMapView: View {
                 // in dark mode was the least readable text on a screen used
                 // outdoors. See `Palette.onAccent`.
                 .foregroundStyle(isSelected ? Palette.onAccent : Color.primary)
+                // 44pt TALL. Footnote text with 7pt of padding is about 32pt,
+                // and these sit 8pt apart in a horizontal row on a screen used
+                // standing in a field. The capsule keeps its drawn size — the
+                // frame extends the TARGET, not the paint, so the row does not
+                // grow.
+                .frame(minHeight: 44)
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
@@ -582,13 +591,13 @@ struct ParcelMapView: View {
             .font(.caption)
             // Never `.secondary`. This is the caveat on everything above it,
             // and the one line here that must not read as a footnote.
-            .foregroundStyle(days > Staleness.satellitePass ? Color.orange : Color.primary)
+            .foregroundStyle(days > Staleness.satellitePass ? Palette.warning : Color.primary)
         } else {
             // The server may omit the date. Saying so is the honest answer —
             // an undated overlay must not be allowed to pass as a dated one.
             Text("Датата на заснемане е неизвестна.")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -597,6 +606,28 @@ struct ParcelMapView: View {
 
     @ViewBuilder
     private func parcelRow(_ parcel: Parcel) -> some View {
+        // A BUTTON WHEN IT DOES SOMETHING, plain content when it does not.
+        //
+        // This row is the only route to «Запиши операция» that does not need a
+        // finger on a shape drawn on a map, so for a Switch Control or Full
+        // Keyboard user it is not a convenience — it IS the route. It was an
+        // `.onTapGesture`, which no focus ring stops on and no activation
+        // reaches, whatever traits are declared beside it.
+        //
+        // `ParcelChooser` already renders this same name/crop/area row as a
+        // Button, so this is the app's own pattern. Not a Button for a reader
+        // who cannot operate: a control that focuses and then does nothing is
+        // worse than content.
+        if mayOperate {
+            Button { operating = parcel } label: { parcelRowContent(parcel) }
+                .buttonStyle(.plain)
+        } else {
+            parcelRowContent(parcel)
+        }
+    }
+
+    @ViewBuilder
+    private func parcelRowContent(_ parcel: Parcel) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(parcel.name).font(.subheadline.weight(.medium))
@@ -628,11 +659,25 @@ struct ParcelMapView: View {
         // them: "Пшеница middle dot 124 дка middle dot под аренда". Spoken
         // from the values, with the unit said in full — «дка» is read out
         // as three letters, so the audio channel gets «декара».
+        // A BUTTON, NOT A TAP GESTURE.
+        //
+        // This row is the only route to «Запиши операция» that does not
+        // require a finger on a shape drawn on a map — so for a Switch Control
+        // or Full Keyboard user it is not a convenience, it is the route. An
+        // `onTapGesture` is invisible to both: no focus ring stops on it and
+        // no activation reaches it, whatever traits are declared.
+        //
+        // `ParcelChooser` already renders this same name/crop/area row as a
+        // Button, so this is the app's own pattern rather than a new one.
+        // Wrapped rather than rebuilt, so the row's layout and its spoken
+        // label are untouched.
         .contentShape(Rectangle())
-        .onTapGesture { if mayOperate { operating = parcel } }
         .accessibilityElement(children: .ignore)
-        .accessibilityAddTraits(mayOperate ? .isButton : [])
-        .accessibilityHint(mayOperate ? "Двоен допир, за да запишете операция" : "")
+        // WHAT IT DOES, not how to do it. A Switch Control user selects and
+            // activates; a Full Keyboard user presses space. "Двоен допир" is
+            // VoiceOver's gesture and instructing it is wrong for everyone else
+            // — the system already announces the right verb per technology.
+            .accessibilityHint(mayOperate ? "Записва операция за този парцел" : "")
         .accessibilityLabel(A11y.sentence([
             parcel.name,
             CommodityName.freeText(parcel.cropType),
@@ -660,6 +705,15 @@ struct ParcelMapView: View {
                 )
             }
         }
-        .frame(maxHeight: 260)
+        // THE WINDOW SCALES WITH THE TEXT IN IT. 260 points was measured
+        // against rows at the default size — about four parcels — and it was
+        // a constant, so at accessibility5 the same window showed ONE row of
+        // a list whose whole job is comparing parcels, inside a scroll view
+        // most people never discover is scrollable.
+        //
+        // Capped, because the map above it is the other half of this screen
+        // and a list that grows without limit pushes it off. 520 is roughly
+        // the default four rows at the largest size.
+        .frame(maxHeight: min(scaledParcelListHeight, 520))
     }
 }

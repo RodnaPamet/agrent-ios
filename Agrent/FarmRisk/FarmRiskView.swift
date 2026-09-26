@@ -193,15 +193,57 @@ struct FarmRiskView: View {
 
     // MARK: - One parcel
 
+    /// THREE STOPS PER PARCEL: the reading, the archive, the insurance ask.
+    ///
+    /// It was about twelve. Every other list in this app groups its row —
+    /// `TaskRow`, `JournalRow`, `MemberRow` all build one spoken sentence
+    /// from the values — and this one, the densest row in the app, never
+    /// did. A VoiceOver user swiped through the name, the area, the crop,
+    /// «Зеленина», its chip, «NDVI 0,62 ср.», «Влага», its chip, «NDMI 0,31
+    /// ср.» and the acquisition line before reaching the next parcel. Seven
+    /// parcels is eighty-odd swipes to read a screen a sighted farmer takes
+    /// in at a glance.
+    ///
+    /// `children: .ignore` on the WHOLE row would have been the obvious
+    /// thing and the wrong one — it swallows controls, which is exactly the
+    /// defect the ЕГН row on Админ was fixed for. So the grouping stops
+    /// short of the two buttons, and they stay their own stops.
+    ///
+    /// Spoken from the VALUES rather than `.combine`, for the reason
+    /// `JournalRow` records: the acquisition line contains a `·`, and
+    /// VoiceOver reads it as "middle dot".
     private func parcelRow(_ row: RiskRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            parcelReading(row)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(spoken(row))
+
+            historyControl(row)
+
+            askControl(row)
+        }
+    }
+
+    private func parcelReading(_ row: RiskRow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             // Name and area on one line: both short, each pinned to its
             // own edge, neither able to grow into the other.
-            HStack(alignment: .firstTextBaseline) {
+            //
+            // EXCEPT AT THE ACCESSIBILITY SIZES, where "both short" stops
+            // being true — «Нива до шосето» at accessibility5 is most of the
+            // screen on its own, and the area it is pinned away from is a
+            // number the farmer is reading the row FOR. The `Spacer` holds
+            // them apart until there is nothing left to hold apart, and then
+            // the area wraps to «2,4 / ха» in the last few points.
+            let nameAndArea = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+
+            nameAndArea {
                 Text(row.parcel.name)
                     .font(.headline)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
+                if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
                 if let area = row.risk?.areaHa ?? row.parcel.areaHa {
                     Text(Area(hectares: area).text)
                         .font(.footnote)
@@ -228,11 +270,43 @@ struct FarmRiskView: View {
                     Text("Изчисляване…").font(.footnote).foregroundStyle(.secondary)
                 }
             }
-
-            historyControl(row)
-
-            askControl(row)
         }
+    }
+
+    /// What the grouped reading says, built from the values.
+    private func spoken(_ row: RiskRow) -> String {
+        var parts: [String?] = [
+            row.parcel.name,
+            (row.risk?.areaHa ?? row.parcel.areaHa).map { Area(hectares: $0).text },
+            CommodityName.freeText(row.risk?.cropType ?? row.parcel.cropType),
+        ]
+
+        if let risk = row.risk {
+            parts.append(spokenReading("зеленина", risk.vegetation, risk.ndvi, "NDVI"))
+            parts.append(spokenReading("влага", risk.moisture, risk.ndmi, "NDMI"))
+            parts.append(risk.absenceReason)
+            parts.append(Self.acquisition(risk, row.freshness)?.spoken
+                ?? "датата на заснемане е неизвестна")
+        } else if let failure = row.failure {
+            parts.append(failure)
+        } else {
+            // The row exists before its reading does. Saying so beats a
+            // parcel that announces a name and an area and then stops.
+            parts.append("изчислява се")
+        }
+
+        return A11y.sentence(parts)
+    }
+
+    /// «зеленина добро, NDVI 0,62 средно» — the chip's MEANING rather than
+    /// its rendered fragment, and «ср.» spelled out, which is an
+    /// abbreviation on screen and a word in the ear.
+    private func spokenReading(
+        _ title: String, _ level: RiskLevel, _ value: Double?, _ index: String
+    ) -> String {
+        var text = "\(title) \(level.label.lowercased())"
+        if let value { text += ", \(index) \(Num.text(value)) средно" }
+        return text
     }
 
     /// THE ARCHIVE, as its own control — never the whole row.
@@ -432,39 +506,64 @@ struct FarmRiskView: View {
     /// Computed from two server timestamps — see `Staleness`. A reading
     /// with no date reads as today's, and the composite reaches back past
     /// cloud cover without saying so.
+    /// The acquisition line as DATA, so the row's spoken label and the row
+    /// itself cannot say different things.
+    ///
+    /// Two joins over one source: the screen puts a `·` between the clauses,
+    /// the spoken label a comma. That is the whole reason this is not simply
+    /// `.combine`d off the rendered text — VoiceOver reads `·` as "middle
+    /// dot", which `JournalRow` found first.
+    struct Acquisition {
+        var clauses: [String]
+        var isStale: Bool
+
+        var shown: String { clauses.joined(separator: " · ") }
+        var spoken: String { clauses.joined(separator: ", ").lowercased() }
+    }
+
+    /// A CACHED READING MAY NOT SAY «ДНЕС», OR COUNT DAYS.
+    ///
+    /// `staleDays` is `generatedAt − acquiredDate` and both are frozen
+    /// inside the payload, so an analysis fetched on Monday whose
+    /// acquisition was Monday still computes 0 on Thursday. Served from the
+    /// cache it would print «Заснето днес» over a three-day-old image — and
+    /// the parcel list above it can be perfectly fresh, so the stale banner
+    /// says nothing.
+    ///
+    /// The absolute date is the part that stays true whatever the payload's
+    /// age, so a stale reading shows that alone. The relative clause is
+    /// dropped rather than guessed at: the cache knows when IT was written,
+    /// not when the satellite passed.
+    static func acquisition(_ risk: ParcelRisk, _ freshness: Freshness?) -> Acquisition? {
+        guard let date = risk.acquired else { return nil }
+        let days = risk.staleDays ?? 0
+        let isCached = { if case .stale = freshness { return true } else { return false } }()
+
+        if isCached {
+            return Acquisition(clauses: ["Заснето на \(BgDate.dayMonth(date))"], isStale: true)
+        }
+        if days <= 0 {
+            return Acquisition(clauses: ["Заснето днес"], isStale: false)
+        }
+        return Acquisition(
+            clauses: [
+                "Заснето на \(BgDate.dayMonth(date))",
+                "преди \(Plural.bg(days, "ден", "дни"))",
+            ],
+            isStale: days > Staleness.satellitePass
+        )
+    }
+
     @ViewBuilder
     private func acquisition(_ risk: ParcelRisk, _ freshness: Freshness?) -> some View {
-        if let date = risk.acquired {
-            let days = risk.staleDays ?? 0
-            // A CACHED READING MAY NOT SAY «ДНЕС», OR COUNT DAYS.
-            //
-            // `staleDays` is `generatedAt − acquiredDate` and both are
-            // frozen inside the payload, so an analysis fetched on Monday
-            // whose acquisition was Monday still computes 0 on Thursday.
-            // Served from the cache it would print «Заснето днес» over a
-            // three-day-old image — and the parcel list above it can be
-            // perfectly fresh, so the stale banner says nothing.
-            //
-            // The absolute date is the part that stays true whatever the
-            // payload's age, so a stale reading shows that alone. The
-            // relative clause is dropped rather than guessed at: the cache
-            // knows when IT was written, not when the satellite passed.
-            let isCached = { if case .stale = freshness { return true } else { return false } }()
-            Label(
-                isCached
-                    ? "Заснето на \(BgDate.dayMonth(date))"
-                    : days <= 0
-                        ? "Заснето днес"
-                        : "Заснето на \(BgDate.dayMonth(date)) · преди \(Plural.bg(days, "ден", "дни"))",
-                systemImage: "camera.badge.clock"
-            )
-            .font(.caption)
-            // NEVER `.secondary`, which is what this was. The parcel map
-            // says it in its own comment: this line is the caveat on every
-            // number above it, and it must not read as a footnote.
-            .foregroundStyle(
-                isCached || days > Staleness.satellitePass ? Color.orange : Color.primary)
-            .fixedSize(horizontal: false, vertical: true)
+        if let line = Self.acquisition(risk, freshness) {
+            Label(line.shown, systemImage: "camera.badge.clock")
+                .font(.caption)
+                // NEVER `.secondary`, which is what this was. The parcel map
+                // says it in its own comment: this line is the caveat on
+                // every number above it, and it must not read as a footnote.
+                .foregroundStyle(line.isStale ? Palette.warning : Color.primary)
+                .fixedSize(horizontal: false, vertical: true)
         } else {
             // THE `else` THE PARCEL MAP ALREADY HAD.
             //
@@ -477,7 +576,7 @@ struct FarmRiskView: View {
             // instant, which is the other shape this codebase has met.
             Label("Датата на заснемане е неизвестна.", systemImage: "camera.badge.clock")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

@@ -78,6 +78,8 @@ struct TasksListView: View {
 struct TaskRow: View {
     let item: WorkItemSummary
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(item.title)
@@ -85,14 +87,7 @@ struct TaskRow: View {
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Side by side while they fit, stacked when they do not. The
-            // journal row's lesson: two flexible children on one line reflow
-            // independently and fight at large Dynamic Type, and the result
-            // is a chip wrapped to three lines beside a date broken mid-word.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { statusChip; meta }
-                VStack(alignment: .leading, spacing: 6) { statusChip; meta }
-            }
+            AdaptiveRow { statusChip; meta }
         }
         .padding(.vertical, 6)
         // One stop, spoken from the values — never from the rendered text,
@@ -133,12 +128,14 @@ struct TaskRow: View {
 
     @ViewBuilder
     private var meta: some View {
-        HStack(spacing: 6) {
+        // THREE flexible values, which is the worst case in the app: at
+        // accessibility5 an HStack gave each of them about four characters.
+        MetaRow {
             if let severityText {
                 Text(severityText).foregroundStyle(Palette.error)
             }
             if let dueText {
-                if severityText != nil { Text("·").foregroundStyle(.secondary) }
+                if severityText != nil { MetaSeparator() }
                 // Overdue is carried by COLOUR here, so it is also carried by
                 // a word in the accessibility label above. Colour alone is
                 // not a channel everyone has.
@@ -147,9 +144,14 @@ struct TaskRow: View {
             }
             if let who = item.assignee?.displayName {
                 if severityText != nil || dueText != nil {
-                    Text("·").foregroundStyle(.secondary)
+                    MetaSeparator()
                 }
-                Text(who).foregroundStyle(.secondary).lineLimit(1)
+                // The cap was right when this shared a line with two other
+                // values and wrong once it has a line of its own: a name is
+                // the whole point of "who is this assigned to".
+                Text(who)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
             }
         }
         .font(.footnote)

@@ -515,3 +515,73 @@ final class AreaTests: XCTestCase {
                           "if these were equal the form's guard would be unnecessary")
     }
 }
+
+/// The acquisition line, which the row PRINTS and VoiceOver SPEAKS.
+///
+/// Two renderings of one value, and they used to be two pieces of code: the
+/// row built a string with a `·` in it and the spoken label did not exist,
+/// because the row was not grouped. Grouping it meant either combining the
+/// rendered text — which makes VoiceOver say "middle dot" — or writing the
+/// sentence a second time, which is how two descriptions of one thing start
+/// disagreeing.
+///
+/// So there is one source and two joins, and this is the test that they stay
+/// two joins of the SAME clauses.
+@MainActor
+final class AcquisitionLineTests: XCTestCase {
+
+    private func risk(acquired: String?, generated: String) async throws -> ParcelRisk {
+        let json = """
+        {"parcelId":"p1","name":"15655-19","areaHa":12.4,"cropType":"wheat",
+         "configured":true,"ndvi":0.612,"ndmi":0.184,
+         "vegetation":"good","moisture":"watch","overall":"watch",
+         "acquiredDate":\(acquired.map { "\"\($0)\"" } ?? "null"),
+         "generatedAt":"\(generated)"}
+        """
+        // Through the API's own decoder, not a bare `JSONDecoder` — the
+        // dates on this model need the strategy it configures.
+        return try await FarmRiskAPI.decodeAnalysis(from: Data(json.utf8))
+    }
+
+    func testTodayIsOneClauseAndNotStale() async throws {
+        let today = try await risk(acquired: "2026-09-23", generated: "2026-09-23T13:41:07.221Z")
+        let line = try XCTUnwrap(FarmRiskView.acquisition(today, .fresh))
+        XCTAssertEqual(line.clauses.count, 1)
+        XCTAssertEqual(line.shown, "Заснето днес")
+        XCTAssertFalse(line.isStale)
+    }
+
+    /// The one that matters: the SAME two clauses, joined differently.
+    func testTheSpokenLineNeverCarriesTheSeparator() async throws {
+        let nineDays = try await risk(acquired: "2026-09-14", generated: "2026-09-23T13:41:07.221Z")
+        let line = try XCTUnwrap(FarmRiskView.acquisition(nineDays, .fresh))
+        XCTAssertEqual(line.clauses.count, 2)
+        XCTAssertTrue(line.shown.contains("·"), line.shown)
+        XCTAssertFalse(line.spoken.contains("·"), line.spoken)
+        XCTAssertTrue(line.spoken.contains(","), line.spoken)
+        // Same content on both sides, so one cannot drift from the other.
+        for clause in line.clauses {
+            XCTAssertTrue(line.shown.contains(clause), clause)
+            XCTAssertTrue(line.spoken.contains(clause.lowercased()), clause)
+        }
+    }
+
+    /// A cached reading shows the date alone. `staleDays` is frozen inside
+    /// the payload, so "преди 9 дни" would be counted from when the server
+    /// generated it, not from now.
+    func testACachedReadingDropsTheRelativeClause() async throws {
+        let cached = try await risk(acquired: "2026-09-14", generated: "2026-09-23T13:41:07.221Z")
+        let line = try XCTUnwrap(FarmRiskView.acquisition(cached, .stale(since: Date(timeIntervalSince1970: 1_790_000_000))))
+        XCTAssertEqual(line.clauses.count, 1)
+        XCTAssertFalse(line.shown.contains("преди"), line.shown)
+        XCTAssertTrue(line.isStale)
+    }
+
+    /// `acquiredDate` is optional on the wire. Nil here is what makes the
+    /// view print «Датата на заснемане е неизвестна.» instead of a row of
+    /// numbers with no caveat under them.
+    func testNoDateIsNoLine() async throws {
+        let undated = try await risk(acquired: nil, generated: "2026-09-23T13:41:07.221Z")
+        XCTAssertNil(FarmRiskView.acquisition(undated, .fresh))
+    }
+}

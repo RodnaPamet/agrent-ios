@@ -169,17 +169,7 @@ struct JournalRow: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
-            // Side by side while they fit, stacked when they do not.
-            //
-            // At accessibility3 the fixed HStack squeezed both children until
-            // the chip wrapped to three lines AND the date broke mid-word —
-            // "септемвр / и". Neither is a wrap; both are a layout that has
-            // run out of room and kept going. ViewThatFits picks the stacked
-            // arrangement instead of forcing the horizontal one to fail.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { chip; dateAndStatus }
-                VStack(alignment: .leading, spacing: 6) { chip; dateAndStatus }
-            }
+            AdaptiveRow { chip; dateAndStatus }
         }
         .padding(.vertical, 6)
         // One stop per entry, spoken from the VALUES.
@@ -211,10 +201,10 @@ struct JournalRow: View {
     private var dateAndStatus: some View {
         // fixedSize on the vertical axis lets the date take the height it
         // needs rather than being compressed into a mid-word break.
-        HStack(spacing: 6) {
+        MetaRow {
             Text(BgDate.dayMonth(entry.occurredAt))
             if entry.status == .planned {
-                Text("·")
+                MetaSeparator()
                 Text(entry.status.label)
             }
         }

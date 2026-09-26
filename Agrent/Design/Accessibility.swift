@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
 
 /// The things a screen reader needs that a sighted reader gets from layout.
 ///
@@ -14,6 +15,37 @@ import Foundation
 ///
 /// So facts are assembled ONCE, from the values rather than from the rendered
 /// text, and the view declares that label explicitly with `children: .ignore`.
+extension View {
+    /// ONE SPOKEN SENTENCE FOR VOICEOVER, AND A SHORT NAME TO SAY OUT LOUD.
+    ///
+    /// ── The trade-off this exists to stop making silently ──
+    ///
+    /// `A11y.sentence` + `children: .ignore` is right for VoiceOver: it turns a
+    /// row into one stop and keeps the `·` out of the audio channel. It is
+    /// ALSO, unavoidably, what removes the row's short visible name from the
+    /// set of phrases Voice Control will accept. A user who says «Пшеница»
+    /// gets nothing, because the only name that element has is
+    /// «Пшеница, продава, 250 тона, 51,13 евро на тон.»
+    ///
+    /// Voice Control matches on `accessibilityInputLabels` when they exist and
+    /// falls back to the label when they do not — so the two technologies want
+    /// different strings and both can be given. Every row in this app declared
+    /// the first and none declared the second, because nothing tied them
+    /// together.
+    ///
+    /// This does. A row that adopts the house pattern gets both or neither,
+    /// and the short name is a parameter rather than something to remember.
+    ///
+    /// `spoken` is what VoiceOver reads; `saying` is what a person can say —
+    /// the words actually printed on screen, shortest first, because Voice
+    /// Control shows the first match in its label overlay.
+    func accessibleRow(spoken: String, saying: [String]) -> some View {
+        accessibilityElement(children: .ignore)
+            .accessibilityLabel(spoken)
+            .accessibilityInputLabels(saying.filter { !$0.isEmpty })
+    }
+}
+
 enum A11y {
 
     /// Join facts as speech: nils and blanks dropped, comma-separated, one

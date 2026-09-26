@@ -10,8 +10,34 @@ struct TabCustomiserView: View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(chosen) { surface in
+                    ForEach(Array(chosen.enumerated()), id: \.element.id) { index, surface in
                         row(surface, inBar: true)
+                            // NAMED ACTIONS, because `.onMove` is a DRAG.
+                            //
+                            // Order is the point of this screen — which five
+                            // surfaces are in the bar AND in what sequence —
+                            // and a drag is the one gesture no focus ring can
+                            // perform. A Switch Control user could add and
+                            // remove but never reorder, and Full Keyboard
+                            // Access had no route at all.
+                            //
+                            // Named actions appear in the Switch Control menu,
+                            // under Tab+Z for Full Keyboard, and in VoiceOver's
+                            // actions rotor — the reference's own answer to an
+                            // action hidden behind a gesture. The drag still
+                            // works; this is an alternative, not a replacement.
+                            .accessibilityActions {
+                                if index > 0 {
+                                    Button("Премести нагоре") {
+                                        chosen.move(fromOffsets: [index], toOffset: index - 1)
+                                    }
+                                }
+                                if index < chosen.count - 1 {
+                                    Button("Премести надолу") {
+                                        chosen.move(fromOffsets: [index], toOffset: index + 2)
+                                    }
+                                }
+                            }
                     }
                     .onMove { from, to in chosen.move(fromOffsets: from, toOffset: to) }
                 } header: {
@@ -73,10 +99,14 @@ struct TabCustomiserView: View {
                 if let failure = store.saveFailure {
                     Text(failure)
                         .font(.footnote)
-                        .foregroundStyle(.white)
+                        // White on `Color.red` is 3.55:1 in light and 3.41:1
+                        // in dark — under the 4.5:1 this footnote needs, on
+                        // the ONE surface that prints why a save was refused.
+                        // See `Palette.onError`.
+                        .foregroundStyle(Palette.onError)
                         .padding(12)
                         .frame(maxWidth: .infinity)
-                        .background(.red)
+                        .background(Palette.error)
                 }
             }
         }
@@ -94,6 +124,10 @@ struct TabCustomiserView: View {
         return HStack {
             Label(surface.label, systemImage: surface.icon)
             Spacer()
+            // The GLYPH is the second channel: minus against plus, not red
+            // against green alone. Red and green are the classic pair that
+            // deuteranopia collapses, and the two buttons sit in the same
+            // position on rows that otherwise look identical.
             Button {
                 if inBar {
                     chosen.removeAll { $0.id == surface.id }
@@ -102,9 +136,24 @@ struct TabCustomiserView: View {
                 }
             } label: {
                 Image(systemName: inBar ? "minus.circle.fill" : "plus.circle.fill")
+                    // MEASURED, not `.red` and `.green`. A control needs 3:1,
+                    // and systemGreen on a white row is 2.22:1 — the plus was
+                    // the faintest thing on the sheet. The glyph shape below
+                    // handles colour vision; this handles being able to see it
+                    // at all, which is a different problem with the same
+                    // symptom.
+                    //
+                    // The disabled colour stays `tertiaryLabel`: an inactive
+                    // control is exempt, and looking unavailable is the point.
                     .foregroundStyle(enabled
-                        ? (inBar ? Color.red : Color.green)
+                        ? (inBar ? Palette.error : Palette.success)
                         : Color(.tertiaryLabel))
+                    // 44pt. A body-size SF Symbol in a `.plain` button with no
+                    // padding is about 22pt of hit area — half the minimum,
+                    // for the control that adds and removes tabs, sitting at
+                    // the trailing edge where a thumb is least accurate.
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!enabled)

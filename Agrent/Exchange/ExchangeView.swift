@@ -232,7 +232,16 @@ struct ExchangeView: View {
                     : "line.3.horizontal.decrease.circle"
             )
         }
-        .accessibilityLabel(listings.query.isFiltered ? "Филтри, активни" : "Филтри")
+        // THE NAME IS STABLE, THE STATE IS A VALUE.
+        //
+        // This read «Филтри, активни» once a filter was on — so a Voice
+        // Control user said «Филтри», opened the menu, picked a tonnage band,
+        // and the control they had just used stopped answering to the name
+        // they had just used. A name that changes as a side effect of using it
+        // is the one thing a spoken interface cannot tolerate.
+        .accessibilityLabel("Филтри")
+        .accessibilityValue(listings.query.isFiltered ? "активни" : "")
+        .accessibilityInputLabels(["Филтри"])
     }
 
     // MARK: - Mine: the seller's custody view
@@ -342,6 +351,17 @@ struct ListingRow: View {
             }
         }
         .padding(.vertical, 2)
+        // Борса's rows are the only tappable thing on the board, and a
+        // Voice Control user could not name one: the spoken label is the whole
+        // sentence, so saying the crop matched nothing. The crop is what is
+        // printed largest and what a person would actually say.
+        .accessibleRow(
+            spoken: A11y.sentence([
+                CommodityName.canonical(listing.commodity) ?? listing.commodity,
+                listing.side.label,
+                listing.regionName,
+            ]),
+            saying: [CommodityName.canonical(listing.commodity) ?? listing.commodity])
     }
 }
 

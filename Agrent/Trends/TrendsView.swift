@@ -2,33 +2,7 @@ import Charts
 import SwiftUI
 
 /// Price history, one chart per unit-and-currency.
-private extension View {
-    /// Axis labels stop growing at `.large`.
-    ///
-    /// ── Measured, not assumed ──
-    ///
-    /// At AX3 the x axis rendered «1 октом18нуар1апр…» — three date
-    /// labels overlapping into one unreadable string. A chart axis has a
-    /// fixed width that text does not get to negotiate with, so labels
-    /// that scale without limit do not become more readable, they become
-    /// illegible in a different way.
-    ///
-    /// ── Why this is not a loss of accessibility ──
-    ///
-    /// The chart was never the accessible surface. It is one opaque
-    /// element to VoiceOver by construction, and the legend beneath it
-    /// carries every series' name, latest price, date and age AS TEXT —
-    /// which does scale to AX5, and which is the path somebody reading at
-    /// AX3 is actually using. Capping the axis makes the chart remain a
-    /// picture of the shape; the numbers live below it and always did.
-    ///
-    /// Clamping the whole screen would be the wrong fix: it would shrink
-    /// the legend too, which is the part that must grow.
-    func axisLabelScaling() -> some View {
-        dynamicTypeSize(...DynamicTypeSize.large)
-    }
-}
-
+///
 /// Every commodity name on this screen comes from
 /// `ChartableCommodity.label`, which resolves through `CommodityName` —
 /// there is no path here that can print a raw slug, because `commodity` is
@@ -95,6 +69,12 @@ struct TrendsView: View {
                     Image(systemName: "chevron.down").font(.footnote.weight(.semibold))
                 }
                 .foregroundStyle(.primary)
+                // A Menu's target is its label's bounds, and this label is an
+                // unframed HStack — so the tappable area was the glyphs. It is
+                // the control that chooses which commodity the whole screen is
+                // about.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .accessibilityLabel("Стока: \(store.commodity.label)")
             .accessibilityHint("Избира стока за графиката")
@@ -169,7 +149,9 @@ struct TrendsView: View {
                 if group.series.count > visible.count {
                     Text("\(visible.count) от \(group.series.count)")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        // See `AppMenu`: 1.73:1 in light. This one says the
+                        // chart is not showing everything.
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -314,6 +296,10 @@ struct TrendsView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(visible ? [.isButton, .isSelected] : .isButton)
+        // `combine` concatenates the price, the age and the series name into
+        // one phrase, which is the only thing Voice Control would accept. The
+        // series title is what is printed and what somebody would say.
+        .accessibilityInputLabels([seriesTitle(series)])
         .accessibilityHint(visible ? "Скрива тази серия" : "Показва тази серия")
     }
 
@@ -339,13 +325,13 @@ struct TrendsView: View {
                     systemImage: "exclamationmark.triangle"
                 )
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
             }
         } else {
             Text("Няма дата на последно наблюдение.")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.warning)
         }
     }
 }

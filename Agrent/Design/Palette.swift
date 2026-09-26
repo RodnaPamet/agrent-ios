@@ -100,6 +100,68 @@ enum Palette {
     /// changes, so nothing moves on a screen that was already correct.
     static let error = Color(light: 0xB4472A, dark: 0xE8705A)
 
+    /// WHAT TO WRITE ON TOP OF `error` when it is the FILL rather than the
+    /// ink — the same pairing `onAccent` makes, for the same reason.
+    ///
+    ///     white on #B4472A (light)     5.42:1
+    ///     white on #E8705A (dark)      3.05:1   fails
+    ///     #0A1712 on #E8705A           6.03:1
+    ///
+    /// The dark error is light precisely so it can be READ as text on a dark
+    /// page, which makes it a poor thing to put white on. Defined here beside
+    /// the colour it sits on so the two cannot be changed apart.
+    static let onError = Color(light: 0xFFFFFF, dark: 0x0A1712)
+
+    /// The counterpart: something WORKED. Reserved the same way `error` is.
+    ///
+    /// `Color.green` was standing in for this at three sites, and it is the
+    /// worst-measuring colour Apple ships:
+    ///
+    ///     systemGreen #34C759 on white           2.22:1
+    ///     systemGreen #30D158 on Surface.page    9.08:1
+    ///
+    /// Light mode is where it fails, by a long way, and light mode is what
+    /// this app shipped with. «Запитването е изпратено.» — the one sentence
+    /// confirming an inquiry reached a buyer — was printed at 2.22:1.
+    ///
+    /// The light value is `RiskLevel.good`'s foreground, already chosen and
+    /// already measured in this app rather than invented here; the dark one
+    /// is systemGreen's dark variant, which passes comfortably.
+    ///
+    ///     #1F6B3A on white             6.52:1
+    ///     #30D158 on Surface.page      9.08:1
+    ///
+    /// This does not contradict the header's rule about green. That rule is
+    /// about the ACCENT — green on the parcel map means "this field is sown",
+    /// so the app's accent must not be green. A success tick is not on the
+    /// map and is not the accent.
+    static let success = Color(light: 0x1F6B3A, dark: 0x30D158)
+
+    /// NOT BROKEN, BUT NOT RIGHT EITHER — the caveat colour.
+    ///
+    /// Fourteen sites reached for `Color.orange`, which makes this the most
+    /// widespread contrast failure in the app:
+    ///
+    ///     systemOrange #FF9500 on white          2.20:1
+    ///     systemOrange #FF9F0A on Surface.page   8.93:1
+    ///     #8A5B00 on white                       5.87:1
+    ///
+    /// Light again, and badly. The irony is on the record in `FarmRiskView`,
+    /// where the comment above one of these reads "NEVER `.secondary`, which
+    /// is what this was … it must not read as a footnote" — and the colour
+    /// chosen to stop it reading as a footnote measures 2.20:1 against
+    /// `.secondary`'s 3.44:1. It was fainter than the thing it replaced.
+    ///
+    /// What it marks, everywhere: a satellite reading older than a pass, an
+    /// outbox entry the server refused, a break-even that is not covered, a
+    /// product with no ЗЗР number, a file that will duplicate every parcel if
+    /// it has already been imported. None of those is an error and none is
+    /// decoration — they are the sentence a farmer must read before acting.
+    ///
+    /// Light takes `RiskLevel.watch`'s foreground, already chosen and already
+    /// measured in this app. Dark keeps systemOrange, which passes.
+    static let warning = Color(light: 0x8A5B00, dark: 0xFF9F0A)
+
     /// Entry-type chips. Two families so a glance separates an input
     /// application from an observation without reading.
     enum Chip {
@@ -107,7 +169,29 @@ enum Palette {
         static let inputFill = Color(hex: 0xF6EBE2)
         static let activityText = Color(hex: 0x274A6D)
         static let activityFill = Color(hex: 0xE7EFF7)
-        static let neutralText = Color.secondary
+        /// EXPLICIT, because two semantic colours drift against each other.
+        ///
+        /// This was `Color.secondary` — `secondaryLabel`, #3C3C43 at 60% —
+        /// over `secondarySystemFill`, #787880 at 16%. Both system-resolved,
+        /// neither chosen with the other in mind:
+        ///
+        ///     secondaryLabel on secondarySystemFill, light   3.19:1   fails
+        ///     secondaryLabel on secondarySystemFill, dark    4.88:1
+        ///     #4A4A4F on the light fill                      7.29:1
+        ///     #D8D8DC on the dark fill                       8.73:1
+        ///
+        /// A chip's text is `.caption` at 11pt, which is normal-size text and
+        /// needs 4.5:1, so LIGHT MODE IS THE ONE THAT FAILS here — the
+        /// opposite of `onAccent` and `error`, which both fail only in dark.
+        /// A grey label at 60% opacity over a grey fill at 16% is two washes
+        /// of the same thing, and that is exactly as legible as it sounds.
+        ///
+        /// The other two chip families were picked as pairs and measure
+        /// 7.33:1 and 7.91:1. This one inherited its halves from different
+        /// places, so nobody ever put the two numbers next to each other.
+        /// The values here land in the same band, which is the point: the
+        /// three chip families should not differ in how readable they are.
+        static let neutralText = Color(light: 0x4A4A4F, dark: 0xD8D8DC)
         static let neutralFill = Color(.secondarySystemFill)
     }
 
@@ -121,6 +205,31 @@ enum Palette {
         static let fallowFill = Color(hex: 0x9A9560)
         static let fallowStroke = Color(hex: 0x6F6B3E)
         static let label = Color.white
+        /// WHAT GOES UNDER THE LABEL, because white alone does not carry it.
+        ///
+        /// A parcel name is drawn over whichever fill it lands on, and the
+        /// fills are muted earth tones chosen for direct sunlight:
+        ///
+        ///     white on sown   #3E8E4F @0.55 over ground   4.70:1
+        ///     white on fallow #9A9560 @0.55 over ground   3.93:1   fails
+        ///     white on bare ground #6E6A52                5.46:1
+        ///
+        /// And with INCREASE CONTRAST on, where the fill goes to 0.92:
+        ///
+        ///     white on sown                               4.16:1
+        ///     white on fallow                             3.20:1
+        ///
+        /// which is the part that matters. The near-solid fill was added for
+        /// people who cannot separate two mid-tone colours, and it makes the
+        /// text on top of it LESS readable, not more — the one setting in the
+        /// app whose whole purpose is contrast was reducing it.
+        ///
+        /// A per-state ink would fix the numbers and not the problem: the
+        /// placement solver nudges a colliding label down by up to four line
+        /// heights, so a label can end up over the other state's fill, over
+        /// bare ground, or straddling a boundary. An outline does not care
+        /// what it lands on, which is why every map draws them.
+        static let labelHalo = Color(hex: 0x0A1712)
         /// The coordinate grid. Shares the minor-path value deliberately —
         /// same family, no new colour introduced into a closed palette — but
         /// named separately because it means something else, and because
