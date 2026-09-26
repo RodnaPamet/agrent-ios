@@ -137,6 +137,31 @@ enum Palette {
     /// map and is not the accent.
     static let success = Color(light: 0x1F6B3A, dark: 0x30D158)
 
+    /// NOT BROKEN, BUT NOT RIGHT EITHER — the caveat colour.
+    ///
+    /// Fourteen sites reached for `Color.orange`, which makes this the most
+    /// widespread contrast failure in the app:
+    ///
+    ///     systemOrange #FF9500 on white          2.20:1
+    ///     systemOrange #FF9F0A on Surface.page   8.93:1
+    ///     #8A5B00 on white                       5.87:1
+    ///
+    /// Light again, and badly. The irony is on the record in `FarmRiskView`,
+    /// where the comment above one of these reads "NEVER `.secondary`, which
+    /// is what this was … it must not read as a footnote" — and the colour
+    /// chosen to stop it reading as a footnote measures 2.20:1 against
+    /// `.secondary`'s 3.44:1. It was fainter than the thing it replaced.
+    ///
+    /// What it marks, everywhere: a satellite reading older than a pass, an
+    /// outbox entry the server refused, a break-even that is not covered, a
+    /// product with no ЗЗР number, a file that will duplicate every parcel if
+    /// it has already been imported. None of those is an error and none is
+    /// decoration — they are the sentence a farmer must read before acting.
+    ///
+    /// Light takes `RiskLevel.watch`'s foreground, already chosen and already
+    /// measured in this app. Dark keeps systemOrange, which passes.
+    static let warning = Color(light: 0x8A5B00, dark: 0xFF9F0A)
+
     /// Entry-type chips. Two families so a glance separates an input
     /// application from an observation without reading.
     enum Chip {

@@ -251,7 +251,7 @@ struct DashboardView: View {
                         lastObservedAt: chosen.series.lastObservedAt) {
                         Text("Отчетена преди \(Plural.bg(age, "ден", "дни"))")
                             .font(.caption)
-                            .foregroundStyle(age >= Staleness.concerning ? .orange : .secondary)
+                            .foregroundStyle(age >= Staleness.concerning ? Palette.warning : Color.secondary)
                     }
 
                     if chosen.outOf > 1 {

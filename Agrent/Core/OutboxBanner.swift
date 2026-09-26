@@ -46,7 +46,7 @@ struct OutboxBanner: View {
                 }
             }
             .font(.footnote)
-            .foregroundStyle(outbox.refused.isEmpty ? Color.primary : Color.orange)
+            .foregroundStyle(outbox.refused.isEmpty ? Color.primary : Palette.warning)
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity, alignment: .leading)

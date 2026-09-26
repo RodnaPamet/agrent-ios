@@ -325,13 +325,13 @@ struct TrendsView: View {
                     systemImage: "exclamationmark.triangle"
                 )
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
             }
         } else {
             Text("Няма дата на последно наблюдение.")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.warning)
         }
     }
 }

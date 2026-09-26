@@ -206,7 +206,7 @@ struct ParcelOperationSheet: View {
                             systemImage: "exclamationmark.triangle"
                         )
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Palette.warning)
                         .fixedSize(horizontal: false, vertical: true)
                     }
 

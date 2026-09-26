@@ -146,7 +146,7 @@ struct InsuranceRequestForm: View {
                             // field exists; a typo looks identical, and only
                             // the farmer can tell them apart.
                             Text("По регистър: \(recorded.text).")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Palette.warning)
                         } else if let recorded = selected?.areaHa {
                             Text("По регистър: \(Area(hectares: recorded).text).")
                         }
@@ -166,7 +166,7 @@ struct InsuranceRequestForm: View {
                                 : "Запитването не може да бъде оттеглено.",
                             systemImage: "exclamationmark.triangle")
                             .font(.footnote)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Palette.warning)
                     }
                 }
             }

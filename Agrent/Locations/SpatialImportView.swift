@@ -150,7 +150,7 @@ struct SpatialImportView: View {
                     "Ако този файл вече е импортиран, всяко поле ще се появи втори път.",
                     systemImage: "exclamationmark.triangle")
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Palette.warning)
             }
         }
     }

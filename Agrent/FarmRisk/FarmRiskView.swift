@@ -474,7 +474,7 @@ struct FarmRiskView: View {
             // says it in its own comment: this line is the caveat on every
             // number above it, and it must not read as a footnote.
             .foregroundStyle(
-                isCached || days > Staleness.satellitePass ? Color.orange : Color.primary)
+                isCached || days > Staleness.satellitePass ? Palette.warning : Color.primary)
             .fixedSize(horizontal: false, vertical: true)
         } else {
             // THE `else` THE PARCEL MAP ALREADY HAD.
@@ -488,7 +488,7 @@ struct FarmRiskView: View {
             // instant, which is the other shape this codebase has met.
             Label("Датата на заснемане е неизвестна.", systemImage: "camera.badge.clock")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
