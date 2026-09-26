@@ -2,6 +2,8 @@ import MapKit
 import SwiftUI
 
 struct ParcelMapView: View {
+    @ScaledMetric(relativeTo: .body) private var scaledParcelListHeight: CGFloat = 260
+
     let location: Location
 
     @State private var importing = false
@@ -703,6 +705,15 @@ struct ParcelMapView: View {
                 )
             }
         }
-        .frame(maxHeight: 260)
+        // THE WINDOW SCALES WITH THE TEXT IN IT. 260 points was measured
+        // against rows at the default size — about four parcels — and it was
+        // a constant, so at accessibility5 the same window showed ONE row of
+        // a list whose whole job is comparing parcels, inside a scroll view
+        // most people never discover is scrollable.
+        //
+        // Capped, because the map above it is the other half of this screen
+        // and a list that grows without limit pushes it off. 520 is roughly
+        // the default four rows at the largest size.
+        .frame(maxHeight: min(scaledParcelListHeight, 520))
     }
 }

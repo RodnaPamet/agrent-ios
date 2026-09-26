@@ -197,11 +197,22 @@ struct FarmRiskView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Name and area on one line: both short, each pinned to its
             // own edge, neither able to grow into the other.
-            HStack(alignment: .firstTextBaseline) {
+            //
+            // EXCEPT AT THE ACCESSIBILITY SIZES, where "both short" stops
+            // being true — «Нива до шосето» at accessibility5 is most of the
+            // screen on its own, and the area it is pinned away from is a
+            // number the farmer is reading the row FOR. The `Spacer` holds
+            // them apart until there is nothing left to hold apart, and then
+            // the area wraps to «2,4 / ха» in the last few points.
+            let nameAndArea = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+
+            nameAndArea {
                 Text(row.parcel.name)
                     .font(.headline)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
+                if !typeSize.isAccessibilitySize { Spacer(minLength: 8) }
                 if let area = row.risk?.areaHa ?? row.parcel.areaHa {
                     Text(Area(hectares: area).text)
                         .font(.footnote)

@@ -123,7 +123,11 @@ struct NewsView: View {
                     Text(summary)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                        // The cap RELAXES at the accessibility sizes. Three
+                        // lines of `.footnote` is a readable teaser at the
+                        // default; at AX5 three lines is barely a sentence, so
+                        // the summary stops summarising anything.
+                        .lineLimit(typeSize.isAccessibilitySize ? 8 : 3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

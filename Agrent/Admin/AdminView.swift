@@ -249,16 +249,15 @@ struct AdminView: View {
 struct MemberRow: View {
     let member: Membership
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(member.user.displayName ?? "—")
                 .font(.headline)
                 .fixedSize(horizontal: false, vertical: true)
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { roleChip; meta }
-                VStack(alignment: .leading, spacing: 6) { roleChip; meta }
-            }
+            AdaptiveRow { roleChip; meta }
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .ignore)
@@ -289,12 +288,18 @@ struct MemberRow: View {
 
     @ViewBuilder
     private var meta: some View {
-        HStack(spacing: 6) {
+        MetaRow {
             if let email = member.user.email, !email.isEmpty {
-                Text(email).lineLimit(1).truncationMode(.middle)
+                // Middle truncation keeps the domain visible, which is the
+                // half that identifies the person when a list is all one
+                // farm's staff. At the accessibility sizes there is no half
+                // left to keep — "и…bg" identifies nobody — so it wraps.
+                Text(email)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                    .truncationMode(.middle)
             }
             if let sessionText {
-                if member.user.email != nil { Text("·").foregroundStyle(.secondary) }
+                if member.user.email != nil { MetaSeparator() }
                 Text(sessionText)
             }
         }
