@@ -464,6 +464,181 @@ jobs:
           print('Unit test targets in CI: %s' % ', '.join(sorted(unit)))
           SCHEMES
 
+      # THE SEAM THAT LETS A UI TEST PAST SIGN-IN, HELD TO ITS TERMS.
+      #
+      # `Agrent/Debug/UITestSeam.swift` makes the app open on `MainTabView`
+      # and serves every request from `Tests/Fixtures` when it is launched
+      # with `AGRENT_UITEST_FIXTURES`. That is a switch in the auth path of a
+      # real farm's app, so it carries three conditions, and this step is
+      # where each one is checked against the tree rather than against a
+      # sentence in a review:
+      #
+      #   1. every line of `Agrent/Debug` is inside `#if DEBUG`;
+      #   2. nothing outside that directory names a seam type except inside
+      #      `#if DEBUG` — that is the line by which the seam would leak into
+      #      code that ships;
+      #   3. `isActive` is read from the argument vector and from nothing
+      #      else, so being a debug build cannot switch it on by itself.
+      #
+      # This step is SOURCE analysis and is the cheap half. The half that
+      # cannot be fooled is "The UI test seam cannot reach Release" in the
+      # build job, which reads the produced Release binary. Both, because a
+      # `#if` and a build setting fail differently and neither implies the
+      # other.
+      - name: The UI test seam is DEBUG-only
+        run: |
+          python3 - <<'SEAM'
+          import pathlib, re, sys
+
+          SEAM_DIR = pathlib.Path('Agrent/Debug')
+          # Every type the seam is made of. Spelled out, so renaming one
+          # without teaching this step trips the tripwire below rather than
+          # quietly emptying the search.
+          SYMBOLS = ['UITestSeam', 'FixtureURLProtocol', 'FixtureCatalogue']
+          NAMED = re.compile(r'\b(%s)\b' % '|'.join(SYMBOLS))
+
+          def walk(lines):
+              """(lineno, text, inside_debug) per line.
+
+              A stack, not a counter: `#if DEBUG` nested inside `#if os(iOS)`
+              is still guarded, and the `#else` of a `#if DEBUG` is NOT — a
+              counter would call both of those the same thing.
+              """
+              stack = []
+              for n, raw in enumerate(lines, 1):
+                  text = raw.strip()
+                  if text.startswith('#if'):
+                      stack.append(text[3:].strip() == 'DEBUG')
+                  elif text.startswith('#elseif'):
+                      if stack:
+                          stack[-1] = text[7:].strip() == 'DEBUG'
+                  elif text.startswith('#else'):
+                      if stack:
+                          stack[-1] = False
+                  elif text.startswith('#endif'):
+                      if stack:
+                          stack.pop()
+                  else:
+                      yield n, raw, any(stack)
+                      continue
+                  yield n, raw, False
+
+          def is_skippable(raw):
+              text = raw.strip()
+              return not text or text.startswith('//')
+
+          problems = []
+
+          # ── 1. the seam's own files ──
+          seam_files = sorted(SEAM_DIR.rglob('*.swift'))
+          if not seam_files:
+              print('::error::No .swift under Agrent/Debug. This step is keyed on that '
+                    'directory and is no longer guarding anything. If the seam moved, '
+                    'move this step with it.')
+              sys.exit(1)
+
+          for path in seam_files:
+              lines = path.read_text(encoding='utf-8').split('\n')
+              for n, raw, inside in walk(lines):
+                  if is_skippable(raw) or raw.strip().startswith('#'):
+                      continue
+                  if not inside:
+                      problems.append('%s:%d: outside #if DEBUG — %s'
+                                      % (path, n, raw.strip()[:70]))
+                      break
+
+          # ── 2. every reference from the rest of the app ──
+          wired = 0
+          for path in sorted(pathlib.Path('Agrent').rglob('*.swift')):
+              if SEAM_DIR in path.parents:
+                  continue
+              lines = path.read_text(encoding='utf-8').split('\n')
+              for n, raw, inside in walk(lines):
+                  if is_skippable(raw) or not NAMED.search(raw):
+                      continue
+                  if inside:
+                      wired += 1
+                  else:
+                      problems.append('%s:%d: names the seam outside #if DEBUG — %s'
+                                      % (path, n, raw.strip()[:70]))
+
+          # ── 3. the switch is the launch argument and nothing else ──
+          seam_src = (SEAM_DIR / 'UITestSeam.swift').read_text(encoding='utf-8')
+          if not re.search(
+              # ANCHORED AT BOTH ENDS. A prefix match accepts
+              # `… .contains(launchArgument) || somethingElse`, which is the
+              # one edit that would matter: it is how a seam stops being
+              # switched on by the argument and nothing else.
+              r'isActive\s*:\s*Bool\s*=\s*\n?\s*'
+              r'ProcessInfo\.processInfo\.arguments'
+              r'\.contains\(launchArgument\)\s*\n', seam_src):
+              problems.append(
+                  'UITestSeam.isActive is no longer `ProcessInfo.processInfo.arguments'
+                  '.contains(launchArgument)`. An explicit argument is the whole '
+                  'condition the owner agreed to; being a debug build must not be enough.')
+          argument = re.search(r'launchArgument\s*=\s*"([^"]+)"', seam_src)
+          if not argument:
+              problems.append('UITestSeam.launchArgument is not a string literal, so '
+                              'the Release check cannot look for it in the binary.')
+          elif argument.group(1).startswith('-'):
+              problems.append('The launch argument starts with "-", so UserDefaults will '
+                              'read it into NSArgumentDomain as a preference key.')
+
+          # ── 4. Release strikes the whole directory out of the build ──
+          spec = pathlib.Path('project.yml').read_text(encoding='utf-8')
+          # UNDER `Release:`, not merely somewhere in the file. Searching the
+          # whole spec accepts the setting under Debug, under another target,
+          # or in a comment — all of which leave Release carrying the seam
+          # while the step reports that it does not.
+          excluded = None
+          release_indent = None
+          for line in spec.split('\n'):
+              stripped = line.strip()
+              indent = len(line) - len(line.lstrip())
+              if release_indent is not None and stripped and indent <= release_indent:
+                  release_indent = None          # the Release block ended
+              if stripped == 'Release:':
+                  release_indent = indent
+                  continue
+              if release_indent is None or stripped.startswith('#'):
+                  continue
+              found = re.match(r'EXCLUDED_SOURCE_FILE_NAMES:\s*"([^"]*)"', stripped)
+              if found:
+                  excluded = found.group(1)
+
+          for needed in ('Agrent/Debug/*', 'Tests/Fixtures/*'):
+              if excluded is None or needed not in excluded:
+                  problems.append('project.yml does not exclude %s from Release via '
+                                  'EXCLUDED_SOURCE_FILE_NAMES, under a `Release:` key.'
+                                  % needed)
+
+          # ── the tripwires ──
+          for symbol, declaration in (
+              ('UITestSeam', 'enum UITestSeam'),
+              ('FixtureURLProtocol', 'class FixtureURLProtocol'),
+              ('FixtureCatalogue', 'enum FixtureCatalogue'),
+          ):
+              if not any(declaration in p.read_text(encoding='utf-8') for p in seam_files):
+                  print('::error::`%s` is not declared under Agrent/Debug. This step '
+                        'searches for that name; teach it the new one rather than '
+                        'letting it search for nothing.' % declaration)
+                  sys.exit(1)
+          if wired == 0:
+              print('::error::Nothing outside Agrent/Debug names the seam. Either the '
+                    'wiring in AgrentApp/APIClient is gone — in which case the seam does '
+                    'nothing — or this step has stopped being able to see it.')
+              sys.exit(1)
+
+          if problems:
+              print('\n'.join(problems))
+              print('::error::The UI test seam must be unreachable in Release and must '
+                    'require its launch argument. See Agrent/Debug/UITestSeam.swift.')
+              sys.exit(1)
+          print('Seam files: %d, all inside #if DEBUG. References from the app: %d, all '
+                'inside #if DEBUG. Release excludes Agrent/Debug/* and Tests/Fixtures/*.'
+                % (len(seam_files), wired))
+          SEAM
+
       # Agrent.xcodeproj and Agrent/Info.plist are DERIVED from project.yml and
       # gitignored. Committing either reintroduces the conflict-prone pbxproj
       # the spec exists to avoid, and lets the two drift apart.
@@ -644,6 +819,159 @@ jobs:
             echo "::error::$SOURCE_COUNT source warnings; 2 are known (ISO8601DateFormatter Sendable)."
             exit 1
           fi
+
+      # THE HALF THAT READS THE BINARY.
+      #
+      # "The UI test seam is DEBUG-only" in the guards job reads the source.
+      # Source is where the mistake is made and it is not where the guarantee
+      # lives: a `#if DEBUG` is only as good as which configurations define
+      # DEBUG, and `EXCLUDED_SOURCE_FILE_NAMES` is only as good as the paths
+      # it names. So this builds Release and looks in the product.
+      #
+      # ── The scan proves itself in the same run ──
+      #
+      # A search for three symbols that finds none of them is the shape every
+      # guard in this file was written against: it reports that it passed
+      # whether or not it can see anything. So the identical scan runs over
+      # the DEBUG product the test step just built, where all three symbols,
+      # the launch-argument literal and the fixture payloads must ALL be
+      # found. Release must then show none of them. Two directions, one scan,
+      # every run.
+      #
+      # ── Why every Mach-O and not just the executable ──
+      #
+      # Xcode 26 splits a Debug build: the app's own code goes into
+      # `Agrent.debug.dylib` (13.2 MB measured locally) and the file named
+      # `Agrent` is a 58 KB stub. A scan of the executable alone would find
+      # nothing in Debug — and would then be reporting that the control
+      # passed when it had looked at the wrong file.
+      #
+      # ── iOS Simulator, not a device ──
+      #
+      # `generic/platform=iOS Simulator` needs no signing team, and the
+      # signing team is deliberately not committed (project.yml). What is
+      # being asked is which SOURCE FILES the Release configuration compiles
+      # and which resources it copies; that is decided by the configuration,
+      # not by the platform.
+      - name: The UI test seam cannot reach Release
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Agrent.xcodeproj \
+            -scheme Agrent \
+            -configuration Release \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath "$RUNNER_TEMP/release-dd" \
+            | tee release.log \
+            | grep -E "error:|\*\* BUILD" \
+            || { echo "::error::the Release build failed"; tail -60 release.log; exit 1; }
+
+          # The Debug product is wherever the test step above put it — that
+          # step uses the default derived data, and asking xcodebuild beats
+          # guessing the hashed directory name.
+          DEBUG_APP=$(xcodebuild -project Agrent.xcodeproj -scheme Agrent \
+                        -configuration Debug \
+                        -destination "id=${{ steps.sim.outputs.udid }}" \
+                        -showBuildSettings 2>/dev/null \
+                      | sed -n 's/^ *BUILT_PRODUCTS_DIR = //p' | head -1)/Agrent.app
+          RELEASE_APP="$RUNNER_TEMP/release-dd/Build/Products/Release-iphonesimulator/Agrent.app"
+
+          python3 - "$RELEASE_APP" "$DEBUG_APP" <<'RELEASE'
+          import pathlib, re, subprocess, sys
+
+          release_app, debug_app = sys.argv[1], sys.argv[2]
+          NAMES = ('UITestSeam', 'FixtureURLProtocol', 'FixtureCatalogue')
+
+          # The one spelling of the launch argument, read from the source
+          # rather than repeated here.
+          source = pathlib.Path('Agrent/Debug/UITestSeam.swift').read_text(encoding='utf-8')
+          match = re.search(r'launchArgument\s*=\s*"([^"]+)"', source)
+          if not match:
+              print('::error::UITestSeam.launchArgument is not a string literal, so this '
+                    'step cannot look for it in the binary.')
+              sys.exit(1)
+          argument = match.group(1)
+
+          fixtures = sorted(p.name for p in pathlib.Path('Tests/Fixtures').glob('*.json'))
+          if not fixtures:
+              print('::error::Tests/Fixtures holds no .json. This step checks that those '
+                    'files stay out of a Release bundle and has nothing to check.')
+              sys.exit(1)
+
+          def binaries(app):
+              found = []
+              for path in sorted(pathlib.Path(app).rglob('*')):
+                  if not path.is_file():
+                      continue
+                  kind = subprocess.run(['file', '-b', str(path)],
+                                        capture_output=True, text=True).stdout
+                  if 'Mach-O' in kind:
+                      found.append(path)
+              return found
+
+          def scan(app):
+              """Everything seam-shaped in one .app."""
+              hits, machos = [], binaries(app)
+              for path in machos:
+                  symbols = subprocess.run(['nm', '-a', str(path)],
+                                           capture_output=True, text=True).stdout
+                  for name in NAMES:
+                      if name in symbols:
+                          hits.append('%s carries the symbol %s' % (path.name, name))
+                  text = subprocess.run(['strings', '-a', str(path)],
+                                        capture_output=True, text=True).stdout
+                  if argument in text:
+                      hits.append('%s carries the literal %s' % (path.name, argument))
+              for name in fixtures:
+                  if (pathlib.Path(app) / name).exists():
+                      hits.append('the bundle carries %s' % name)
+              return hits, machos
+
+          for app in (release_app, debug_app):
+              if not pathlib.Path(app).is_dir():
+                  print('::error::%s is not there, so nothing was scanned.' % app)
+                  sys.exit(1)
+
+          control, control_machos = scan(debug_app)
+          print('Debug product: %s (%d Mach-O file(s))'
+                % (debug_app, len(control_machos)))
+          for line in control:
+              print('  %s' % line)
+
+          # THE CONTROL. Everything this step looks for must be findable where
+          # it is known to be, or a clean Release result means only that the
+          # search was spelled wrong.
+          missing = [n for n in NAMES if not any(n in line for line in control)]
+          if missing:
+              print('::error::The Debug product does not appear to contain %s. This scan '
+                    'cannot see what it is looking for, so its Release result proves '
+                    'nothing. Fix the scan, do not delete the step.' % ', '.join(missing))
+              sys.exit(1)
+          if not any(argument in line for line in control):
+              print('::error::The launch-argument literal is not in the Debug product '
+                    'either — the string search is not working.')
+              sys.exit(1)
+          if not any(line.startswith('the bundle carries') for line in control):
+              print('::error::The Debug bundle carries none of Tests/Fixtures, so the '
+                    'seam could not serve a payload and this scan cannot see resources.')
+              sys.exit(1)
+
+          leaked, release_machos = scan(release_app)
+          print('Release product: %s (%d Mach-O file(s))'
+                % (release_app, len(release_machos)))
+          if not release_machos:
+              print('::error::No Mach-O file in the Release product. Nothing was scanned.')
+              sys.exit(1)
+          if leaked:
+              for line in leaked:
+                  print('  %s' % line)
+              print('::error::The UI test seam reached a Release build. It must be absent '
+                    'from anything that could ship — see Agrent/Debug/UITestSeam.swift.')
+              sys.exit(1)
+          print('Release carries none of %s, not the literal %s, and none of the %d '
+                'recorded payloads. The same scan found all of them in Debug.'
+                % (', '.join(NAMES), argument, len(fixtures)))
+          RELEASE
 
       - name: Upload results
         if: always()

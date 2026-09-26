@@ -1,0 +1,37 @@
+[
+  {
+    "id": "itm_fixture_1",
+    "name": "Generic хербицид",
+    "category": "PESTICIDE",
+    "createdByUserId": null,
+    "defaultUnit": {"id": "unt_l_dka", "key": "L_PER_DKA", "symbol": "л/дка", "measure": "RATE"}
+  },
+  {
+    "id": "itm_fixture_2",
+    "name": "Generic инсектицид",
+    "category": "PESTICIDE",
+    "createdByUserId": null,
+    "defaultUnit": {"id": "unt_ml_dka", "key": "ML_PER_DKA", "symbol": "мл/дка", "measure": "RATE"}
+  },
+  {
+    "id": "itm_fixture_3",
+    "name": "Generic амониева селитра",
+    "category": "FERTILIZER",
+    "createdByUserId": null,
+    "defaultUnit": {"id": "unt_kg_dka", "key": "KG_PER_DKA", "symbol": "кг/дка", "measure": "RATE"}
+  },
+  {
+    "id": "itm_fixture_4",
+    "name": "Почвен подобрител, синтетичен запис",
+    "category": "AMENDMENT",
+    "createdByUserId": "usr_fixture_owner",
+    "defaultUnit": {"id": "unt_kg_dka", "key": "KG_PER_DKA", "symbol": "кг/дка", "measure": "RATE"}
+  },
+  {
+    "id": "itm_fixture_5",
+    "name": "Семена пшеница, синтетичен запис",
+    "category": "SEED",
+    "createdByUserId": "usr_fixture_owner",
+    "defaultUnit": {"id": "unt_kg_dka", "key": "KG_PER_DKA", "symbol": "кг/дка", "measure": "RATE"}
+  }
+]

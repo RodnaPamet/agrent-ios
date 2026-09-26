@@ -39,6 +39,26 @@ targets:
     platform: iOS
     sources:
       - path: Agrent
+      # THE RECORDED PAYLOADS, INTO THE APP — in Debug only.
+      #
+      # `FixtureURLProtocol` answers the app's own requests from these files
+      # when the app is launched with `AGRENT_UITEST_FIXTURES`, which is how a
+      # UI test reaches a screen on a runner whose simulator has never signed
+      # in. Read `Agrent/Debug/UITestSeam.swift` before moving this.
+      #
+      # POINTED AT `Tests/Fixtures` RATHER THAN COPIED. One set of bytes, read
+      # by the unit suite and by the seam, so a fixture cannot be corrected in
+      # one place and stay wrong in the other. `README.md` is excluded because
+      # it is documentation, not a payload.
+      #
+      # Both this and `Agrent/Debug` are struck out of Release by
+      # `EXCLUDED_SOURCE_FILE_NAMES` below, and the CI step "The UI test seam
+      # cannot reach Release" checks the produced Release binary and bundle
+      # rather than trusting this file.
+      - path: Tests/Fixtures
+        buildPhase: resources
+        excludes:
+          - "README.md"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: bg.agrent.app
@@ -48,6 +68,19 @@ targets:
         # a device build wants YOUR team rather than a value committed here.
         # Xcode → Signing & Capabilities → Team, then it persists locally.
         CODE_SIGN_STYLE: Automatic
+      configs:
+        # TWO MECHANISMS FOR ONE GUARANTEE, because they fail differently.
+        #
+        # Every file under `Agrent/Debug` is also wrapped in `#if DEBUG`. A
+        # `#if` is defeated by a configuration that defines DEBUG and is not
+        # called Debug; a build-setting exclusion is defeated by a seam file
+        # written outside this directory. Neither mistake is exotic, and the
+        # cost of holding both is two lines.
+        #
+        # Release is `archive` and `profile` for the `Agrent` scheme, so this
+        # is the configuration a build that could reach a phone uses.
+        Release:
+          EXCLUDED_SOURCE_FILE_NAMES: "$(SRCROOT)/Agrent/Debug/* $(SRCROOT)/Tests/Fixtures/*"
     info:
       path: Agrent/Info.plist
       properties:

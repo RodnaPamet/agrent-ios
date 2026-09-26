@@ -1,0 +1,9 @@
+{
+  "user": {
+    "id": "usr_fixture_owner",
+    "name": "Иван Фикстуров",
+    "email": "owner@example.invalid",
+    "role": "OWNER",
+    "bottomTabOrder": null
+  }
+}
