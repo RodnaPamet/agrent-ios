@@ -175,7 +175,9 @@ struct TrendsView: View {
                 if group.series.count > visible.count {
                     Text("\(visible.count) от \(group.series.count)")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        // See `AppMenu`: 1.73:1 in light. This one says the
+                        // chart is not showing everything.
+                        .foregroundStyle(.secondary)
                 }
             }
 

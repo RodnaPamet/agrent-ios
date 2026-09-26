@@ -257,7 +257,10 @@ struct DashboardView: View {
                     if chosen.outOf > 1 {
                         Text("1 от \(chosen.outOf) серии — вижте Тенденции за всички.")
                             .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            // `.tertiary` is 1.73:1 on a white row. This
+                            // sentence is the only thing telling a farmer the
+                            // number above is one of several.
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .pageRow()
