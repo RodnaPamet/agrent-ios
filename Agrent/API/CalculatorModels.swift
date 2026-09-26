@@ -197,7 +197,39 @@ struct CostSlice: Decodable, Equatable, Sendable, Identifiable {
     let id: String
     let labelKey: String
     let value: Double
-    let variant: String
+
+    /// OPTIONAL, and this was `String` until the calculator was documented.
+    ///
+    /// `CalculatorCostSlice` requires `id`, `labelKey` and `value` — and NOT
+    /// this. It is a colour hint (`brand | success | warning | error | info |
+    /// neutral`), typed `variant?: …` on the server, and `undefined` does not
+    /// survive `JSON.stringify`: the key is simply ABSENT on the wire for any
+    /// slice built without one.
+    ///
+    /// Non-optional, an absent key throws — and because `costBreakdown` is an
+    /// array inside `rows` inside the payload, one such slice fails the WHOLE
+    /// calculator. Every cost, every crop, the net worth, gone, on a money
+    /// screen, over a colour nothing here even renders.
+    ///
+    /// ── Why the fixture could not catch it ──
+    ///
+    /// `calculator-sample.json` carries `variant` on all six of its slices, so
+    /// the case does not exist in the suite. The same shape as every
+    /// parcel-history operation fixture being a SPRAY, which is why a null
+    /// dose survived review, and as the milestone test injecting exactly ONE
+    /// unknown key, which is why two collapsing into one row survived.
+    /// A fixture that only contains the easy case is not a check.
+    ///
+    /// ── Kept rather than deleted ──
+    ///
+    /// NOTHING IN THIS APP READS IT. `Location.createdAt` was the same
+    /// yesterday and was made optional rather than removed, for the same
+    /// reason: the field is real, the shape is worth documenting, and a
+    /// future styling pass should not have to rediscover that the server
+    /// already sends a severity for each slice. It is `String?` and not an
+    /// enum because six colour names the app does not use would be inventing
+    /// work, and a seventh added server-side must not become a decode failure.
+    let variant: String?
 }
 
 /// `refusedWithoutCurrency` is NOT modelled: it is empty in both the fixture

@@ -203,4 +203,55 @@ final class CalculatorPayloadTests: XCTestCase {
         XCTAssertTrue(payload.exclusions.isEmpty)
         XCTAssertTrue(payload.unvalued.isClean)
     }
+    // MARK: - The slice field the fixture always had
+
+    /// A COST SLICE WITH NO `variant` MUST DECODE.
+    ///
+    /// `CalculatorCostSlice` requires `id`, `labelKey` and `value` and not
+    /// `variant` — it is a colour hint typed `variant?: …`, and `undefined`
+    /// does not survive `JSON.stringify`, so the key is absent for any slice
+    /// built without one.
+    ///
+    /// Non-optional, that threw. And `costBreakdown` is an array inside `rows`
+    /// inside the payload, so ONE such slice failed the whole calculator —
+    /// every cost, every crop, the net worth — on a money screen, over a
+    /// colour this app does not render.
+    ///
+    /// `calculator-sample.json` carries `variant` on all six of its slices, so
+    /// the suite had no way to see it. Same as every operation fixture being a
+    /// SPRAY, and the milestone test injecting exactly one unknown key.
+    func testACostSliceWithoutAVariantDecodes() async throws {
+        let slice = try await APIClient.shared.decode(Data(#"""
+        {"id":"s1","labelKey":"costRentLabel","value":1234.5}
+        """#.utf8), as: CostSlice.self)
+        XCTAssertNil(slice.variant)
+        XCTAssertEqual(slice.value, 1234.5)
+
+        let coloured = try await APIClient.shared.decode(Data(#"""
+        {"id":"s2","labelKey":"costRentLabel","value":1,"variant":"warning"}
+        """#.utf8), as: CostSlice.self)
+        XCTAssertEqual(coloured.variant, "warning")
+    }
+
+    /// And one bare slice inside a whole array does not take the array down —
+    /// which is the blast radius, and the only reason this matters.
+    func testOneBareSliceDoesNotFailTheArray() async throws {
+        let slices = try await APIClient.shared.decode(Data(#"""
+        [{"id":"a","labelKey":"costFieldLabel","value":10,"variant":"brand"},
+         {"id":"b","labelKey":"costRentLabel","value":20}]
+        """#.utf8), as: [CostSlice].self)
+        XCTAssertEqual(slices.count, 2)
+        XCTAssertNil(slices.last?.variant)
+    }
+
+    /// A seventh colour added server-side must not become a decode failure
+    /// either. `String?` rather than a six-case enum: the app renders none of
+    /// them, so pinning the set would be inventing work that could only break.
+    func testAnUnknownVariantIsCarriedRatherThanRefused() async throws {
+        let slice = try await APIClient.shared.decode(Data(#"""
+        {"id":"s3","labelKey":"x","value":0,"variant":"critical"}
+        """#.utf8), as: CostSlice.self)
+        XCTAssertEqual(slice.variant, "critical")
+    }
+
 }
