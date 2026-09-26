@@ -73,6 +73,224 @@ jobs:
           fi
           echo "All date formatting goes through BgDate."
 
+      # The same bug as the step above, in the one place a spelling-based
+      # check structurally cannot see it. Табло's task chart printed ENGLISH
+      # month names until #93, and the whole defect was one line:
+      #
+      #   .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
+      #
+      # A bare `AxisMarks` over a `Date` lets Swift Charts format from the
+      # locale, this phone reports en_BG, and the dashboard read "Sep 14"
+      # under a Bulgarian heading.
+      #
+      # Neither guard already here could catch it. `Dates go through BgDate`
+      # rejects two SPELLINGS and there was no spelling to reject — the defect
+      # is the ABSENCE of a format. A file-level check in the `CommodityName`
+      # style would not fire either: DashboardView.swift already held three
+      # other BgDate calls the whole time that chart printed English.
+      #
+      # So the unit has to be the axis BLOCK, which is why this is python and
+      # not grep. A fixed `grep -A N` cannot be tuned: the correct block is 14
+      # lines from `{` to its label, and 23 lines reaches the `.chartYAxis`
+      # BELOW it, whose label would satisfy the check. Both ends move when
+      # somebody edits a comment. Brace matching has no window.
+      #
+      # Inspecting 0 blocks FAILS. A guard keyed on a string stops guarding
+      # the moment the string changes and reports success while it does. The
+      # docstrings below carry the three narrower traps, each of which was a
+      # defect in this step before it was a comment in it.
+      #
+      # Measured by extracting this script and running it per tree: fires on
+      # f5b15f9 and 523598e, the two commits before #93; passes with 2 blocks
+      # inspected on bf0e5a5 (#93 itself) and on 194189b (master).
+      - name: Chart date axes label through BgDate
+        run: |
+          python3 --version
+          python3 - <<'GUARD'
+          import pathlib, re, sys
+
+          # Anchored to `x:`. Unanchored, a chart with dates on the Y axis had
+          # its correctly-bare numeric X axis reported as a defect.
+          KEY = re.compile(r'x:\s*\.value\("\u0414\u0430\u0442\u0430"')
+
+          def scan(text):
+              """(code, tokens, delta) for one line.
+
+              code   — // comment cut off, string literals intact, so KEY can
+                       still see the label it is looking for.
+              tokens — the same with string CONTENTS blanked. Every token
+                       search below runs on this, so no literal can satisfy or
+                       trip a check by quoting it.
+              delta  — brace depth moved, counted outside strings.
+              """
+              code, toks, delta, i, n, in_str = [], [], 0, 0, len(text), False
+              while i < n:
+                  c = text[i]
+                  if in_str:
+                      code.append(c)
+                      if c == '\\':
+                          if i + 1 < n:
+                              code.append(text[i + 1])
+                              toks.append(' ')
+                          toks.append(' ')
+                          i += 2
+                          continue
+                      if c == '"':
+                          in_str = False
+                          toks.append('"')
+                      else:
+                          toks.append(' ')
+                      i += 1
+                      continue
+                  if c == '"':
+                      in_str = True
+                      code.append(c)
+                      toks.append(c)
+                      i += 1
+                      continue
+                  if c == '/' and i + 1 < n and text[i + 1] == '/':
+                      break
+                  if c == '{':
+                      delta += 1
+                  elif c == '}':
+                      delta -= 1
+                  code.append(c)
+                  toks.append(c)
+                  i += 1
+              return ''.join(code), ''.join(toks), delta
+
+          def bare_axis_marks(body):
+              """Every `AxisMarks` with no content closure after it.
+
+              `AxisMarks(values: .automatic(desiredCount: 3))` draws the
+              locale's own labels. One of those beside a labelled sibling
+              passes a whole-block search for `AxisValueLabel`, so each
+              occurrence is walked past its argument list on its own.
+              """
+              bare = 0
+              for m in re.finditer(r'\bAxisMarks\b', body):
+                  j = m.end()
+                  while j < len(body) and body[j] in ' \t\n':
+                      j += 1
+                  if j < len(body) and body[j] == '(':
+                      depth = 0
+                      while j < len(body):
+                          if body[j] == '(':
+                              depth += 1
+                          elif body[j] == ')':
+                              depth -= 1
+                              if depth == 0:
+                                  j += 1
+                                  break
+                          j += 1
+                      while j < len(body) and body[j] in ' \t\n':
+                          j += 1
+                  if j >= len(body) or body[j] != '{':
+                      bare += 1
+              return bare
+
+          problems, unreadable, inspected = [], [], 0
+
+          for path in sorted(pathlib.Path('Agrent').rglob('*.swift')):
+              raw = path.read_text(encoding='utf-8').split('\n')
+              scanned = [scan(l) for l in raw]
+              # Joined, so an `x:` and its `.value` on separate lines still match.
+              if not KEY.search('\n'.join(c for c, _t, _d in scanned)):
+                  continue
+
+              charts = axes = 0
+              for _c, toks, _d in scanned:
+                  charts += len(re.findall(r'\bChart\s*[({]', toks))
+                  axes += toks.count('.chartXAxis')
+              if axes < charts:
+                  problems.append('%s: %d Chart(s) over a Date but %d .chartXAxis — '
+                                  'a chart with no x axis modifier takes the locale default'
+                                  % (path, charts, axes))
+
+              i = 0
+              while i < len(raw):
+                  toks = scanned[i][1]
+                  at = toks.find('.chartXAxis')
+                  if at < 0:
+                      i += 1
+                      continue
+                  tail = toks[at:]
+                  if '{' in tail:
+                      first, region = i, tail[tail.index('{'):]
+                  else:
+                      # The brace may sit on the next line. `.chartXAxis(.hidden)`
+                      # has none and draws no labels, so there is nothing to check.
+                      j = i + 1
+                      while j < len(raw) and not scanned[j][1].strip():
+                          j += 1
+                      nxt = scanned[j][1] if j < len(raw) else ''
+                      if nxt.strip().startswith('{'):
+                          first, region = j, nxt[nxt.index('{'):]
+                      else:
+                          if '.hidden' not in tail:
+                              unreadable.append('%s:%d: %s' % (path, i + 1, raw[i].strip()))
+                          i += 1
+                          continue
+
+                  block, depth, end = [], 0, None
+                  for k in range(first, len(raw)):
+                      if k == first:
+                          text, d = region, scan(region)[2]
+                      else:
+                          text, d = scanned[k][1], scanned[k][2]
+                      block.append(text)
+                      depth += d
+                      if depth <= 0:
+                          end = k
+                          break
+                  if end is None:
+                      unreadable.append('%s:%d: a .chartXAxis block that never closes'
+                                        % (path, first + 1))
+                      i += 1
+                      continue
+
+                  body = '\n'.join(block)
+                  where = '%s:%d-%d' % (path, i + 1, end + 1)
+                  if 'AxisMarks' not in body:
+                      # Counted as unreadable, NOT inspected. A block that
+                      # delegates to a helper must not tick the counter that
+                      # proves this step is still guarding something.
+                      unreadable.append('%s: a .chartXAxis block with no AxisMarks — '
+                                        'it delegates to something this guard cannot follow'
+                                        % where)
+                      i = end + 1
+                      continue
+
+                  inspected += 1
+                  bare = bare_axis_marks(body)
+                  if bare:
+                      problems.append('%s: %d AxisMarks with no content closure, which draws '
+                                      'the locale\'s own labels' % (where, bare))
+                  elif 'AxisValueLabel' not in body:
+                      problems.append('%s: AxisMarks with no AxisValueLabel' % where)
+                  elif 'BgDate' not in body:
+                      problems.append('%s: an AxisValueLabel that does not go through BgDate'
+                                      % where)
+                  i = end + 1
+
+          if unreadable:
+              print('\n'.join(unreadable))
+              print('::error::A .chartXAxis here is in a form this guard cannot read. '
+                    'Teach it the form; do not delete the step.')
+              sys.exit(1)
+          if problems:
+              print('\n'.join(problems))
+              print('::error::A Date x axis needs AxisValueLabel { Text(BgDate...) }. Without one '
+                    'Swift Charts formats from the device locale, and en_BG prints "Sep 14".')
+              sys.exit(1)
+          if inspected == 0:
+              print('::error::0 .chartXAxis blocks inspected. This step is keyed on '
+                    'x: .value("Дата") and is no longer guarding anything.')
+              sys.exit(1)
+          print('%d .chartXAxis block(s) over a Date, every one labelled through BgDate.'
+                % inspected)
+          GUARD
+
       # A crop name is server DATA, not a UI label, so nothing that
       # translates labels was ever going to reach it. Eight sites across
       # three screens rendered the server's English at an operator whose
