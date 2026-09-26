@@ -135,18 +135,32 @@ final class FarmRiskStore {
             ))
             askedParcelIDs.insert(parcelID)
         } catch {
-            if FarmRiskAPI.isAlreadyAsked(error) {
-                // Already asked — the outcome the farmer wanted, reached
-                // before. Recorded as success so the control settles
-                // rather than inviting a retry that can only 409 again.
-                askedParcelIDs.insert(parcelID)
-            } else {
-                askFailure = UserMessage.text(for: error)
-            }
+            // NO SUCCESS-ON-REPLAY BRANCH ANY MORE. A 409 used to mean "this
+            // parcel was already asked about" and was recorded as success; the
+            // route has no conflict path since the unique index was dropped,
+            // so every error here is an error. See `FarmRiskAPI.createLead`.
+            recordAskFailure(error)
         }
     }
 
     func clearAskFailure() { askFailure = nil }
+
+    /// THE failure handler, called by `ask`'s `catch` and by its test — one
+    /// method, not a copy.
+    ///
+    /// `ask` cannot be exercised in a unit test: it POSTs, and the standing
+    /// rule here is never to fire that POST at the live tenant. Extracting the
+    /// branch means a test can at least reach the real code rather than a
+    /// restatement of it. What stays unasserted is that `ask` calls this, which
+    /// is one line and read rather than proved — said out loud because "the
+    /// test covers the handler" and "the test covers the behaviour" are
+    /// different claims and this repo has confused them before.
+    ///
+    /// It marks nothing as asked, deliberately. A failure recorded as an ask
+    /// would show a farmer a parcel as spent when no operator was emailed.
+    func recordAskFailure(_ error: Error) {
+        askFailure = UserMessage.text(for: error)
+    }
 
     /// What the operator reads in the email this becomes.
     ///
