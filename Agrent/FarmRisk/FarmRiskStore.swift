@@ -117,36 +117,125 @@ final class FarmRiskStore {
     ///
     /// Typed as `Area` rather than a bare `Double` so the unit cannot be
     /// lost between the form and the sentence an operator reads.
-    func ask(_ parcelID: String, area: Area? = nil) async {
+    /// WHAT THE SERVER PRICED IT AT, when that differs from the estimate the
+    /// farmer was shown.
+    ///
+    /// Nil when there was no quote, or when the two agree — silence is the
+    /// right output for "the number you saw is the number that was sent". It is
+    /// only set when the screen owes an explanation, which is the case where a
+    /// phone carrying a stale tariff previewed one figure and the operator
+    /// received another.
+    private(set) var serverQuoteNotice: String?
+
+    func clearServerQuoteNotice() { serverQuoteNotice = nil }
+
+    /// THE IDEMPOTENCY KEY, and the one rule that makes it worth having.
+    ///
+    /// Minted at the first send and KEPT across retries while the inputs are
+    /// unchanged, so a retry after a timeout replays the original lead rather
+    /// than writing a second row and sending a second operator email. A NEW key
+    /// is minted the moment any input changes, because then it is not a retry —
+    /// it is the corrected ask, and replaying the old one would tell a farmer
+    /// their correction went out when the original did.
+    ///
+    /// CLEARED ON SUCCESS, which is the half that is easy to get wrong. After a
+    /// success there is no retry; a farmer asking again with the same figures is
+    /// asking again, and the server expects several asks per parcel now. Keeping
+    /// the key would silently collapse that into the first lead.
+    private var pendingKey: (fingerprint: String, key: String)?
+
+    private func idempotencyKey(for fingerprint: String) -> String {
+        if let pendingKey, pendingKey.fingerprint == fingerprint {
+            return pendingKey.key
+        }
+        let minted = UUID().uuidString
+        pendingKey = (fingerprint, minted)
+        return minted
+    }
+
+    func ask(_ parcelID: String, area: Area? = nil,
+             quote: CreateLead.Quote? = nil) async {
         guard mayAsk, !asking.contains(parcelID) else { return }
         let row = parcels.value?.first { $0.id == parcelID }
         asking.insert(parcelID)
         askFailure = nil
         defer { asking.remove(parcelID) }
         do {
-            try await FarmRiskAPI.createLead(CreateLead(
-                parcelId: parcelID,
-                message: Self.leadMessage(row, area: area),
-                locationId: selected?.id,
-                risk: row?.risk.map {
-                    CreateLead.RiskSnapshot(
-                        overall: $0.overall.rawValue, ndvi: $0.ndvi, ndmi: $0.ndmi)
-                }
-            ))
+            let created = try await FarmRiskAPI.createLead(
+                CreateLead(
+                    parcelId: parcelID,
+                    message: Self.leadMessage(row, area: area),
+                    locationId: selected?.id,
+                    risk: row?.risk.map {
+                        CreateLead.RiskSnapshot(
+                            overall: $0.overall.rawValue, ndvi: $0.ndvi, ndmi: $0.ndmi)
+                    },
+                    quote: quote
+                ),
+                idempotencyKey: idempotencyKey(
+                    for: Self.fingerprint(parcelID: parcelID, quote: quote))
+            )
+            pendingKey = nil
             askedParcelIDs.insert(parcelID)
+            serverQuoteNotice = Self.correctionNotice(sent: quote, got: created.quote)
         } catch {
-            if FarmRiskAPI.isAlreadyAsked(error) {
-                // Already asked — the outcome the farmer wanted, reached
-                // before. Recorded as success so the control settles
-                // rather than inviting a retry that can only 409 again.
-                askedParcelIDs.insert(parcelID)
-            } else {
-                askFailure = UserMessage.text(for: error)
-            }
+            // NO SUCCESS-ON-REPLAY BRANCH ANY MORE. A 409 used to mean "this
+            // parcel was already asked about" and was recorded as success; the
+            // route has no conflict path since the unique index was dropped,
+            // so every error here is an error. See `FarmRiskAPI.createLead`.
+            recordAskFailure(error)
         }
     }
 
     func clearAskFailure() { askFailure = nil }
+
+    /// The inputs that decide whether a send is a RETRY or a new ask.
+    ///
+    /// The parcel is in it as well as the four quote values: re-asking about a
+    /// different parcel is obviously not a retry, and leaving it out would have
+    /// replayed the first parcel's lead.
+    static func fingerprint(parcelID: String, quote: CreateLead.Quote?) -> String {
+        guard let quote else { return "\(parcelID)|message-only" }
+        return [parcelID, quote.productKey, String(quote.areaDca),
+                String(quote.sumInsuredCents), String(quote.instalments),
+                quote.areaScope ?? CreateLead.Quote.scopeParcel].joined(separator: "|")
+    }
+
+    /// Nil when there is nothing to explain.
+    ///
+    /// Compares only the PREMIUM. The instalment split follows from it, so two
+    /// equal premiums cannot disagree on the parts unless the server changed its
+    /// splitting rule — and if it did, the premium is still the number a farmer
+    /// is owed an explanation about.
+    static func correctionNotice(sent: CreateLead.Quote?,
+                                 got: CreatedLead.ServerQuote?) -> String? {
+        guard sent != nil, let got else { return nil }
+        guard let estimate = InsurancePremium.quote(
+            sumInsuredCents: sent!.sumInsuredCents, instalments: sent!.instalments),
+              estimate.premiumCents != got.premiumCents
+        else { return nil }
+
+        return "Изчислението на сървъра е \(InsurancePremium.eur(got.premiumCents)), а не "
+             + "\(InsurancePremium.eur(estimate.premiumCents)). Запитването е изпратено със "
+             + "сумата на сървъра."
+    }
+
+    /// THE failure handler, called by `ask`'s `catch` and by its test — one
+    /// method, not a copy.
+    ///
+    /// `ask` cannot be exercised in a unit test: it POSTs, and the standing
+    /// rule here is never to fire that POST at the live tenant. Extracting the
+    /// branch means a test can at least reach the real code rather than a
+    /// restatement of it. What stays unasserted is that `ask` calls this, which
+    /// is one line and read rather than proved — said out loud because "the
+    /// test covers the handler" and "the test covers the behaviour" are
+    /// different claims and this repo has confused them before.
+    ///
+    /// It marks nothing as asked, deliberately. A failure recorded as an ask
+    /// would show a farmer a parcel as spent when no operator was emailed.
+    func recordAskFailure(_ error: Error) {
+        askFailure = UserMessage.text(for: error)
+    }
 
     /// What the operator reads in the email this becomes.
     ///

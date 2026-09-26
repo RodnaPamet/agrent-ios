@@ -118,44 +118,91 @@ enum FarmRiskAPI {
     ///
     /// ── IRREVERSIBLE, and there is no undo by decision ──
     ///
-    /// Unique per (parcel, tenant) at the database level, with no DELETE
-    /// and no withdraw. A 15-minute undo was specified and then dropped by
-    /// the owner, so the confirmation in front of this is the ONLY
-    /// protection a farmer has. It names the parcel and says the ask
-    /// cannot be taken back, because after this there is nowhere to say it.
+    /// NOT unique per (parcel, tenant) any more, and this docblock said it
+    /// was for two days after it stopped being true.
     ///
-    /// No `Idempotency-Key`: the route does not read one and does not need
-    /// to. The (parcel, tenant) pair IS the natural key, so a replay
-    /// returns 409 rather than creating a second lead — which is why the
-    /// 409 is success-on-replay below and not a failure.
-    static func createLead(_ lead: CreateLead) async throws {
-        _ = try await APIClient.shared.post(
+    /// The unique index on `(parcelId, inquirerTenantId)` was dropped
+    /// server-side on 2026-09-24 so that a farmer could re-ask with a
+    /// corrected land size. Several asks per parcel are now expected, and the
+    /// form above already treats `alreadyAsked` as a MARK rather than a
+    /// filter — that part was fixed when the change landed. This comment was
+    /// not, and neither were three equivalents in the server's own repo,
+    /// which is where the claim came from.
+    ///
+    /// Worth keeping as the shape rather than the incident: a true-sounding
+    /// sentence about a constraint that no longer exists is indistinguishable
+    /// from a true one, and nothing fails when it goes stale.
+    ///
+    /// WHAT IS STILL TRUE: an ask cannot be WITHDRAWN. There is no DELETE and
+    /// no PATCH, and the operator has already been emailed. So the
+    /// confirmation says that and stops there — it must not also imply
+    /// finality, because discouraging the correction is the harm.
+    ///
+    /// The `Idempotency-Key` IS read by the route now (1–128 characters,
+    /// `[A-Za-z0-9_-]`, which a UUID satisfies). A fresh one per attempt is
+    /// deliberate and correct here: with the unique gone, a repeat ask is a
+    /// NEW lead with corrected figures, not a replay to be collapsed. Keeping
+    /// a key across a retry would be right only for re-sending the SAME
+    /// figures after a failure, which this form has no path to.
+    /// Returns what the SERVER computed, which is what gets stored and
+    /// emailed — never what the app previewed.
+    @discardableResult
+    static func createLead(_ lead: CreateLead,
+                           idempotencyKey: String) async throws -> CreatedLead {
+        try await APIClient.shared.post(
             leadsPath, body: lead,
-            as: EmptyResponse.self, idempotencyKey: UUID().uuidString
+            as: CreatedLead.self, idempotencyKey: idempotencyKey
         )
     }
 
-    /// 409 means "this parcel was already asked about", not "the request
-    /// failed". Treating it as an error would tell a farmer their ask did
-    /// not go through when it went through the first time — and then
-    /// invite the retry that produces the same 409 forever.
-    /// MATCHES `.conflict`, NOT `.http(409)`.
-    ///
-    /// This read `.http(status:)` and compared it to 409, which cannot
-    /// happen: `APIClient.send` intercepts 409 two cases above its default
-    /// and throws `.conflict` instead, so the guard was dead the day it was
-    /// written and every test that covered it hand-built a value this
-    /// client never produces.
-    ///
-    /// What a farmer got instead of "already asked" was the stale-edit
-    /// sentence — «Записът е променен на сървъра, докато го редактирахте.»
-    /// — on a screen with no editing, for an ask that had succeeded, with
-    /// the button still live to retry the 409 forever.
-    static func isAlreadyAsked(_ error: Error) -> Bool {
-        if case APIClient.APIError.conflict = error { return true }
-        // Kept for a server that ever answers 409 through the generic path.
-        if case APIClient.APIError.http(let status, _, _, _) = error { return status == 409 }
-        return false
+    // `isAlreadyAsked` WAS HERE, and it is deleted rather than kept.
+    //
+    // It mapped a 409 to success-on-replay, which was right while the unique
+    // index existed. The route has no conflict path at all now — the spec
+    // documents 201, 400, 401, 403, 404, 426, 429 and 500 for this operation
+    // and no 409 — and the one uniqueness catch left server-side is an
+    // idempotency race that re-reads the winner and answers 201.
+    //
+    // So it was a guard that could no longer fire, which this repo has spent
+    // a week learning to treat as a defect in its own right rather than as
+    // harmless insurance. It also had that property once before, for a
+    // different reason: it originally compared `.http(409)` when `APIClient`
+    // intercepts 409 and throws `.conflict`, so it was dead the day it was
+    // written and its tests hand-built a value this client never produces.
+    //
+    // Two facts it knew, kept so they are not rediscovered. A 409 reached a
+    // farmer as «Записът е променен на сървъра, докато го редактирахте.» —
+    // the stale-edit sentence, on a screen with no editing. And
+    // `APIClient.send` intercepts 409 before its default case, so anything
+    // matching on `.http(409)` for this client is unreachable.
+    //
+    //     git show 58e744d:Agrent/FarmRisk/FarmRiskModels.swift
+}
+
+/// What the server answered, and the only figures a farmer may be shown.
+///
+/// The request carries NO price and the schema strips one if sent: the server
+/// recomputes from the four inputs. So a local preview is an estimate and this
+/// is the price. When they differ — a phone carrying a stale tariff against a
+/// newer one — THIS wins, and the screen has to show it rather than leaving
+/// the estimate up beside a lead that was priced differently.
+struct CreatedLead: Decodable, Equatable, Sendable {
+    let id: String
+    let status: String
+
+    /// Absent when the ask carried no quote — a message-only enquiry, which
+    /// still works exactly as it did. `quote` is not in the response's
+    /// `required` list.
+    let quote: ServerQuote?
+
+    struct ServerQuote: Decodable, Equatable, Sendable {
+        let premiumCents: Int
+        let instalmentsCents: [Int]
+        let tariffBp: Int
+        /// Which engine priced it. Not shown; recorded because a figure a
+        /// farmer disputes three weeks later is answerable only if the
+        /// version that produced it is known.
+        let engineVersion: String?
     }
 }
 
@@ -193,6 +240,39 @@ struct CreateLead: Encodable, Sendable {
         let overall: String?
         let ndvi: Double?
         let ndmi: Double?
+    }
+
+    /// The four inputs the server prices from. Optional: an ask may still be
+    /// a message alone, and older builds send exactly that.
+    let quote: Quote?
+
+    /// NO PRICE FIELD, and that is not an omission.
+    ///
+    /// The schema strips a price if one is sent. Only these four values cross
+    /// the wire and the server computes from them, which is what makes the
+    /// local arithmetic in `InsurancePremium` a preview rather than a quote.
+    struct Quote: Encodable, Equatable, Sendable {
+        /// The server's `productKey` enum — `InsuranceProduct.rawValue`.
+        let productKey: String
+        /// DECARES, > 0 and <= 2 000 000 server-side. Decares rather than the
+        /// hectares the rest of this app sends: the insurance engine works in
+        /// dca and converting twice is how a figure drifts.
+        let areaDca: Double
+        let sumInsuredCents: Int
+        /// 1 to 4.
+        let instalments: Int
+
+        /// WHERE THE AREA CAME FROM. Absent means "parcel", which is the
+        /// default the server applies, so it is only sent when it is not that.
+        ///
+        /// `crop-at-location` is not produced by this app yet — it needs
+        /// `coveredParcelCount` and a crop-wide selection this form has no
+        /// concept of. Sending it without the count is a 400, so the case is
+        /// absent rather than half-built.
+        let areaScope: String?
+
+        static let scopeParcel = "parcel"
+        static let scopeCustom = "custom"
     }
 }
 

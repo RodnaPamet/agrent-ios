@@ -172,25 +172,38 @@ final class RiskLevelTests: XCTestCase {
 @MainActor
 final class InsuranceAskTests: XCTestCase {
 
-    /// 409 means "already asked", not "failed". Treating it as an error
-    /// tells a farmer their ask did not go through when it went through
-    /// the first time — and invites the retry that produces the same 409
-    /// forever.
-    func testAlreadyAskedIsRecognised() {
-        XCTAssertTrue(FarmRiskAPI.isAlreadyAsked(
-            APIClient.APIError.http(status: 409, code: nil, message: nil)))
-    }
-
-    /// Everything else is a real failure. A 403 in particular must NOT be
-    /// read as success — that is an operator being refused, and recording
-    /// it as asked would show them a parcel as spent when nothing happened.
-    func testOtherStatusesAreNotSuccess() {
-        for status in [400, 401, 403, 404, 422, 500, 503] {
-            XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(
-                APIClient.APIError.http(status: status, code: nil, message: nil)),
-                "a \(status) was treated as already-asked")
+    /// A SECOND ASK IS NOT A CONFLICT, and used to be.
+    ///
+    /// The server's unique on `(parcelId, inquirerTenantId)` was dropped on
+    /// 2026-09-24 so a farmer could re-ask with a corrected land size, and the
+    /// route has no conflict path since: the spec documents 201, 400, 401,
+    /// 403, 404, 426, 429 and 500 for this operation and no 409.
+    ///
+    /// `FarmRiskAPI.isAlreadyAsked` mapped a 409 to success and is deleted.
+    /// The tests that covered it are deleted with it rather than adapted,
+    /// because the behaviour they described is gone — an adapted test would
+    /// keep asserting something about a path the server no longer has.
+    ///
+    /// What replaces them is the property that actually matters now: nothing
+    /// in this client turns a failure into a recorded ask. If it did, a farmer
+    /// would see a parcel marked as asked when no operator was ever emailed.
+    ///
+    /// WHAT IT PROVES AND WHAT IT DOES NOT, because the difference is the
+    /// reason the old tests were worth deleting rather than adapting. It calls
+    /// the exact method `ask`'s `catch` calls — not a copy — so the handler is
+    /// covered. It does NOT prove `ask` routes errors there: that is one line,
+    /// read rather than asserted, because reaching `ask` means firing the POST
+    /// and this repo never fires it at the live tenant.
+    func testTheFailureHandlerMarksNothingAsAsked() {
+        let store = FarmRiskStore()
+        XCTAssertTrue(store.askedParcelIDs.isEmpty)
+        for status in [400, 401, 403, 404, 409, 422, 429, 500, 503] {
+            store.recordAskFailure(
+                APIClient.APIError.http(status: status, code: nil, message: nil))
+            XCTAssertTrue(store.askedParcelIDs.isEmpty,
+                          "a \(status) marked a parcel as asked")
+            XCTAssertNotNil(store.askFailure, "a \(status) reported no failure")
         }
-        XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(URLError(.notConnectedToInternet)))
     }
 
     func testTheLeadsShapeDecodes() async throws {
@@ -210,7 +223,8 @@ final class InsuranceAskTests: XCTestCase {
             parcelId: "cmr3vn01",
             message: "Запитване за оферта.",
             locationId: "loc1",
-            risk: CreateLead.RiskSnapshot(overall: "stress", ndvi: 0.21, ndmi: 0.14)))
+            risk: CreateLead.RiskSnapshot(overall: "stress", ndvi: 0.21, ndmi: 0.14),
+            quote: nil))
         let json = try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any])
 
@@ -371,30 +385,20 @@ final class InsuranceAskTests: XCTestCase {
     }
 }
 
-/// The once-only guard, against the error this client actually throws.
-final class AlreadyAskedTests: XCTestCase {
-
-    /// THE REGRESSION. `APIClient.send` intercepts 409 and throws
-    /// `.conflict`; it never builds `.http(409)`, so matching on `.http`
-    /// meant the guard could not fire.
-    func testAConflictIsRecognisedAsAlreadyAsked() {
-        let error = APIClient.APIError.conflict(currentVersion: 3, expectedVersion: 2)
-        XCTAssertTrue(FarmRiskAPI.isAlreadyAsked(error))
-    }
-
-    /// Kept working, for a server that ever answers 409 through the generic
-    /// path rather than the dedicated one.
-    func testAGenericHTTP409IsStillRecognised() {
-        let error = APIClient.APIError.http(status: 409, code: nil, message: nil, params: nil)
-        XCTAssertTrue(FarmRiskAPI.isAlreadyAsked(error))
-    }
-
-    func testOtherFailuresAreNotAlreadyAsked() {
-        XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(
-            APIClient.APIError.http(status: 500, code: nil, message: nil, params: nil)))
-        XCTAssertFalse(FarmRiskAPI.isAlreadyAsked(URLError(.timedOut)))
-    }
-}
+/// `AlreadyAskedTests` WAS HERE — three tests of a 409 path the server no
+/// longer has.
+///
+/// They were good tests of a real regression: `APIClient.send` intercepts 409
+/// and throws `.conflict`, so the original guard matching on `.http(409)` was
+/// dead the day it was written. That fact outlives the guard and is recorded
+/// in `ParcelHistoryAPI` and `FarmRiskModels`, which is why it is not repeated
+/// here.
+///
+/// Deleted rather than adapted: the unique index that produced the 409 was
+/// dropped server-side on 2026-09-24, and a test kept alive past its subject
+/// is a test that agrees with itself while describing nothing.
+///
+///     git show 58e744d:Tests/FarmRiskTests.swift
 
 /// The ordering and the generation token — the two parts of the loading
 /// path that a screenshot cannot reach.

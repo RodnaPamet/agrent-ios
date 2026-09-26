@@ -108,9 +108,24 @@ struct FarmRiskView: View {
                         parcels: (store.parcels.value ?? []).map(\.parcel),
                         alreadyAsked: store.askedParcelIDs,
                         preselected: target.parcel
-                    ) { parcel, area in
-                        Task { await store.ask(parcel.id, area: area) }
+                    ) { parcel, area, quote in
+                        Task { await store.ask(parcel.id, area: area, quote: quote) }
                     }
+                }
+                // WHEN THE SERVER PRICED IT DIFFERENTLY.
+                //
+                // Only appears when the two figures disagree — a phone carrying
+                // a compiled-in tariff against a newer one server-side. Silence
+                // is right when they agree, and the sheet has already closed by
+                // the time the response lands, so this is the only place left
+                // to say it.
+                .alert("Окончателна сума", isPresented: Binding(
+                    get: { store.serverQuoteNotice != nil },
+                    set: { if !$0 { store.clearServerQuoteNotice() } }
+                )) {
+                    Button("Добре", role: .cancel) { store.clearServerQuoteNotice() }
+                } message: {
+                    Text(store.serverQuoteNotice ?? "")
                 }
                 .alert("Запитването не беше изпратено", isPresented: Binding(
                     get: { store.askFailure != nil },
