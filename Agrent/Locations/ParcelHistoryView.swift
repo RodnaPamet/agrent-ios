@@ -127,7 +127,7 @@ struct ParcelHistoryView: View {
     private var emptyArchive: some View {
         Text(ParcelHistoryCopy.emptyArchive)
             .font(.body)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 8)
             .listRowSeparator(.hidden)
@@ -226,7 +226,7 @@ struct ParcelHistoryView: View {
                 if let count = card.count {
                     Text(count)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             }
 
@@ -239,13 +239,13 @@ struct ParcelHistoryView: View {
                 if !newest.detailText.isEmpty {
                     Text(newest.detailText)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } else {
                 Text(ParcelHistoryCopy.emptySection)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
         .padding(.vertical, 4)

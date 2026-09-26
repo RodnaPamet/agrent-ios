@@ -52,7 +52,7 @@ struct ListingDetailView: View {
                 Section {
                     Text("Това е ваша обява.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             } else if listing.isActive {
                 Section {
@@ -100,7 +100,7 @@ struct InquiryComposeView: View {
                                  price: listing.pricePerTonne,
                                  currency: listing.priceCurrency))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
 
                 Section("Съобщение") {
@@ -117,7 +117,7 @@ struct InquiryComposeView: View {
                             .foregroundStyle(Palette.success)
                         Text("Продавачът ще види контактите ви само ако приеме запитването.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 case .failed(let message):
                     // `.red` is 3.55:1 on a white row; `Palette.error` is

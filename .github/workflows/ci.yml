@@ -96,6 +96,46 @@ jobs:
           fi
           echo "All commodity names go through CommodityName."
 
+      # A colour that MEANS something is a pair, and a pair is only correct
+      # when somebody holds the two halves up against each other. Nobody had.
+      # One audit found, measured over the composited values:
+      #
+      #   Color.secondary on a white row     3.44:1   109 sites
+      #   Color.orange                       2.20:1    14 sites
+      #   Color.green                        2.22:1     3 sites
+      #   Color.red                          3.55:1     4 sites
+      #   Color.tertiary                     1.73:1     3 sites
+      #
+      # Every one is Apple's own value behaving as documented, and every one
+      # is below the bar in light mode — which is the appearance this app
+      # shipped with. They arrived one reasonable-looking line at a time, so
+      # the failure mode is a NEW site rather than a regression in an old one:
+      # somebody writes `.foregroundStyle(.orange)` for the next warning and
+      # it looks exactly like the fourteen that were already there.
+      #
+      # Palette holds the measured replacements with the numbers beside them.
+      # Comment lines are skipped so this can be discussed without tripping,
+      # and Palette.swift itself is exempt because it names what it replaced.
+      - name: Semantic colours come from Palette
+        run: |
+          hits=$(grep -rn --include='*.swift' \
+                   -e 'foregroundStyle(\.secondary)' \
+                   -e 'foregroundStyle(\.tertiary)' \
+                   -e 'foregroundStyle(\.orange)' \
+                   -e 'foregroundStyle(\.red)' \
+                   -e 'foregroundStyle(\.green)' \
+                   -e 'Color\.orange' \
+                   -e 'background(\.red)' \
+                   Agrent/ \
+                 | grep -v '^Agrent/Design/Palette.swift:' \
+                 | awk '{ l=$0; sub(/^[^:]*:[0-9]+:/, "", l); if (l !~ /^[ \t]*\/\//) print }' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Use Palette.secondaryText / .warning / .error / .success — Palette.swift has the measured ratios."
+            exit 1
+          fi
+          echo "Semantic colours all come from Palette."
+
       # Agrent.xcodeproj and Agrent/Info.plist are DERIVED from project.yml and
       # gitignored. Committing either reintroduces the conflict-prone pbxproj
       # the spec exists to avoid, and lets the two drift apart.

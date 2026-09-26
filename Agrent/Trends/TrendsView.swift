@@ -144,14 +144,14 @@ struct TrendsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(SeriesVocabulary.unitHeading(unit: group.unit, currency: group.currency))
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                 Spacer(minLength: 8)
                 if group.series.count > visible.count {
                     Text("\(visible.count) от \(group.series.count)")
                         .font(.caption2)
                         // See `AppMenu`: 1.73:1 in light. This one says the
                         // chart is not showing everything.
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             }
 
@@ -265,7 +265,7 @@ struct TrendsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(seriesTitle(series))
                         .font(.footnote.weight(.medium))
-                        .foregroundStyle(visible ? .primary : .secondary)
+                        .foregroundStyle(visible ? Color.primary : Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let latest, let day = latest.day {
@@ -274,7 +274,7 @@ struct TrendsView: View {
                                 .font(.footnote.weight(.semibold))
                             Text(BgDate.dayMonth(day))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Palette.secondaryText)
                         }
                     }
 
@@ -286,7 +286,7 @@ struct TrendsView: View {
                         // from one seller is not a market.
                         Text("от \(Plural.bg(count, "оферта", "оферти"))")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
                 Spacer(minLength: 0)

@@ -186,7 +186,7 @@ struct ExchangeView: View {
                 if listings.loadingMore {
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text("Зареждане…").font(.footnote).foregroundStyle(.secondary)
+                        Text("Зареждане…").font(.footnote).foregroundStyle(Palette.secondaryText)
                     }
                 } else {
                     Button("Покажи още") { Task { await listings.loadMore() } }
@@ -241,7 +241,7 @@ struct ExchangeView: View {
         // is the one thing a spoken interface cannot tolerate.
         .accessibilityLabel("Филтри")
         .accessibilityValue(listings.query.isFiltered ? "активни" : "")
-        .accessibilityInputLabels(["Филтри"])
+        .accessibilityInputLabels(A11y.spokenNames("Филтри", "Filters"))
     }
 
     // MARK: - Mine: the seller's custody view
@@ -270,15 +270,15 @@ struct ExchangeView: View {
                         Spacer()
                         Text(row.status.label)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                     Text(summary(side: row.side, kind: row.kind,
                                  quantity: row.quantityTonnes, price: row.pricePerTonne,
                                  currency: row.priceCurrency))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                     if row.inquiries.isEmpty {
-                        Text("Няма запитвания").font(.footnote).foregroundStyle(.secondary)
+                        Text("Няма запитвания").font(.footnote).foregroundStyle(Palette.secondaryText)
                     } else {
                         ForEach(row.inquiries) { inquiry in
                             InquiryRow(inquiry: inquiry)
@@ -345,9 +345,9 @@ struct ListingRow: View {
                          quantity: listing.quantityTonnes, price: listing.pricePerTonne,
                          currency: listing.priceCurrency))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
             if let region = listing.regionName {
-                Text(region).font(.footnote).foregroundStyle(.secondary)
+                Text(region).font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         }
         .padding(.vertical, 2)
@@ -361,7 +361,10 @@ struct ListingRow: View {
                 listing.side.label,
                 listing.regionName,
             ]),
-            saying: [CommodityName.canonical(listing.commodity) ?? listing.commodity])
+            // The server's slug is the English word, so the English name
+            // costs nothing to offer — see `A11y.spokenNames`.
+            saying: A11y.spokenNames(
+                CommodityName.canonical(listing.commodity), listing.commodity))
     }
 }
 
@@ -375,11 +378,11 @@ struct InquiryRow: View {
                 Spacer()
                 if let created = inquiry.createdAt {
                     Text(BgDate.full(created))
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Palette.secondaryText)
                 }
             }
             if let message = inquiry.message, !message.isEmpty {
-                Text(message).font(.footnote).foregroundStyle(.secondary).lineLimit(3)
+                Text(message).font(.footnote).foregroundStyle(Palette.secondaryText).lineLimit(3)
             }
             // CONTACT DETAILS ARE WITHHELD UNTIL contactSharedAt IS SET, and
             // that withholding is the feature. A PENDING or DECLINED inquiry
@@ -390,7 +393,7 @@ struct InquiryRow: View {
             if inquiry.contactShared {
                 Label("Контактите са споделени", systemImage: "checkmark.circle")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
         .padding(.vertical, 2)

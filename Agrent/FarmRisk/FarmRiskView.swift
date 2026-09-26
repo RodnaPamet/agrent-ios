@@ -247,12 +247,12 @@ struct FarmRiskView: View {
                 if let area = row.risk?.areaHa ?? row.parcel.areaHa {
                     Text(Area(hectares: area).text)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             }
 
             if let crop = CommodityName.freeText(row.risk?.cropType ?? row.parcel.cropType) {
-                Text(crop).font(.footnote).foregroundStyle(.secondary)
+                Text(crop).font(.footnote).foregroundStyle(Palette.secondaryText)
             }
 
             if let risk = row.risk {
@@ -260,14 +260,14 @@ struct FarmRiskView: View {
             } else if let failure = row.failure {
                 Text(failure)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 // The parcel is listed before its reading arrives, so the
                 // list is complete from the first frame and fills in.
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Изчисляване…").font(.footnote).foregroundStyle(.secondary)
+                    Text("Изчисляване…").font(.footnote).foregroundStyle(Palette.secondaryText)
                 }
             }
         }
@@ -374,7 +374,7 @@ struct FarmRiskView: View {
             if store.asking.contains(row.parcel.id) {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Изпраща се…").font(.footnote).foregroundStyle(.secondary)
+                    Text("Изпраща се…").font(.footnote).foregroundStyle(Palette.secondaryText)
                 }
             } else {
                 let asked = store.askedParcelIDs.contains(row.parcel.id)
@@ -397,7 +397,7 @@ struct FarmRiskView: View {
                     if asked {
                         Label("Заявено запитване", systemImage: "checkmark.seal")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                     Button {
                         requesting = RequestTarget(parcel: row.parcel)
@@ -443,7 +443,7 @@ struct FarmRiskView: View {
             if let reason = risk.absenceReason {
                 Text(reason)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -476,7 +476,7 @@ struct FarmRiskView: View {
         return layout {
             Text(title)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(width: typeSize.isAccessibilitySize ? nil : 72,
                        alignment: .leading)
@@ -495,7 +495,7 @@ struct FarmRiskView: View {
                 // both are correct.
                 Text("\(index) \(Num.text(value)) ср.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
             Spacer(minLength: 0)
         }

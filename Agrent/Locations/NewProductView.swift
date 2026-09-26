@@ -113,7 +113,7 @@ struct NewProductView: View {
                     case .loading:
                         ProgressView()
                     case .failed(let message):
-                        Text(message).font(.footnote).foregroundStyle(.secondary)
+                        Text(message).font(.footnote).foregroundStyle(Palette.secondaryText)
                     case .loaded(let units, _):
                         // Required, and it must RESOLVE — `createItem`
                         // throws "Default unit not found." for an id it

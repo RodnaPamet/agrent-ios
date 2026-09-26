@@ -27,7 +27,7 @@ struct OutboxBanner: View {
                     if let first = outbox.pending.first {
                         Text(first.parcelSummary)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
                 // One stop for the description, built from the values — the
@@ -42,7 +42,7 @@ struct OutboxBanner: View {
                         .font(.footnote.weight(.medium))
                         // Its own element with its own name, so «Изпрати» is
                         // both what is written and what can be said.
-                        .accessibilityInputLabels(["Изпрати"])
+                        .accessibilityInputLabels(A11y.spokenNames("Изпрати", "Send"))
                 }
             }
             .font(.footnote)

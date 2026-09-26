@@ -133,7 +133,7 @@ struct InsuranceRequestForm: View {
                             TextField("0", text: $areaText)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
-                            Text("дка").foregroundStyle(.secondary)
+                            Text("дка").foregroundStyle(Palette.secondaryText)
                         }
                         .accessibilityLabel("Площ за застраховане в декари")
                     } header: {
@@ -197,7 +197,7 @@ struct InsuranceRequestForm: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(parcel.name).font(.subheadline.weight(.medium))
             if let crop = CommodityName.freeText(parcel.cropType) {
-                Text(crop).font(.footnote).foregroundStyle(.secondary)
+                Text(crop).font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         }
     }

@@ -64,7 +64,7 @@ where Item.ID == String {
                 // and until now nothing on screen said.
                 Text(parcelName)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .pageRow()
 
                 let current = section(archive)
@@ -130,7 +130,7 @@ where Item.ID == String {
             if !line.detailText.isEmpty {
                 Text(line.detailText)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -190,7 +190,7 @@ where Item.ID == String {
                     ProgressView()
                     Text(ParcelHistoryCopy.loading)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
 
             case .button:
@@ -203,13 +203,13 @@ where Item.ID == String {
             case .end:
                 Text(ParcelHistoryCopy.noOlder)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
 
             case .noneShown:
                 Text(ParcelHistoryCopy.noneShown)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 

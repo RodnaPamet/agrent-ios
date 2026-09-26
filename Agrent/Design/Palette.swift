@@ -162,6 +162,38 @@ enum Palette {
     /// measured in this app. Dark keeps systemOrange, which passes.
     static let warning = Color(light: 0x8A5B00, dark: 0xFF9F0A)
 
+    /// SECONDARY TEXT, and this one replaces a system colour at 109 sites.
+    ///
+    /// `Color.secondary` is `secondaryLabel`, #3C3C43 at 60%, and over a
+    /// white row it composites to 3.44:1 — under the 4.5:1 that body text
+    /// needs. That is Apple's own value behaving as documented; it is not a
+    /// bug in the app. It is simply below the bar, everywhere, in the
+    /// appearance this app shipped with.
+    ///
+    ///     Color.secondary on white              3.44:1
+    ///     Color.secondary on Surface.page       6.16:1
+    ///     #5A5A5F on white                      6.86:1
+    ///     #A0A0A6 on Surface.page               7.06:1
+    ///
+    /// The light value is NOT invented here: #5A5A5F is the design canvas's
+    /// own secondary text, named in this file's header as one of the
+    /// neutrals deliberately left to the system. The reasoning there was
+    /// that reproducing them as literals would pin the app to light mode for
+    /// no gain. `Color(light:dark:)` removes the pinning, and the gain
+    /// turned out to be three and a half stops of contrast.
+    ///
+    /// The dark value is chosen to MATCH the light one's ratio rather than
+    /// to be as bright as possible. Secondary text has a job — being
+    /// visibly subordinate to primary — and primary is 21:1 in light and
+    /// 18.35:1 in dark, so roughly 7:1 keeps the same three-to-one
+    /// separation in both appearances.
+    ///
+    /// A literal also fixes something opacity could not. A translucent grey
+    /// takes its final colour from whatever is behind it, which is exactly
+    /// how `Chip.neutralText` ended up at 3.19:1 over a chip fill nobody had
+    /// measured it against. #5A5A5F is #5A5A5F on every surface in the app.
+    static let secondaryText = Color(light: 0x5A5A5F, dark: 0xA0A0A6)
+
     /// Entry-type chips. Two families so a glance separates an input
     /// application from an observation without reading.
     enum Chip {

@@ -140,7 +140,7 @@ struct TaskRow: View {
                 // a word in the accessibility label above. Colour alone is
                 // not a channel everyone has.
                 Text(dueText)
-                    .foregroundStyle(item.isOverdue ? Palette.error : .secondary)
+                    .foregroundStyle(item.isOverdue ? Palette.error : Palette.secondaryText)
             }
             if let who = item.assignee?.displayName {
                 if severityText != nil || dueText != nil {
@@ -150,7 +150,7 @@ struct TaskRow: View {
                 // values and wrong once it has a line of its own: a name is
                 // the whole point of "who is this assigned to".
                 Text(who)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
             }
         }
