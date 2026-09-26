@@ -223,7 +223,8 @@ final class InsuranceAskTests: XCTestCase {
             parcelId: "cmr3vn01",
             message: "Запитване за оферта.",
             locationId: "loc1",
-            risk: CreateLead.RiskSnapshot(overall: "stress", ndvi: 0.21, ndmi: 0.14)))
+            risk: CreateLead.RiskSnapshot(overall: "stress", ndvi: 0.21, ndmi: 0.14),
+            quote: nil))
         let json = try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any])
 

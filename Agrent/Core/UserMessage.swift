@@ -173,6 +173,31 @@ enum UserMessage {
                  + "Изберете или създайте реален продукт, преди да отбележите "
                  + "операцията като изпълнена."
 
+        case "INSURANCE_QUOTE_INVALID":
+            // `params.reason` names WHICH of the four inputs the server
+            // rejected: "area", "sumInsured", "tariff" or "instalments". The
+            // app validates all four before sending, so reaching this means
+            // the two rules have drifted — and the sentence still has to name
+            // the field, because "invalid quote" sends a farmer back to a form
+            // with four fields and no idea which one.
+            switch params?["reason"] {
+            case "area":
+                return "Площта не е приета от сървъра. Проверете я и опитайте пак."
+            case "sumInsured":
+                return "Застрахователната сума не е приета от сървъра. "
+                     + "Проверете я и опитайте пак."
+            case "instalments":
+                return "Броят вноски не е приет от сървъра. Изберете от 1 до 4."
+            case "tariff":
+                // Not the farmer's input at all. The tariff is the server's,
+                // so there is nothing for them to correct.
+                return "Тарифата не е налична в момента. Изпратете запитване "
+                     + "без изчисление или опитайте по-късно."
+            default:
+                return "Изчислението не е прието от сървъра. Проверете площта "
+                     + "и сумата и опитайте пак."
+            }
+
         case "PESTICIDE_REGULATORY_FIELDS_REQUIRED":
             // The app already blocks this before sending, so reaching it
             // means the two rules have drifted. The sentence still has to
@@ -190,6 +215,26 @@ enum UserMessage {
     }
 
     static let bulgarian: [String: String] = [
+        // ── The insurance quote's own refusals ──
+        //
+        // Coded rather than prose deliberately, by the server, BECAUSE this
+        // app renders the raw envelope: an English sentence from the server
+        // would otherwise reach a Bulgarian farmer untranslated. That has
+        // happened here before, which is why `httpText` uses `code` as a
+        // lookup key and never prints it.
+        //
+        // `INSURANCE_QUOTE_INVALID` is not here — it carries `params.reason`
+        // and is built in `interpolated` above, so it can name the field.
+        "INSURANCE_PRODUCT_UNKNOWN":
+            "Този вид застраховка вече не се предлага. Изберете друг.",
+
+        // A farmer can do nothing about this one: the key is minted by the
+        // app. So it says what happens next rather than asking them to fix
+        // something they cannot see.
+        "IDEMPOTENCY_KEY_INVALID":
+            "Запитването не беше изпратено заради техническа грешка. "
+            + "Опитайте пак.",
+
         // The bottom-row editor. `codedBadRequest` gives this refusal a
         // real identity rather than the shared category code 152 other
         // call sites use, which is what makes it translatable at all.

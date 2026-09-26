@@ -214,3 +214,166 @@ final class InsuranceProductTests: XCTestCase {
         }
     }
 }
+
+/// What the quote puts ON THE WIRE, and what it deliberately leaves off.
+final class InsuranceQuoteWireTests: XCTestCase {
+
+    private func encoded(_ lead: CreateLead) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(lead)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func lead(quote: CreateLead.Quote?) -> CreateLead {
+        CreateLead(parcelId: "p1", message: "Запитване.", locationId: "l1",
+                   risk: nil, quote: quote)
+    }
+
+    /// A MESSAGE-ONLY ASK OMITS `quote` ENTIRELY rather than sending null.
+    ///
+    /// The server requires a non-blank message OR a quote. An explicit
+    /// `"quote": null` would be a quote key present with nothing in it, and
+    /// this app already shipped one bug from sending a shape the schema
+    /// refused — every enquiry 400'd for weeks on `message invalid_type`.
+    func testAMessageOnlyAskSendsNoQuoteKey() throws {
+        let json = try encoded(lead(quote: nil))
+        XCTAssertNil(json["quote"], "a nil quote was encoded as a key")
+        XCTAssertFalse((json["message"] as? String ?? "").isEmpty)
+    }
+
+    /// FOUR INPUTS AND NO PRICE. The server strips a price if one is sent and
+    /// recomputes; a client that sent its own figure would be asserting
+    /// authority it does not have.
+    func testTheQuoteCarriesTheFourInputsAndNoPrice() throws {
+        let json = try encoded(lead(quote: CreateLead.Quote(
+            productKey: "wheat", areaDca: 250, sumInsuredCents: 3_750_055,
+            instalments: 4, areaScope: nil)))
+        let quote = try XCTUnwrap(json["quote"] as? [String: Any])
+
+        XCTAssertEqual(quote["productKey"] as? String, "wheat")
+        XCTAssertEqual(quote["areaDca"] as? Double, 250)
+        XCTAssertEqual(quote["sumInsuredCents"] as? Int, 3_750_055)
+        XCTAssertEqual(quote["instalments"] as? Int, 4)
+
+        for absent in ["premiumCents", "premium", "price", "tariffBp",
+                       "instalmentsCents", "perDecareCents"] {
+            XCTAssertNil(quote[absent], "the request carried «\(absent)»")
+        }
+    }
+
+    /// `areaScope` is omitted when it IS the parcel, because that is the
+    /// server's default. Sending "parcel" explicitly would work and would also
+    /// be a second statement of the same fact.
+    func testAreaScopeIsOnlySentWhenItIsNotTheParcel() throws {
+        let asParcel = try encoded(lead(quote: CreateLead.Quote(
+            productKey: "hail", areaDca: 10, sumInsuredCents: 100_000,
+            instalments: 1, areaScope: nil)))
+        XCTAssertNil(try XCTUnwrap(asParcel["quote"] as? [String: Any])["areaScope"])
+
+        let asCustom = try encoded(lead(quote: CreateLead.Quote(
+            productKey: "hail", areaDca: 10, sumInsuredCents: 100_000,
+            instalments: 1, areaScope: CreateLead.Quote.scopeCustom)))
+        XCTAssertEqual(
+            try XCTUnwrap(asCustom["quote"] as? [String: Any])["areaScope"] as? String,
+            "custom")
+    }
+
+    /// `crop-at-location` needs `coveredParcelCount` and is a 400 without it.
+    /// This app produces only the two scopes it can satisfy, and this asserts
+    /// the third is not reachable by a typo in a string literal.
+    func testTheOnlyScopesThisAppCanProduceAreTheOnesItCanSatisfy() {
+        XCTAssertEqual(CreateLead.Quote.scopeParcel, "parcel")
+        XCTAssertEqual(CreateLead.Quote.scopeCustom, "custom")
+    }
+}
+
+/// The idempotency key, whose whole value is in when it is REUSED.
+@MainActor
+final class InsuranceIdempotencyTests: XCTestCase {
+
+    private func quote(sumInsuredCents: Int = 100_000,
+                       instalments: Int = 1) -> CreateLead.Quote {
+        CreateLead.Quote(productKey: "wheat", areaDca: 100,
+                         sumInsuredCents: sumInsuredCents,
+                         instalments: instalments, areaScope: nil)
+    }
+
+    /// A RETRY IS THE SAME ASK: unchanged inputs must produce the same
+    /// fingerprint, so the store reuses the key and the server replays the
+    /// original lead instead of writing a second row and emailing again.
+    func testUnchangedInputsAreTheSameAsk() {
+        let a = FarmRiskStore.fingerprint(parcelID: "p1", quote: quote())
+        let b = FarmRiskStore.fingerprint(parcelID: "p1", quote: quote())
+        XCTAssertEqual(a, b)
+    }
+
+    /// EVERY INPUT CHANGES IT, including the parcel. Leaving the parcel out
+    /// would have replayed the first parcel's lead when a farmer moved on to
+    /// the next field.
+    func testAnyChangedInputIsADifferentAsk() {
+        let base = FarmRiskStore.fingerprint(parcelID: "p1", quote: quote())
+        XCTAssertNotEqual(base, FarmRiskStore.fingerprint(parcelID: "p2", quote: quote()))
+        XCTAssertNotEqual(base, FarmRiskStore.fingerprint(
+            parcelID: "p1", quote: quote(sumInsuredCents: 100_001)))
+        XCTAssertNotEqual(base, FarmRiskStore.fingerprint(
+            parcelID: "p1", quote: quote(instalments: 2)))
+        XCTAssertNotEqual(base, FarmRiskStore.fingerprint(
+            parcelID: "p1",
+            quote: CreateLead.Quote(productKey: "barley", areaDca: 100,
+                                    sumInsuredCents: 100_000, instalments: 1,
+                                    areaScope: nil)))
+        XCTAssertNotEqual(base, FarmRiskStore.fingerprint(
+            parcelID: "p1",
+            quote: CreateLead.Quote(productKey: "wheat", areaDca: 100.5,
+                                    sumInsuredCents: 100_000, instalments: 1,
+                                    areaScope: nil)))
+    }
+
+    /// A message-only ask is distinguishable from a quoted one, so toggling the
+    /// calculator off after a failure is a new ask rather than a replay.
+    func testAMessageOnlyAskIsNotTheSameAsAQuotedOne() {
+        XCTAssertNotEqual(FarmRiskStore.fingerprint(parcelID: "p1", quote: nil),
+                          FarmRiskStore.fingerprint(parcelID: "p1", quote: quote()))
+    }
+}
+
+/// When the server disagrees with the estimate.
+@MainActor
+final class InsuranceCorrectionNoticeTests: XCTestCase {
+
+    private let sent = CreateLead.Quote(
+        productKey: "wheat", areaDca: 250, sumInsuredCents: 3_750_055,
+        instalments: 4, areaScope: nil)
+
+    /// SILENCE WHEN THEY AGREE. The estimate was right, it was shown, and
+    /// saying so again is noise on top of a confirmation.
+    func testAgreementSaysNothing() {
+        let got = CreatedLead.ServerQuote(
+            premiumCents: 375_006, instalmentsCents: [93_753, 93_751, 93_751, 93_751],
+            tariffBp: 1000, engineVersion: "1")
+        XCTAssertNil(FarmRiskStore.correctionNotice(sent: sent, got: got))
+    }
+
+    /// A DIFFERENT TARIFF SERVER-SIDE is the case this exists for: the phone
+    /// carries 1000 bp, the server has moved on, and the figure the farmer read
+    /// is not the one the operator received.
+    func testADisagreementNamesBothNumbers() throws {
+        let got = CreatedLead.ServerQuote(
+            premiumCents: 450_007, instalmentsCents: [112_504, 112_501, 112_501, 112_501],
+            tariffBp: 1200, engineVersion: "1")
+        let notice = try XCTUnwrap(
+            FarmRiskStore.correctionNotice(sent: sent, got: got))
+        XCTAssertTrue(notice.contains(InsurancePremium.eur(450_007)), notice)
+        XCTAssertTrue(notice.contains(InsurancePremium.eur(375_006)), notice)
+    }
+
+    /// No quote sent, or none returned, is nothing to explain rather than a
+    /// notice comparing against zero.
+    func testNothingToCompareIsNoNotice() {
+        XCTAssertNil(FarmRiskStore.correctionNotice(sent: nil, got: nil))
+        XCTAssertNil(FarmRiskStore.correctionNotice(sent: sent, got: nil))
+        XCTAssertNil(FarmRiskStore.correctionNotice(
+            sent: nil,
+            got: CreatedLead.ServerQuote(premiumCents: 1, instalmentsCents: [1],
+                                         tariffBp: 1000, engineVersion: nil)))
+    }
+}

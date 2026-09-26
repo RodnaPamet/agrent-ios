@@ -84,6 +84,30 @@ enum InsurancePremium {
         }
     }
 
+    /// Cents as «10 000,00 EUR».
+    ///
+    /// ALWAYS TWO DECIMALS, unlike `Num.text`, which drops trailing zeros. A
+    /// premium of «3 750,6» reads as an unfinished number where «3 750,60»
+    /// reads as money, and this figure is the one a farmer decides on.
+    ///
+    /// FORCED TO bg_BG, for the reason `Num` records: a formatter with no
+    /// locale reads the PROCESS's, and this phone reports en_BG — so «10
+    /// 000,00» became «10,000.00» the moment the region was not European,
+    /// while the `Text` two lines above it stayed Bulgarian.
+    ///
+    /// The ISO code rather than «€»: `RefusalText` already established that
+    /// currency codes are substituted as-is here, and the server talks in EUR.
+    static func eur(_ cents: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "bg_BG")
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let text = formatter.string(from: NSNumber(value: Double(cents) / 100))
+            ?? String(format: "%.2f", Double(cents) / 100)
+        return "\(text) EUR"
+    }
+
     // MARK: - Reading what a farmer typed
 
     /// MONEY AND AREA PARSE DIFFERENTLY, deliberately, and the asymmetry is

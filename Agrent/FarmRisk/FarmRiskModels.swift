@@ -144,10 +144,14 @@ enum FarmRiskAPI {
     /// NEW lead with corrected figures, not a replay to be collapsed. Keeping
     /// a key across a retry would be right only for re-sending the SAME
     /// figures after a failure, which this form has no path to.
-    static func createLead(_ lead: CreateLead) async throws {
-        _ = try await APIClient.shared.post(
+    /// Returns what the SERVER computed, which is what gets stored and
+    /// emailed — never what the app previewed.
+    @discardableResult
+    static func createLead(_ lead: CreateLead,
+                           idempotencyKey: String) async throws -> CreatedLead {
+        try await APIClient.shared.post(
             leadsPath, body: lead,
-            as: EmptyResponse.self, idempotencyKey: UUID().uuidString
+            as: CreatedLead.self, idempotencyKey: idempotencyKey
         )
     }
 
@@ -173,6 +177,33 @@ enum FarmRiskAPI {
     // matching on `.http(409)` for this client is unreachable.
     //
     //     git show 58e744d:Agrent/FarmRisk/FarmRiskModels.swift
+}
+
+/// What the server answered, and the only figures a farmer may be shown.
+///
+/// The request carries NO price and the schema strips one if sent: the server
+/// recomputes from the four inputs. So a local preview is an estimate and this
+/// is the price. When they differ — a phone carrying a stale tariff against a
+/// newer one — THIS wins, and the screen has to show it rather than leaving
+/// the estimate up beside a lead that was priced differently.
+struct CreatedLead: Decodable, Equatable, Sendable {
+    let id: String
+    let status: String
+
+    /// Absent when the ask carried no quote — a message-only enquiry, which
+    /// still works exactly as it did. `quote` is not in the response's
+    /// `required` list.
+    let quote: ServerQuote?
+
+    struct ServerQuote: Decodable, Equatable, Sendable {
+        let premiumCents: Int
+        let instalmentsCents: [Int]
+        let tariffBp: Int
+        /// Which engine priced it. Not shown; recorded because a figure a
+        /// farmer disputes three weeks later is answerable only if the
+        /// version that produced it is known.
+        let engineVersion: String?
+    }
 }
 
 struct CreateLead: Encodable, Sendable {
@@ -209,6 +240,39 @@ struct CreateLead: Encodable, Sendable {
         let overall: String?
         let ndvi: Double?
         let ndmi: Double?
+    }
+
+    /// The four inputs the server prices from. Optional: an ask may still be
+    /// a message alone, and older builds send exactly that.
+    let quote: Quote?
+
+    /// NO PRICE FIELD, and that is not an omission.
+    ///
+    /// The schema strips a price if one is sent. Only these four values cross
+    /// the wire and the server computes from them, which is what makes the
+    /// local arithmetic in `InsurancePremium` a preview rather than a quote.
+    struct Quote: Encodable, Equatable, Sendable {
+        /// The server's `productKey` enum — `InsuranceProduct.rawValue`.
+        let productKey: String
+        /// DECARES, > 0 and <= 2 000 000 server-side. Decares rather than the
+        /// hectares the rest of this app sends: the insurance engine works in
+        /// dca and converting twice is how a figure drifts.
+        let areaDca: Double
+        let sumInsuredCents: Int
+        /// 1 to 4.
+        let instalments: Int
+
+        /// WHERE THE AREA CAME FROM. Absent means "parcel", which is the
+        /// default the server applies, so it is only sent when it is not that.
+        ///
+        /// `crop-at-location` is not produced by this app yet — it needs
+        /// `coveredParcelCount` and a crop-wide selection this form has no
+        /// concept of. Sending it without the count is a 400, so the case is
+        /// absent rather than half-built.
+        let areaScope: String?
+
+        static let scopeParcel = "parcel"
+        static let scopeCustom = "custom"
     }
 }
 

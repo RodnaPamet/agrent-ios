@@ -28,17 +28,29 @@ import SwiftUI
 struct InsuranceRequestForm: View {
     let parcels: [Parcel]
     let alreadyAsked: Set<String>
-    let onSubmit: (Parcel, Area?) -> Void
+    let onSubmit: (Parcel, Area?, CreateLead.Quote?) -> Void
 
     @State private var selectedID: String?
     @State private var areaText: String = ""
+
+    /// THE QUOTE IS OPTIONAL, and starts off.
+    ///
+    /// A message-only ask is what this form did before the calculator existed
+    /// and is still a complete, useful enquiry — an operator reads the field,
+    /// its size and what the satellite said, and quotes back. So the figures
+    /// are something a farmer opts INTO rather than four more fields standing
+    /// between them and asking a question.
+    @State private var wantsQuote = false
+    @State private var product: InsuranceProduct = .wheat
+    @State private var sumInsuredText: String = ""
+    @State private var instalments: Int = 1
     @Environment(\.dismiss) private var dismiss
 
     /// Opened from a row: that parcel, fixed. Opened from the action
     /// button: whichever parcels can still be asked about.
     init(parcels: [Parcel], alreadyAsked: Set<String>,
          preselected: Parcel? = nil,
-         onSubmit: @escaping (Parcel, Area?) -> Void) {
+         onSubmit: @escaping (Parcel, Area?, CreateLead.Quote?) -> Void) {
         self.parcels = parcels
         self.alreadyAsked = alreadyAsked
         self.onSubmit = onSubmit
@@ -92,6 +104,72 @@ struct InsuranceRequestForm: View {
             return selected.areaHa.map(Area.init(hectares:))
         }
         return typed
+    }
+
+    /// Decares, as typed. The AREA parser, so «12,345» is twelve and a bit.
+    private var areaDecares: Double? {
+        InsurancePremium.areaDecares(areaText)
+    }
+
+    /// The MONEY parser, so «100 000» is one hundred thousand.
+    private var sumInsuredCents: Int? {
+        InsurancePremium.moneyCents(sumInsuredText)
+    }
+
+    private var estimate: InsurancePremium.Quote? {
+        guard wantsQuote, let sumInsuredCents else { return nil }
+        return InsurancePremium.quote(sumInsuredCents: sumInsuredCents,
+                                      instalments: instalments)
+    }
+
+    /// Which field could not be read. Named, because "invalid" in front of two
+    /// number fields tells a farmer to check both.
+    private var unreadableInputNote: String {
+        if areaDecares == nil, !areaText.isEmpty {
+            return "Площта не се разчита. Използвайте «12,5» за дванадесет и половина декара."
+        }
+        if sumInsuredCents == nil, !sumInsuredText.isEmpty {
+            return "Сумата не се разчита. Използвайте «100 000» или «100,50»."
+        }
+        return "Въведете площ и застрахователна сума, за да видите прогнозата."
+    }
+
+    /// What crosses the wire, or nil for a message-only ask.
+    ///
+    /// `areaScope` is sent as `custom` only when the farmer changed the area
+    /// away from the register — otherwise the scope IS the parcel and the
+    /// server's default says so. `crop-at-location` is not produced here: it
+    /// requires `coveredParcelCount` and a crop-wide selection this form has no
+    /// concept of, and sending the scope without the count is a 400.
+    private var wireQuote: CreateLead.Quote? {
+        guard wantsQuote, let sumInsuredCents, let areaDecares, areaDecares > 0
+        else { return nil }
+
+        let recorded = selected?.areaHa.map(Area.init(hectares:))
+        let edited = recorded.map { area?.differs(from: $0) == true } ?? false
+
+        return CreateLead.Quote(
+            productKey: product.rawValue,
+            areaDca: areaDecares,
+            sumInsuredCents: sumInsuredCents,
+            instalments: instalments,
+            areaScope: edited ? CreateLead.Quote.scopeCustom : nil
+        )
+    }
+
+    /// WHY SEND CAN BE BLOCKED, or nil when it cannot.
+    ///
+    /// Only blocks on something the farmer can fix. It deliberately does NOT
+    /// block on being offline: this app has no reachability monitor, and one
+    /// reporting "connected" says nothing about the server being reachable —
+    /// so a disabled button would be wrong in both directions. Sending fails
+    /// with «Запитването не беше изпратено» instead, which is honest, and
+    /// nothing is ever queued: this POST does not go through the outbox.
+    private var sendBlockedReason: String? {
+        guard selected != nil else { return "Изберете парцел." }
+        guard wantsQuote else { return nil }
+        if sumInsuredText.isEmpty { return "Въведете застрахователна сума." }
+        return wireQuote == nil ? unreadableInputNote : nil
     }
 
     var body: some View {
@@ -153,6 +231,97 @@ struct InsuranceRequestForm: View {
                     }
 
                     Section {
+                        Toggle("Изчисли премия", isOn: $wantsQuote)
+                    } footer: {
+                        Text("Може да изпратите запитване и без изчисление — "
+                             + "тогава оферта дава застрахователят.")
+                    }
+
+                    if wantsQuote {
+                        Section {
+                            Picker("Покритие", selection: $product) {
+                                Section("Култури") {
+                                    ForEach(InsuranceProduct.allCases.filter(\.isCrop)) {
+                                        Text($0.label).tag($0)
+                                    }
+                                }
+                                Section("Рискове") {
+                                    ForEach(InsuranceProduct.allCases.filter { !$0.isCrop }) {
+                                        Text($0.label).tag($0)
+                                    }
+                                }
+                            }
+                            .pickerStyle(.navigationLink)
+
+                            HStack {
+                                TextField("0", text: $sumInsuredText)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                Text("EUR").foregroundStyle(Palette.secondaryText)
+                            }
+                            .accessibilityLabel("Застрахователна сума в евро")
+
+                            Picker("Вноски", selection: $instalments) {
+                                ForEach(1...4, id: \.self) { Text("\($0)").tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            .accessibilityLabel("Брой вноски")
+                        } header: {
+                            Text("Изчисление")
+                        } footer: {
+                            // «100 000» is one hundred thousand and «12,345»
+                            // decares is twelve and a bit: the two fields read
+                            // the same characters differently, which is the
+                            // server's rule and has to be said rather than
+                            // discovered. The area field is above and already
+                            // labelled in decares.
+                            Text("Сумата се въвежда в евро: «100 000» е сто хиляди. "
+                                 + "«100,50» е сто евро и петдесет цента.")
+                        }
+
+                        if let estimate {
+                            Section {
+                                LabeledContent("Прогнозна премия") {
+                                    Text(InsurancePremium.eur(estimate.premiumCents))
+                                        .fontWeight(.semibold)
+                                }
+                                if let perDca = areaDecares.flatMap(estimate.perDecareCents) {
+                                    LabeledContent("На декар") {
+                                        Text(InsurancePremium.eur(perDca))
+                                    }
+                                }
+                                if estimate.instalmentsCents.count > 1 {
+                                    LabeledContent("Вноски") {
+                                        Text(estimate.instalmentsCents
+                                            .map(InsurancePremium.eur)
+                                            .joined(separator: " + "))
+                                            .multilineTextAlignment(.trailing)
+                                    }
+                                }
+                            } footer: {
+                                // AN ESTIMATE, NOT A PRICE, and the distinction
+                                // is load-bearing rather than modest. The
+                                // request carries no price; the server
+                                // recomputes and its figure is what gets stored
+                                // and emailed. This phone also carries a
+                                // compiled-in tariff, so a rate change server
+                                // side makes this number stale with nothing
+                                // here able to know it.
+                                Text("Прогноза. Окончателната сума се изчислява "
+                                     + "от застрахователя при изпращане.")
+                            }
+                        } else if !sumInsuredText.isEmpty || !areaText.isEmpty {
+                            Section {
+                                Label(unreadableInputNote,
+                                      systemImage: "exclamationmark.triangle")
+                                    .font(.footnote)
+                                    .foregroundStyle(Palette.warning)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
+                    Section {
                         // The warning is now narrower and truer. A lead
                         // still cannot be withdrawn — there is no DELETE
                         // and no PATCH — but it is no longer one per
@@ -185,10 +354,12 @@ struct InsuranceRequestForm: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Изпрати") {
-                        if let selected { onSubmit(selected, area) }
+                        if let selected { onSubmit(selected, area, wireQuote) }
                         dismiss()
                     }
-                    .disabled(selected == nil)
+                    // Blocked only on what a farmer can fix — NOT on being
+                    // offline. See `sendBlockedReason`.
+                    .disabled(sendBlockedReason != nil)
                     .accessibilityInputLabels(A11y.Spoken.send)
                 }
             }
