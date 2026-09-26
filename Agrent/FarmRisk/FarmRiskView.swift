@@ -84,6 +84,7 @@ struct FarmRiskView: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Затвори") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.close)
                     }
                 }
                 .task {

@@ -72,11 +72,16 @@ struct SpatialImportView: View {
                         if phase == .done { onFinished() }
                         dismiss()
                     }
+                    // Same button, two words, so two names.
+                    .accessibilityInputLabels(phase == .done
+                        ? A11y.Spoken.done
+                        : A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if phase == .choosing {
                         Button("Импортирай") { Task { await start() } }
                             .disabled(chosen == nil)
+                            .accessibilityInputLabels(A11y.Spoken.importing)
                     }
                 }
             }

@@ -139,13 +139,17 @@ struct NewProductView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ") { dismiss() }.disabled(store.isSaving)
+                    Button("Отказ") { dismiss() }
+                        .disabled(store.isSaving)
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if store.isSaving {
                         ProgressView()
                     } else {
-                        Button("Запази") { Task { await save() } }.disabled(!canSave)
+                        Button("Запази") { Task { await save() } }
+                            .disabled(!canSave)
+                            .accessibilityInputLabels(A11y.Spoken.save)
                     }
                 }
             }

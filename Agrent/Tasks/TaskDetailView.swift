@@ -301,9 +301,12 @@ private struct ResolutionSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ", action: cancel)
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Запази") { confirm(text) }.disabled(!isUsable)
+                    Button("Запази") { confirm(text) }
+                        .disabled(!isUsable)
+                        .accessibilityInputLabels(A11y.Spoken.save)
                 }
             }
         }

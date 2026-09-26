@@ -22,6 +22,7 @@ struct NewsView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Затвори") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.close)
             }
         }
         .task { if store.news.value == nil { await store.loadNews() } }

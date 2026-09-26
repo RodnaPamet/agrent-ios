@@ -38,6 +38,7 @@ struct TrendsView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Затвори") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.close)
             }
         }
         .task { if store.prices.value == nil { await store.loadPrices() } }

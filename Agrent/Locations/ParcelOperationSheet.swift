@@ -291,11 +291,17 @@ struct ParcelOperationSheet: View {
             .inlineTitle(parcel.name)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ") { dismiss() }.disabled(saving)
+                    Button("Отказ") { dismiss() }
+                        .disabled(saving)
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if saving { ProgressView() }
-                    else { Button("Запиши") { Task { await save() } }.disabled(!canSave) }
+                    else {
+                        Button("Запиши") { Task { await save() } }
+                            .disabled(!canSave)
+                            .accessibilityInputLabels(A11y.Spoken.record)
+                    }
                 }
             }
             .interactiveDismissDisabled(saving)

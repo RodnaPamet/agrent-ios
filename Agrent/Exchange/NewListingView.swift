@@ -184,13 +184,17 @@ struct NewListingView: View {
             .inlineTitle("Нова обява")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ") { dismiss() }.disabled(sending)
+                    Button("Отказ") { dismiss() }
+                        .disabled(sending)
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if sending {
                         ProgressView()
                     } else {
-                        Button("Публикувай") { Task { await post() } }.disabled(!canSend)
+                        Button("Публикувай") { Task { await post() } }
+                            .disabled(!canSend)
+                            .accessibilityInputLabels(A11y.Spoken.publish)
                     }
                 }
             }

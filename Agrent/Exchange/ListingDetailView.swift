@@ -132,6 +132,10 @@ struct InquiryComposeView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(composer.phase == .sent ? "Готово" : "Отказ") { dismiss() }
+                        // The word changes with the phase, so the name has to.
+                        .accessibilityInputLabels(composer.phase == .sent
+                            ? A11y.Spoken.done
+                            : A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if composer.phase == .sending {
@@ -140,6 +144,7 @@ struct InquiryComposeView: View {
                         Button("Изпрати") {
                             Task { await composer.send(listingID: listing.id) }
                         }
+                        .accessibilityInputLabels(A11y.Spoken.send)
                         .disabled(!composer.canSend)
                     }
                 }

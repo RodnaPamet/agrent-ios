@@ -18,6 +18,7 @@ struct AdminView: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Затвори") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.close)
                     }
                     if store.access == .allowed {
                         ToolbarItem(placement: .primaryAction) {
@@ -374,13 +375,17 @@ private struct InviteMemberView: View {
             .inlineTitle("Покани член")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ") { dismiss() }.disabled(sending)
+                    Button("Отказ") { dismiss() }
+                        .disabled(sending)
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if sending {
                         ProgressView()
                     } else {
-                        Button("Изпрати") { Task { await submit() } }.disabled(!canSend)
+                        Button("Изпрати") { Task { await submit() } }
+                            .disabled(!canSend)
+                            .accessibilityInputLabels(A11y.Spoken.send)
                     }
                 }
             }

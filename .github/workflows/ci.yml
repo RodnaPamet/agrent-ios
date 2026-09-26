@@ -354,6 +354,54 @@ jobs:
           fi
           echo "Semantic colours all come from Palette."
 
+      # A SHEET THAT CANNOT BE NAMED ALOUD IS A SHEET A VOICE USER CANNOT LEAVE.
+      #
+      # Voice Control's recogniser follows the DEVICE language. This phone
+      # reports en_BG, so it listens in English while every button names itself
+      # in Bulgarian — visible, correct, unsayable. `A11y.Spoken` carries the
+      # nine toolbar verbs with the English a person would actually say, and 29
+      # sheet buttons go through it.
+      #
+      # The reason this is a step and not a convention: the same sweep that
+      # added those 29 missed two of them — the send on the insurance form and
+      # the cancel on the operation sheet — and the count below is what found
+      # them. A design-system helper is an option until something fails when a
+      # screen declines to use it.
+      #
+      # A confirmation or cancellation slot holds one button, so a file needs
+      # at least as many input labels as it has slots. Files with MORE are
+      # normal: Новини and Тенденции also name their rows.
+      - name: Sheet actions can be named aloud
+        run: |
+          python3 - <<'SPOKEN'
+          import pathlib, sys
+
+          slots_total, gaps = 0, []
+          for path in sorted(pathlib.Path('Agrent').rglob('*.swift')):
+              text = path.read_text(encoding='utf-8')
+              slots = (text.count('placement: .confirmationAction')
+                       + text.count('placement: .cancellationAction'))
+              if not slots:
+                  continue
+              slots_total += slots
+              labels = text.count('accessibilityInputLabels')
+              if labels < slots:
+                  gaps.append('%s: %d toolbar slot(s), %d input label(s)'
+                              % (path, slots, labels))
+
+          if not slots_total:
+              print('::error::No confirmationAction/cancellationAction slots found. This '
+                    'step is keyed on those placements and is no longer guarding anything.')
+              sys.exit(1)
+          if gaps:
+              print('\n'.join(gaps))
+              print('::error::Give each sheet action a name through A11y.Spoken. Voice '
+                    'Control listens in the DEVICE language; en_BG cannot say the '
+                    'Bulgarian one.')
+              sys.exit(1)
+          print('%d toolbar slot(s), every file at least as many input labels.' % slots_total)
+          SPOKEN
+
       # The interpunct belongs to ONE view, because it has to disappear.
       #
       # Five screens build a subtitle as `Text(crop) · Text(area)`. At the
