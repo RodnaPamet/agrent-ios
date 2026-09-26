@@ -597,6 +597,28 @@ struct ParcelMapView: View {
 
     @ViewBuilder
     private func parcelRow(_ parcel: Parcel) -> some View {
+        // A BUTTON WHEN IT DOES SOMETHING, plain content when it does not.
+        //
+        // This row is the only route to «Запиши операция» that does not need a
+        // finger on a shape drawn on a map, so for a Switch Control or Full
+        // Keyboard user it is not a convenience — it IS the route. It was an
+        // `.onTapGesture`, which no focus ring stops on and no activation
+        // reaches, whatever traits are declared beside it.
+        //
+        // `ParcelChooser` already renders this same name/crop/area row as a
+        // Button, so this is the app's own pattern. Not a Button for a reader
+        // who cannot operate: a control that focuses and then does nothing is
+        // worse than content.
+        if mayOperate {
+            Button { operating = parcel } label: { parcelRowContent(parcel) }
+                .buttonStyle(.plain)
+        } else {
+            parcelRowContent(parcel)
+        }
+    }
+
+    @ViewBuilder
+    private func parcelRowContent(_ parcel: Parcel) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(parcel.name).font(.subheadline.weight(.medium))
@@ -628,10 +650,20 @@ struct ParcelMapView: View {
         // them: "Пшеница middle dot 124 дка middle dot под аренда". Spoken
         // from the values, with the unit said in full — «дка» is read out
         // as three letters, so the audio channel gets «декара».
+        // A BUTTON, NOT A TAP GESTURE.
+        //
+        // This row is the only route to «Запиши операция» that does not
+        // require a finger on a shape drawn on a map — so for a Switch Control
+        // or Full Keyboard user it is not a convenience, it is the route. An
+        // `onTapGesture` is invisible to both: no focus ring stops on it and
+        // no activation reaches it, whatever traits are declared.
+        //
+        // `ParcelChooser` already renders this same name/crop/area row as a
+        // Button, so this is the app's own pattern rather than a new one.
+        // Wrapped rather than rebuilt, so the row's layout and its spoken
+        // label are untouched.
         .contentShape(Rectangle())
-        .onTapGesture { if mayOperate { operating = parcel } }
         .accessibilityElement(children: .ignore)
-        .accessibilityAddTraits(mayOperate ? .isButton : [])
         // WHAT IT DOES, not how to do it. A Switch Control user selects and
             // activates; a Full Keyboard user presses space. "Двоен допир" is
             // VoiceOver's gesture and instructing it is wrong for everyone else
