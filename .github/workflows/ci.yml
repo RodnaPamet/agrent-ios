@@ -354,6 +354,37 @@ jobs:
           fi
           echo "Semantic colours all come from Palette."
 
+      # The interpunct belongs to ONE view, because it has to disappear.
+      #
+      # Five screens build a subtitle as `Text(crop) · Text(area)`. At the
+      # accessibility sizes that line has to stack, and when it does the
+      # separator becomes a row containing a single dot — so `MetaSeparator`
+      # renders nothing there, and every one of those rows has to go through it.
+      #
+      # The Dynamic Type pass fixed THREE of the five, which is the whole
+      # reason this step exists. `MetaRow` and `MetaSeparator` were written to
+      # stop the fix being applied per-screen, and then the sweep was applied
+      # per-screen anyway: Задачи, Дневник and Админ were the rows on screen at
+      # the time, and Локации, the parcel list under a location map and the
+      # parcel picker kept a plain `HStack`. A screenshot at AX5 found it —
+      # «Пшени / ца · 324,78 / дка», a name broken mid-word with the dot
+      # still drawn beside it. Nobody would have found it by reading.
+      #
+      # It is also the character `.combine` reads aloud as "middle dot", which
+      # is why these rows all build their spoken label from the values.
+      - name: The interpunct comes from MetaSeparator
+        run: |
+          hits=$(grep -rn --include='*.swift' -F 'Text("·")' Agrent/ \
+                 | grep -v '^Agrent/Design/AdaptiveRows.swift:' \
+                 | awk '{ l=$0; sub(/^[^:]*:[0-9]+:/, "", l); if (l !~ /^[ \t]*\/\//) print }' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Use MetaRow { … MetaSeparator() … }. A literal separator cannot"
+            echo "::error::disappear when the row stacks at the accessibility sizes."
+            exit 1
+          fi
+          echo "The interpunct is only in MetaSeparator."
+
       # THE COST OF SPELLING THE SCHEMES OUT, paid back.
       #
       # `project.yml` had no `schemes:` block until the UI test target arrived,

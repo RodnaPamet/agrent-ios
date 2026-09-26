@@ -60,10 +60,10 @@ struct LocationsView: View {
                         // not leave a leading «·» in front of the count, the
                         // way an absent dose unit left a trailing space on
                         // the operation lines.
-                        HStack(spacing: 8) {
+                        MetaRow(spacing: 8) {
                             if let kind = location.kind { Text(kind) }
                             if let count = location.parcelCount {
-                                if location.kind != nil { Text("·") }
+                                if location.kind != nil { MetaSeparator() }
                                 Text(Plural.bg(count, "парцел", "парцела"))
                             }
                         }

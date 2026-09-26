@@ -35,14 +35,17 @@ struct ParcelChooser: View {
                         Text(parcel.name)
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.primary)
-                        HStack(spacing: 6) {
+                        // The same row as `ParcelMapView.parcelRowContent`,
+                        // and it had the same defect. Both now go through
+                        // `MetaRow`, which is the point of having one.
+                        MetaRow {
                             if let crop = CommodityName.freeText(parcel.cropType) { Text(crop) }
                             if let area = parcel.areaHa {
-                                if parcel.cropType != nil { Text("·") }
+                                if parcel.cropType != nil { MetaSeparator() }
                                 Text(Area(hectares: area).text)
                             }
                             if parcel.hasActiveLease == true {
-                                Text("·"); Text("под аренда")
+                                MetaSeparator(); Text("под аренда")
                             }
                         }
                         .font(.footnote)

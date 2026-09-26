@@ -6,7 +6,10 @@ import SwiftUI
 ///
 /// ── Why `·` is the recurring bug ──
 ///
-/// Five screens build a subtitle as `Text(crop); Text("·"); Text(area)`. Read
+/// Five screens build a subtitle as `Text(crop); Text("·"); Text(area)` — and
+/// that count is why three of them kept a plain `HStack` through the Dynamic
+/// Type pass: the sweep fixed the three rows it was looking at. All five go
+/// through `MetaRow` now, and a CI step keeps the separator in one place. Read
 /// visually that is one line of facts. Read by VoiceOver it is three stops,
 /// the middle one announced as "middle dot" — and `.accessibilityElement
 /// (children: .combine)` does not fix it, it concatenates the children
