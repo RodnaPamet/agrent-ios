@@ -100,6 +100,43 @@ enum Palette {
     /// changes, so nothing moves on a screen that was already correct.
     static let error = Color(light: 0xB4472A, dark: 0xE8705A)
 
+    /// WHAT TO WRITE ON TOP OF `error` when it is the FILL rather than the
+    /// ink — the same pairing `onAccent` makes, for the same reason.
+    ///
+    ///     white on #B4472A (light)     5.42:1
+    ///     white on #E8705A (dark)      3.05:1   fails
+    ///     #0A1712 on #E8705A           6.03:1
+    ///
+    /// The dark error is light precisely so it can be READ as text on a dark
+    /// page, which makes it a poor thing to put white on. Defined here beside
+    /// the colour it sits on so the two cannot be changed apart.
+    static let onError = Color(light: 0xFFFFFF, dark: 0x0A1712)
+
+    /// The counterpart: something WORKED. Reserved the same way `error` is.
+    ///
+    /// `Color.green` was standing in for this at three sites, and it is the
+    /// worst-measuring colour Apple ships:
+    ///
+    ///     systemGreen #34C759 on white           2.22:1
+    ///     systemGreen #30D158 on Surface.page    9.08:1
+    ///
+    /// Light mode is where it fails, by a long way, and light mode is what
+    /// this app shipped with. «Запитването е изпратено.» — the one sentence
+    /// confirming an inquiry reached a buyer — was printed at 2.22:1.
+    ///
+    /// The light value is `RiskLevel.good`'s foreground, already chosen and
+    /// already measured in this app rather than invented here; the dark one
+    /// is systemGreen's dark variant, which passes comfortably.
+    ///
+    ///     #1F6B3A on white             6.52:1
+    ///     #30D158 on Surface.page      9.08:1
+    ///
+    /// This does not contradict the header's rule about green. That rule is
+    /// about the ACCENT — green on the parcel map means "this field is sown",
+    /// so the app's accent must not be green. A success tick is not on the
+    /// map and is not the accent.
+    static let success = Color(light: 0x1F6B3A, dark: 0x30D158)
+
     /// Entry-type chips. Two families so a glance separates an input
     /// application from an observation without reading.
     enum Chip {

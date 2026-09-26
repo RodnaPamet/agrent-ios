@@ -113,13 +113,16 @@ struct InquiryComposeView: View {
                 case .sent:
                     Section {
                         Label("Запитването е изпратено.", systemImage: "checkmark.circle")
-                            .foregroundStyle(.green)
+                            // 2.22:1 as `.green`. See `Palette.success`.
+                            .foregroundStyle(Palette.success)
                         Text("Продавачът ще види контактите ви само ако приеме запитването.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 case .failed(let message):
-                    Section { Text(message).foregroundStyle(.red) }
+                    // `.red` is 3.55:1 on a white row; `Palette.error` is
+                    // 5.42:1 and is the app's one colour for "this broke".
+                    Section { Text(message).foregroundStyle(Palette.error) }
                 case .editing, .sending:
                     EmptyView()
                 }
