@@ -143,6 +143,31 @@ enum Palette {
         static let fallowFill = Color(hex: 0x9A9560)
         static let fallowStroke = Color(hex: 0x6F6B3E)
         static let label = Color.white
+        /// WHAT GOES UNDER THE LABEL, because white alone does not carry it.
+        ///
+        /// A parcel name is drawn over whichever fill it lands on, and the
+        /// fills are muted earth tones chosen for direct sunlight:
+        ///
+        ///     white on sown   #3E8E4F @0.55 over ground   4.70:1
+        ///     white on fallow #9A9560 @0.55 over ground   3.93:1   fails
+        ///     white on bare ground #6E6A52                5.46:1
+        ///
+        /// And with INCREASE CONTRAST on, where the fill goes to 0.92:
+        ///
+        ///     white on sown                               4.16:1
+        ///     white on fallow                             3.20:1
+        ///
+        /// which is the part that matters. The near-solid fill was added for
+        /// people who cannot separate two mid-tone colours, and it makes the
+        /// text on top of it LESS readable, not more — the one setting in the
+        /// app whose whole purpose is contrast was reducing it.
+        ///
+        /// A per-state ink would fix the numbers and not the problem: the
+        /// placement solver nudges a colliding label down by up to four line
+        /// heights, so a label can end up over the other state's fill, over
+        /// bare ground, or straddling a boundary. An outline does not care
+        /// what it lands on, which is why every map draws them.
+        static let labelHalo = Color(hex: 0x0A1712)
         /// The coordinate grid. Shares the minor-path value deliberately —
         /// same family, no new colour introduced into a closed palette — but
         /// named separately because it means something else, and because
