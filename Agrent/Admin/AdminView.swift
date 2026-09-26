@@ -230,7 +230,7 @@ struct AdminView: View {
             // and would otherwise match nothing.
             .accessibilityInputLabels(
                 revealEGN ? ["Скрий", "ЕГН"] : ["Покажи", "ЕГН"])
-            .accessibilityHint(revealEGN ? "Двоен допир, за да скриете" : "Двоен допир, за да покажете")
+            .accessibilityHint(revealEGN ? "Скрива номера" : "Показва номера")
         }
     }
 

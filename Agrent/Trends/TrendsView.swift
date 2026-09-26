@@ -314,6 +314,10 @@ struct TrendsView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(visible ? [.isButton, .isSelected] : .isButton)
+        // `combine` concatenates the price, the age and the series name into
+        // one phrase, which is the only thing Voice Control would accept. The
+        // series title is what is printed and what somebody would say.
+        .accessibilityInputLabels([seriesTitle(series)])
         .accessibilityHint(visible ? "Скрива тази серия" : "Показва тази серия")
     }
 

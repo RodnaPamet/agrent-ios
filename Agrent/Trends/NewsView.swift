@@ -132,6 +132,9 @@ struct NewsView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isLink)
+        // The combined name is headline plus summary plus source plus date —
+        // far too long to say. The headline is the handle.
+        .accessibilityInputLabels([item.title])
         .accessibilityHint("Отваря статията в браузър")
     }
 }

@@ -632,7 +632,11 @@ struct ParcelMapView: View {
         .onTapGesture { if mayOperate { operating = parcel } }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(mayOperate ? .isButton : [])
-        .accessibilityHint(mayOperate ? "Двоен допир, за да запишете операция" : "")
+        // WHAT IT DOES, not how to do it. A Switch Control user selects and
+            // activates; a Full Keyboard user presses space. "Двоен допир" is
+            // VoiceOver's gesture and instructing it is wrong for everyone else
+            // — the system already announces the right verb per technology.
+            .accessibilityHint(mayOperate ? "Записва операция за този парцел" : "")
         .accessibilityLabel(A11y.sentence([
             parcel.name,
             CommodityName.freeText(parcel.cropType),
