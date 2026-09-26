@@ -95,6 +95,12 @@ struct TrendsView: View {
                     Image(systemName: "chevron.down").font(.footnote.weight(.semibold))
                 }
                 .foregroundStyle(.primary)
+                // A Menu's target is its label's bounds, and this label is an
+                // unframed HStack — so the tappable area was the glyphs. It is
+                // the control that chooses which commodity the whole screen is
+                // about.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .accessibilityLabel("Стока: \(store.commodity.label)")
             .accessibilityHint("Избира стока за графиката")

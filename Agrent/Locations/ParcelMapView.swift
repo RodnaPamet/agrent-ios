@@ -465,6 +465,13 @@ struct ParcelMapView: View {
                 // in dark mode was the least readable text on a screen used
                 // outdoors. See `Palette.onAccent`.
                 .foregroundStyle(isSelected ? Palette.onAccent : Color.primary)
+                // 44pt TALL. Footnote text with 7pt of padding is about 32pt,
+                // and these sit 8pt apart in a horizontal row on a screen used
+                // standing in a field. The capsule keeps its drawn size — the
+                // frame extends the TARGET, not the paint, so the row does not
+                // grow.
+                .frame(minHeight: 44)
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
