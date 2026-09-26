@@ -42,7 +42,7 @@ struct OutboxBanner: View {
                         .font(.footnote.weight(.medium))
                         // Its own element with its own name, so «Изпрати» is
                         // both what is written and what can be said.
-                        .accessibilityInputLabels(["Изпрати"])
+                        .accessibilityInputLabels(A11y.spokenNames("Изпрати", "Send"))
                 }
             }
             .font(.footnote)

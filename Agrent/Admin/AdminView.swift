@@ -228,8 +228,9 @@ struct AdminView: View {
             // What a Voice Control user SEES on the button, so «Покажи» works
             // as spoken. The visible word is not in the accessibility label
             // and would otherwise match nothing.
-            .accessibilityInputLabels(
-                revealEGN ? ["Скрий", "ЕГН"] : ["Покажи", "ЕГН"])
+            .accessibilityInputLabels(revealEGN
+                ? A11y.spokenNames("Скрий", "ЕГН", "Hide")
+                : A11y.spokenNames("Покажи", "ЕГН", "Show"))
             .accessibilityHint(revealEGN ? "Скрива номера" : "Показва номера")
         }
     }

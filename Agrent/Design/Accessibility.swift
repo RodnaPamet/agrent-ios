@@ -48,6 +48,45 @@ extension View {
 
 enum A11y {
 
+    /// WHAT A CONTROL CAN BE CALLED, in both languages.
+    ///
+    /// ── Voice Control listens in the PHONE's language, not the app's ──
+    ///
+    /// This app is Bulgarian by declaration and every name in it is
+    /// Bulgarian. Voice Control's recogniser follows the device language,
+    /// and this owner's phone reports `en_BG` — English language, Bulgarian
+    /// region, an ordinary thing for a person to set, and the same setting
+    /// that made `BgDate` necessary. On it, Voice Control runs in English:
+    /// the labels are visible, correct, and unsayable. Saying «Покажи» to an
+    /// English recogniser produces nothing.
+    ///
+    /// `accessibilityInputLabels` takes a LIST of alternatives, so a control
+    /// can answer to both. Bulgarian stays FIRST — it is what appears when a
+    /// user turns on "Show Names", and it is what the screen says.
+    ///
+    /// ── What this does not reach ──
+    ///
+    /// Only controls with an explicit input label. Everywhere else Voice
+    /// Control falls back to the accessibility label, which is Bulgarian, so
+    /// an English recogniser cannot name those either. The platform's own way
+    /// out is "Show Numbers" — an overlay that puts a number on every control
+    /// — and that works whatever the language. This makes the controls a
+    /// person is most likely to reach for directly sayable without it.
+    ///
+    /// Only for FIXED names. A news headline and a price series are data;
+    /// they have no English form worth inventing, and `NewsView` and
+    /// `TrendsView` pass them through as they are. A commodity is the
+    /// exception, because the server's own slug IS the English word.
+    ///
+    /// Case-insensitively deduplicated, so passing a name that happens to be
+    /// the same in both does not register it twice.
+    static func spokenNames(_ names: String?...) -> [String] {
+        var seen = Set<String>()
+        return names
+            .compactMap { $0?.recorded }
+            .filter { seen.insert($0.lowercased()).inserted }
+    }
+
     /// Join facts as speech: nils and blanks dropped, comma-separated, one
     /// full stop at the end so VoiceOver pauses instead of running into
     /// whatever follows.

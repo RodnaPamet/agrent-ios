@@ -241,7 +241,7 @@ struct ExchangeView: View {
         // is the one thing a spoken interface cannot tolerate.
         .accessibilityLabel("Филтри")
         .accessibilityValue(listings.query.isFiltered ? "активни" : "")
-        .accessibilityInputLabels(["Филтри"])
+        .accessibilityInputLabels(A11y.spokenNames("Филтри", "Filters"))
     }
 
     // MARK: - Mine: the seller's custody view
@@ -361,7 +361,10 @@ struct ListingRow: View {
                 listing.side.label,
                 listing.regionName,
             ]),
-            saying: [CommodityName.canonical(listing.commodity) ?? listing.commodity])
+            // The server's slug is the English word, so the English name
+            // costs nothing to offer — see `A11y.spokenNames`.
+            saying: A11y.spokenNames(
+                CommodityName.canonical(listing.commodity), listing.commodity))
     }
 }
 

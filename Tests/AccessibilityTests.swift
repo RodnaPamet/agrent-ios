@@ -183,3 +183,37 @@ final class SchematicAccessibilityTests: XCTestCase {
         XCTAssertFalse(label.contains("·"), label)
     }
 }
+
+/// What a control can be CALLED, as opposed to what it is called.
+///
+/// Voice Control's recogniser follows the phone's language, not the app's,
+/// and this owner's phone reports `en_BG` — the same setting that made
+/// `BgDate` necessary. On it the Bulgarian names are visible, correct and
+/// unsayable, so each control offers an English alternative alongside.
+final class SpokenNamesTests: XCTestCase {
+
+    /// Bulgarian FIRST. The first entry is what "Show Names" displays, and
+    /// what the screen itself says.
+    func testBulgarianLeadsAndEnglishFollows() {
+        XCTAssertEqual(A11y.spokenNames("Изпрати", "Send"), ["Изпрати", "Send"])
+    }
+
+    func testBlanksAndNilsAreDropped() {
+        XCTAssertEqual(A11y.spokenNames("Филтри", nil, "", "   ", "Filters"),
+                       ["Филтри", "Filters"])
+    }
+
+    /// The commodity case: the server's slug IS the English word, so the
+    /// call site passes it straight through — and for a commodity whose two
+    /// forms happen to coincide that must not register twice.
+    func testANameThatIsTheSameInBothLanguagesAppearsOnce() {
+        XCTAssertEqual(A11y.spokenNames("Рапица", "rapeseed"), ["Рапица", "rapeseed"])
+        XCTAssertEqual(A11y.spokenNames("Wheat", "wheat"), ["Wheat"])
+    }
+
+    /// Nothing to say is an empty list rather than a list of one empty
+    /// string, which Voice Control would treat as a nameless control.
+    func testNothingSayableIsAnEmptyList() {
+        XCTAssertTrue(A11y.spokenNames(nil, "", " ").isEmpty)
+    }
+}
