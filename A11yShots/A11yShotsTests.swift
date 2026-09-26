@@ -75,6 +75,33 @@ final class A11yShotsTests: XCTestCase {
         // shape PR #93 changed.
         capture("01-journal", app: app)
 
+        // ── The screens reached from the menu, done BEFORE Локации ──
+        //
+        // Локации pushes into a location and then cycles the map mode, so it
+        // ends two screens deep with `@AppStorage` state to restore. Doing the
+        // menu screens first means every one of them starts from the same
+        // place — the Дневник root — and a failure in one cannot leave the next
+        // somewhere unexpected.
+        //
+        // Риск, Новини and Табло are NOT tabs by default: the bottom bar comes
+        // from /api/auth/me and holds five of nine surfaces, so these live in
+        // `tabs.overflow` and open as sheets from the menu. Админ is an
+        // unconditional menu row. That means the menu is the only read-only
+        // route to them — moving a surface into the bar goes through
+        // `BottomTabsStore.save()`, which is a PUT against the live tenant.
+        captureFromMenu("05-risk", label: "Риск", app: app)
+        captureFromMenu("06-news", label: "Новини", app: app)
+        captureFromMenu("07-dashboard", label: "Табло", app: app)
+        captureAdmin(app)
+
+        // Задачи and Борса ARE in the default bar — but the bar is whatever the
+        // server sent, so this asks the tab bar first and falls back to the
+        // menu rather than assuming. A suite that assumes a tab exists reports
+        // "no Задачи button" for a farm that simply arranged its bar
+        // differently.
+        captureTabOrMenu("08-tasks", label: "Задачи", app: app)
+        captureTabOrMenu("09-exchange", label: "Борса", app: app)
+
         // Локации → a location's map: the one #97 calls "the one that matters
         // most", because Increase Contrast is what switches the near-solid
         // fill on and the label outline is the answer to it.
@@ -193,6 +220,255 @@ final class A11yShotsTests: XCTestCase {
     /// The button offers «Точни очертания» exactly when the schematic is what
     /// is on screen.
     private var schematicIsOn: String { "Точни очертания" }
+
+
+    // MARK: - reaching the screens that are not tabs
+
+    /// THE MENU HOLDS «ИЗХОД», so nothing here may tap by index.
+    ///
+    /// `AppMenuButton` lists the overflow surfaces, then Админ, then a
+    /// destructive «Изход» that calls `auth.signOut()` — which clears the
+    /// Keychain. This suite runs against a simulator somebody has SIGNED IN ON,
+    /// without the DEBUG seam, so a mis-tap there would destroy a real Google
+    /// session and every subsequent capture would be of `SignInView`.
+    ///
+    /// Every lookup below is by exact label. There is no `element(boundBy:)`
+    /// anywhere in this file's menu handling, and there must not be.
+    private func openMenu(_ app: XCUIApplication) -> Bool {
+        let menu = app.buttons["Меню"]
+        guard menu.waitForExistence(timeout: 10) else { return false }
+        menu.tap()
+        return true
+    }
+
+    /// Tap a menu row by its exact label, refusing «Изход» explicitly.
+    ///
+    /// The refusal is belt and braces — no caller passes it — but a guard that
+    /// only exists in a comment is the failure mode this project keeps finding,
+    /// so it is code.
+    private func tapMenuRow(_ label: String, in app: XCUIApplication) -> Bool {
+        guard label != "Изход" else {
+            XCTFail("this suite must never tap «Изход» — it would clear the Keychain")
+            return false
+        }
+        let row = app.buttons[label]
+        guard row.waitForExistence(timeout: 5) else { return false }
+        row.tap()
+        return true
+    }
+
+    /// Open a menu-presented screen, photograph it, and put it back.
+    private func captureFromMenu(_ name: String, label: String, app: XCUIApplication) {
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for \(label)")
+        XCTAssertTrue(tapMenuRow(label, in: app),
+                      "«\(label)» is not in the menu — it may be in the bottom bar")
+
+        // These sheets all load over the network. There is no single element
+        // common to six different screens worth waiting on, so this waits for
+        // the sheet's own navigation bar and then gives the content a fixed
+        // moment. A guess, and named as one: if a capture comes out empty this
+        // is the number to raise.
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20),
+                      "«\(label)» did not present a sheet")
+        Thread.sleep(forTimeInterval: 4)
+        capture(name, app: app)
+        dismissSheet(app, named: label)
+    }
+
+    /// A surface that is normally a tab, but need not be.
+    private func captureTabOrMenu(_ name: String, label: String, app: XCUIApplication) {
+        let tab = app.tabBars.buttons[label]
+        if tab.waitForExistence(timeout: 3) {
+            tab.tap()
+            XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20),
+                          "the «\(label)» tab showed nothing")
+            Thread.sleep(forTimeInterval: 4)
+            capture(name, app: app)
+            // Back to the launch tab so the next step starts where it expects.
+            app.tabBars.buttons["Дневник"].tap()
+            return
+        }
+        captureFromMenu(name, label: label, app: app)
+    }
+
+    /// ТАБЛО HAS NO DISMISS BUTTON, which is why this is not just a tap.
+    ///
+    /// `DashboardView` has no «Затвори» and no `dismiss` of its own — the only
+    /// `@Environment(\.dismiss)` in that file belongs to `DashboardBlockPicker`.
+    /// So a sheet showing it can only be left by dragging it down. The other
+    /// five all have «Затвори» in the leading slot.
+    ///
+    /// Tries the button first and falls back to the drag, rather than choosing
+    /// per screen: one path that works for both is less to keep true than a
+    /// list of which screens have a button.
+    private func dismissSheet(_ app: XCUIApplication, named label: String) {
+        let close = app.buttons["Затвори"]
+        if close.exists {
+            close.tap()
+        } else {
+            // From just under the sheet's top edge to well down the screen. A
+            // `swipeDown()` on the app window starts too low and scrolls the
+            // sheet's own content instead of moving the sheet.
+            let top = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
+            let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+            top.press(forDuration: 0.1, thenDragTo: bottom)
+        }
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 10),
+                      "«\(label)» would not close — the run cannot continue from here")
+    }
+
+    /// Админ, MASKED, and the swipe that #99 is about.
+    ///
+    /// ── The ЕГН is never revealed ──
+    ///
+    /// A member row carries a national identity number behind «Покажи».
+    /// `AdminView` draws dots until that is tapped, so simply never tapping it
+    /// means no identity number is written to a PNG — the row's layout,
+    /// contrast and Dynamic Type are all still visible, which is what the audit
+    /// changed. The owner chose this over skipping the screen or revealing it.
+    ///
+    /// There is no assertion that the digits are absent, and that is honest
+    /// rather than lazy: the guarantee is that nothing taps «Покажи», which is
+    /// a property of this code, not of the image.
+    ///
+    /// ── The swipe ──
+    ///
+    /// agrent-ios#99. On the last active owner the deactivate action is absent,
+    /// so the row springs back with nothing revealed and no explanation. A
+    /// probe could not settle what `.swipeActions` renders for a non-Button —
+    /// its positive control came back empty, so it proved nothing — and a real
+    /// swipe photographed is the only answer available here.
+    private func captureAdmin(_ app: XCUIApplication) {
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Админ")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20),
+                      "Админ did not present a sheet")
+        Thread.sleep(forTimeInterval: 4)
+
+        // No assertion that the digits are absent. `x && false` would have
+        // been one that cannot fail, which is the defect this repo has spent a
+        // week removing — and there is nothing honest to assert here anyway:
+        // the guarantee is that this method never taps «Покажи», which is a
+        // property of the code above and not of the image below.
+        capture("10-admin-masked", app: app)
+
+        // THE SWIPE, AND WHY IT IS SAFE ONLY SINCE `allowsFullSwipe: false`.
+        //
+        // Until that landed, `.swipeActions(edge: .trailing)` had full swipe
+        // ENABLED and the first action was `Button(role: .destructive)` calling
+        // `store.setActive(member, active: false)`. `XCUIElement.swipeLeft()`
+        // is a fast gesture that completes a full swipe, so photographing the
+        // revealed actions would have DEACTIVATED A REAL MEMBER of the owner's
+        // farm — a write, against production, from a suite whose whole premise
+        // is that it only reads.
+        //
+        // Full swipe is off now, so the actions reveal and nothing fires until
+        // a button is tapped. Nothing here taps one.
+        //
+        // Worth keeping as the general rule: a read-only suite is only
+        // read-only if every GESTURE is read-only. A tap can be checked by
+        // reading which button it lands on; a swipe can trigger an action
+        // nobody named at the call site.
+        // THE OWNER'S ROW, BY LABEL — not `cells.firstMatch`.
+        //
+        // The first cell on this screen is «Долна лента» under «Приложение»,
+        // which has no swipe actions at all. Swiping it photographed an
+        // untouched screen and looked like a successful capture; only opening
+        // the image showed the swipe had answered a different question.
+        //
+        // The row carries a combined label built by `A11y.sentence`, which
+        // includes the role — so «Собственик» finds the owner, who is also the
+        // LAST ACTIVE OWNER and therefore exactly the case #99 is about.
+        // `.other`, NOT `.cells`. Measured: on this screen all 18 cells have
+        // an EMPTY label, and the combined row label — «Eivo Ivanov,
+        // Собственик, 11 активни сесии.», built by `A11y.sentence` — sits on
+        // an `.other` element inside the cell. So `cells.matching(label ...)`
+        // matches nothing, and `cells.firstMatch` is «Долна лента», which has
+        // no swipe actions at all.
+        //
+        // That first attempt photographed an untouched screen and passed. The
+        // capture is what showed it had answered a different question.
+        // AT AX5 THE MEMBER ROWS ARE BELOW THE FOLD, and this used to cost the
+        // whole variant.
+        //
+        // «Долна лента» alone fills most of an accessibility5 screen, so the
+        // first member row starts off-screen. The swipe checks then failed the
+        // test, `continueAfterFailure` is false, and the run produced ZERO
+        // screenshots for the one text size the Dynamic Type items are about.
+        // A check that cannot run taking the captures down with it is the worst
+        // of both.
+        //
+        // So: scroll toward them first, and if they are still not reachable,
+        // skip the swipe pair and say so. The #99 assertions run at the other
+        // three sizes, and what AX5 is FOR is the layout capture above.
+        app.swipeUp()
+        Thread.sleep(forTimeInterval: 1)
+
+        let ownerRow = app.descendants(matching: .other)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Собственик"))
+            .firstMatch
+        guard ownerRow.waitForExistence(timeout: 10), ownerRow.isHittable else {
+            // NOT silent. The variant's output is short two files and this says
+            // why, so a reader comparing directories is not left guessing.
+            print("SKIPPED the #99 swipe checks: no hittable «Собственик» row at this "
+                  + "text size. Expected at the accessibility sizes; if it happens at "
+                  + "the default size, access is refused or the row label changed.")
+            dismissSheet(app, named: "Админ")
+            return
+        }
+        ownerRow.swipeLeft()
+        Thread.sleep(forTimeInterval: 1)
+        // #99's answer is in this image: whether SwiftUI renders a non-Button
+        // in a swipe slot at all. If the slot is empty, the `Label` in
+        // `AdminView.actions(for:)` has to become a disabled Button.
+        // ASSERTED, not just photographed. #99's answer is that a bare `Label`
+        // in a swipe slot renders nothing and a disabled Button does — so if
+        // somebody changes `AdminView.actions(for:)` back to a non-Button, the
+        // explanation silently disappears again and only this fails.
+        XCTAssertTrue(app.buttons["Последният собственик не може да се деактивира"].exists,
+                      "the last owner's row revealed no explanation — a non-Button in a "
+                      + "swipeActions slot renders nothing, see AdminView.actions(for:)")
+        capture("11-admin-row-swiped", app: app)
+        ownerRow.swipeRight()
+        Thread.sleep(forTimeInterval: 1)
+
+        // THE POSITIVE CONTROL, which is the whole reason this pair exists.
+        //
+        // An «Администратор» is not the last owner, so its slot holds a real
+        // `Button(role: .destructive)`. If THIS swipe reveals «Деактивирай»
+        // and the owner's does not, the gesture works and the difference is
+        // the content — which answers #99. If neither reveals anything, the
+        // swipe is not landing and the owner's empty slot proves nothing.
+        //
+        // An in-process probe failed to answer this exact question BECAUSE it
+        // had no positive control: its known-good Button also came back empty,
+        // so its empty results meant nothing. Same mistake is cheap to repeat.
+        //
+        // Safe only because `allowsFullSwipe: false`: the action reveals and
+        // nothing fires until a button is tapped. Nothing here taps one.
+        let adminRow = app.descendants(matching: .other)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Администратор"))
+            .firstMatch
+        if adminRow.waitForExistence(timeout: 5) {
+            adminRow.swipeLeft()
+            Thread.sleep(forTimeInterval: 1)
+            // THE POSITIVE CONTROL, asserted. Without this the line above is
+            // worthless: an empty slot and a swipe that never landed look
+            // identical, which is precisely how the earlier probe went wrong.
+            XCTAssertTrue(app.buttons["Деактивирай"].exists,
+                          "the control swipe revealed nothing either — the gesture is not "
+                          + "landing, so nothing can be concluded about the owner's row")
+            capture("12-admin-control-swiped", app: app)
+            adminRow.swipeRight()
+            Thread.sleep(forTimeInterval: 1)
+        } else {
+            print("SKIPPED the positive control: no hittable «Администратор» row at this "
+                  + "text size. The owner-row assertion above already passed, which it "
+                  + "could not have done if the gesture were not landing.")
+        }
+
+        dismissSheet(app, named: "Админ")
+    }
 
     // MARK: - helpers
 

@@ -106,7 +106,28 @@ struct AdminView: View {
                 Section(status.label) {
                     ForEach(rows) { member in
                         MemberRow(member: member)
-                            .swipeActions(edge: .trailing) { actions(for: member) }
+                            // FULL SWIPE OFF, which is the owner's ruling and
+                            // closes a real hole.
+                            //
+                            // `allowsFullSwipe` defaults to TRUE, so a
+                            // brisk swipe across a row fired the first
+                            // destructive action directly — deactivating a
+                            // member, removing their access to the farm, with
+                            // no tap and no confirmation.
+                            //
+                            // The comment below reasons carefully about a TAP
+                            // ("a button on every row invites a tap that was
+                            // not meant") and nobody considered the gesture
+                            // that reveals it. Same shape as the rest of this
+                            // week: the care went into the case somebody
+                            // pictured.
+                            //
+                            // Found by writing a UI test that swipes this row,
+                            // and realising the test itself would have
+                            // deactivated somebody real.
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                actions(for: member)
+                            }
                     }
                 }
             }
@@ -127,7 +148,54 @@ struct AdminView: View {
         if store.busy.contains(member.id) {
             EmptyView()
         } else if member.status == .active {
-            if !store.isLastOwner(member) {
+            if store.isLastOwner(member) {
+                // agrent-ios#99 — SAY WHY, RATHER THAN SPRINGING BACK SILENTLY.
+                //
+                // The destructive action stays ABSENT for the last active
+                // owner: the server counts them live with a database trigger
+                // behind it, and an action that cannot work should not be
+                // offered. That reasoning is sound for a TAP and leaves a
+                // swipe with nothing at all — the row bounces back, which is
+                // indistinguishable from a swipe that did not register, so the
+                // admin swipes again harder.
+                //
+                // NOT A BUTTON. A `Label` in a swipe slot, so the guard is not
+                // weakened by making the refusal look actionable, and VoiceOver
+                // has something to announce where there was silence.
+                //
+                // A DISABLED BUTTON, AND NOT BY PREFERENCE. The owner asked
+                // for something that is NOT a button, and SwiftUI does not
+                // offer one here.
+                //
+                // Measured rather than read, by photographing real swipes on
+                // this screen:
+                //
+                //     a bare `Label` in the slot      renders NOTHING
+                //     a disabled `Button`             renders
+                //     a real Button (the control)     renders «Деактивирай»
+                //
+                // The control is what makes the first line mean anything. An
+                // earlier in-process probe reached the opposite conclusion —
+                // or rather reached no conclusion and read as one — because
+                // its known-good Button ALSO came back empty, so its empty
+                // results were evidence of nothing.
+                //
+                // THE COST, since it is a real one: VoiceOver announces this
+                // as a dimmed button rather than as text. A farmer hears
+                // something that sounds actionable and is not. That is worse
+                // than plain text and better than the silence it replaces,
+                // where a swipe sprang back with no explanation and the admin
+                // swiped again harder.
+                //
+                // The spoken label carries the whole sentence; the visible one
+                // is short because a swipe slot is narrow.
+                Button {} label: {
+                    Label("Последният собственик", systemImage: "lock")
+                }
+                .disabled(true)
+                .tint(Color(.systemGray3))
+                .accessibilityLabel("Последният собственик не може да се деактивира")
+            } else {
                 Button(role: .destructive) {
                     Task { await store.setActive(member, active: false) }
                 } label: {

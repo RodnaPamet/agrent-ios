@@ -377,3 +377,50 @@ final class InsuranceCorrectionNoticeTests: XCTestCase {
                                          tariffBp: 1000, engineVersion: nil)))
     }
 }
+
+/// A SPACE IS NEVER A DECIMAL SEPARATOR.
+///
+/// Found by the server session, which checked its own parsers after I sent it
+/// the «1,2,3,4» case and found the same hole behind SPACES — in both its
+/// money and its area parser. Mine already refused «1 2 3 4», because the
+/// grouping check looks at the groups BETWEEN the first and the last and there
+/// were two of them. It never looked at a two-group input, so «1 23» read as
+/// 1.23 and «1 2» as 1.2.
+///
+/// The shape of the bug I had in mind was the shape I had already fixed. These
+/// are the inputs, not the rule.
+final class InsuranceSpaceSeparatorTests: XCTestCase {
+
+    func testASpaceCannotOpenADecimalTail() {
+        for text in ["1 23", "1 2", "12 34", "1 2 3 4", "12 3456", "100 00"] {
+            XCTAssertNil(InsurancePremium.moneyCents(text), "money accepted «\(text)»")
+            XCTAssertNil(InsurancePremium.areaDecares(text), "area accepted «\(text)»")
+        }
+    }
+
+    /// The other direction, which is the one this kind of fix breaks: every
+    /// shape a farmer actually types still parses.
+    func testEverythingValidStillParses() throws {
+        XCTAssertEqual(InsurancePremium.moneyCents("100 000"), 10_000_000)
+        XCTAssertEqual(InsurancePremium.moneyCents("12 345"), 1_234_500)
+        XCTAssertEqual(InsurancePremium.moneyCents("100 000,50"), 10_000_050)
+        XCTAssertEqual(InsurancePremium.moneyCents("1 234 567.89"), 123_456_789)
+        XCTAssertEqual(InsurancePremium.moneyCents("  37 500,55  "), 3_750_055)
+        XCTAssertEqual(InsurancePremium.moneyCents("100,50"), 10_050)
+
+        XCTAssertEqual(try XCTUnwrap(InsurancePremium.areaDecares("1 000,5")),
+                       1000.5, accuracy: 0.0000001)
+        XCTAssertEqual(try XCTUnwrap(InsurancePremium.areaDecares("12,345")),
+                       12.345, accuracy: 0.0000001)
+    }
+
+    /// A letter anywhere is refused rather than skipped. The old splitter
+    /// dropped unknown characters by filtering empty components, so «12a34»
+    /// could have become two groups; this walks the string and refuses.
+    func testANonDigitIsRefusedRatherThanSkipped() {
+        for text in ["12a34", "1,2a", "а100", "100 000x"] {
+            XCTAssertNil(InsurancePremium.moneyCents(text), "money accepted «\(text)»")
+            XCTAssertNil(InsurancePremium.areaDecares(text), "area accepted «\(text)»")
+        }
+    }
+}

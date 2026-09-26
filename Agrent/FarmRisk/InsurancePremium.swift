@@ -160,17 +160,52 @@ enum InsurancePremium {
     /// Digits split on every separator a keyboard might produce, or nil when
     /// the text is not a number at all. A non-breaking space is included
     /// because that is what an iOS number pad's grouping inserts.
+    ///
+    /// A SPACE IS NEVER A DECIMAL SEPARATOR, which is the distinction this
+    /// originally missed. Every separator was treated alike, so a space could
+    /// introduce a decimal tail and «1 23» read as 1.23 — money or decares.
+    /// Nonsense producing a plausible number, which on this form reaches an
+    /// operator as a real one.
+    ///
+    /// Only «,» and «.» may open the tail. After a space the group that
+    /// follows has to be exactly three digits, because that is the only thing
+    /// a space can mean between digits.
+    ///
+    /// Found by the server session checking its own parsers after I sent it
+    /// the «1,2,3,4» case, finding the same hole behind SPACES in both of
+    /// theirs, and saying so. My grouping check already refused «1 2 3 4»; it
+    /// never looked at a TWO-group input, because the shape I had in mind for
+    /// the bug was the shape I had already fixed.
     private static func separatedGroups(_ text: String) -> [String]? {
-        let separators = CharacterSet(charactersIn: ". ,\u{00A0}\u{202F}'")
+        let decimalSeparators: Set<Character> = [",", "."]
+        let spaceSeparators: Set<Character> = [" ", "\u{00A0}", "\u{202F}", "'"]
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        let groups = trimmed
-            .components(separatedBy: separators)
-            .filter { !$0.isEmpty }
-        guard !groups.isEmpty,
-              groups.allSatisfy({ $0.allSatisfy(\.isNumber) })
-        else { return nil }
+        var groups: [String] = []
+        var separators: [Character] = []
+        var current = ""
+        for character in trimmed {
+            if character.isNumber {
+                current.append(character)
+            } else if decimalSeparators.contains(character)
+                        || spaceSeparators.contains(character) {
+                guard !current.isEmpty else { return nil }
+                groups.append(current)
+                separators.append(character)
+                current = ""
+            } else {
+                return nil
+            }
+        }
+        guard !current.isEmpty else { return nil }
+        groups.append(current)
+
+        // A group that FOLLOWS A SPACE is a thousands group and nothing else.
+        for (index, separator) in separators.enumerated()
+        where spaceSeparators.contains(separator) {
+            guard groups[index + 1].count == 3 else { return nil }
+        }
 
         // EVERY GROUP BETWEEN THE FIRST AND THE LAST MUST BE EXACTLY THREE
         // DIGITS, because that is what a thousands separator means.
