@@ -112,12 +112,6 @@ final class DecoderToleranceTests: XCTestCase {
         {"id":"t","title":"Пръскане","status":"OPEN","dueAt":null}
         """#) { _ = try await APIClient.shared.decode($0, as: AgDashboard.TaskItem.self) },
 
-        Probe("TrendDataPoint", #"""
-        {"date":"2026-09-24","evidenceOverdue":0,"evidenceDueSoon7d":0,
-         "evidenceCurrent":2,"tasksOpen":1,"tasksOverdue":0,"assetsTotal":3,
-         "assetsActive":3,"assetsHighCriticality":0,"assetsRetired":0}
-        """#) { _ = try await APIClient.shared.decode($0, as: TrendDataPoint.self) },
-
         Probe("FarmTaskTrendPoint", #"""
         {"date":"2026-09-25","created":3,"completed":1}
         """#) { _ = try await APIClient.shared.decode($0, as: FarmTaskTrendPoint.self) },
@@ -263,11 +257,6 @@ final class DecoderToleranceTests: XCTestCase {
         "AgDashboard.JournalItem": ["id", "title", "type"],
         "AgDashboard.LowStockItem": ["id", "name", "quantityOnHand", "unitSymbol"],
         "AgDashboard.TaskItem": ["id", "status", "title"],
-        "TrendDataPoint": [
-            "assetsActive", "assetsHighCriticality", "assetsRetired", "assetsTotal",
-            "date", "evidenceCurrent", "evidenceDueSoon7d", "evidenceOverdue",
-            "tasksOpen", "tasksOverdue",
-        ],
         "FarmTaskTrendPoint": ["completed", "created", "date"],
         "BriefingAction": ["action", "priority"],
         "ImportJobStatus": ["state"],

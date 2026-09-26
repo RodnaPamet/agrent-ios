@@ -194,55 +194,18 @@ final class DashboardTests: XCTestCase {
 
     // MARK: - Two sibling endpoints, two envelopes
 
-    /// `/dashboard/trends` carries range metadata; `/dashboard/task-trend`
-    /// answers with a bare `{trend: [...]}`. Documented rather than
-    /// discovered — a client that assumed the sibling's envelope would have
-    /// decoded nothing and had no idea why.
-    func testTheTwoTrendEndpointsHaveDifferentEnvelopes() async throws {
-        let metric = try await decode(#"""
-        {"dataPoints":[],"daysRequested":90,"daysAvailable":90,
-         "rangeStart":"2026-06-27","rangeEnd":"2026-09-25"}
-        """#, as: TrendPayload.self)
-        XCTAssertEqual(metric.daysRequested, 90)
-
+    /// The task trend answers a bare `{trend: [...]}`.
+    ///
+    /// Its sibling `/dashboard/trends` carried range metadata instead — two
+    /// shapes under one prefix — and was deleted unused on 2026-09-26. The
+    /// asymmetry is recorded in `TrendModels` rather than here, because a test
+    /// for a type that no longer exists is not a test.
+    func testTheTaskTrendIsABareEnvelope() async throws {
         let tasks = try await decode(#"""
         {"trend":[{"date":"2026-09-25","created":3,"completed":1}]}
         """#, as: FarmTaskTrend.self)
         XCTAssertEqual(tasks.trend.first?.created, 3)
-
-        // The shapes really are incompatible, which is the point of keeping
-        // two types rather than one generic that hides it.
-        let asMetric = try? await decode(#"""
-        {"trend":[{"date":"2026-09-25","created":3,"completed":1}]}
-        """#, as: TrendPayload.self)
-        XCTAssertNil(asMetric)
-    }
-
-    /// A young tenant has less history than the screen asked for. The server's
-    /// instruction is explicit: plot the range you were GIVEN, because padding
-    /// the difference with zeroes draws a collapse that never happened.
-    ///
-    /// Nothing here pads — `dataPoints` is exactly what arrived — and
-    /// `isPartial` exists so a view can say the range is short instead of
-    /// drawing sixty-nine days of nothing followed by a farm.
-    func testAShortRangeIsFlaggedAndNeverPadded() async throws {
-        let young = try await decode(#"""
-        {"dataPoints":[{"date":"2026-09-24","evidenceOverdue":0,"evidenceDueSoon7d":0,
-                        "evidenceCurrent":2,"tasksOpen":1,"tasksOverdue":0,
-                        "assetsTotal":3,"assetsActive":3,"assetsHighCriticality":0,
-                        "assetsRetired":0}],
-         "daysRequested":90,"daysAvailable":21,
-         "rangeStart":"2026-09-04","rangeEnd":"2026-09-25"}
-        """#, as: TrendPayload.self)
-
-        XCTAssertTrue(young.isPartial)
-        XCTAssertEqual(young.dataPoints.count, 1, "exactly what arrived, padded to nothing")
-
-        let whole = try await decode(#"""
-        {"dataPoints":[],"daysRequested":30,"daysAvailable":30,
-         "rangeStart":"2026-08-26","rangeEnd":"2026-09-25"}
-        """#, as: TrendPayload.self)
-        XCTAssertFalse(whole.isPartial)
+        XCTAssertEqual(tasks.trend.count, 1)
     }
 
     // MARK: - The briefing, and why there is none
@@ -340,31 +303,31 @@ final class DashboardTests: XCTestCase {
 
     // MARK: - Dates, which none of these routes pin
 
-    /// Not one date field across the four routes declares a `format`, so every
-    /// one is parsed rather than decoded — the same asymmetry as the parcel
-    /// archive, and the same reason: one unparseable value must not fail an
-    /// envelope full of things that parsed.
-    func testEveryDateShapeAcrossTheseRoutesParses() async throws {
+    /// No date field on these routes declares a `format`, so every one is
+    /// parsed rather than decoded — the same asymmetry as the parcel archive,
+    /// and the same reason: one unparseable value must not fail an envelope
+    /// full of things that parsed.
+    ///
+    /// Written against `FarmTaskTrendPoint` now. It used `TrendPayload`, which
+    /// was deleted unused — but the property under test belongs to every date
+    /// on every one of these routes, so it moved rather than went.
+    func testEveryDateShapeOnTheseRoutesParses() async throws {
         let bareDay = try await decode(#"""
-        {"dataPoints":[],"daysRequested":7,"daysAvailable":7,
-         "rangeStart":"2026-09-18","rangeEnd":"2026-09-25"}
-        """#, as: TrendPayload.self)
-        XCTAssertNotNil(bareDay.rangeStart)
+        {"date":"2026-09-25","created":3,"completed":1}
+        """#, as: FarmTaskTrendPoint.self)
+        XCTAssertNotNil(bareDay.date)
 
         let instant = try await decode(#"""
-        {"dataPoints":[],"daysRequested":7,"daysAvailable":7,
-         "rangeStart":"2026-09-18T00:00:00.000Z","rangeEnd":"2026-09-25T00:00:00Z"}
-        """#, as: TrendPayload.self)
-        XCTAssertNotNil(instant.rangeStart)
-        XCTAssertNotNil(instant.rangeEnd)
+        {"date":"2026-09-25T00:00:00.000Z","created":3,"completed":1}
+        """#, as: FarmTaskTrendPoint.self)
+        XCTAssertNotNil(instant.date)
 
         // Unparseable is nil rather than a throw: the counts are still good.
         let bad = try await decode(#"""
-        {"dataPoints":[],"daysRequested":7,"daysAvailable":7,
-         "rangeStart":"осемнадесети","rangeEnd":"2026-09-25"}
-        """#, as: TrendPayload.self)
-        XCTAssertNil(bad.rangeStart)
-        XCTAssertEqual(bad.daysRequested, 7)
+        {"date":"осемнадесети","created":3,"completed":1}
+        """#, as: FarmTaskTrendPoint.self)
+        XCTAssertNil(bad.date)
+        XCTAssertEqual(bad.created, 3)
     }
 
     // MARK: - Paths
@@ -389,26 +352,21 @@ final class DashboardTests: XCTestCase {
     /// server fall back to its default SILENTLY — drawing a convincing chart of
     /// the wrong period. A request this client knows to be invalid is not made.
     func testAnOutOfRangeWindowIsClampedRatherThanSent() {
-        XCTAssertTrue(DashboardAPI.trendsPath(days: 0).hasSuffix("days=1"))
-        XCTAssertTrue(DashboardAPI.trendsPath(days: -30).hasSuffix("days=1"))
         XCTAssertTrue(DashboardAPI.taskTrendPath(days: 0).hasSuffix("days=1"))
+        XCTAssertTrue(DashboardAPI.taskTrendPath(days: -30).hasSuffix("days=1"))
     }
 
-    /// The two routes DEFAULT to different windows — 90 and 14 — so omitting
-    /// the parameter on both compares a quarter against a fortnight. Named
-    /// constants exist so a caller can pass one window to both deliberately.
-    func testTheTwoRoutesDefaultToDifferentWindows() {
-        XCTAssertEqual(DashboardAPI.DefaultWindow.metrics, 90)
+    /// The window is NAMED rather than omitted. The deleted sibling defaulted
+    /// to 90 where this one defaults to 14, so a screen that omitted `days` on
+    /// both compared a quarter with a fortnight — the reason this constant
+    /// exists at all, kept now that only one of the pair remains.
+    func testTheTaskWindowIsNamed() {
         XCTAssertEqual(DashboardAPI.DefaultWindow.tasks, 14)
-        XCTAssertNotEqual(DashboardAPI.DefaultWindow.metrics,
-                          DashboardAPI.DefaultWindow.tasks)
     }
 
     func testThePathsMatchTheSpec() {
         XCTAssertTrue(DashboardAPI.agPath.hasSuffix("/dashboard/ag"))
-        XCTAssertTrue(DashboardAPI.trendsPath().hasSuffix("/dashboard/trends"))
         XCTAssertTrue(DashboardAPI.taskTrendPath().hasSuffix("/dashboard/task-trend"))
-        XCTAssertTrue(DashboardAPI.trendsPath(days: 30).hasSuffix("/trends?days=30"))
         // Under /reports, not /dashboard — the prefix decides which roles the
         // server's lockdown lets through, so it is not cosmetic.
         XCTAssertTrue(DashboardAPI.fieldBriefingPath.hasSuffix("/reports/field-briefing"))

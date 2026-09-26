@@ -1,81 +1,40 @@
 import Foundation
 
-// MARK: - GET /dashboard/trends
+// MARK: - GET /dashboard/trends — MODELLED, THEN DELETED
 
-/// Metric history, with the range the server could actually answer for.
+/// `TrendPayload` and `TrendDataPoint` lived here and were removed on
+/// 2026-09-26, unused. The owner chose the two-line created-against-completed
+/// chart over the ten-series metric trend, so the route was never rendered:
+/// fully modelled, fully tested, and read by nothing.
 ///
-/// ── `daysAvailable` can be SMALLER than `daysRequested` ──
+/// Deleted rather than kept, on this file's own house rule — `Location`'s
+/// header puts it as "user ids that a mobile client has no use for. Decodable
+/// ignores what it is not asked for." A type nothing decodes cannot be wrong in
+/// a way anyone notices, which is exactly what makes it rot.
 ///
-/// A young tenant has fewer days of history than the screen asked for, and the
-/// server says what to do about it: *"Plot the range you were given, not the
-/// one you requested: a chart that pads the difference with zeroes shows a
-/// collapse that never happened."*
+/// ── The four things it knew, so nobody has to rediscover them ──
 ///
-/// So nothing here pads, and `isPartial` exists so a view can SAY the range is
-/// short rather than drawing it as if it were not. A farm three weeks old
-/// asking for ninety days would otherwise get a chart that looks like sixty-
-/// nine days of nothing followed by a farm — which is the same defect as a
-/// capped list that looks like a complete one.
-struct TrendPayload: Decodable, Equatable, Sendable {
-    let dataPoints: [TrendDataPoint]
-    let daysRequested: Int
-    let daysAvailable: Int
-
-    /// No `format` declared on either, so parsed rather than decoded.
-    let rangeStartRaw: String
-    let rangeEndRaw: String
-
-    var rangeStart: Date? { BgDate.parseInstantOrDay(rangeStartRaw) }
-    var rangeEnd: Date? { BgDate.parseInstantOrDay(rangeEndRaw) }
-
-    enum CodingKeys: String, CodingKey {
-        case dataPoints, daysRequested, daysAvailable
-        case rangeStartRaw = "rangeStart"
-        case rangeEndRaw = "rangeEnd"
-    }
-
-    /// The server had less history than was asked for. Not an error, and not
-    /// something to hide: it is the difference between "nothing happened" and
-    /// "we were not here yet".
-    var isPartial: Bool { daysAvailable < daysRequested }
-}
-
-/// One day of counts.
+/// 1. THE TWO TREND ROUTES HAVE DIFFERENT ENVELOPES. `/dashboard/trends`
+///    answers `{dataPoints, daysRequested, daysAvailable, rangeStart,
+///    rangeEnd}`; `/dashboard/task-trend` answers a bare `{trend: [...]}`.
+///    Sibling routes under one prefix, two shapes. A client that assumed the
+///    sibling's envelope would decode nothing and have no idea why.
 ///
-/// NINE required integers plus a required `date`, none of them nullable —
-/// unusual in this API, and the reason this type has no leniency in it: a
-/// missing counter here would be a genuine server defect rather than an absent
-/// relation, and swallowing it would draw a zero that is a lie about the day.
+/// 2. THEY DEFAULT TO DIFFERENT WINDOWS — 90 days and 14. Omitting `days` on
+///    both compares a quarter against a fortnight, which looks like a data
+///    story and is not one.
 ///
-/// (It said "TEN required integers". Ten is the length of `required`, one of
-/// which is the date string. A small thing to get wrong in a file whose whole
-/// claim is that its comments were measured rather than remembered.)
-struct TrendDataPoint: Decodable, Equatable, Identifiable, Sendable {
-    let dateRaw: String
-
-    let evidenceOverdue: Int
-    let evidenceDueSoon7d: Int
-    let evidenceCurrent: Int
-    let tasksOpen: Int
-    let tasksOverdue: Int
-    let assetsTotal: Int
-    let assetsActive: Int
-    let assetsHighCriticality: Int
-    let assetsRetired: Int
-
-    var date: Date? { BgDate.parseInstantOrDay(dateRaw) }
-
-    /// The raw string, which is stable and unique per point, so a chart's
-    /// `ForEach` does not depend on a parse succeeding.
-    var id: String { dateRaw }
-
-    enum CodingKeys: String, CodingKey {
-        case dateRaw = "date"
-        case evidenceOverdue, evidenceDueSoon7d, evidenceCurrent
-        case tasksOpen, tasksOverdue
-        case assetsTotal, assetsActive, assetsHighCriticality, assetsRetired
-    }
-}
+/// 3. `daysAvailable` CAN BE SMALLER THAN `daysRequested` on a young tenant,
+///    and the server says plainly what to do about it: "Plot the range you
+///    were given, not the one you requested: a chart that pads the difference
+///    with zeroes shows a collapse that never happened."
+///
+/// 4. A data point carries NINE required integers plus a required `date` and
+///    not one of them is nullable — unusual in this API, and the reason that
+///    type had no leniency: a missing counter would be a real server defect,
+///    and swallowing it would draw a zero that is a lie about the day.
+///
+/// Restoring it is `git show 056e9ec:Agrent/Dashboard/TrendModels.swift`.
 
 // MARK: - GET /dashboard/task-trend
 
