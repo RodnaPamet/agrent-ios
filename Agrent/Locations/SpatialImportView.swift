@@ -39,6 +39,8 @@ struct SpatialImportView: View {
     @State private var refusal: SpatialImportRefusal?
     @State private var cropType: ChartableCommodity?
     @State private var phase: Phase = .choosing
+
+    private var isDone: Bool { if case .done = phase { true } else { false } }
     @Environment(\.dismiss) private var dismiss
 
     struct ChosenFile: Equatable {
@@ -53,7 +55,10 @@ struct SpatialImportView: View {
         /// Polling. The 202 is not an import — nothing has changed on the
         /// server when it returns, so the map must not be refreshed on it.
         case working(jobId: String, stage: ImportJobStage)
-        case done
+        /// Carries what the reconciliation DID, when the envelope said.
+        /// Optional rather than required: the counts are a summary, and a
+        /// finished import with no summary is still a finished import.
+        case done(SpatialImportDetails?)
         case failed(String)
     }
 
@@ -68,15 +73,20 @@ struct SpatialImportView: View {
             .inlineTitle("Импорт на граници")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(phase == .done ? "Готово" : "Отказ") {
-                        if phase == .done { onFinished() }
+                    Button(isDone ? "Готово" : "Отказ") {
+                        if isDone { onFinished() }
                         dismiss()
                     }
+                    // Same button, two words, so two names.
+                    .accessibilityInputLabels(isDone
+                        ? A11y.Spoken.done
+                        : A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if phase == .choosing {
                         Button("Импортирай") { Task { await start() } }
                             .disabled(chosen == nil)
+                            .accessibilityInputLabels(A11y.Spoken.importing)
                     }
                 }
             }
@@ -138,20 +148,12 @@ struct SpatialImportView: View {
             // the warning that was nearly shipped instead.
             Label(
                 existingParcelCount > 0
-                    ? "Импортът ДОБАВЯ парцели към «\(locationName)» — не заменя "
-                      + "съществуващите. Сега там има "
+                    ? "Импортът обновява съществуващите парцели на «\(locationName)», "
+                      + "добавя новите и не изтрива нищо. Сега там има "
                       + "\(Plural.bg(existingParcelCount, "парцел", "парцела"))."
                     : "Импортът добавя парцелите от файла към «\(locationName)».",
-                systemImage: "plus.square.on.square")
+                systemImage: "arrow.triangle.2.circlepath")
                 .font(.footnote)
-
-            if existingParcelCount > 0 {
-                Label(
-                    "Ако този файл вече е импортиран, всяко поле ще се появи втори път.",
-                    systemImage: "exclamationmark.triangle")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.warning)
-            }
         }
     }
 
@@ -176,9 +178,37 @@ struct SpatialImportView: View {
                     Text(stage.text)
                 }
 
-            case .done:
+            case .done(let details):
                 Label("Импортът завърши.", systemImage: "checkmark.circle")
                     .foregroundStyle(Palette.accent)
+
+                // THE NUMBERS COME FROM THE JOB, not from the sheet's guess.
+                //
+                // A pre-upload screen cannot know the split before the server
+                // has parsed anything — which is how two earlier versions of
+                // the warning above came to promise the wrong thing. Once the
+                // job has run, the split is a fact and is worth stating: a
+                // farmer who re-imports a corrected file wants to know how
+                // much of it matched what was already there.
+                //
+                // «Обновени» and «нови» sum to what the FILE contained.
+                // «Извън файла» is deliberately not added to them: those
+                // parcels were already here and the file did not mention
+                // them, so counting them as imported would report more than
+                // arrived.
+                if let details {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Обновени \(details.matched), нови \(details.created).")
+                        if details.flagged > 0 {
+                            Text(Plural.bg(details.flagged,
+                                           "парцел не е във файла и е запазен",
+                                           "парцела не са във файла и са запазени"))
+                                .foregroundStyle(Palette.warning)
+                        }
+                    }
+                    .font(.footnote)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
 
             case .failed(let message):
                 Label(message, systemImage: "exclamationmark.triangle")
@@ -280,7 +310,9 @@ struct SpatialImportView: View {
 
                 switch status.stage {
                 case .done:
-                    phase = .done
+                    // `result` is null until the job completes, so this is the
+                    // first poll that can carry the counts.
+                    phase = .done(status.result?.spatial)
                     onFinished()
                     return
                 case .failed:

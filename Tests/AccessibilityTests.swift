@@ -103,7 +103,8 @@ final class SchematicAccessibilityTests: XCTestCase {
     ) -> Parcel {
         Parcel(
             id: id, name: name, cropType: crop, areaHa: ha, geometry: nil,
-            soilType: nil, cadastralId: nil, ekatte: nil, hasActiveLease: nil
+            soilType: nil, cadastralId: nil, ekatte: nil, hasActiveLease: nil,
+            absentFromImportAt: nil
         )
     }
 
@@ -215,5 +216,39 @@ final class SpokenNamesTests: XCTestCase {
     /// string, which Voice Control would treat as a nameless control.
     func testNothingSayableIsAnEmptyList() {
         XCTAssertTrue(A11y.spokenNames(nil, "", " ").isEmpty)
+    }
+}
+
+/// The toolbar vocabulary, which is 29 sheet buttons speaking with 9 words.
+final class SpokenVocabularyTests: XCTestCase {
+
+    /// Bulgarian first in every one, because the first entry is what "Show
+    /// Names" displays and what the screen itself says.
+    func testEveryVerbLeadsWithBulgarianAndOffersEnglish() {
+        let vocabulary: [(String, [String])] = [
+            ("cancel", A11y.Spoken.cancel), ("close", A11y.Spoken.close),
+            ("save", A11y.Spoken.save), ("record", A11y.Spoken.record),
+            ("create", A11y.Spoken.create), ("publish", A11y.Spoken.publish),
+            ("send", A11y.Spoken.send), ("done", A11y.Spoken.done),
+            ("importing", A11y.Spoken.importing),
+        ]
+        XCTAssertEqual(vocabulary.count, 9)
+        for (name, names) in vocabulary {
+            XCTAssertEqual(names.count, 2, "\(name) should offer exactly two names")
+            XCTAssertTrue(names[0].unicodeScalars.contains { $0.properties.isAlphabetic
+                && $0.value >= 0x0400 && $0.value <= 0x04FF },
+                          "\(name) does not lead with Cyrillic: \(names)")
+            XCTAssertTrue(names[1].allSatisfy { $0.isASCII },
+                          "\(name)'s second name is not the English one: \(names)")
+        }
+    }
+
+    /// «Запази» and «Запиши» are both "Save" — two Bulgarian verbs, one
+    /// English one. Deliberate, and recorded so nobody "fixes" it by
+    /// inventing a second English word for a control that has no second name.
+    func testTwoVerbsDeliberatelyShareOneEnglishWord() {
+        XCTAssertEqual(A11y.Spoken.save[1], "Save")
+        XCTAssertEqual(A11y.Spoken.record[1], "Save")
+        XCTAssertNotEqual(A11y.Spoken.save[0], A11y.Spoken.record[0])
     }
 }

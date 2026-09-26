@@ -1,0 +1,50 @@
+{
+  "rows": [
+    {
+      "id": "log_fixture_1",
+      "type": "INPUT_APPLICATION",
+      "status": "DONE",
+      "title": "Третиране срещу плевели, блок 2",
+      "notes": "Гербицид, 1,5 л/дка. Вятър 2 м/с.",
+      "occurredAt": "2026-09-18T06:40:00.000Z",
+      "version": 3
+    },
+    {
+      "id": "log_fixture_2",
+      "type": "ACTIVITY",
+      "status": "DONE",
+      "title": "Профилактика на пръскачката",
+      "notes": null,
+      "occurredAt": "2026-09-16T13:05:00.000Z",
+      "version": 1
+    },
+    {
+      "id": "log_fixture_3",
+      "type": "OBSERVATION",
+      "status": "DONE",
+      "title": "Поява на житна дървеница",
+      "notes": "Единични екземпляри в северния край.",
+      "occurredAt": "2026-09-12T08:15:00.000Z",
+      "version": 1
+    },
+    {
+      "id": "log_fixture_4",
+      "type": "SEEDING",
+      "status": "PLANNED",
+      "title": "Сеитба на пшеница",
+      "notes": "След прибиране на слънчогледа.",
+      "occurredAt": "2026-10-05T05:00:00Z",
+      "version": 1
+    },
+    {
+      "id": "log_fixture_5",
+      "type": "__A_TYPE_THIS_BUILD_DOES_NOT_KNOW__",
+      "status": "DONE",
+      "title": "Запис от по-нова версия на сървъра",
+      "notes": null,
+      "occurredAt": "2026-09-10T09:00:00.000Z",
+      "version": 2
+    }
+  ],
+  "nextCursor": null
+}

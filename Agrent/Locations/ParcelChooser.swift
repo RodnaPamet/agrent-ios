@@ -62,6 +62,7 @@ struct ParcelChooser: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
             }
             // Tall enough to show the overlap without covering the map it

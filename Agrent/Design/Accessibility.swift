@@ -90,6 +90,38 @@ enum A11y {
             .filter { seen.insert($0.lowercased()).inserted }
     }
 
+
+    /// THE TOOLBAR VERBS, each with the English a Voice Control user would
+    /// actually say to it.
+    ///
+    /// Twenty-eight sheet buttons, and nine of them are the same word. Saying
+    /// «Отказ»/"Cancel" nine times at nine call sites is how the third and
+    /// fourth spellings of it appear, so the words live here and the screens
+    /// name one.
+    ///
+    /// WHY «ОТКАЗ» IS HERE AT ALL, when the owner's wording was "the main
+    /// action on each screen". Taken literally that gives an English speaker
+    /// a way to COMPLETE a sheet and no way to leave one — they open it by
+    /// voice, then have to turn on Show Numbers to back out. A sheet that can
+    /// only be finished is worse than one that was never sayable.
+    ///
+    /// «Запази» and «Запиши» are both "Save". Two Bulgarian verbs, one
+    /// English one, and no screen shows both at once — so the ambiguity
+    /// cannot arise where it would matter, and inventing a second English
+    /// word for it would be worse than sharing one.
+    enum Spoken {
+        static let cancel = spokenNames("Отказ", "Cancel")
+        static let close = spokenNames("Затвори", "Close")
+        static let save = spokenNames("Запази", "Save")
+        /// The operation sheet's own verb. "Save" as well — see above.
+        static let record = spokenNames("Запиши", "Save")
+        static let create = spokenNames("Създай", "Create")
+        static let publish = spokenNames("Публикувай", "Post")
+        static let send = spokenNames("Изпрати", "Send")
+        static let done = spokenNames("Готово", "Done")
+        static let importing = spokenNames("Импортирай", "Import")
+    }
+
     /// Join facts as speech: nils and blanks dropped, comma-separated, one
     /// full stop at the end so VoiceOver pauses instead of running into
     /// whatever follows.

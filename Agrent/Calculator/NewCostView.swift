@@ -154,13 +154,17 @@ struct NewCostView: View {
             .inlineTitle("Нов разход")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ") { dismiss() }.disabled(saving)
+                    Button("Отказ") { dismiss() }
+                        .disabled(saving)
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if saving {
                         ProgressView()
                     } else {
-                        Button("Запази") { Task { await save() } }.disabled(!canSave)
+                        Button("Запази") { Task { await save() } }
+                            .disabled(!canSave)
+                            .accessibilityInputLabels(A11y.Spoken.save)
                     }
                 }
             }

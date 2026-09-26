@@ -181,6 +181,7 @@ struct InsuranceRequestForm: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Изпрати") {
@@ -188,6 +189,7 @@ struct InsuranceRequestForm: View {
                         dismiss()
                     }
                     .disabled(selected == nil)
+                    .accessibilityInputLabels(A11y.Spoken.send)
                 }
             }
         }

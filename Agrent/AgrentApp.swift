@@ -12,10 +12,36 @@ struct AgrentApp: App {
         BulgarianLayout.install()
     }
 
+    /// Which screen the app opens on.
+    ///
+    /// In Release, and in every debug run that was not launched with the
+    /// seam's argument, this is `auth.state` and nothing else — the same
+    /// expression the `switch` below has always been written against.
+    ///
+    /// Under `UITestSeam` it is `.signedIn`, because a runner's simulator has
+    /// an empty Keychain and `AuthClient.init` therefore leaves the state at
+    /// `.signedOut`. `auth` is left ALONE rather than driven into a signed-in
+    /// state: `AuthClient` owns its own state machine and the seam has no
+    /// business reaching into it.
+    ///
+    /// Изход IS special-cased, in `AuthClient.signOut`, and the reason is
+    /// worth having here too. This property returns `.signedIn` for as long
+    /// as the seam is on, so a sign-out changes nothing on screen — while on
+    /// the owner's signed-in simulator, which is where the screenshot harness
+    /// actually runs, it would have cleared a real Google session. Invisible
+    /// and unrecoverable without a browser. That is the one place the seam
+    /// has to reach into the auth path, and it reaches in to do LESS.
+    private var openingState: AuthClient.State {
+        #if DEBUG
+        if UITestSeam.isActive { return .signedIn }
+        #endif
+        return auth.state
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
-                switch auth.state {
+                switch openingState {
                 case .signedIn:
                     MainTabView()
                 default:

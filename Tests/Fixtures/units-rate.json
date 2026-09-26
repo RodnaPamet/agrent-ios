@@ -1,0 +1,6 @@
+[
+  {"id": "unt_l_dka", "key": "L_PER_DKA", "name": "литра на декар", "symbol": "л/дка", "measure": "RATE"},
+  {"id": "unt_kg_dka", "key": "KG_PER_DKA", "name": "килограма на декар", "symbol": "кг/дка", "measure": "RATE"},
+  {"id": "unt_ml_dka", "key": "ML_PER_DKA", "name": "милилитра на декар", "symbol": "мл/дка", "measure": "RATE"},
+  {"id": "unt_g_dka", "key": "G_PER_DKA", "name": "грама на декар", "symbol": "г/дка", "measure": "RATE"}
+]

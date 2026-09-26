@@ -1,0 +1,35 @@
+{
+  "rows": [
+    {
+      "id": "tsk_fixture_1",
+      "key": "FT-101",
+      "title": "Смяна на масло на трактора",
+      "type": "FARM_TASK",
+      "status": "OPEN",
+      "severity": "MEDIUM",
+      "dueAt": "2026-10-01T09:00:00.000Z",
+      "assignee": {
+        "id": "usr_fixture_operator",
+        "name": "Петър Механизаторов",
+        "email": "operator@example.invalid"
+      },
+      "assigneeUserId": "usr_fixture_operator",
+      "createdAt": "2026-09-20T07:00:00.000Z",
+      "updatedAt": "2026-09-24T11:30:00.000Z"
+    },
+    {
+      "id": "tsk_fixture_2",
+      "key": null,
+      "title": "Заявка за анализ на почвата",
+      "type": "TASK",
+      "status": "IN_PROGRESS",
+      "severity": null,
+      "dueAt": null,
+      "assignee": null,
+      "assigneeUserId": null,
+      "createdAt": "2026-09-22T06:10:00.000Z",
+      "updatedAt": "2026-09-22T06:10:00.000Z"
+    }
+  ],
+  "truncated": false
+}

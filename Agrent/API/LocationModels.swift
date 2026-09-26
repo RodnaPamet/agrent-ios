@@ -201,6 +201,30 @@ struct Parcel: Decodable, Equatable, Hashable, Sendable, Identifiable {
     let ekatte: String?
     let hasActiveLease: Bool?
 
+    /// WHEN THE LAST IMPORT DID NOT MENTION THIS PARCEL.
+    ///
+    /// Since agri-saas#1135 an import reconciles rather than replaces: a
+    /// parcel the file does not contain is KEPT, with all of its history, and
+    /// marked with this timestamp. Null means it WAS in the last import, or
+    /// that the location has never been imported into — both mean there is
+    /// nothing to say about it.
+    ///
+    /// A TIMESTAMP RATHER THAN A BOOLEAN, which is the server's reasoning and
+    /// worth keeping: "not in the last import" and "not in any import since
+    /// March" are different facts and only the first is actionable. Compare it
+    /// against the location's own last import.
+    ///
+    /// `["string", "null"]` and in `required` — present-and-null, so the key
+    /// is always there and the value need not be. A non-optional here would
+    /// fail the whole array from one row, and this array is behind both the
+    /// map and the parcel list.
+    let absentFromImportAt: String?
+
+    /// Whether to say anything about it. Reads the timestamp as a flag at the
+    /// one place that only needs the flag; anything comparing dates should
+    /// use `absentFromImportAt` directly.
+    var isAbsentFromLastImport: Bool { absentFromImportAt?.recorded != nil }
+
     /// `properties`, `soilJson` and `companyOwners` are NOT modelled.
     /// `properties` in particular has arbitrary keys with mixed value types —
     /// `{"NTP": "100000", "NAME": "19", "YEAR": 2026}` mixes String and Int in

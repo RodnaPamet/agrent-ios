@@ -64,6 +64,31 @@ final class AuthClient: NSObject {
     }
 
     func signOut() {
+        #if DEBUG
+        // UNDER THE SEAM THE KEYCHAIN IS NOT OURS TO CLEAR.
+        //
+        // The seam was written for a runner, whose Keychain is empty, and on
+        // that reading `TokenStore.clear()` is a no-op. It is not a no-op on
+        // the machine the seam is actually used on: the screenshot harness
+        // runs against the owner's SIGNED-IN simulator, and there this line
+        // destroys a real Google session that has to be re-established
+        // through a browser.
+        //
+        // Silently, which is the worse half. `AgrentApp.openingState` returns
+        // `.signedIn` whenever the seam is on, so the app carries on showing
+        // `MainTabView` with the tokens already gone. Nothing on screen
+        // changes at the moment the damage is done.
+        //
+        // The seam does not read the Keychain — `APIClient` hands out
+        // `UITestSeam.stubTokens` — so there is nothing of the seam's to
+        // clear here and nothing to lose by not clearing it.
+        if UITestSeam.isActive {
+            CurrentUserStore.shared.clear()
+            state = .signedOut
+            return
+        }
+        #endif
+
         TokenStore.clear()
         // The cached identity is per-session. Leaving it would let the
         // next person to sign in on this device be assigned somebody

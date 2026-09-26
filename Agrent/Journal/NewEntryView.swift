@@ -47,9 +47,11 @@ struct NewEntryView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Създай") { Task { await save() } }
+                        .accessibilityInputLabels(A11y.Spoken.create)
                         .disabled(!canSave)
                 }
             }

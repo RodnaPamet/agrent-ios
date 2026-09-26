@@ -524,6 +524,7 @@ struct DashboardBlockPicker: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Готово") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.done)
                 }
             }
         }

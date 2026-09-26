@@ -71,6 +71,7 @@ struct TabCustomiserView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Запази") {
@@ -92,6 +93,7 @@ struct TabCustomiserView: View {
                         }
                     }
                     .disabled(chosen.isEmpty || store.isSaving)
+                    .accessibilityInputLabels(A11y.Spoken.save)
                 }
             }
             .task { if chosen.isEmpty { chosen = store.bottomTabs } }

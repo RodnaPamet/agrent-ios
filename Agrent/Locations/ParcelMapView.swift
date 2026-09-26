@@ -643,6 +643,18 @@ struct ParcelMapView: View {
                     if parcel.hasActiveLease == true {
                         MetaSeparator(); Text("под аренда")
                     }
+                    // A PARCEL THE LAST IMPORT DID NOT MENTION.
+                    //
+                    // It was kept with all its history rather than deleted —
+                    // that is what makes a re-import safe — but a boundary
+                    // file that has stopped describing one of the farm's
+                    // fields is worth knowing about, because the usual reason
+                    // is that the field was left out by mistake.
+                    if parcel.isAbsentFromLastImport {
+                        MetaSeparator()
+                        Text("извън последния импорт")
+                            .foregroundStyle(Palette.warning)
+                    }
                 }
                 .font(.footnote)
                 .foregroundStyle(Palette.secondaryText)

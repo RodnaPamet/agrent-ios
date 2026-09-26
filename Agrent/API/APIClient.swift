@@ -70,6 +70,28 @@ actor APIClient {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 15
         configuration.waitsForConnectivity = false
+        #if DEBUG
+        // THE UI TEST SEAM, and the only place in the networking layer that
+        // knows it exists.
+        //
+        // `URLProtocol.registerClass` is the usual incantation and does NOT
+        // work here: it registers into the global list that `URLSession.shared`
+        // consults, and this session is built from its own configuration, which
+        // carries its own `protocolClasses`. The one it would have caught is
+        // `AuthClient.exchange`, which does use `URLSession.shared` — and that
+        // path is unreachable under the seam, because the app never shows the
+        // sign-in screen that starts it.
+        //
+        // PREPENDED rather than replacing the list: the default protocols still
+        // handle anything `FixtureURLProtocol.canInit` declines, and `canInit`
+        // re-reads `UITestSeam.isActive` so the ordering cannot matter on a
+        // normal run. On a normal run this `if` is false and the configuration
+        // is byte-for-byte what it has always been.
+        if UITestSeam.isActive {
+            configuration.protocolClasses =
+                [FixtureURLProtocol.self] + (configuration.protocolClasses ?? [])
+        }
+        #endif
         return URLSession(configuration: configuration)
     }()
 
@@ -580,6 +602,20 @@ actor APIClient {
     }
 
     private func currentTokens() throws -> Tokens {
+        #if DEBUG
+        // THE KEYCHAIN IS NOT TOUCHED UNDER THE SEAM, and that is the whole
+        // reason this branch exists rather than a `TokenStore.save` at launch.
+        //
+        // Planting a token would have been fewer lines and would have written
+        // into the Keychain of whatever simulator the seam was pointed at —
+        // including, one mistake later, the owner's signed-in one, replacing a
+        // real session with a value no server issued. Reading past the
+        // Keychain instead leaves it exactly as it was found.
+        //
+        // The token is never presented to anything: `FixtureURLProtocol`
+        // answers before URLSession opens a socket.
+        if UITestSeam.isActive { return UITestSeam.stubTokens }
+        #endif
         guard let t = TokenStore.load() else { throw APIError.notSignedIn }
         return t
     }
