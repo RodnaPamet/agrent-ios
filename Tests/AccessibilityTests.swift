@@ -103,7 +103,8 @@ final class SchematicAccessibilityTests: XCTestCase {
     ) -> Parcel {
         Parcel(
             id: id, name: name, cropType: crop, areaHa: ha, geometry: nil,
-            soilType: nil, cadastralId: nil, ekatte: nil, hasActiveLease: nil
+            soilType: nil, cadastralId: nil, ekatte: nil, hasActiveLease: nil,
+            absentFromImportAt: nil
         )
     }
 

@@ -121,8 +121,40 @@ final class DecoderToleranceTests: XCTestCase {
         """#) { _ = try await APIClient.shared.decode($0, as: BriefingAction.self) },
 
         Probe("ImportJobStatus", #"""
-        {"jobId":"job","state":"active","failedReason":null}
+        {"jobId":"job","state":"active","failedReason":null,"result":null}
         """#) { _ = try await APIClient.shared.decode($0, as: ImportJobStatus.self) },
+
+        // ── Added 2026-09-26, and the reason is the point ──
+        //
+        // `Parcel` was not in this list. Twenty models were "covered" and the
+        // one behind the parcel map and the parcel list was not one of them —
+        // a count that looks like coverage until you ask what it ranged over.
+        // It came up because `absentFromImportAt` arrived and wanted a probe.
+        Probe("Parcel", #"""
+        {"id":"p1","name":"15655-19","cropType":"wheat","areaHa":12.4,
+         "geometry":{"type":"MultiPolygon","coordinates":[[[[24.20,43.11],
+           [24.21,43.11],[24.21,43.12],[24.20,43.11]]]]},
+         "soilType":"Чернозем","cadastralId":"15655.19","ekatte":"15655",
+         "hasActiveLease":true,"absentFromImportAt":null}
+        """#) { _ = try await APIClient.shared.decode($0, as: Parcel.self) },
+
+        // The executor envelope, shared by spatial-import and cadastre-import.
+        Probe("JobRunEnvelope", #"""
+        {"jobName":"spatial-import","jobRunId":"run1","success":true,
+         "startedAt":"2026-09-26T10:00:00.000Z","completedAt":"2026-09-26T10:00:04.000Z",
+         "durationMs":4000,"itemsScanned":14,"itemsActioned":14,"itemsSkipped":0,
+         "details":{"tenantId":"t","locationId":"l","fileRecordId":"f",
+           "format":"shapefile","parcelCount":14,"matched":11,"created":3,
+           "flagged":2,"jobRunId":"run1"}}
+        """#) { _ = try await APIClient.shared.decode($0, as: JobRunEnvelope.self) },
+
+        // The three counts that were described to this app before they were on
+        // the wire. Probed against the published `required` so the next time
+        // they change shape it is this suite that says so, not a blank screen.
+        Probe("SpatialImportDetails", #"""
+        {"tenantId":"t","locationId":"l","fileRecordId":"f","format":"shapefile",
+         "parcelCount":14,"matched":11,"created":3,"flagged":2,"jobRunId":"run1"}
+        """#) { _ = try await APIClient.shared.decode($0, as: SpatialImportDetails.self) },
 
         Probe("SpatialImportAccepted", #"""
         {"jobId":"j","fileRecordId":"f","format":"shapefile","status":"queued"}
@@ -260,6 +292,27 @@ final class DecoderToleranceTests: XCTestCase {
         "FarmTaskTrendPoint": ["completed", "created", "date"],
         "BriefingAction": ["action", "priority"],
         "ImportJobStatus": ["state"],
+
+        // ── Checked 2026-09-26 against agri-saas main after #1135/#1137 ──
+        //
+        // `Parcel` requires two of the ten keys its schema does, which is the
+        // safe direction. `absentFromImportAt` is `["string","null"]` AND in
+        // `required` — present-and-null — so it is absent from this set on
+        // purpose: a non-optional there would fail the whole array from one
+        // row, on the screen the map draws from.
+        "Parcel": ["id", "name"],
+
+        // Six of the nine `required`. `details` is not among them because it
+        // is read with `try?` — two job kinds share the envelope and a
+        // cadastre payload must not fail a spatial poll. `startedAt`,
+        // `completedAt` and `durationMs` are on the wire and unread.
+        "JobRunEnvelope": ["itemsActioned", "itemsScanned", "itemsSkipped",
+                           "jobName", "jobRunId", "success"],
+
+        // Four of the nine. `bounds` is untyped AND optional — the one
+        // combination that has cost this repo a screen twice — so it is not
+        // modelled at all.
+        "SpatialImportDetails": ["created", "flagged", "matched", "parcelCount"],
         "SpatialImportAccepted": ["fileRecordId", "format", "jobId", "status"],
         "ExchangeInquiry": ["id"],
         "PricePoint": ["date", "price"],

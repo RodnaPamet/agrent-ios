@@ -4,15 +4,30 @@ import Foundation
 ///
 /// ── What the server does with the file, which the warning has to say ──
 ///
-/// TODAY the worker REPLACES the location's parcels. Not merges — swaps the
-/// set. There is no undo route. The owner has asked for geometry-matched
-/// replacement with history carried across (overlap above a threshold, and an
-/// unmatched parcel kept and flagged), and that work is with the server
-/// session as an issue. Until it lands, the confirmation names the whole
-/// parcel count, because a client that promised "only matching parcels are
-/// replaced" against a worker that swaps everything would be the defect this
-/// repo has spent a week removing: a declared contract describing something
-/// untrue.
+/// THE WORKER RECONCILES BY GEOMETRY, since agri-saas#1135:
+///
+///     IoU >= 0.90   the existing parcel is UPDATED in place — same row,
+///                   same id, so its history follows the new boundary
+///     no match      INSERTED
+///     not in file   KEPT and flagged with `absentFromImportAt`
+///
+/// Nothing is deleted at any point, which is what makes a re-import safe to
+/// run twice. It was not.
+///
+/// THIS SENTENCE HAS BEEN WRONG TWICE, in opposite directions, and both times
+/// it was wrong in the repo rather than in anyone's head. It first said the
+/// worker REPLACES the set — quoted from a route description — and a
+/// confirmation reading «Ще замени 14 парцела» was two hours from shipping.
+/// The worker was in fact additive, which its own docblock said while the
+/// route description said otherwise. The copy was corrected to warn about
+/// duplicates, and then #1135 made THAT wrong. This header was left saying
+/// "replaces" through both corrections.
+///
+/// So the rule the third version follows: the screen promises only what is
+/// true of every file, and the numbers come from the job AFTERWARDS. A
+/// pre-upload sheet cannot know the split before the server has parsed
+/// anything, and a promise it cannot keep is how the first two versions went
+/// wrong.
 ///
 /// ── Nothing has happened when the POST returns ──
 ///
@@ -152,6 +167,93 @@ struct SpatialImportAccepted: Decodable, Equatable, Sendable {
 /// list with an explicit ellipsis. So it is a `String` here and
 /// `ImportJobStage` interprets it, rather than an enum that would turn a new
 /// queue state into a decode failure on a screen the farmer is watching.
+/// THE EXECUTOR'S RETURN VALUE, shared by two job kinds.
+///
+/// ── Why `details` is decoded with `try?` ──
+///
+/// On the wire `details` is `{}` — untyped — because `spatial-import` and
+/// `cadastre-import` share this envelope and a `$ref` to either one's shape
+/// would over-claim for the other. The server registers
+/// `SpatialImportDetails` separately for exactly this reason: nothing
+/// `$ref`s it, and reading it is the client's choice.
+///
+/// So this app polls both kinds through one type, and a cadastre envelope's
+/// `details` does not carry `matched`/`created`/`flagged`. Decoding it
+/// strictly would fail the WHOLE poll response — on the screen a farmer is
+/// watching an import finish. A missing summary is a worse screen; a failed
+/// poll is a broken one.
+///
+/// The cost is stated rather than hidden: `try?` also swallows a genuine
+/// spatial-import shape change. The tolerance probe is what catches that,
+/// against the published `required` list, which is why both models are in it.
+struct JobRunEnvelope: Decodable, Equatable, Sendable {
+    let jobName: String
+    let jobRunId: String
+    let success: Bool
+    let itemsScanned: Int
+    let itemsActioned: Int
+    let itemsSkipped: Int
+
+    /// `details` read as the spatial shape, or nil when it is another job's.
+    let spatial: SpatialImportDetails?
+
+    /// `startedAt`, `completedAt`, `durationMs` and `errorMessage` are on the
+    /// wire and are not read here. Nothing on this screen shows them —
+    /// `failedReason` already carries why a job failed — and a field modelled
+    /// for its own sake is a field that can fail a payload for its own sake.
+    enum CodingKeys: String, CodingKey {
+        case jobName, jobRunId, success
+        case itemsScanned, itemsActioned, itemsSkipped
+        case details
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        jobName = try c.decode(String.self, forKey: .jobName)
+        jobRunId = try c.decode(String.self, forKey: .jobRunId)
+        success = try c.decode(Bool.self, forKey: .success)
+        itemsScanned = try c.decode(Int.self, forKey: .itemsScanned)
+        itemsActioned = try c.decode(Int.self, forKey: .itemsActioned)
+        itemsSkipped = try c.decode(Int.self, forKey: .itemsSkipped)
+        spatial = try? c.decodeIfPresent(SpatialImportDetails.self, forKey: .details)
+    }
+}
+
+/// WHAT THE RECONCILIATION DID, in three numbers.
+///
+/// ── The one arithmetic rule ──
+///
+/// `parcelCount == matched + created` — the shapes the FILE contained — and
+/// `flagged` is deliberately NOT part of it. Flagged parcels were already
+/// there and the file did not mention them, so adding them to a total called
+/// "imported" would report more than arrived.
+///
+/// ── These three did not exist on the wire a day ago ──
+///
+/// They were described to this app as available and were not: the worker
+/// returned them, and the executor that builds `details` dropped them before
+/// they reached the poll route. Nothing caught it on either side — `details`
+/// is `Record<string, unknown>` so the compiler was happy, and the server's
+/// shape ratchet was happy because the operation DOES describe a response.
+/// It was found only because this app declined to model three field names
+/// from a message. agri-saas#1137 put them on the contract.
+///
+/// `bounds` is on the wire and is not modelled: untyped AND optional, which
+/// is the one combination that has cost this repo a screen twice.
+struct SpatialImportDetails: Decodable, Equatable, Sendable {
+    /// Matched an existing parcel above the IoU threshold and updated it in
+    /// place, so that parcel's history followed its new boundary.
+    let matched: Int
+    /// Had no match and were inserted.
+    let created: Int
+    /// Were already there, were not in the file, and were KEPT.
+    let flagged: Int
+    /// `matched + created`. Read rather than computed, because the server
+    /// owns the definition and a client that recomputes it is a second
+    /// description of one thing.
+    let parcelCount: Int
+}
+
 struct ImportJobStatus: Decodable, Equatable, Sendable {
     /// NULLABLE despite being `required` — the key is always present, the
     /// value need not be.
@@ -159,10 +261,18 @@ struct ImportJobStatus: Decodable, Equatable, Sendable {
     let state: String
     let failedReason: String?
 
-    /// `progress` and `result` are untyped in the spec (`{}` — any JSON), and
-    /// modelling them would be inventing a shape. The counters live in
-    /// `result.details` per the description; when a screen needs them, they
-    /// get read then, against a real response.
+    /// OPTIONAL, although `result` is in the spec's `required` list.
+    ///
+    /// `JobRunEnvelope` is `{"type": ["object", "null"]}` in its own schema,
+    /// so a `$ref` to it admits null even where the property is required —
+    /// the key is always present and the value is null until the job
+    /// completes. `DashboardModels` records getting exactly this wrong once,
+    /// with `FieldBriefing`, and that note is why this one is optional.
+    let result: JobRunEnvelope?
+
+    /// `progress` is still untyped in the spec (`{}` — any JSON) and is still
+    /// not modelled. `result` no longer is: #1137 gave it a `$ref` to
+    /// `JobRunEnvelope`, which is what made the counts readable.
     var stage: ImportJobStage { ImportJobStage(state) }
 }
 

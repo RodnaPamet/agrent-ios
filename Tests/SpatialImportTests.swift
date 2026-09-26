@@ -213,3 +213,90 @@ final class SpatialImportTests: XCTestCase {
             .hasSuffix("/locations/loc1/spatial-import/j2"))
     }
 }
+
+
+/// The envelope two job kinds share, and the `try?` that lets them.
+///
+/// The tolerance probe next door asks what a model refuses to decode WITHOUT
+/// a key. It cannot ask the question this class asks, which is what happens
+/// when a key is PRESENT and holds another job's shape — and that is the
+/// case this app actually meets, because it polls `spatial-import` and
+/// `cadastre-import` through one type.
+@MainActor
+final class JobRunEnvelopeTests: XCTestCase {
+
+    private func envelope(details: String) async throws -> JobRunEnvelope {
+        let json = """
+        {"jobName":"spatial-import","jobRunId":"r","success":true,
+         "startedAt":"2026-09-26T10:00:00.000Z",
+         "completedAt":"2026-09-26T10:00:04.000Z","durationMs":4000,
+         "itemsScanned":1,"itemsActioned":1,"itemsSkipped":0,
+         "details":\(details)}
+        """
+        return try await APIClient.shared.decode(Data(json.utf8), as: JobRunEnvelope.self)
+    }
+
+    func testTheSpatialShapeIsRead() async throws {
+        let e = try await envelope(details: """
+        {"tenantId":"t","locationId":"l","fileRecordId":"f","format":"kml",
+         "parcelCount":14,"matched":11,"created":3,"flagged":2,"jobRunId":"r"}
+        """)
+        XCTAssertEqual(e.spatial?.matched, 11)
+        XCTAssertEqual(e.spatial?.created, 3)
+        XCTAssertEqual(e.spatial?.flagged, 2)
+        XCTAssertEqual(e.spatial?.parcelCount, 14)
+    }
+
+    /// THE ONE THAT MATTERS. A cadastre job's `details` has none of the
+    /// counts. Decoded strictly it would fail the whole poll response — on
+    /// the screen a farmer is watching an import finish.
+    func testAnotherJobKindsDetailsDoesNotFailThePoll() async throws {
+        let e = try await envelope(details: """
+        {"tenantId":"t","locationId":"l","kaisIdentifier":"15655.19","jobRunId":"r"}
+        """)
+        XCTAssertNil(e.spatial)
+        XCTAssertEqual(e.jobName, "spatial-import")
+        XCTAssertEqual(e.itemsScanned, 1)
+    }
+
+    func testAbsentAndNullDetailsAreBothToleratedRatherThanEitherThrowing() async throws {
+        let nullDetails = try await envelope(details: "null")
+        XCTAssertNil(nullDetails.spatial)
+
+        let json = """
+        {"jobName":"cadastre-import","jobRunId":"r","success":true,
+         "startedAt":"2026-09-26T10:00:00.000Z",
+         "completedAt":"2026-09-26T10:00:04.000Z","durationMs":1,
+         "itemsScanned":0,"itemsActioned":0,"itemsSkipped":0}
+        """
+        let withoutKey = try await APIClient.shared.decode(
+            Data(json.utf8), as: JobRunEnvelope.self)
+        XCTAssertNil(withoutKey.spatial)
+    }
+
+    /// `parcelCount` is READ, not recomputed from `matched + created`.
+    ///
+    /// The server owns that definition. A client that recomputes it is a
+    /// second description of one thing, and this repo has spent a week
+    /// removing those — so a payload where they disagree must still report
+    /// the server's number rather than quietly correcting it.
+    func testParcelCountIsTheServersNumberEvenWhenItDisagrees() async throws {
+        let e = try await envelope(details: """
+        {"tenantId":"t","locationId":"l","fileRecordId":"f","format":"geojson",
+         "parcelCount":99,"matched":11,"created":3,"flagged":2,"jobRunId":"r"}
+        """)
+        XCTAssertEqual(e.spatial?.parcelCount, 99)
+        XCTAssertEqual((e.spatial?.matched ?? 0) + (e.spatial?.created ?? 0), 14)
+    }
+
+    /// `result` is in the spec's `required` list and is still optional here,
+    /// because `JobRunEnvelope` is `["object","null"]` in its own schema — the
+    /// `FieldBriefing` lesson. A poll while the job is queued carries null.
+    func testAQueuedJobCarriesANullResult() async throws {
+        let status = try await APIClient.shared.decode(
+            Data(#"{"jobId":"j","state":"waiting","failedReason":null,"result":null}"#.utf8),
+            as: ImportJobStatus.self)
+        XCTAssertNil(status.result)
+        XCTAssertEqual(status.stage, .waiting)
+    }
+}
