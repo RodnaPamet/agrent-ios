@@ -69,7 +69,37 @@ struct DashboardView: View {
         preferences.blocks.count { hasContent($0) }
     }
 
+    /// A block that is empty BECAUSE THE FARM DOES NOT HAVE THE MODULE.
+    ///
+    /// Returns the sentence to show, or nil when there is nothing honest to
+    /// say. Two conditions, both required: the block must have a gating module
+    /// this app is confident about (see `DashboardBlock.gatingModule`), and the
+    /// payload must have arrived — `enabledModules` cannot be consulted before
+    /// it loads, and guessing while loading would flash "not enabled" at
+    /// somebody who has it.
+    ///
+    /// ── Why this replaced hiding ──
+    ///
+    /// Hiding was right while "gated" and "no data" were indistinguishable:
+    /// «Няма записи» under a heading tells a farmer his data is missing when
+    /// the feature simply is not his. The module enum makes the distinction
+    /// readable, and the owner chose to say it — because hiding is also how a
+    /// farm concludes a feature does not exist and stops asking for it.
+    private func disabledNote(for block: DashboardBlock) -> String? {
+        guard let module = block.gatingModule,
+              let payload = store.ag.value,
+              !payload.isEnabled(module)
+        else { return nil }
+        return "Не е включено за това стопанство."
+    }
+
     private func hasContent(_ block: DashboardBlock) -> Bool {
+        // A block that can EXPLAIN its emptiness has something to show.
+        if disabledNote(for: block) != nil { return true }
+        return hasData(block)
+    }
+
+    private func hasData(_ block: DashboardBlock) -> Bool {
         switch block {
         case .briefing: store.briefing.value != nil || store.briefing.isFailed
         case .grainPrice: store.chosenPriceSeries != nil || store.prices.isFailed
@@ -83,6 +113,24 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func content(for block: DashboardBlock) -> some View {
+        // THE EXPLANATION WINS over the block's own body. A gated module has no
+        // data by definition, so every section below would render nothing and
+        // the reason would never be seen.
+        if let note = disabledNote(for: block) {
+            Section(block.label) {
+                Text(note)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .pageRow()
+            }
+        } else {
+            body(for: block)
+        }
+    }
+
+    @ViewBuilder
+    private func body(for block: DashboardBlock) -> some View {
         switch block {
         case .briefing: briefingSection
         case .grainPrice: priceSection

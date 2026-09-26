@@ -51,6 +51,44 @@ struct SchematicParcelMap: View {
     /// Matches the padding the projection's test vectors were computed at.
     private let padding: CGFloat = 16
 
+    /// THE MAP'S TEXT SCALES NOW, and it did not.
+    ///
+    /// Parcel names were drawn at a hard `.system(size: 14)` and the graticule
+    /// and compass at 11. Fourteen points is already SMALLER than `.body` at
+    /// the default setting, and it stayed 14 at the largest accessibility size
+    /// while every other word on screen roughly tripled. This is the DEFAULT
+    /// map mode on Локации, so a low-vision farmer who turned text up — the
+    /// person the setting exists for, and not necessarily a VoiceOver user —
+    /// got coloured squares they could not name.
+    ///
+    /// The list underneath carries the names as text that does scale, but not
+    /// POSITION, and this file's whole argument for existing is that position
+    /// is the one thing it knows truthfully. `Accessibility.swift` says the
+    /// same in its own words about the VoiceOver rebuild of this map.
+    ///
+    /// ── The trap this fell into is written in this file, twelve lines up ──
+    ///
+    /// "A `Canvas` draws outside the view hierarchy, so it cannot read the
+    /// environment itself — the value has to be captured here and carried in.
+    /// Easy to forget, and the failure is silent: the map simply ignores the
+    /// setting for the people who turned it on." That is about
+    /// `colorSchemeContrast`, which IS captured. `dynamicTypeSize` is the same
+    /// trap and is the one that was forgotten.
+    ///
+    /// ── Clamped, and the clamp has a reason ──
+    ///
+    /// The label placement solver gives up after four downward nudges and this
+    /// file calls it "deliberately simple". Unbounded labels at AX5 would be
+    /// three times the size with the same four attempts, so they would pile up
+    /// instead of clipping — a different failure, not a better one. 26pt is
+    /// roughly the largest that still resolves, and the list below is the
+    /// unbounded channel for anyone who needs more.
+    @ScaledMetric(relativeTo: .footnote) private var scaledLabelSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .caption2) private var scaledChromeSize: CGFloat = 11
+
+    private var labelSize: CGFloat { min(scaledLabelSize, 26) }
+    private var chromeSize: CGFloat { min(scaledChromeSize, 20) }
+
     /// How much larger than life. ONE NUMBER, on purpose — this is a legibility
     /// dial, and the right value is whatever a person holding the phone says
     /// it is, so it should be trivial to turn.
@@ -429,7 +467,7 @@ struct SchematicParcelMap: View {
 
     private func gridLabel(_ value: Double, step: Double) -> Text {
         Text(Self.formatDegrees(value, step: step))
-            .font(.system(size: 11, weight: .medium).monospacedDigit())
+            .font(.system(size: chromeSize, weight: .medium).monospacedDigit())
             .foregroundStyle(Palette.Map.graticuleLabel)
     }
 
@@ -458,7 +496,7 @@ struct SchematicParcelMap: View {
         arrow.closeSubpath()
         context.fill(arrow, with: .color(Palette.Map.graticuleLabel))
         context.draw(
-            Text("С").font(.system(size: 11, weight: .semibold))
+            Text("С").font(.system(size: chromeSize, weight: .semibold))
                 .foregroundStyle(Palette.Map.graticuleLabel),
             at: CGPoint(x: origin.x, y: origin.y + 22)
         )
@@ -503,7 +541,7 @@ struct SchematicParcelMap: View {
 
         for label in labels {
             let text = Text(label.name)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: labelSize, weight: .semibold))
                 .foregroundStyle(Palette.Map.label)
             let measured = context.resolve(text).measure(in: size)
 
