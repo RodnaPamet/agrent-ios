@@ -120,7 +120,7 @@ struct DashboardView: View {
             Section(block.label) {
                 Text(note)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .pageRow()
             }
@@ -155,7 +155,7 @@ struct DashboardView: View {
                         Text(briefing.headline).font(.headline)
                         Text(briefing.summary)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .accessibilityElement(children: .ignore)
@@ -171,7 +171,7 @@ struct DashboardView: View {
                 } else if let absence = payload.absence {
                     Text(Self.text(for: absence))
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                         .pageRow()
                 }
@@ -193,7 +193,7 @@ struct DashboardView: View {
                 // Nil means THE WHOLE FARM, which is a scope rather than a
                 // gap — so no placeholder, and no label for the absence.
                 if let field = action.field {
-                    Text(field).font(.caption).foregroundStyle(.secondary)
+                    Text(field).font(.caption).foregroundStyle(Palette.secondaryText)
                 }
             }
             Spacer(minLength: 8)
@@ -244,14 +244,14 @@ struct DashboardView: View {
                         chosen.series.stage,
                     ]))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
 
                     if let age = Staleness.days(
                         generatedAt: store.prices.value?.generatedAt ?? Date(),
                         lastObservedAt: chosen.series.lastObservedAt) {
                         Text("Отчетена преди \(Plural.bg(age, "ден", "дни"))")
                             .font(.caption)
-                            .foregroundStyle(age >= Staleness.concerning ? Palette.warning : Color.secondary)
+                            .foregroundStyle(age >= Staleness.concerning ? Palette.warning : Palette.secondaryText)
                     }
 
                     if chosen.outOf > 1 {
@@ -260,7 +260,7 @@ struct DashboardView: View {
                             // `.tertiary` is 1.73:1 on a white row. This
                             // sentence is the only thing telling a farmer the
                             // number above is one of several.
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
                 .pageRow()
@@ -287,7 +287,7 @@ struct DashboardView: View {
                             entry.occurredAt.map(BgDate.dayMonth),
                         ]))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(A11y.sentence([
@@ -416,7 +416,7 @@ struct DashboardView: View {
                             task.status == .unknown ? nil : task.status.label,
                             task.dueAt.map(BgDate.dayMonth),
                         ]))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(Palette.secondaryText)
                     }
                     .pageRow()
                 }
@@ -434,7 +434,7 @@ struct DashboardView: View {
                         Spacer(minLength: 8)
                         Text(item.quantityText)
                             .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(A11y.sentence([item.name, item.quantityText]))

@@ -134,7 +134,7 @@ struct SignInView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(.green)
             Text("Agrent").font(.largeTitle.bold())
-            Text("Земеделският агент").foregroundStyle(.secondary)
+            Text("Земеделският агент").foregroundStyle(Palette.secondaryText)
 
             if case .failed(let message) = auth.state {
                 Text(message)

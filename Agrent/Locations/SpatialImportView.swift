@@ -103,7 +103,7 @@ struct SpatialImportView: View {
             if let chosen {
                 LabeledContent(chosen.name) {
                     Text("\(Num.text(Double(chosen.bytes.count) / (1024 * 1024))) MB")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
                 .accessibilityLabel(A11y.sentence([chosen.name, chosen.format.label]))
             }

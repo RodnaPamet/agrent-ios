@@ -127,7 +127,7 @@ struct JournalListView: View {
                 if store.loadingMore {
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text("Зареждане…").font(.footnote).foregroundStyle(.secondary)
+                        Text("Зареждане…").font(.footnote).foregroundStyle(Palette.secondaryText)
                     }
                 } else {
                     Button("Покажи още") { Task { await store.loadMore() } }
@@ -209,7 +209,7 @@ struct JournalRow: View {
             }
         }
         .font(.footnote)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
     }
 }

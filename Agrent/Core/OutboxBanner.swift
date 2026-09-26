@@ -27,7 +27,7 @@ struct OutboxBanner: View {
                     if let first = outbox.pending.first {
                         Text(first.parcelSummary)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
                 // One stop for the description, built from the values — the

@@ -68,7 +68,7 @@ struct LocationsView: View {
                             }
                         }
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                     }
                     .padding(.vertical, 2)
                     // `.combine` was here and it read the `·` aloud as

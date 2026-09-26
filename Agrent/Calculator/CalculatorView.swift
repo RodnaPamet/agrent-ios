@@ -91,7 +91,7 @@ struct CalculatorView: View {
                         .font(.headline)
                     Text("Калкулаторът показва стойност само когато има сезон със засети площи. За това стопанство още няма такива.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 costsSection
@@ -149,7 +149,7 @@ struct CalculatorView: View {
             Section("Разходи") {
                 Text("Още няма въведени разходи.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
 
         case .loaded(let page, _):
@@ -188,7 +188,7 @@ struct CalculatorView: View {
                         // complete.
                         Text("Без: \(total.refusedCommodities.joined(separator: ", "))")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
             }
@@ -248,7 +248,7 @@ struct CalculatorView: View {
                 // A yyyy-mm-dd STRING, shown verbatim. Parsing it into a Date
                 // to reformat would be the trap this model exists to avoid.
                 LabeledContent("Цена от") {
-                    Text(observed).foregroundStyle(.secondary)
+                    Text(observed).foregroundStyle(Palette.secondaryText)
                 }
             }
 
@@ -325,7 +325,7 @@ private struct UncertaintyBadge: View {
     /// is reserved for things that are actually broken.
     private var tint: Color {
         switch value {
-        case .exact, .allocated: .secondary
+        case .exact, .allocated: Palette.secondaryText
         case .atLeast, .atMost, .partial, .refused, .unknown: Palette.accentDeep
         }
     }
@@ -396,7 +396,7 @@ struct CostRow: View {
                 Text(cost.category.label).font(.subheadline.weight(.medium))
                 Text(BgDate.dayMonth(cost.incurredOn))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
             Spacer(minLength: 12)
             // Padded back to the column's scale: 1.00 arrives as 1, and

@@ -84,7 +84,7 @@ struct MetaSeparator: View {
 
     var body: some View {
         if !typeSize.isAccessibilitySize {
-            Text("·").foregroundStyle(.secondary)
+            Text("·").foregroundStyle(Palette.secondaryText)
         }
     }
 }

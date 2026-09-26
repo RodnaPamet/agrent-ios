@@ -112,7 +112,7 @@ struct JournalDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Бележки")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
 
             if let text, !text.isEmpty {
                 Text(text)
@@ -127,7 +127,7 @@ struct JournalDetailView: View {
                 // it has nothing to show or has not shown it.
                 Text("Няма бележки по този запис.")
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -159,7 +159,7 @@ private struct LabelledFact<Content: View>: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)

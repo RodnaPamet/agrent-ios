@@ -79,7 +79,7 @@ struct AdminView: View {
 
         case .loaded(let all, _) where all.isEmpty:
             Section("Достъп") {
-                Text("Няма членове.").font(.footnote).foregroundStyle(.secondary)
+                Text("Няма членове.").font(.footnote).foregroundStyle(Palette.secondaryText)
             }
 
         case .loaded(let all, _):
@@ -91,9 +91,9 @@ struct AdminView: View {
                     // and the list below is the authority.
                     Label("Неясен резултат", systemImage: "questionmark.circle")
                         .foregroundStyle(Palette.error)
-                    Text(writeUnknown).font(.footnote).foregroundStyle(.secondary)
+                    Text(writeUnknown).font(.footnote).foregroundStyle(Palette.secondaryText)
                     Text("Връзката прекъсна. Проверете статуса в списъка по-долу — той е меродавен.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                        .font(.footnote).foregroundStyle(Palette.secondaryText)
                 }
             }
             if let writeError = store.writeError {
@@ -160,7 +160,7 @@ struct AdminView: View {
             Section("Стопанство") {
                 Text("Данните за стопанството още не са попълнени.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
 
         case .loaded(let profile, _):
@@ -304,7 +304,7 @@ struct MemberRow: View {
             }
         }
         .font(.footnote)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Palette.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -366,7 +366,7 @@ private struct InviteMemberView: View {
                     Section {
                         Text(failure).font(.footnote).foregroundStyle(Palette.error)
                         Text("Поканата може да се изпрати отново безопасно — повторното изпращане не създава втора покана.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(Palette.secondaryText)
                     }
                 }
             }

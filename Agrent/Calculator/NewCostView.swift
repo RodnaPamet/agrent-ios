@@ -144,7 +144,7 @@ struct NewCostView: View {
                 }
 
                 if let problem = firstProblemText {
-                    Section { Text(problem).font(.footnote).foregroundStyle(.secondary) }
+                    Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
                 }
 
                 if let failure {
@@ -175,7 +175,7 @@ struct NewCostView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(Palette.error)
                 Text("Разходът НЕ е записан. Можете да опитате отново.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         case .unknown(let message):
             // The honest answer, and it is deliberately not a retry button.
@@ -191,7 +191,7 @@ struct NewCostView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Label("Неясен резултат", systemImage: "questionmark.circle")
                     .foregroundStyle(Palette.error)
-                Text(message).font(.footnote).foregroundStyle(.secondary)
+                Text(message).font(.footnote).foregroundStyle(Palette.secondaryText)
                 Text("""
                     Връзката прекъсна, преди сървърът да отговори. Разходът \
                     може да е записан, а може и да не е. Проверете списъка с \
@@ -199,7 +199,7 @@ struct NewCostView: View {
                     въвеждане създава втори запис.
                     """)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
     }

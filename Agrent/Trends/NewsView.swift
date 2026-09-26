@@ -94,7 +94,7 @@ struct NewsView: View {
                 Text(BgDate.dayMonth(item.publishedAt))
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
         } else {
             HStack {
@@ -103,7 +103,7 @@ struct NewsView: View {
                 Text(BgDate.dayMonth(item.publishedAt))
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.secondaryText)
         }
     }
 
@@ -122,7 +122,7 @@ struct NewsView: View {
                 if let summary = item.cleanedSummary {
                     Text(summary)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                         // The cap RELAXES at the accessibility sizes. Three
                         // lines of `.footnote` is a readable teaser at the
                         // default; at AX5 three lines is barely a sentence, so

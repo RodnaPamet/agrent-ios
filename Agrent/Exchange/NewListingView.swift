@@ -144,7 +144,7 @@ struct NewListingView: View {
                     // being deliberately narrowed. Offering a choice that
                     // does not exist would be a 400 dressed as a feature.
                     LabeledContent("Валута") {
-                        Text("EUR").foregroundStyle(.secondary)
+                        Text("EUR").foregroundStyle(Palette.secondaryText)
                     }
                 }
 
@@ -178,7 +178,7 @@ struct NewListingView: View {
                     }
                 }
 
-                if let problem = problemText { Section { Text(problem).font(.footnote).foregroundStyle(.secondary) } }
+                if let problem = problemText { Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) } }
                 if let failure { Section { failureView(failure) } }
             }
             .inlineTitle("Нова обява")
@@ -204,7 +204,7 @@ struct NewListingView: View {
         case .refused(let message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(Palette.error)
-                Text("Обявата НЕ е публикувана.").font(.footnote).foregroundStyle(.secondary)
+                Text("Обявата НЕ е публикувана.").font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         case .unknown(let message):
             // No retry button, deliberately. A second attempt after a lost
@@ -213,14 +213,14 @@ struct NewListingView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Label("Неясен резултат", systemImage: "questionmark.circle")
                     .foregroundStyle(Palette.error)
-                Text(message).font(.footnote).foregroundStyle(.secondary)
+                Text(message).font(.footnote).foregroundStyle(Palette.secondaryText)
                 Text("""
                     Връзката прекъсна, преди сървърът да отговори. Обявата може \
                     да е публикувана. Проверете „Моите обяви“, преди да я \
                     въведете отново — повторното публикуване създава втора обява, \
                     видима за всички стопанства.
                     """)
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         }
     }

@@ -54,7 +54,7 @@ struct IndexExplainerView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Скала")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
 
             LinearGradient(colors: index.ramp, startPoint: .leading, endPoint: .trailing)
                 .frame(height: 12)
@@ -66,7 +66,7 @@ struct IndexExplainerView: View {
                 Text(index.highLabel)
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.secondaryText)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
@@ -77,16 +77,16 @@ struct IndexExplainerView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Какво да имате предвид")
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
 
             ForEach(VegetationIndex.sharedNotes, id: \.self) { note in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "info.circle")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                     Text(note)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

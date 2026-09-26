@@ -152,10 +152,10 @@ struct TabCustomiserRow: View {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     // The ONLY mark that this row opens something, and at
-                    // `.tertiary` it measures 1.73:1 against a white row —
+                    // `.tertiary` it measured 1.73:1 against a white row —
                     // invisible rather than subtle. A non-text control needs
-                    // 3:1; `.secondary` is 3.44:1.
-                    .foregroundStyle(.secondary)
+                    // 3:1; `Palette.secondaryText` is 6.86:1.
+                    .foregroundStyle(Palette.secondaryText)
             } label: {
                 Label("Долна лента", systemImage: "square.grid.2x2")
             }

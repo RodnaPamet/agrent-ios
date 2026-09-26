@@ -412,7 +412,7 @@ struct ParcelMapView: View {
                     } else if let failure = indices.failure {
                         Text(failure)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     } else if indices.tiles != nil {
                         legendRamp(selected)
@@ -490,7 +490,7 @@ struct ParcelMapView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(index.explanation)
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
             LinearGradient(colors: index.ramp, startPoint: .leading, endPoint: .trailing)
@@ -506,7 +506,7 @@ struct ParcelMapView: View {
                 Text(index.highLabel)
             }
             .font(.caption2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.secondaryText)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(index.name). \(index.explanation). "
@@ -642,7 +642,7 @@ struct ParcelMapView: View {
                     }
                 }
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
             }
             Spacer()
             if !parcel.isDrawable {
@@ -652,7 +652,7 @@ struct ParcelMapView: View {
                 // about.
                 Label("без очертание", systemImage: "questionmark.square.dashed")
                     .labelStyle(.iconOnly)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
         // Up to three `·` separators in one row, so this was the worst of

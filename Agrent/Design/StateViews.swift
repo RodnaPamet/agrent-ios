@@ -42,7 +42,7 @@ struct RefusalNote: View {
     var body: some View {
         Label(text, systemImage: icon)
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.secondaryText)
     }
 }
 

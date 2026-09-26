@@ -116,7 +116,7 @@ struct TaskDetailView: View {
                     if store.saving {
                         HStack(spacing: 8) {
                             ProgressView()
-                            Text("Записване…").font(.footnote).foregroundStyle(.secondary)
+                            Text("Записване…").font(.footnote).foregroundStyle(Palette.secondaryText)
                         }
                     }
                     if let writeError = store.writeError {
@@ -201,7 +201,7 @@ struct TaskDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(label)
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                 Text(trimmed)
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
@@ -229,7 +229,7 @@ struct TaskDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Свързани")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                 // Stated, and stated as unavailable here. An operator who
                 // can see "3 коментара" and cannot open them should be told
                 // which it is, rather than tapping a number that does
@@ -237,7 +237,7 @@ struct TaskDetailView: View {
                 ForEach(present, id: \.self) { Text($0).font(.body) }
                 Text("Съдържанието им се вижда в уеб приложението.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -247,7 +247,7 @@ struct TaskDetailView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
                 .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
             Text(value)
                 .font(.body)
                 .foregroundStyle(emphasised ? Palette.error : .primary)
@@ -294,7 +294,7 @@ private struct ResolutionSheet: View {
                 Section {
                     Text("Изисква се, за да се завърши задачата.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             }
             .inlineTitle(target.label)

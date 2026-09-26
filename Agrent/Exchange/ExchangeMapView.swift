@@ -40,7 +40,7 @@ struct ExchangeMapView: View {
                     // without it. Says which, rather than "no data".
                     Text("Картата не е налична в това копие на приложението.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             } footer: {
                 Text("Маркерите показват област, не точно местоположение.")
@@ -50,7 +50,7 @@ struct ExchangeMapView: View {
                 Section {
                     Text("Няма обяви с посочена област.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             } else {
                 Section("По области") {
@@ -194,17 +194,17 @@ struct RegionRow: View {
                 Spacer(minLength: 8)
                 Text(Plural.bg(region.count, "обява", "обяви"))
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
             ForEach(region.prices, id: \.currency) { price in
-                Text(priceText(price)).font(.footnote).foregroundStyle(.secondary)
+                Text(priceText(price)).font(.footnote).foregroundStyle(Palette.secondaryText)
             }
             if region.isMixedCurrency {
                 // NOT averaged across. Two currencies are two figures; one
                 // blended number would be a price in no currency at all.
                 Text("Обявите са в различни валути и не се сравняват.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
         .padding(.vertical, 2)

@@ -46,7 +46,7 @@ struct ParcelChooser: View {
                             }
                         }
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                     }
                 }
                 .accessibilityLabel(A11y.sentence([

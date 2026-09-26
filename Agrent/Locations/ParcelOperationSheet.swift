@@ -165,7 +165,7 @@ struct ParcelOperationSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(message)
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Palette.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                             Button("Опитайте отново") { Task { await store.load() } }
                                 .font(.footnote)
@@ -173,7 +173,7 @@ struct ParcelOperationSheet: View {
                     case .loaded:
                     if choices.isEmpty {
                         Text("Няма въведени артикули от този вид.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(Palette.secondaryText)
                     } else {
                         Picker("Избор", selection: $product) {
                             Text("— изберете —").tag(InputItem?.none)
@@ -261,14 +261,14 @@ struct ParcelOperationSheet: View {
                 }
 
                 if let problem = problemText {
-                    Section { Text(problem).font(.footnote).foregroundStyle(.secondary) }
+                    Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
                 }
                 if let failure {
                     Section {
                         Text(failure).font(.footnote).foregroundStyle(Palette.error)
                         // The ONLY write in this app that may say this.
                         Text("Може да опитате отново — повторното изпращане не създава втора операция.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(Palette.secondaryText)
 
                         // Offered only when a later attempt could work. A
                         // refusal must not be queueable: it would sit in
@@ -282,7 +282,7 @@ struct ParcelOperationSheet: View {
                             }
                             Text("Записът остава на устройството и се изпраща "
                                + "автоматично, когато има връзка.")
-                                .font(.footnote).foregroundStyle(.secondary)
+                                .font(.footnote).foregroundStyle(Palette.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
