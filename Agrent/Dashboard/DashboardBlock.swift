@@ -56,6 +56,42 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// WHICH MODULE GATES THIS BLOCK, or nil when nothing here knows.
+    ///
+    /// `enabledModules` gained a nine-value enum on the server (JOURNAL,
+    /// INVENTORY, PLANNING, CERTIFICATION, AUTOMATION, PROCESSES, AI, GRAIN,
+    /// EXCHANGE), which is what makes "empty because you do not have this"
+    /// distinguishable from "empty because nothing is recorded" at all. Before
+    /// it, the only honest option was to hide an empty block, and that is what
+    /// this screen did.
+    ///
+    /// ── Only two of seven are mapped, and that is deliberate ──
+    ///
+    /// `journal` is gated by JOURNAL and `lowStock` by INVENTORY; those are
+    /// near-tautological and I am confident in them. The other five I would be
+    /// guessing at:
+    ///
+    ///     briefing     AI? — but the briefing's own three booleans are a
+    ///                  DEPLOYMENT fact (is a model configured), which is not
+    ///                  the same question as a tenant entitlement
+    ///     grainPrice   GRAIN? — the price comes from /trends/prices, and
+    ///                  whether that route is gated at all is not stated
+    ///     tasks,
+    ///     taskTrend    no module in the nine obviously covers farm tasks
+    ///     achievements same
+    ///
+    /// A wrong mapping would tell a farmer a module is off when it is on, which
+    /// is worse than saying nothing — so an unmapped block keeps the old
+    /// behaviour and hides when empty. Asked of the server session; each answer
+    /// is one line here.
+    var gatingModule: String? {
+        switch self {
+        case .journal: "JOURNAL"
+        case .lowStock: "INVENTORY"
+        case .briefing, .grainPrice, .taskTrend, .tasks, .achievements: nil
+        }
+    }
+
     /// THE OWNER'S FOUR, chosen 2026-09-25.
     ///
     /// Briefing, the journal's latest, a chosen crop's price, and the
