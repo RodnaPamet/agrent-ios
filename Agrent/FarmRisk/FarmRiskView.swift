@@ -18,6 +18,10 @@ import SwiftUI
 /// chart that looked like today.
 struct FarmRiskView: View {
     @Environment(\.dismiss) private var dismiss
+
+    /// Read so the readings row can stop being a fixed-width column at the
+    /// accessibility sizes — see `reading(_:_:value:index:)`.
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var store = FarmRiskStore()
 
     /// The enquiry form's target — a parcel when a row opened it, or none
@@ -330,6 +334,21 @@ struct FarmRiskView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Palette.accent)
+                    // 44pt, on the IRREVERSIBLE one.
+                    //
+                    // A `.plain` button around a `.footnote` Label with no
+                    // frame has the glyphs themselves as its hit area — about
+                    // 18pt tall. This is the control that sends an insurance
+                    // enquiry with no DELETE, no PATCH and no withdraw.
+                    //
+                    // «История ›» eight points above it was given a 44pt frame
+                    // yesterday, for the stated reason that two small targets
+                    // beside an irreversible one is a mis-tap waiting to
+                    // happen. I enlarged the reversible control and left the
+                    // irreversible one at glyph size, which is the wrong way
+                    // round and was invisible until an audit measured both.
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     .accessibilityHint(asked
                         ? "Изпраща ново запитване за този парцел, например с поправена площ"
                         : "Изпраща запитване за застрахователна оферта")
@@ -361,11 +380,32 @@ struct FarmRiskView: View {
     private func reading(
         _ title: String, _ level: RiskLevel, value: Double?, index: String
     ) -> some View {
-        HStack(spacing: 8) {
+        // A COLUMN WHILE IT FITS, STACKED WHEN IT CANNOT.
+        //
+        // `Text(title).frame(width: 72)` boxed «Зеленина» at a hard 72pt. At
+        // `.footnote` that is comfortable by default and ruinous at the five
+        // accessibility sizes, where the word wants roughly 290pt: with no
+        // `fixedSize` the column breaks it into two- and three-letter
+        // fragments and the tail is simply cut. On the one screen whose job is
+        // telling a farmer WHICH reading is bad — and the chip beside it says
+        // only the level, while the trailing text is an index code.
+        //
+        // The 72 is worth keeping below that threshold: it aligns «Зеленина»
+        // and «Влага» so the two chips form a column you can compare down.
+        // Above it the alignment is the thing that has to go, because there
+        // are only two readings and losing the column costs less than losing
+        // the words. `NewsView` already switches axis on the same threshold.
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 8))
+
+        return layout {
             Text(title)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .frame(width: 72, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(width: typeSize.isAccessibilitySize ? nil : 72,
+                       alignment: .leading)
 
             CategoryChip(
                 text: level.label,
