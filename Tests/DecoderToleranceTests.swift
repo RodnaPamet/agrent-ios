@@ -139,6 +139,44 @@ final class DecoderToleranceTests: XCTestCase {
          "createdAt":"2026-09-01T10:00:00.000Z","contactSharedAt":null}
         """#) { _ = try await APIClient.shared.decode($0, as: ExchangeInquiry.self) },
 
+        // ── The surfaces documented on 2026-09-26 ──
+        //
+        // Борса and Тенденции were two of five tabs whose routes were in no
+        // schema at all, so their models were "measured, not contracted" —
+        // the exact state `CostSlice.variant` was in when one colourless
+        // slice could have blanked the calculator. They are checkable now.
+        Probe("ExchangeListing", #"""
+        {"id":"l","side":"SELL","kind":"CULTURE","status":"ACTIVE",
+         "commodity":"wheat","quantityTonnes":"250","pricePerTonne":"51.13",
+         "priceCurrency":"EUR","regionCode":"BG-23","regionName":"София",
+         "lat":42.7,"lon":23.3,"description":"суха","sellerDisplayName":"Иван",
+         "expiresAt":"2026-12-01T00:00:00.000Z","createdAt":"2026-09-01T10:00:00.000Z",
+         "isOwn":false}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeListing.self) },
+
+        Probe("PriceSeries", #"""
+        {"source":"ec","region":"BG","stage":"delivered","unit":"t",
+         "currency":"EUR","label":"EC BG","lastObservedAt":"2026-09-18",
+         "points":[{"date":"2026-09-18","price":229.5,"count":4}]}
+        """#) { _ = try await APIClient.shared.decode($0, as: PriceSeries.self) },
+
+        Probe("NewsItem", #"""
+        {"id":"n","title":"Заглавие","summary":"Обобщение","url":"https://x.bg/a",
+         "source":"agri.bg","category":"MARKET","imageUrl":null,
+         "publishedAt":"2026-09-25T06:00:00.000Z"}
+        """#) { _ = try await APIClient.shared.decode($0, as: NewsItem.self) },
+
+        Probe("Unit", #"""
+        {"id":"u","key":"L_PER_DA","name":"литра на декар","symbol":"л/дка",
+         "measure":"RATE","createdAt":"2026-01-01T00:00:00.000Z"}
+        """#) { _ = try await APIClient.shared.decode($0, as: Unit.self) },
+
+        Probe("InputItem", #"""
+        {"id":"i","name":"Раундъп","category":"PESTICIDE",
+         "defaultUnit":{"id":"u","key":"L","symbol":"л","measure":"VOLUME"},
+         "createdByUserId":"user1"}
+        """#) { _ = try await APIClient.shared.decode($0, as: InputItem.self) },
+
         Probe("PricePoint", #"""
         {"date":"2026-09-18","price":229.5,"count":4}
         """#) { _ = try await APIClient.shared.decode($0, as: PricePoint.self) },
@@ -236,6 +274,34 @@ final class DecoderToleranceTests: XCTestCase {
         "SpatialImportAccepted": ["fileRecordId", "format", "jobId", "status"],
         "ExchangeInquiry": ["id"],
         "PricePoint": ["date", "price"],
+
+        // ── Checked 2026-09-26 against the schemas documented that day ──
+        //
+        // Борса and Тенденции had no schema at all until this week, so
+        // every model below was "measured, not contracted" — and measurement
+        // only ever sees the values that happened to arrive, which is how
+        // `CostSlice.variant` survived a year. Each set is a strict SUBSET of
+        // its schema's `required`, i.e. this client tolerates more than the
+        // server promises, which is the safe direction:
+        //
+        //     ExchangeListing  vs ExchangeListing     (spec also requires 10 more)
+        //     PriceSeries      vs TrendSeries         (also label, lastObservedAt, stage)
+        //     NewsItem         vs NewsItem            (also imageUrl, summary)
+        //     Unit             vs Unit                (also createdAt, measure, name)
+        //     InputItem        vs CatalogItemListRow AND CatalogItemDetail
+        //
+        // `InputItem` is checked against BOTH item schemas deliberately: this
+        // app decodes it from the list and the detail, which are genuinely
+        // different shapes. The detail does not carry `defaultUnit` at all and
+        // the list's copy has no `name`, which the model's own header
+        // documents from production. `reorderLevel` differs harder still —
+        // a decimal STRING on the list and a NUMBER on the detail — and is
+        // not modelled here, which is why that cannot bite us.
+        "ExchangeListing": ["commodity", "createdAt", "id", "isOwn", "kind", "side", "status"],
+        "PriceSeries": ["currency", "points", "region", "source", "unit"],
+        "NewsItem": ["category", "id", "publishedAt", "source", "title", "url"],
+        "Unit": ["id", "key", "symbol"],
+        "InputItem": ["category", "id", "name"],
     ]
 
     /// THE GUARD. A field going non-optional turns this red and names it.
