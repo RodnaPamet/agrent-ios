@@ -631,14 +631,17 @@ struct ParcelMapView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(parcel.name).font(.subheadline.weight(.medium))
-                HStack(spacing: 6) {
+                // THREE values on one line, which at accessibility5 gave each
+                // of them a few characters: «Пшени / ца · 324,78 / дка». Caught by
+                // photographing the screen rather than by reading it.
+                MetaRow {
                     if let crop = CommodityName.freeText(parcel.cropType) { Text(crop) }
                     if let area = parcel.areaHa {
-                        if parcel.cropType != nil { Text("·") }
+                        if parcel.cropType != nil { MetaSeparator() }
                         Text(Area(hectares: area).text)
                     }
                     if parcel.hasActiveLease == true {
-                        Text("·"); Text("под аренда")
+                        MetaSeparator(); Text("под аренда")
                     }
                 }
                 .font(.footnote)

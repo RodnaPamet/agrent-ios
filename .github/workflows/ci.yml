@@ -73,6 +73,224 @@ jobs:
           fi
           echo "All date formatting goes through BgDate."
 
+      # The same bug as the step above, in the one place a spelling-based
+      # check structurally cannot see it. Табло's task chart printed ENGLISH
+      # month names until #93, and the whole defect was one line:
+      #
+      #   .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
+      #
+      # A bare `AxisMarks` over a `Date` lets Swift Charts format from the
+      # locale, this phone reports en_BG, and the dashboard read "Sep 14"
+      # under a Bulgarian heading.
+      #
+      # Neither guard already here could catch it. `Dates go through BgDate`
+      # rejects two SPELLINGS and there was no spelling to reject — the defect
+      # is the ABSENCE of a format. A file-level check in the `CommodityName`
+      # style would not fire either: DashboardView.swift already held three
+      # other BgDate calls the whole time that chart printed English.
+      #
+      # So the unit has to be the axis BLOCK, which is why this is python and
+      # not grep. A fixed `grep -A N` cannot be tuned: the correct block is 14
+      # lines from `{` to its label, and 23 lines reaches the `.chartYAxis`
+      # BELOW it, whose label would satisfy the check. Both ends move when
+      # somebody edits a comment. Brace matching has no window.
+      #
+      # Inspecting 0 blocks FAILS. A guard keyed on a string stops guarding
+      # the moment the string changes and reports success while it does. The
+      # docstrings below carry the three narrower traps, each of which was a
+      # defect in this step before it was a comment in it.
+      #
+      # Measured by extracting this script and running it per tree: fires on
+      # f5b15f9 and 523598e, the two commits before #93; passes with 2 blocks
+      # inspected on bf0e5a5 (#93 itself) and on 194189b (master).
+      - name: Chart date axes label through BgDate
+        run: |
+          python3 --version
+          python3 - <<'GUARD'
+          import pathlib, re, sys
+
+          # Anchored to `x:`. Unanchored, a chart with dates on the Y axis had
+          # its correctly-bare numeric X axis reported as a defect.
+          KEY = re.compile(r'x:\s*\.value\("\u0414\u0430\u0442\u0430"')
+
+          def scan(text):
+              """(code, tokens, delta) for one line.
+
+              code   — // comment cut off, string literals intact, so KEY can
+                       still see the label it is looking for.
+              tokens — the same with string CONTENTS blanked. Every token
+                       search below runs on this, so no literal can satisfy or
+                       trip a check by quoting it.
+              delta  — brace depth moved, counted outside strings.
+              """
+              code, toks, delta, i, n, in_str = [], [], 0, 0, len(text), False
+              while i < n:
+                  c = text[i]
+                  if in_str:
+                      code.append(c)
+                      if c == '\\':
+                          if i + 1 < n:
+                              code.append(text[i + 1])
+                              toks.append(' ')
+                          toks.append(' ')
+                          i += 2
+                          continue
+                      if c == '"':
+                          in_str = False
+                          toks.append('"')
+                      else:
+                          toks.append(' ')
+                      i += 1
+                      continue
+                  if c == '"':
+                      in_str = True
+                      code.append(c)
+                      toks.append(c)
+                      i += 1
+                      continue
+                  if c == '/' and i + 1 < n and text[i + 1] == '/':
+                      break
+                  if c == '{':
+                      delta += 1
+                  elif c == '}':
+                      delta -= 1
+                  code.append(c)
+                  toks.append(c)
+                  i += 1
+              return ''.join(code), ''.join(toks), delta
+
+          def bare_axis_marks(body):
+              """Every `AxisMarks` with no content closure after it.
+
+              `AxisMarks(values: .automatic(desiredCount: 3))` draws the
+              locale's own labels. One of those beside a labelled sibling
+              passes a whole-block search for `AxisValueLabel`, so each
+              occurrence is walked past its argument list on its own.
+              """
+              bare = 0
+              for m in re.finditer(r'\bAxisMarks\b', body):
+                  j = m.end()
+                  while j < len(body) and body[j] in ' \t\n':
+                      j += 1
+                  if j < len(body) and body[j] == '(':
+                      depth = 0
+                      while j < len(body):
+                          if body[j] == '(':
+                              depth += 1
+                          elif body[j] == ')':
+                              depth -= 1
+                              if depth == 0:
+                                  j += 1
+                                  break
+                          j += 1
+                      while j < len(body) and body[j] in ' \t\n':
+                          j += 1
+                  if j >= len(body) or body[j] != '{':
+                      bare += 1
+              return bare
+
+          problems, unreadable, inspected = [], [], 0
+
+          for path in sorted(pathlib.Path('Agrent').rglob('*.swift')):
+              raw = path.read_text(encoding='utf-8').split('\n')
+              scanned = [scan(l) for l in raw]
+              # Joined, so an `x:` and its `.value` on separate lines still match.
+              if not KEY.search('\n'.join(c for c, _t, _d in scanned)):
+                  continue
+
+              charts = axes = 0
+              for _c, toks, _d in scanned:
+                  charts += len(re.findall(r'\bChart\s*[({]', toks))
+                  axes += toks.count('.chartXAxis')
+              if axes < charts:
+                  problems.append('%s: %d Chart(s) over a Date but %d .chartXAxis — '
+                                  'a chart with no x axis modifier takes the locale default'
+                                  % (path, charts, axes))
+
+              i = 0
+              while i < len(raw):
+                  toks = scanned[i][1]
+                  at = toks.find('.chartXAxis')
+                  if at < 0:
+                      i += 1
+                      continue
+                  tail = toks[at:]
+                  if '{' in tail:
+                      first, region = i, tail[tail.index('{'):]
+                  else:
+                      # The brace may sit on the next line. `.chartXAxis(.hidden)`
+                      # has none and draws no labels, so there is nothing to check.
+                      j = i + 1
+                      while j < len(raw) and not scanned[j][1].strip():
+                          j += 1
+                      nxt = scanned[j][1] if j < len(raw) else ''
+                      if nxt.strip().startswith('{'):
+                          first, region = j, nxt[nxt.index('{'):]
+                      else:
+                          if '.hidden' not in tail:
+                              unreadable.append('%s:%d: %s' % (path, i + 1, raw[i].strip()))
+                          i += 1
+                          continue
+
+                  block, depth, end = [], 0, None
+                  for k in range(first, len(raw)):
+                      if k == first:
+                          text, d = region, scan(region)[2]
+                      else:
+                          text, d = scanned[k][1], scanned[k][2]
+                      block.append(text)
+                      depth += d
+                      if depth <= 0:
+                          end = k
+                          break
+                  if end is None:
+                      unreadable.append('%s:%d: a .chartXAxis block that never closes'
+                                        % (path, first + 1))
+                      i += 1
+                      continue
+
+                  body = '\n'.join(block)
+                  where = '%s:%d-%d' % (path, i + 1, end + 1)
+                  if 'AxisMarks' not in body:
+                      # Counted as unreadable, NOT inspected. A block that
+                      # delegates to a helper must not tick the counter that
+                      # proves this step is still guarding something.
+                      unreadable.append('%s: a .chartXAxis block with no AxisMarks — '
+                                        'it delegates to something this guard cannot follow'
+                                        % where)
+                      i = end + 1
+                      continue
+
+                  inspected += 1
+                  bare = bare_axis_marks(body)
+                  if bare:
+                      problems.append('%s: %d AxisMarks with no content closure, which draws '
+                                      'the locale\'s own labels' % (where, bare))
+                  elif 'AxisValueLabel' not in body:
+                      problems.append('%s: AxisMarks with no AxisValueLabel' % where)
+                  elif 'BgDate' not in body:
+                      problems.append('%s: an AxisValueLabel that does not go through BgDate'
+                                      % where)
+                  i = end + 1
+
+          if unreadable:
+              print('\n'.join(unreadable))
+              print('::error::A .chartXAxis here is in a form this guard cannot read. '
+                    'Teach it the form; do not delete the step.')
+              sys.exit(1)
+          if problems:
+              print('\n'.join(problems))
+              print('::error::A Date x axis needs AxisValueLabel { Text(BgDate...) }. Without one '
+                    'Swift Charts formats from the device locale, and en_BG prints "Sep 14".')
+              sys.exit(1)
+          if inspected == 0:
+              print('::error::0 .chartXAxis blocks inspected. This step is keyed on '
+                    'x: .value("Дата") and is no longer guarding anything.')
+              sys.exit(1)
+          print('%d .chartXAxis block(s) over a Date, every one labelled through BgDate.'
+                % inspected)
+          GUARD
+
       # A crop name is server DATA, not a UI label, so nothing that
       # translates labels was ever going to reach it. Eight sites across
       # three screens rendered the server's English at an operator whose
@@ -135,6 +353,116 @@ jobs:
             exit 1
           fi
           echo "Semantic colours all come from Palette."
+
+      # The interpunct belongs to ONE view, because it has to disappear.
+      #
+      # Five screens build a subtitle as `Text(crop) · Text(area)`. At the
+      # accessibility sizes that line has to stack, and when it does the
+      # separator becomes a row containing a single dot — so `MetaSeparator`
+      # renders nothing there, and every one of those rows has to go through it.
+      #
+      # The Dynamic Type pass fixed THREE of the five, which is the whole
+      # reason this step exists. `MetaRow` and `MetaSeparator` were written to
+      # stop the fix being applied per-screen, and then the sweep was applied
+      # per-screen anyway: Задачи, Дневник and Админ were the rows on screen at
+      # the time, and Локации, the parcel list under a location map and the
+      # parcel picker kept a plain `HStack`. A screenshot at AX5 found it —
+      # «Пшени / ца · 324,78 / дка», a name broken mid-word with the dot
+      # still drawn beside it. Nobody would have found it by reading.
+      #
+      # It is also the character `.combine` reads aloud as "middle dot", which
+      # is why these rows all build their spoken label from the values.
+      - name: The interpunct comes from MetaSeparator
+        run: |
+          hits=$(grep -rn --include='*.swift' -F 'Text("·")' Agrent/ \
+                 | grep -v '^Agrent/Design/AdaptiveRows.swift:' \
+                 | awk '{ l=$0; sub(/^[^:]*:[0-9]+:/, "", l); if (l !~ /^[ \t]*\/\//) print }' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Use MetaRow { … MetaSeparator() … }. A literal separator cannot"
+            echo "::error::disappear when the row stacks at the accessibility sizes."
+            exit 1
+          fi
+          echo "The interpunct is only in MetaSeparator."
+
+      # THE COST OF SPELLING THE SCHEMES OUT, paid back.
+      #
+      # `project.yml` had no `schemes:` block until the UI test target arrived,
+      # so Xcode auto-created one scheme and folded EVERY test bundle that
+      # depends on the app into its test action. That is why the block exists:
+      # left implicit, `AgrentA11yShots` would have joined the run above and
+      # failed there for a reason unrelated to the code, because a runner's
+      # simulator has an empty Keychain and the app opens on SignInView.
+      #
+      # But a hardcoded list trades a silent inclusion for a silent EXCLUSION.
+      # The next unit-test target somebody adds will not run in CI, and nothing
+      # will say so — the test count simply stays where it was, which looks
+      # exactly like a branch that added no tests.
+      #
+      # So the two are held against each other. Any target typed
+      # `bundle.unit-testing` must appear in the `Agrent` scheme's test targets.
+      # UI test targets are deliberately NOT required: keeping them out is the
+      # whole point of the block.
+      - name: Every unit test target runs in CI
+        run: |
+          python3 - <<'SCHEMES'
+          import pathlib, re, sys
+
+          lines = pathlib.Path('project.yml').read_text(encoding='utf-8').split('\n')
+
+          # A deliberately small parser rather than a yaml import: the guards
+          # job has no pyyaml, and adding a dependency to check a two-section
+          # file is a worse trade than reading its two sections.
+          section = name = None
+          blocks = {}
+          for line in lines:
+              if line[:1] not in (' ', '') :
+                  section, name = line.split(':')[0], None
+                  continue
+              head = re.match(r'^  ([A-Za-z0-9_.-]+):\s*$', line)
+              if head:
+                  name = head.group(1)
+                  blocks[(section, name)] = []
+                  continue
+              if name is not None:
+                  blocks[(section, name)].append(line)
+
+          # Both spellings: XcodeGen takes `bundle.unit-test` and
+          # `bundle.unit-testing` as the same type, and this file uses the
+          # first. Keying on the second alone made the tripwire below fire on
+          # a clean tree, which is how that error was found rather than
+          # shipped as a guard of nothing.
+          UNIT = re.compile(r'type:\s*bundle\.unit-test(ing)?\s*$')
+          unit = {n for (sec, n), body in blocks.items()
+                  if sec == 'targets' and any(UNIT.search(l) for l in body)}
+
+          wired, in_test, in_targets = set(), False, False
+          for line in blocks.get(('schemes', 'Agrent'), []):
+              if re.match(r'^    [A-Za-z]', line):
+                  in_test = line.strip() == 'test:'
+                  in_targets = False
+                  continue
+              if in_test and line.strip() == 'targets:':
+                  in_targets = True
+                  continue
+              if in_targets:
+                  item = re.match(r'^\s*-\s*([A-Za-z0-9_.-]+)\s*$', line)
+                  if item:
+                      wired.add(item.group(1))
+                  elif line.strip():
+                      in_targets = False
+
+          if not unit:
+              print('::error::No bundle.unit-test target found in project.yml. '
+                    'This guard is keyed on that type and is no longer guarding anything.')
+              sys.exit(1)
+          missing = sorted(unit - wired)
+          if missing:
+              print('::error::These unit test targets are not in the Agrent scheme, '
+                    'so CI never runs them: %s' % ', '.join(missing))
+              sys.exit(1)
+          print('Unit test targets in CI: %s' % ', '.join(sorted(unit)))
+          SCHEMES
 
       # Agrent.xcodeproj and Agrent/Info.plist are DERIVED from project.yml and
       # gitignored. Committing either reintroduces the conflict-prone pbxproj
