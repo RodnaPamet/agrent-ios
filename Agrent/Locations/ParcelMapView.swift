@@ -57,10 +57,27 @@ struct ParcelMapView: View {
             content
         }
         .inlineTitle(location.name)
-        // IN THE MENU, not the bar. The trailing slot holds the mode toggle,
-        // and the note further down explains why a second glyph there costs
-        // the Bulgarian title the width it has left — while an import is
-        // monthly work, which is what that menu was described as being for.
+        // IN THE MENU — and the menu button IS the second trailing glyph this
+        // file warns about. Owner accepted it staying (2026-09-26).
+        //
+        // The first version of this comment cited the note below as the REASON
+        // for using the menu, as though routing through it avoided the cost.
+        // It does not: `ParcelMapView` had no `appMenu` before the import, so
+        // adding one puts a ⋯ beside the mode toggle in `.primaryAction`, and
+        // the note's objection — that a second glyph eats what is left of the
+        // Bulgarian title's width — applies to this glyph exactly as it would
+        // have applied to a direct import button. The menu changes how many
+        // taps the action takes, not how much width the bar spends.
+        //
+        // So the cost is paid and named rather than argued away. What is
+        // bought with it: the action names ONE location, which the Локации
+        // list cannot do until a location is chosen, and it is monthly work
+        // that does not deserve permanent screen space.
+        //
+        // WHAT TO WATCH, since nothing here can measure it: a long location
+        // name truncating on this screen and not on others. `BulgarianLayout`
+        // fixes the measurement defect, not genuine width pressure, and this
+        // screen now has one glyph more of it than any other.
         .appMenu {
             Button {
                 importing = true
