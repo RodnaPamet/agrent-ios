@@ -81,3 +81,69 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+
+  # A UI TEST TARGET, WHICH #97 ASSUMED COULD NOT EXIST HERE.
+  #
+  # The issue's reason for a 20-item manual checklist is that "the simulator
+  # cannot be driven from this machine (no assistive access, no `simctl` input
+  # verb)". Both are true; neither covers XCUITest, which drives the app from a
+  # second process over the accessibility server. It taps, it navigates, and it
+  # photographs — see `A11yShots/A11yShotsTests.swift` for what that does and
+  # does not answer.
+  #
+  # It is NOT part of the `Agrent` scheme, and that is the whole reason the
+  # `schemes:` block below exists — read it before moving this.
+  AgrentA11yShots:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: A11yShots
+    dependencies:
+      - target: Agrent
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+# SCHEMES ARE SPELLED OUT HERE BECAUSE THE UI TESTS MUST NOT RUN ON CI.
+#
+# Nothing declared them before, so Xcode auto-created one scheme named after
+# the app and folded every test bundle that depends on it into that scheme's
+# test action. CI runs `xcodebuild test -scheme Agrent` (.github/workflows/
+# ci.yml). Adding a UI test target with no schemes declared would therefore
+# have added it to CI silently — and it would fail there for a reason that has
+# nothing to do with the code under test: a GitHub runner's simulator is new
+# every run, its Keychain is empty, so the app opens on `SignInView` and the
+# suite cannot reach a single screen behind auth.
+#
+# So: `Agrent` keeps doing exactly what it did — build the app, run
+# `AgrentTests` — and the screenshots live in a scheme of their own that only
+# ever runs when somebody asks for it by name.
+schemes:
+  Agrent:
+    build:
+      targets:
+        Agrent: all
+    test:
+      config: Debug
+      targets:
+        - AgrentTests
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  AgrentA11yShots:
+    build:
+      targets:
+        Agrent: [run, test]
+        AgrentA11yShots: [test]
+    test:
+      config: Debug
+      targets:
+        - AgrentA11yShots
+    run:
+      config: Debug

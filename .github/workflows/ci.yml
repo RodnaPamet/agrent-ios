@@ -354,6 +354,85 @@ jobs:
           fi
           echo "Semantic colours all come from Palette."
 
+      # THE COST OF SPELLING THE SCHEMES OUT, paid back.
+      #
+      # `project.yml` had no `schemes:` block until the UI test target arrived,
+      # so Xcode auto-created one scheme and folded EVERY test bundle that
+      # depends on the app into its test action. That is why the block exists:
+      # left implicit, `AgrentA11yShots` would have joined the run above and
+      # failed there for a reason unrelated to the code, because a runner's
+      # simulator has an empty Keychain and the app opens on SignInView.
+      #
+      # But a hardcoded list trades a silent inclusion for a silent EXCLUSION.
+      # The next unit-test target somebody adds will not run in CI, and nothing
+      # will say so — the test count simply stays where it was, which looks
+      # exactly like a branch that added no tests.
+      #
+      # So the two are held against each other. Any target typed
+      # `bundle.unit-testing` must appear in the `Agrent` scheme's test targets.
+      # UI test targets are deliberately NOT required: keeping them out is the
+      # whole point of the block.
+      - name: Every unit test target runs in CI
+        run: |
+          python3 - <<'SCHEMES'
+          import pathlib, re, sys
+
+          lines = pathlib.Path('project.yml').read_text(encoding='utf-8').split('\n')
+
+          # A deliberately small parser rather than a yaml import: the guards
+          # job has no pyyaml, and adding a dependency to check a two-section
+          # file is a worse trade than reading its two sections.
+          section = name = None
+          blocks = {}
+          for line in lines:
+              if line[:1] not in (' ', '') :
+                  section, name = line.split(':')[0], None
+                  continue
+              head = re.match(r'^  ([A-Za-z0-9_.-]+):\s*$', line)
+              if head:
+                  name = head.group(1)
+                  blocks[(section, name)] = []
+                  continue
+              if name is not None:
+                  blocks[(section, name)].append(line)
+
+          # Both spellings: XcodeGen takes `bundle.unit-test` and
+          # `bundle.unit-testing` as the same type, and this file uses the
+          # first. Keying on the second alone made the tripwire below fire on
+          # a clean tree, which is how that error was found rather than
+          # shipped as a guard of nothing.
+          UNIT = re.compile(r'type:\s*bundle\.unit-test(ing)?\s*$')
+          unit = {n for (sec, n), body in blocks.items()
+                  if sec == 'targets' and any(UNIT.search(l) for l in body)}
+
+          wired, in_test, in_targets = set(), False, False
+          for line in blocks.get(('schemes', 'Agrent'), []):
+              if re.match(r'^    [A-Za-z]', line):
+                  in_test = line.strip() == 'test:'
+                  in_targets = False
+                  continue
+              if in_test and line.strip() == 'targets:':
+                  in_targets = True
+                  continue
+              if in_targets:
+                  item = re.match(r'^\s*-\s*([A-Za-z0-9_.-]+)\s*$', line)
+                  if item:
+                      wired.add(item.group(1))
+                  elif line.strip():
+                      in_targets = False
+
+          if not unit:
+              print('::error::No bundle.unit-test target found in project.yml. '
+                    'This guard is keyed on that type and is no longer guarding anything.')
+              sys.exit(1)
+          missing = sorted(unit - wired)
+          if missing:
+              print('::error::These unit test targets are not in the Agrent scheme, '
+                    'so CI never runs them: %s' % ', '.join(missing))
+              sys.exit(1)
+          print('Unit test targets in CI: %s' % ', '.join(sorted(unit)))
+          SCHEMES
+
       # Agrent.xcodeproj and Agrent/Info.plist are DERIVED from project.yml and
       # gitignored. Committing either reintroduces the conflict-prone pbxproj
       # the spec exists to avoid, and lets the two drift apart.
