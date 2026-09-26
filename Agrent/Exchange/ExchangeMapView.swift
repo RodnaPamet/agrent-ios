@@ -73,18 +73,31 @@ struct ExchangeMapView: View {
         }
     }
 
+    /// Fit the 1000×600 space into whatever the row is, preserving aspect.
+    /// The geometry is pre-projected, so this is a scale rather than a
+    /// projection — nothing here can distort the country.
+    ///
+    /// EXTRACTED rather than duplicated, for the same reason the schematic
+    /// parcel map extracted its `layout`: the accessibility proxies have to
+    /// land exactly where the drawing puts the markers, and two copies of
+    /// this arithmetic drift the moment one of them is edited.
+    private static func place(_ p: CGPoint, in size: CGSize, map: BulgariaMap) -> CGPoint {
+        let scale = min(size.width / map.width, size.height / map.height)
+        let dx = (size.width - map.width * scale) / 2
+        let dy = (size.height - map.height * scale) / 2
+        return CGPoint(x: dx + p.x * scale, y: dy + p.y * scale)
+    }
+
+    /// Area proportional to count, so two markers of twice the count are
+    /// twice the ink rather than twice the radius — radius would exaggerate
+    /// by the square.
+    private static func markerRadius(_ count: Int) -> CGFloat {
+        5 + sqrt(Double(count)) * 3.5
+    }
+
     private func canvas(_ map: BulgariaMap) -> some View {
         Canvas { context, size in
-            // Fit the 1000×600 space into whatever the row is, preserving
-            // aspect. The geometry is pre-projected, so this is a scale
-            // rather than a projection — nothing here can distort the
-            // country.
-            let scale = min(size.width / map.width, size.height / map.height)
-            let dx = (size.width - map.width * scale) / 2
-            let dy = (size.height - map.height * scale) / 2
-            func place(_ p: CGPoint) -> CGPoint {
-                CGPoint(x: dx + p.x * scale, y: dy + p.y * scale)
-            }
+            func place(_ p: CGPoint) -> CGPoint { Self.place(p, in: size, map: map) }
 
             let withOffers = Set(regions.map(\.regionCode))
             for oblast in map.oblasti {
@@ -110,10 +123,7 @@ struct ExchangeMapView: View {
                 guard let first = region.listings.first,
                       let lat = first.lat, let lon = first.lon else { continue }
                 let centre = place(map.point(lat: lat, lon: lon))
-                // Area proportional to count, so two markers of twice the
-                // count are twice the ink rather than twice the radius —
-                // radius would exaggerate by the square.
-                let radius = 5 + sqrt(Double(region.count)) * 3.5
+                let radius = Self.markerRadius(region.count)
                 let rect = CGRect(
                     x: centre.x - radius, y: centre.y - radius,
                     width: radius * 2, height: radius * 2)
@@ -135,11 +145,40 @@ struct ExchangeMapView: View {
         .accessibilityLabel(
             "Карта на обявите: "
             + Plural.bg(regions.count, "област", "области"))
-        .accessibilityChildren {
+        .accessibilityChildren { proxies(map) }
+    }
+
+    /// THE PROXIES WERE NOT ANYWHERE. They were a bare `ForEach` of
+    /// `Color.clear`, which SwiftUI lays out stacked at the full size of the
+    /// canvas — so all 28 oblasti had the same accessibility frame, the whole
+    /// map.
+    ///
+    /// Swiping through them still read the right names in the right order,
+    /// which is why this looked correct and stayed. What did not work is
+    /// everything that uses the FRAME: exploring the map by dragging a finger
+    /// over it reads whichever element happens to be on top wherever you
+    /// touch, Switch Control scans 28 identical rectangles, and the focus
+    /// ring lands on the whole canvas every time. On a map, position is the
+    /// entire content — «Пловдив, 3 обяви» announced while the finger is over
+    /// Видин is not a partial answer, it is a wrong one.
+    ///
+    /// Placed at the marker, sized to the marker, with a 44pt floor so a
+    /// one-listing oblast is not a 16pt target.
+    private func proxies(_ map: BulgariaMap) -> some View {
+        GeometryReader { geometry in
             ForEach(regions) { region in
-                Color.clear
-                    .accessibilityElement()
-                    .accessibilityLabel(region.accessibilityText)
+                if let first = region.listings.first,
+                   let lat = first.lat, let lon = first.lon {
+                    let centre = Self.place(
+                        map.point(lat: lat, lon: lon), in: geometry.size, map: map
+                    )
+                    let side = max(44, Self.markerRadius(region.count) * 2)
+                    Color.clear
+                        .frame(width: side, height: side)
+                        .position(centre)
+                        .accessibilityElement()
+                        .accessibilityLabel(region.accessibilityText)
+                }
             }
         }
     }
