@@ -135,10 +135,14 @@ final class FarmRiskStore {
     private(set) var catalogue: LoadState<InsuranceCatalogue> = .loading
 
     func readCatalogue() async {
-        await CachedResource.loadShowingCacheFirst(
-            InsuranceCatalogueAPI.path,
-            decode: InsuranceCatalogueAPI.decode,
-            publish: { [weak self] state in
+        await CachedResource.loadShowingCacheFirst(InsuranceCatalogueAPI.path) { data in
+            // A closure rather than `InsuranceCatalogueAPI.decode` by
+            // reference: a function value is not `@Sendable`, and passing one
+            // warns about data races. Every other call site here spells it
+            // this way; this one did not, and CI's warnings gate caught it —
+            // I had grepped the local build for `error:` only.
+            try await InsuranceCatalogueAPI.decode(data)
+        } publish: { [weak self] state in
                 self?.catalogue = state
                 // Logged, not shown. A farmer can do nothing about it and it
                 // does not make the preview wrong — the TARIFF is still the
@@ -149,8 +153,7 @@ final class FarmRiskStore {
                         insurance catalogue names \(row.key, privacy: .public) as                         "\(row.fetched, privacy: .public)" where CommodityName says                         "\(row.ours, privacy: .public)" — change the server's                         messages/ entry rather than hardcoding either side
                         """)
                 }
-            }
-        )
+        }
     }
 
     /// THE IDEMPOTENCY KEY, and the one rule that makes it worth having.

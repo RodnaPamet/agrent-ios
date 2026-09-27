@@ -434,21 +434,50 @@ final class InsuranceCatalogueTests: XCTestCase {
         XCTAssertFalse(c.product(key: "hail")?.isCrop == true)
     }
 
-    /// THE TARIFF IS PER PRODUCT, which is why the compiled-in constant had to
-    /// go rather than become a default: hail is 1200 bp where wheat is 1000,
-    /// so a single app-wide rate was already wrong for six of the eight.
-    func testEachProductCarriesItsOwnTariff() async throws {
+    /// THE APP PRICES FROM THE PRODUCT'S OWN TARIFF, whatever it is.
+    ///
+    /// ── The fixture below is SYNTHETIC, and saying so is the point ──
+    ///
+    /// Its 1200 for hail is a number I invented to make the two products
+    /// differ. On agri-saas main today **all eight products are 1000 bp**, so
+    /// a single app-wide rate would have been correct for the whole catalogue
+    /// right now.
+    ///
+    /// I wrote that fixture, then reported "hail is 1200 bp where wheat is
+    /// 1000" to the owner and to the server session as an observation about
+    /// production. It was not. The server session checked `products.ts`,
+    /// found 1000 across the board, and asked where 1200 came from. It came
+    /// from this file.
+    ///
+    /// Exactly the failure this repo has spent a week naming, committed while
+    /// writing about it: a test agreeing with a fixture I wrote, and me
+    /// reading its agreement as evidence about a server.
+    ///
+    /// THE TEST IS STILL WORTH HAVING, for a narrower claim than I made for
+    /// it. It asserts the app reads `tariffBp` from the chosen product rather
+    /// than from anywhere else — which is why the compiled-in constant was
+    /// deleted rather than turned into a default argument. That claim is about
+    /// this app's plumbing and is true regardless of what the rates are. What
+    /// it does NOT assert, and cannot, is anything about the server's rates.
+    func testTheQuoteUsesTheChosenProductsTariffWhateverItIs() async throws {
         let c = try await catalogue()
         let wheat = try XCTUnwrap(c.product(key: "wheat"))
         let hail = try XCTUnwrap(c.product(key: "hail"))
-        XCTAssertNotEqual(wheat.tariffBp, hail.tariffBp)
 
+        // Two rates that differ ONLY because this fixture makes them differ.
+        // The assertion is that each premium follows its own product's rate,
+        // not that these are the rates.
         let onWheat = try XCTUnwrap(InsurancePremium.quote(
             sumInsuredCents: 1_000_000, tariffBp: wheat.tariffBp, instalments: 1))
         let onHail = try XCTUnwrap(InsurancePremium.quote(
             sumInsuredCents: 1_000_000, tariffBp: hail.tariffBp, instalments: 1))
-        XCTAssertEqual(onWheat.premiumCents, 100_000)
-        XCTAssertEqual(onHail.premiumCents, 120_000)
+
+        XCTAssertEqual(onWheat.premiumCents, 1_000_000 * wheat.tariffBp / 10_000)
+        XCTAssertEqual(onHail.premiumCents, 1_000_000 * hail.tariffBp / 10_000)
+        // And the two track their rates rather than a shared one, which is
+        // what a compiled-in constant could not have done.
+        XCTAssertEqual(onHail.premiumCents != onWheat.premiumCents,
+                       hail.tariffBp != wheat.tariffBp)
     }
 
     /// A NEWER ENGINE MEANS STOP PREVIEWING. The local arithmetic was written
