@@ -215,6 +215,19 @@ enum UserMessage {
     }
 
     static let bulgarian: [String: String] = [
+        // The session could not be renewed and the tokens were KEPT, because
+        // only a 401 proves a refresh token is dead — see `APIClient`. So the
+        // app is still nominally signed in while every request fails, and
+        // without this the farmer read «Заявката съдържа невалидни данни.» on
+        // whichever screen they happened to open. The owner met it as "the
+        // satellite data does not render".
+        //
+        // Names the fix, because there IS one and it is two taps: «Изход» in
+        // the menu, then sign in again.
+        "TOKEN_REFRESH_FAILED":
+            "Сесията не можа да бъде подновена. Излезте от менюто и влезте "
+            + "отново.",
+
         // ── The insurance quote's own refusals ──
         //
         // Coded rather than prose deliberately, by the server, BECAUSE this
