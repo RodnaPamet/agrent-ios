@@ -770,10 +770,17 @@ actor APIClient {
                     // sentence blames the data.
                     //
                     // Keeping the tokens is still right — see above, a
-                    // question that was not answered is not a no — but the
-                    // farmer has to be told the session is the problem and
-                    // that «Изход» then signing in again fixes it. Silence
-                    // plus a wrong sentence is the worst of both.
+                    // question that was not answered is not a no — and the
+                    // episode that prompted this PROVED the rule rather than
+                    // breaking it. The 400 came from a different application
+                    // answering on the same hostname, not from this server;
+                    // clearing tokens on it would have signed a farmer out
+                    // because of a proxy. The premise above was true of the
+                    // server and false only of what reached us.
+                    //
+                    // What was wrong was saying nothing true about it. Silence
+                    // plus a generic sentence blaming the DATA is the worst of
+                    // both, so the failure now names itself.
                     throw APIError.http(status: status,
                                         code: code ?? "TOKEN_REFRESH_FAILED",
                                         message: nil)
