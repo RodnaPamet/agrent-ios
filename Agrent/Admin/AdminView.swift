@@ -244,6 +244,19 @@ struct AdminView: View {
                 field("ЕКАТТЕ", profile.registrationEkatte)
                 field("ОДБХ", profile.odbhCity)
                 field("Областна дирекция", profile.agricultureDirectorateCity)
+
+                // ── The holding, as opposed to the producer above ──
+                //
+                // Read-only, which is the owner's ruling. A write path is a
+                // different size of job: a blank string CLEARS a field on the
+                // server rather than being ignored, so it needs
+                // read-modify-write of the whole object, and the response can
+                // legitimately differ from what was sent because the server
+                // trims, refuses a negative size as null, and drops blank and
+                // duplicate crops. None of that is needed to SHOW them.
+                field("УРН", profile.urn)
+                sizeField(profile.sizeHa)
+                grainField(profile.grainProduced)
             }
         }
     }
@@ -301,6 +314,47 @@ struct AdminView: View {
                 ? A11y.spokenNames("Скрий", "ЕГН", "Hide")
                 : A11y.spokenNames("Покажи", "ЕГН", "Show"))
             .accessibilityHint(revealEGN ? "Скрива номера" : "Показва номера")
+        }
+    }
+
+    /// Declared hectares, and NOTHING when it was never declared.
+    ///
+    /// A DECLARED ZERO IS SHOWN. `field` hides an empty string because an
+    /// absent name is nothing to say; a zero here is something the farm told
+    /// the state, and hiding it would make "declared nothing" and "declared
+    /// nothing yet" the same row. So this branches on nil, not on falsity.
+    @ViewBuilder
+    private func sizeField(_ hectares: Double?) -> some View {
+        if let hectares {
+            LabeledContent("Размер") {
+                Text(Area(hectares: hectares).text)
+                    .multilineTextAlignment(.trailing)
+            }
+        }
+    }
+
+    /// The declared crops, through `CommodityName`.
+    ///
+    /// The wire carries the server's slugs — `wheat`, `barley` — and this app
+    /// has a CI step requiring any file touching a commodity to resolve it,
+    /// because eight sites once printed the server's English at an operator
+    /// whose app is otherwise entirely Bulgarian and the owner found it rather
+    /// than a test. `freeText` rather than `canonical`: a crop the mapping
+    /// does not know is shown as it came rather than dropped, since a farm
+    /// declaring something unusual should not see a shorter list than it
+    /// filed.
+    ///
+    /// `[]` is the empty case and renders nothing — the array is never nil,
+    /// so there is no third state to handle.
+    @ViewBuilder
+    private func grainField(_ crops: [String]) -> some View {
+        if !crops.isEmpty {
+            LabeledContent("Култури") {
+                Text(crops.map { CommodityName.freeText($0) ?? $0 }
+                        .joined(separator: ", "))
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
