@@ -222,6 +222,20 @@ enum UserMessage {
         // whichever screen they happened to open. The owner met it as "the
         // satellite data does not render".
         //
+        // THE CAUSE THE FIRST TIME WAS NOT AN EXPIRED SESSION, and the commit
+        // that added this said it was. `app.agrent.bg` was intermittently
+        // being served by a DIFFERENT APPLICATION: a second product shared the
+        // Docker network and declared the same `app` alias, so Docker DNS
+        // returned two addresses and Caddy picked one per connection. The
+        // other app has no `/api/auth/*` routes, so its catch-all answered 400
+        // with no code where agri-saas answers 401 `invalid_grant`.
+        //
+        // Connection reuse made it sticky, which is why one device failed on
+        // every screen while a simulator was fine — and why "his tokens are
+        // four days older" fitted the evidence and was wrong. Fixed
+        // server-side by pinning the upstream to one container
+        // (agri-saas#1143); 40 probes from here now answer identically.
+        //
         // Names the fix, because there IS one and it is two taps: «Изход» in
         // the menu, then sign in again.
         "TOKEN_REFRESH_FAILED":
