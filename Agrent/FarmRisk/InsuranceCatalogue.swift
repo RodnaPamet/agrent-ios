@@ -24,15 +24,23 @@ import Foundation
 /// arriving as DATA, where neither the `BgDate` guard nor the `CommodityName`
 /// guard would have seen it.
 ///
-/// The parameter is not in the operation's documented `parameters` (only
-/// `tenantSlug` is), so a client generated from the document alone would never
-/// send it and would silently be served English. Reported; sent here
-/// regardless.
+/// The parameter WAS missing from the document — the operation listed only
+/// `tenantSlug`, so a client generated from it would never send a locale and
+/// would silently be served English. Reported, and fixed in agri-saas#1140:
+/// `locale`, `in: query`, `required: false`, `enum: ['en','bg']` derived from
+/// their `LOCALES` rather than restated, so a new language cannot leave the
+/// document describing a narrower set than the server accepts.
 ///
-/// What detects it if English ever arrives is `labelsDisagreeingWithCommodityName`
-/// below, at RUNTIME. Not a test: a test would compare a fixture written here
-/// against a mapping written here and agree with itself, while the strings
-/// that matter come off a server.
+/// Kept here rather than deleted because it is the SAME defect as the
+/// `anyOf` omission on the lead request, one layer out: a missing `required`
+/// hands the next client an error, while a missing query parameter hands them
+/// English names as DATA — and data is the one route a localisation guard
+/// cannot watch.
+///
+/// What detects it if English ever arrives anyway is
+/// `labelsDisagreeingWithCommodityName` below, at RUNTIME. Not a test: a test
+/// would compare a fixture written here against a mapping written here and
+/// agree with itself, while the strings that matter come off a server.
 struct InsuranceCatalogue: Decodable, Equatable, Sendable {
 
     /// WHICH ENGINE PRICED IT, for comparing rather than sending.
