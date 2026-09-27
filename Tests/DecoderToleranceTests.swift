@@ -148,6 +148,16 @@ final class DecoderToleranceTests: XCTestCase {
            "flagged":2,"jobRunId":"run1"}}
         """#) { _ = try await APIClient.shared.decode($0, as: JobRunEnvelope.self) },
 
+        // The farm profile, thirteen fields all in `required` — twelve
+        // nullable, and `grainProduced` neither nullable nor optional.
+        Probe("FarmProfile", #"""
+        {"producerName":"Иван Петров","egn":"7501011234","eik":"203912345",
+         "urn":"1234567","address":"ул. Дунав 3","municipality":"Плевен",
+         "settlement":"Плевен","agricultureDirectorateCity":"Плевен",
+         "registrationPlace":"Плевен","registrationEkatte":"56722",
+         "odbhCity":"Плевен","sizeHa":124.5,"grainProduced":["wheat"]}
+        """#) { _ = try await AdminAPI.decodeFarmProfile(from: $0) },
+
         // The catalogue, whose `commodity` is the only optional field.
         Probe("InsuranceCatalogue", #"""
         {"engineVersion":1,"currencySymbol":"€","products":[
@@ -327,6 +337,14 @@ final class DecoderToleranceTests: XCTestCase {
         // the one the server session and this repo found on the same day from
         // opposite directions.
         "InsuranceCatalogue": ["currencySymbol", "engineVersion", "products"],
+
+        // ONE of thirteen, and that one is the odd field out. Twelve are
+        // `["<type>","null"]` — present-and-null — so the model takes them as
+        // optionals and refuses none. `grainProduced` is `type: array` with no
+        // null and is in `required`, so it is the only key this model cannot
+        // do without, and modelling it as an optional would describe a state
+        // the server cannot produce.
+        "FarmProfile": ["grainProduced"],
         "SpatialImportAccepted": ["fileRecordId", "format", "jobId", "status"],
         "ExchangeInquiry": ["id"],
         "PricePoint": ["date", "price"],

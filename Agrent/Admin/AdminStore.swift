@@ -59,11 +59,15 @@ final class AdminStore {
             // A 403 here is already carried by `access`; do not also show a
             // second failure for the same cause.
             if AdminAPI.isForbidden(error) {
+                // An EMPTY profile, not a failure — `isEmpty` is true of this,
+                // so the section says «още не са попълнени» rather than
+                // repeating a refusal the screen already shows.
                 profile = .loaded(
                     FarmProfile(producerName: nil, eik: nil, egn: nil, address: nil,
                                 settlement: nil, municipality: nil,
                                 registrationPlace: nil, registrationEkatte: nil,
-                                odbhCity: nil, agricultureDirectorateCity: nil),
+                                odbhCity: nil, agricultureDirectorateCity: nil,
+                                urn: nil, sizeHa: nil, grainProduced: []),
                     .fresh)
             } else {
                 profile = .failed(UserMessage.text(for: error))

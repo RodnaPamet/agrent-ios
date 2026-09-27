@@ -166,12 +166,64 @@ struct FarmProfile: Decodable, Equatable, Sendable {
     let odbhCity: String?
     let agricultureDirectorateCity: String?
 
+    // ── The holding, added 2026-09-27 with agri-saas#1141/#1145 ──
+    //
+    // The ten above describe the PRODUCER — who they are and where they are
+    // registered. These three describe the HOLDING.
+
+    /// УРН, the holding's registration number. `["string","null"]`.
+    ///
+    /// A state identifier, encrypted at rest server-side and arriving as
+    /// PLAINTEXT like `egn` and `eik` — so the rules in this file's header
+    /// apply to it in full: never a log line, a query parameter or a cache
+    /// key. It is NOT masked on screen: the owner's ruling is that ЕИК and
+    /// УРН are business identifiers appearing on public filings, while ЕГН is
+    /// the personal one and keeps its reveal.
+    let urn: String?
+
+    /// Declared hectares. A NUMBER, and this is where the pattern in this
+    /// repo misleads.
+    ///
+    /// `quantityTonnes` on the exchange is a decimal STRING, `WireDecimal`
+    /// exists to accept either, and the habit those built is "server decimals
+    /// are strings". That habit came from MONEY, where a binary float cannot
+    /// represent a cent and a rounding error is someone's lev. An area in
+    /// hectares to three decimals is exactly representable, and the contract
+    /// says `["number","null"]`, so a `Double?` is what it is.
+    ///
+    /// NULL AND ZERO ARE DIFFERENT CLAIMS. Null is "not declared"; 0 is a
+    /// declaration of zero hectares. Collapsing them would show a farm that
+    /// declared nothing and a farm that declared zero as the same thing, and
+    /// only one of those is a farm that has told the state something.
+    let sizeHa: Double?
+
+    /// Declared crops. `[]` when unset, NEVER null, and in `required`.
+    ///
+    /// NOT OPTIONAL, which breaks the shape of every field above it. All ten
+    /// of those are `String?`; this one is always present, so an optional here
+    /// would model a state the server cannot produce — and the empty case is
+    /// `[]`, not `nil`, which is why it cannot join `isEmpty`'s array below.
+    let grainProduced: [String]
+
     /// Nothing filled in at all, which is the state this tenant is in and
-    /// needs saying rather than showing ten empty rows.
+    /// needs saying rather than showing thirteen empty rows.
+    ///
+    /// THE THREE NEW FIELDS HAD TO BE ADDED HERE TOO, and the reason is not
+    /// symmetry. The plausible near-term state is a tenant who fills exactly
+    /// `urn`, `sizeHa` and `grainProduced` and nothing else — those are the
+    /// three that just arrived. Left out, this would report "nothing filled
+    /// in" over three populated rows, and it would fail in the direction that
+    /// looks like an empty database rather than like a bug.
+    ///
+    /// `sizeHa` and `grainProduced` cannot join the array — one is a `Double?`
+    /// and the other is never nil — so they are tested on their own terms.
+    /// `sizeHa != nil` rather than `sizeHa != 0`, because a declared zero is
+    /// still a declaration.
     var isEmpty: Bool {
-        [producerName, eik, egn, address, settlement, municipality,
-         registrationPlace, registrationEkatte, odbhCity,
-         agricultureDirectorateCity]
+        let noText = [producerName, eik, egn, urn, address, settlement,
+                      municipality, registrationPlace, registrationEkatte,
+                      odbhCity, agricultureDirectorateCity]
             .allSatisfy { ($0 ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+        return noText && sizeHa == nil && grainProduced.isEmpty
     }
 }
