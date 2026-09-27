@@ -13,6 +13,7 @@ import SwiftUI
 /// not his. So a block with nothing to say renders nothing, and the picker is
 /// where you learn a block exists.
 struct DashboardView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var store = DashboardStore()
     @State private var preferences = DashboardPreferences.shared
     @State private var editing = false
@@ -41,7 +42,32 @@ struct DashboardView: View {
             .navigationTitle("Табло")
             .appMenu()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                // «ЗАТВОРИ», WHICH THIS SCREEN WAS THE ONLY ONE WITHOUT.
+                //
+                // Табло is opened from the app menu as a `.sheet`, like Риск,
+                // Новини, Тенденции, Админ and the index explainer — and every
+                // one of those puts a «Затвори» in the leading slot. This one
+                // put the block picker there instead and shipped with no way
+                // back.
+                //
+                // A sheet can be dragged down in principle. Not this one in
+                // practice: it is a full-screen `List`, so a downward drag
+                // scrolls the rows and never reaches the sheet. The owner
+                // found it on the device — "once entered there is no way of
+                // coming back to the main menu" — which is exactly right.
+                //
+                // FLAGGED BEFORE IT SHIPPED AND MISFILED. A review of the
+                // screenshot harness noted that Табло has no dismiss, and I
+                // treated that as a fact the test had to cope with rather than
+                // a defect the screen had. The harness grew a drag-to-dismiss
+                // fallback and the app kept the bug. A finding about test
+                // plumbing and a finding about the product looked identical
+                // from inside the harness.
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Затвори") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.close)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         editing = true
                     } label: {

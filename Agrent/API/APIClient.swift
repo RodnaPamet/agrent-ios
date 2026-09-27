@@ -759,7 +759,24 @@ actor APIClient {
                     Log.auth.error(
                         "token refresh failed but NOT rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), keeping tokens"
                     )
-                    throw APIError.http(status: status, code: code, message: nil)
+                    // A CODE, so the sentence can say what happened.
+                    //
+                    // Without one this threw a bare 400 and `UserMessage`
+                    // rendered the generic «Заявката съдържа невалидни данни.»
+                    // — on every screen, for a session that could not be
+                    // renewed. The owner met it as "the satellite data does
+                    // not render", which is what it looks like from the
+                    // outside: the request that failed is invisible and the
+                    // sentence blames the data.
+                    //
+                    // Keeping the tokens is still right — see above, a
+                    // question that was not answered is not a no — but the
+                    // farmer has to be told the session is the problem and
+                    // that «Изход» then signing in again fixes it. Silence
+                    // plus a wrong sentence is the worst of both.
+                    throw APIError.http(status: status,
+                                        code: code ?? "TOKEN_REFRESH_FAILED",
+                                        message: nil)
                 }
 
                 Log.auth.error(
