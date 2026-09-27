@@ -93,6 +93,12 @@ struct FarmRiskView: View {
                     if store.parcels.value == nil { await store.loadParcels() }
                     await store.loadLeads()
                     await store.readRisks()
+                    // The catalogue, so the ask sheet can price a preview. A
+                    // failure here is not surfaced: no catalogue means no
+                    // preview, and the sheet says so in its own words rather
+                    // than putting an error on a screen about satellite
+                    // readings.
+                    await store.readCatalogue()
                 }
                 // A FORM, because there is no undo.
                 //
@@ -107,9 +113,13 @@ struct FarmRiskView: View {
                     InsuranceRequestForm(
                         parcels: (store.parcels.value ?? []).map(\.parcel),
                         alreadyAsked: store.askedParcelIDs,
-                        preselected: target.parcel
-                    ) { parcel, area, quote in
-                        Task { await store.ask(parcel.id, area: area, quote: quote) }
+                        preselected: target.parcel,
+                        catalogue: store.catalogue.value
+                    ) { parcel, area, quote, shown in
+                        Task {
+                            await store.ask(parcel.id, area: area, quote: quote,
+                                            shownPremiumCents: shown)
+                        }
                     }
                 }
                 // WHEN THE SERVER PRICED IT DIFFERENTLY.

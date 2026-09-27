@@ -28,7 +28,15 @@ import SwiftUI
 struct InsuranceRequestForm: View {
     let parcels: [Parcel]
     let alreadyAsked: Set<String>
-    let onSubmit: (Parcel, Area?, CreateLead.Quote?) -> Void
+    /// The fetched products and tariffs, or nil when they have never been
+    /// loaded on this device. Nil is not an error — it is "no preview", which
+    /// is a complete state: a message-only ask still works.
+    let catalogue: InsuranceCatalogue?
+
+    /// The premium is handed back so the caller can compare it with the
+    /// server's. It is what was ON SCREEN, which is the only figure worth
+    /// comparing — see `FarmRiskStore.correctionNotice`.
+    let onSubmit: (Parcel, Area?, CreateLead.Quote?, Int?) -> Void
 
     @State private var selectedID: String?
     @State private var areaText: String = ""
@@ -41,7 +49,7 @@ struct InsuranceRequestForm: View {
     /// are something a farmer opts INTO rather than four more fields standing
     /// between them and asking a question.
     @State private var wantsQuote = false
-    @State private var product: InsuranceProduct = .wheat
+    @State private var productKey: String?
     @State private var sumInsuredText: String = ""
     @State private var instalments: Int = 1
     @Environment(\.dismiss) private var dismiss
@@ -50,10 +58,13 @@ struct InsuranceRequestForm: View {
     /// button: whichever parcels can still be asked about.
     init(parcels: [Parcel], alreadyAsked: Set<String>,
          preselected: Parcel? = nil,
-         onSubmit: @escaping (Parcel, Area?, CreateLead.Quote?) -> Void) {
+         catalogue: InsuranceCatalogue? = nil,
+         onSubmit: @escaping (Parcel, Area?, CreateLead.Quote?, Int?) -> Void) {
         self.parcels = parcels
         self.alreadyAsked = alreadyAsked
+        self.catalogue = catalogue
         self.onSubmit = onSubmit
+        _productKey = State(initialValue: catalogue?.products.first?.key)
         // PREFILL FROM WHATEVER IS SELECTED, not from `preselected`.
         //
         // Opened from the action button there is no preselection, so the
@@ -116,9 +127,43 @@ struct InsuranceRequestForm: View {
         InsurancePremium.moneyCents(sumInsuredText)
     }
 
+    private var product: InsuranceCatalogue.Product? {
+        productKey.flatMap { catalogue?.product(key: $0) }
+    }
+
+    /// THE PREVIEW IS REFUSED RATHER THAN SHOWN STALE, in two cases.
+    ///
+    /// No catalogue: nothing has ever been fetched on this device, so there is
+    /// no tariff to price with. Cached counts as fetched — calculating offline
+    /// is fine, and only SENDING needs a connection.
+    ///
+    /// A NEWER ENGINE: the server's `engineVersion` has moved past the one
+    /// `InsurancePremium`'s arithmetic was written for, so what this app
+    /// computes is no longer what gets stored and emailed. The server session's
+    /// own words: "that is the signal to stop previewing or to update."
+    ///
+    /// A visible refusal beats a silent wrong number — the same reasoning that
+    /// shows the server's figure over ours on disagreement. Without this, a
+    /// phone left on an old build previews confidently and wrongly forever.
+    private var previewRefusal: String? {
+        guard let catalogue else {
+            return "Изчислението не е налично офлайн, преди да е заредено веднъж. "
+                 + "Може да изпратите запитване без изчисление."
+        }
+        guard catalogue.matchesLocalArithmetic else {
+            return "Изчислението в приложението вече не съвпада с това на "
+                 + "застрахователя. Изпратете запитване без изчисление — "
+                 + "офертата се изчислява от тях."
+        }
+        return nil
+    }
+
     private var estimate: InsurancePremium.Quote? {
-        guard wantsQuote, let sumInsuredCents else { return nil }
+        guard wantsQuote, previewRefusal == nil,
+              let product, let sumInsuredCents
+        else { return nil }
         return InsurancePremium.quote(sumInsuredCents: sumInsuredCents,
+                                      tariffBp: product.tariffBp,
                                       instalments: instalments)
     }
 
@@ -142,14 +187,15 @@ struct InsuranceRequestForm: View {
     /// requires `coveredParcelCount` and a crop-wide selection this form has no
     /// concept of, and sending the scope without the count is a 400.
     private var wireQuote: CreateLead.Quote? {
-        guard wantsQuote, let sumInsuredCents, let areaDecares, areaDecares > 0
+        guard wantsQuote, let product, let sumInsuredCents,
+              let areaDecares, areaDecares > 0
         else { return nil }
 
         let recorded = selected?.areaHa.map(Area.init(hectares:))
         let edited = recorded.map { area?.differs(from: $0) == true } ?? false
 
         return CreateLead.Quote(
-            productKey: product.rawValue,
+            productKey: product.key,
             areaDca: areaDecares,
             sumInsuredCents: sumInsuredCents,
             instalments: instalments,
@@ -168,6 +214,11 @@ struct InsuranceRequestForm: View {
     private var sendBlockedReason: String? {
         guard selected != nil else { return "Изберете парцел." }
         guard wantsQuote else { return nil }
+        // A REFUSED PREVIEW DOES NOT BLOCK SENDING. The quote simply is not
+        // attached, and the ask goes as a message — which is a complete
+        // enquiry and what this form did before the calculator existed.
+        if previewRefusal != nil { return nil }
+        if product == nil { return "Изберете покритие." }
         if sumInsuredText.isEmpty { return "Въведете застрахователна сума." }
         return wireQuote == nil ? unreadableInputNote : nil
     }
@@ -237,17 +288,24 @@ struct InsuranceRequestForm: View {
                              + "тогава оферта дава застрахователят.")
                     }
 
-                    if wantsQuote {
+                    if wantsQuote, let refusal = previewRefusal {
                         Section {
-                            Picker("Покритие", selection: $product) {
+                            Label(refusal, systemImage: "exclamationmark.triangle")
+                                .font(.footnote)
+                                .foregroundStyle(Palette.warning)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else if wantsQuote, let catalogue {
+                        Section {
+                            Picker("Покритие", selection: $productKey) {
                                 Section("Култури") {
-                                    ForEach(InsuranceProduct.allCases.filter(\.isCrop)) {
-                                        Text($0.label).tag($0)
+                                    ForEach(catalogue.products.filter(\.isCrop)) {
+                                        Text($0.name).tag(Optional($0.key))
                                     }
                                 }
                                 Section("Рискове") {
-                                    ForEach(InsuranceProduct.allCases.filter { !$0.isCrop }) {
-                                        Text($0.label).tag($0)
+                                    ForEach(catalogue.products.filter { !$0.isCrop }) {
+                                        Text($0.name).tag(Optional($0.key))
                                     }
                                 }
                             }
@@ -257,7 +315,10 @@ struct InsuranceRequestForm: View {
                                 TextField("0", text: $sumInsuredText)
                                     .keyboardType(.decimalPad)
                                     .multilineTextAlignment(.trailing)
-                                Text("EUR").foregroundStyle(Palette.secondaryText)
+                                // The tenant's own symbol, so the app does not
+                                // guess at a currency it was never told.
+                                Text(catalogue.currencySymbol)
+                                    .foregroundStyle(Palette.secondaryText)
                             }
                             .accessibilityLabel("Застрахователна сума в евро")
 
@@ -354,7 +415,9 @@ struct InsuranceRequestForm: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Изпрати") {
-                        if let selected { onSubmit(selected, area, wireQuote) }
+                        if let selected {
+                            onSubmit(selected, area, wireQuote, estimate?.premiumCents)
+                        }
                         dismiss()
                     }
                     // Blocked only on what a farmer can fix — NOT on being

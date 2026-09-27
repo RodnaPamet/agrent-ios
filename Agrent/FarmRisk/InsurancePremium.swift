@@ -27,20 +27,20 @@ import Foundation
 /// to be wrong.
 enum InsurancePremium {
 
-    /// Basis points, provisional and compiled in — SEE THE WARNING.
-    ///
-    /// A flat 1000 bp (10%) on every product today. This value being here at
-    /// all is a known defect of the same class this repo has spent a week
-    /// removing: a second description of one thing. Change it server-side and
-    /// every preview in every installed copy is silently wrong, while the
-    /// server's recompute is what reaches the operator.
-    ///
-    /// The server session has been asked for the tariff and the product
-    /// catalogue as an ENDPOINT so this constant can be deleted. Until that
-    /// lands, `quote(...)` takes the tariff as a parameter rather than reading
-    /// this directly, so the call sites are already shaped for a fetched
-    /// value and only the default has to go.
-    static let provisionalTariffBp = 1000
+    // `provisionalTariffBp = 1000` WAS HERE, and it is deleted rather than
+    // defaulted.
+    //
+    // It was a second description of one thing, and the asymmetry made it
+    // worse than ordinary duplication: the server recomputes and its figure is
+    // what gets stored and emailed, so a stale local tariff showed the farmer
+    // one number while the operator received another. agri-saas#1138 serves
+    // the tariff per product, so the value now comes from
+    // `InsuranceCatalogue.Product.tariffBp`.
+    //
+    // NO DEFAULT ARGUMENT REPLACES IT. A default would mean a call site that
+    // forgets to pass the fetched tariff silently prices at whatever this file
+    // last believed — which is the defect with an extra step. `tariffBp` is
+    // required, so forgetting it does not compile.
 
     /// What an ask will cost, and how it splits.
     ///
@@ -53,7 +53,7 @@ enum InsurancePremium {
     /// parts sum back to the total exactly. A farmer paying in four sees
     /// 937.53 then 937.51 three times, not four times 937.51 and a missing
     /// two cents.
-    static func quote(sumInsuredCents: Int, tariffBp: Int = provisionalTariffBp,
+    static func quote(sumInsuredCents: Int, tariffBp: Int,
                       instalments: Int) -> Quote? {
         guard sumInsuredCents > 0, tariffBp > 0, (1...4).contains(instalments)
         else { return nil }
@@ -230,38 +230,13 @@ enum InsurancePremium {
     }
 }
 
-/// The eight products the server's engine knows, PROVISIONALLY compiled in.
-///
-/// Same defect as `provisionalTariffBp` and the same plan: the catalogue has
-/// been asked for as an endpoint. The `rawValue`s are the server's
-/// `productKey` enum verbatim, so a fetched list drops straight in.
-///
-/// The labels are Bulgarian because every label in this app is. The five crops
-/// go through `CommodityName` rather than being spelled here — a crop name is
-/// server DATA and this repo has a CI guard saying so — and the three perils
-/// have no commodity to resolve, so they are named here.
-enum InsuranceProduct: String, CaseIterable, Identifiable, Sendable {
-    case wheat, barley, maize, sunflower, rapeseed
-    case drought, hail, frost
-
-    var id: String { rawValue }
-
-    /// Whether this is a crop policy or a peril policy. Only used to group
-    /// the picker, so a farmer is not choosing between «Пшеница» and «Градушка»
-    /// in one undifferentiated list of eight.
-    var isCrop: Bool {
-        switch self {
-        case .wheat, .barley, .maize, .sunflower, .rapeseed: true
-        case .drought, .hail, .frost: false
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .drought: "Суша"
-        case .hail: "Градушка"
-        case .frost: "Измръзване"
-        default: CommodityName.canonical(rawValue) ?? rawValue
-        }
-    }
-}
+// `InsuranceProduct`, the eight-case enum, WAS HERE.
+//
+// Deleted with the tariff and for the same reason: the catalogue is the
+// server's, and a copy of it here is a copy that goes stale silently. The
+// fetched `InsuranceCatalogue.Product` replaces it, `kind` carries what
+// `isCrop` did, and `name` arrives localised — so `CommodityName` no longer
+// resolves the five crops and the equality between the two is asserted rather
+// than produced.
+//
+//     git show a917bf3:Agrent/FarmRisk/InsurancePremium.swift

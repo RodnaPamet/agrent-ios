@@ -148,6 +148,13 @@ final class DecoderToleranceTests: XCTestCase {
            "flagged":2,"jobRunId":"run1"}}
         """#) { _ = try await APIClient.shared.decode($0, as: JobRunEnvelope.self) },
 
+        // The catalogue, whose `commodity` is the only optional field.
+        Probe("InsuranceCatalogue", #"""
+        {"engineVersion":1,"currencySymbol":"€","products":[
+          {"key":"wheat","kind":"crop","commodity":"wheat","tariffBp":1000,
+           "name":"Пшеница","blurb":"Покритие за пшеница."}]}
+        """#) { _ = try await APIClient.shared.decode($0, as: InsuranceCatalogue.self) },
+
         // The three counts that were described to this app before they were on
         // the wire. Probed against the published `required` so the next time
         // they change shape it is this suite that says so, not a blank screen.
@@ -313,6 +320,13 @@ final class DecoderToleranceTests: XCTestCase {
         // combination that has cost this repo a screen twice — so it is not
         // modelled at all.
         "SpatialImportDetails": ["created", "flagged", "matched", "parcelCount"],
+
+        // All three of its `required`. The PRODUCT's own optional field is
+        // `commodity`, which this probe cannot reach — it mutates top-level
+        // keys only, and `products` is an array of objects. That limitation is
+        // the one the server session and this repo found on the same day from
+        // opposite directions.
+        "InsuranceCatalogue": ["currencySymbol", "engineVersion", "products"],
         "SpatialImportAccepted": ["fileRecordId", "format", "jobId", "status"],
         "ExchangeInquiry": ["id"],
         "PricePoint": ["date", "price"],

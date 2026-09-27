@@ -19,13 +19,22 @@ import XCTest
 /// implementation passes A and B and fails C.
 final class InsurancePremiumParityTests: XCTestCase {
 
+    /// THE TARIFF IS NAMED HERE, not defaulted.
+    ///
+    /// It used to be `provisionalTariffBp` compiled into the app, and these
+    /// cases silently relied on that default. It comes from the server's
+    /// catalogue now, so the reference figures need the rate they were
+    /// computed at stated alongside them — a parity test that borrows a live
+    /// value proves nothing the day that value changes.
+    private let referenceTariffBp = 1000
+
     /// A — 1000 dca, «100 000», 3 instalments.
     /// EUR 10,000.00 · 10.00/dca · 3,333.34 + 3,333.33 + 3,333.33
     func testReferenceCaseA() throws {
         let sum = try XCTUnwrap(InsurancePremium.moneyCents("100 000"))
         XCTAssertEqual(sum, 10_000_000)
 
-        let q = try XCTUnwrap(InsurancePremium.quote(sumInsuredCents: sum, instalments: 3))
+        let q = try XCTUnwrap(InsurancePremium.quote(sumInsuredCents: sum, tariffBp: referenceTariffBp, instalments: 3))
         XCTAssertEqual(q.premiumCents, 1_000_000)
         XCTAssertEqual(q.instalmentsCents, [333_334, 333_333, 333_333])
         XCTAssertEqual(q.perDecareCents(areaDca: 1000), 1_000)
@@ -43,7 +52,7 @@ final class InsurancePremiumParityTests: XCTestCase {
         let sum = try XCTUnwrap(InsurancePremium.moneyCents("3 000"))
         XCTAssertEqual(sum, 300_000)
 
-        let q = try XCTUnwrap(InsurancePremium.quote(sumInsuredCents: sum, instalments: 2))
+        let q = try XCTUnwrap(InsurancePremium.quote(sumInsuredCents: sum, tariffBp: referenceTariffBp, instalments: 2))
         XCTAssertEqual(q.premiumCents, 30_000)
         XCTAssertEqual(q.instalmentsCents, [15_000, 15_000])
         XCTAssertEqual(q.perDecareCents(areaDca: area), 2_430)
@@ -60,7 +69,7 @@ final class InsurancePremiumParityTests: XCTestCase {
         let sum = try XCTUnwrap(InsurancePremium.moneyCents("37 500,55"))
         XCTAssertEqual(sum, 3_750_055)
 
-        let q = try XCTUnwrap(InsurancePremium.quote(sumInsuredCents: sum, instalments: 4))
+        let q = try XCTUnwrap(InsurancePremium.quote(sumInsuredCents: sum, tariffBp: referenceTariffBp, instalments: 4))
         XCTAssertEqual(q.premiumCents, 375_006)
         XCTAssertEqual(q.instalmentsCents, [93_753, 93_751, 93_751, 93_751])
         XCTAssertEqual(q.perDecareCents(areaDca: 250), 1_500)
@@ -75,7 +84,7 @@ final class InsurancePremiumParityTests: XCTestCase {
             for instalments in 1...4 {
                 let q = try XCTUnwrap(
                     InsurancePremium.quote(sumInsuredCents: cents * 10,
-                                           instalments: instalments),
+                                           tariffBp: referenceTariffBp, instalments: instalments),
                     "no quote for \(cents) over \(instalments)")
                 XCTAssertEqual(q.instalmentsCents.reduce(0, +), q.premiumCents,
                                "\(cents)c over \(instalments) does not sum back")
@@ -93,18 +102,17 @@ final class InsurancePremiumParityTests: XCTestCase {
     func testTheHalfCentRoundsUpRatherThanTruncating() throws {
         // 5c × 1000bp = 5000; +5000 = 10000; /10000 = 1 exactly.
         XCTAssertEqual(try XCTUnwrap(
-            InsurancePremium.quote(sumInsuredCents: 5, instalments: 1)).premiumCents, 1)
+            InsurancePremium.quote(sumInsuredCents: 5, tariffBp: referenceTariffBp, instalments: 1)).premiumCents, 1)
         // 4c × 1000bp = 4000; +5000 = 9000; /10000 = 0 → refused, not zero.
-        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 4, instalments: 1))
+        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 4, tariffBp: referenceTariffBp, instalments: 1))
     }
 
     func testAnImpossibleInputHasNoQuoteRatherThanAZeroOne() {
-        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 0, instalments: 1))
-        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: -1, instalments: 1))
-        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 10_000, instalments: 0))
-        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 10_000, instalments: 5))
-        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 10_000,
-                                            tariffBp: 0, instalments: 1))
+        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 0, tariffBp: referenceTariffBp, instalments: 1))
+        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: -1, tariffBp: referenceTariffBp, instalments: 1))
+        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 10_000, tariffBp: referenceTariffBp, instalments: 0))
+        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 10_000, tariffBp: referenceTariffBp, instalments: 5))
+        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: 10_000, tariffBp: 0, instalments: 1))
     }
 }
 
@@ -176,44 +184,16 @@ final class InsuranceParserTests: XCTestCase {
     }
 }
 
-/// The product list, which is compiled in PROVISIONALLY and should not be.
-final class InsuranceProductTests: XCTestCase {
-
-    /// The server's `productKey` enum, verbatim, so a fetched catalogue drops
-    /// straight in. Order is the server's too.
-    func testTheKeysAreTheServersEnum() {
-        XCTAssertEqual(InsuranceProduct.allCases.map(\.rawValue),
-                       ["wheat", "barley", "maize", "sunflower", "rapeseed",
-                        "drought", "hail", "frost"])
-    }
-
-    /// FIVE OF THE EIGHT ARE COMMODITIES, and this app already has a Bulgarian
-    /// name for each. If a fetched catalogue ever returns a different label for
-    /// `wheat` than `CommodityName` does, the app shows two Bulgarian names for
-    /// one crop on two screens — worse than either alone. This asserts the
-    /// equality is deliberate so nobody resolves it by hardcoding a second
-    /// spelling.
-    func testCropProductsAreNamedByCommodityNameRatherThanSpelledHere() {
-        for product in InsuranceProduct.allCases where product.isCrop {
-            XCTAssertEqual(product.label,
-                           CommodityName.canonical(product.rawValue),
-                           "\(product.rawValue) is not named by CommodityName")
-        }
-    }
-
-    /// The three perils have no commodity to resolve, so they are named here
-    /// and must not be blank or left as an English slug.
-    func testPerilsAreNamedInBulgarian() {
-        for product in InsuranceProduct.allCases where !product.isCrop {
-            XCTAssertFalse(product.label.isEmpty)
-            XCTAssertNotEqual(product.label, product.rawValue,
-                              "\(product.rawValue) reached a farmer in English")
-            XCTAssertTrue(product.label.unicodeScalars.contains {
-                $0.value >= 0x0400 && $0.value <= 0x04FF
-            }, "\(product.rawValue) is not Cyrillic: \(product.label)")
-        }
-    }
-}
+/// `InsuranceProductTests` WAS HERE — three tests of a compiled-in enum.
+///
+/// The enum is gone: the catalogue is the server's and a copy of it here went
+/// stale silently. What those tests asserted has moved:
+///
+///   the keys matching the server's enum        now the server's own list
+///   crop labels equalling `CommodityName`      `InsuranceCatalogueTests`
+///   perils being Cyrillic                      likewise, against fetched copy
+///
+///     git show a917bf3:Tests/InsurancePremiumTests.swift
 
 /// What the quote puts ON THE WIRE, and what it deliberately leaves off.
 final class InsuranceQuoteWireTests: XCTestCase {
@@ -336,45 +316,45 @@ final class InsuranceIdempotencyTests: XCTestCase {
     }
 }
 
-/// When the server disagrees with the estimate.
+/// When the server disagrees with the figure that was ON SCREEN.
+///
+/// It takes the shown premium rather than recomputing one. Recomputing would
+/// be a second description of the number the farmer read — and could use a
+/// different tariff than the preview used, since the tariff now comes from a
+/// fetched catalogue per product.
 @MainActor
 final class InsuranceCorrectionNoticeTests: XCTestCase {
 
-    private let sent = CreateLead.Quote(
-        productKey: "wheat", areaDca: 250, sumInsuredCents: 3_750_055,
-        instalments: 4, areaScope: nil)
+    private func server(_ cents: Int) -> CreatedLead.ServerQuote {
+        CreatedLead.ServerQuote(premiumCents: cents, instalmentsCents: [cents],
+                                tariffBp: 1000, engineVersion: "1")
+    }
 
     /// SILENCE WHEN THEY AGREE. The estimate was right, it was shown, and
     /// saying so again is noise on top of a confirmation.
     func testAgreementSaysNothing() {
-        let got = CreatedLead.ServerQuote(
-            premiumCents: 375_006, instalmentsCents: [93_753, 93_751, 93_751, 93_751],
-            tariffBp: 1000, engineVersion: "1")
-        XCTAssertNil(FarmRiskStore.correctionNotice(sent: sent, got: got))
+        XCTAssertNil(FarmRiskStore.correctionNotice(
+            shownPremiumCents: 375_006, got: server(375_006)))
     }
 
     /// A DIFFERENT TARIFF SERVER-SIDE is the case this exists for: the phone
-    /// carries 1000 bp, the server has moved on, and the figure the farmer read
-    /// is not the one the operator received.
+    /// priced from a cached catalogue, the server has moved on, and the figure
+    /// the farmer read is not the one the operator received.
     func testADisagreementNamesBothNumbers() throws {
-        let got = CreatedLead.ServerQuote(
-            premiumCents: 450_007, instalmentsCents: [112_504, 112_501, 112_501, 112_501],
-            tariffBp: 1200, engineVersion: "1")
-        let notice = try XCTUnwrap(
-            FarmRiskStore.correctionNotice(sent: sent, got: got))
+        let notice = try XCTUnwrap(FarmRiskStore.correctionNotice(
+            shownPremiumCents: 375_006, got: server(450_007)))
         XCTAssertTrue(notice.contains(InsurancePremium.eur(450_007)), notice)
         XCTAssertTrue(notice.contains(InsurancePremium.eur(375_006)), notice)
     }
 
-    /// No quote sent, or none returned, is nothing to explain rather than a
-    /// notice comparing against zero.
+    /// No preview shown, or no quote returned, is nothing to explain rather
+    /// than a notice comparing against zero. The first is the ordinary case
+    /// for a message-only ask and for a refused preview.
     func testNothingToCompareIsNoNotice() {
-        XCTAssertNil(FarmRiskStore.correctionNotice(sent: nil, got: nil))
-        XCTAssertNil(FarmRiskStore.correctionNotice(sent: sent, got: nil))
+        XCTAssertNil(FarmRiskStore.correctionNotice(shownPremiumCents: nil, got: nil))
+        XCTAssertNil(FarmRiskStore.correctionNotice(shownPremiumCents: 1, got: nil))
         XCTAssertNil(FarmRiskStore.correctionNotice(
-            sent: nil,
-            got: CreatedLead.ServerQuote(premiumCents: 1, instalmentsCents: [1],
-                                         tariffBp: 1000, engineVersion: nil)))
+            shownPremiumCents: nil, got: server(1)))
     }
 }
 
@@ -422,5 +402,82 @@ final class InsuranceSpaceSeparatorTests: XCTestCase {
             XCTAssertNil(InsurancePremium.moneyCents(text), "money accepted «\(text)»")
             XCTAssertNil(InsurancePremium.areaDecares(text), "area accepted «\(text)»")
         }
+    }
+}
+
+/// The fetched catalogue — decoding, and the two refusals it drives.
+@MainActor
+final class InsuranceCatalogueTests: XCTestCase {
+
+    private func catalogue(engineVersion: Int = 1,
+                           wheatName: String = "Пшеница") async throws -> InsuranceCatalogue {
+        let json = """
+        {"engineVersion":\(engineVersion),"currencySymbol":"€","products":[
+          {"key":"wheat","kind":"crop","commodity":"wheat","tariffBp":1000,
+           "name":"\(wheatName)","blurb":"Покритие за пшеница."},
+          {"key":"hail","kind":"peril","tariffBp":1200,
+           "name":"Градушка","blurb":"Покритие срещу градушка."}]}
+        """
+        return try await InsuranceCatalogueAPI.decode(Data(json.utf8))
+    }
+
+    func testTheShapeDecodesAndCommodityIsOptional() async throws {
+        let c = try await catalogue()
+        XCTAssertEqual(c.engineVersion, 1)
+        XCTAssertEqual(c.currencySymbol, "€")
+        XCTAssertEqual(c.products.count, 2)
+        XCTAssertEqual(c.product(key: "wheat")?.tariffBp, 1000)
+        XCTAssertTrue(c.product(key: "wheat")?.isCrop == true)
+        // A peril has no crop behind it, and `commodity` is the one optional
+        // field in the schema.
+        XCTAssertNil(c.product(key: "hail")?.commodity)
+        XCTAssertFalse(c.product(key: "hail")?.isCrop == true)
+    }
+
+    /// THE TARIFF IS PER PRODUCT, which is why the compiled-in constant had to
+    /// go rather than become a default: hail is 1200 bp where wheat is 1000,
+    /// so a single app-wide rate was already wrong for six of the eight.
+    func testEachProductCarriesItsOwnTariff() async throws {
+        let c = try await catalogue()
+        let wheat = try XCTUnwrap(c.product(key: "wheat"))
+        let hail = try XCTUnwrap(c.product(key: "hail"))
+        XCTAssertNotEqual(wheat.tariffBp, hail.tariffBp)
+
+        let onWheat = try XCTUnwrap(InsurancePremium.quote(
+            sumInsuredCents: 1_000_000, tariffBp: wheat.tariffBp, instalments: 1))
+        let onHail = try XCTUnwrap(InsurancePremium.quote(
+            sumInsuredCents: 1_000_000, tariffBp: hail.tariffBp, instalments: 1))
+        XCTAssertEqual(onWheat.premiumCents, 100_000)
+        XCTAssertEqual(onHail.premiumCents, 120_000)
+    }
+
+    /// A NEWER ENGINE MEANS STOP PREVIEWING. The local arithmetic was written
+    /// against engine 1; past that, what this app computes is no longer what
+    /// gets stored and emailed, so the form refuses rather than showing a
+    /// figure it cannot defend.
+    func testANewerEngineStopsTheLocalArithmeticBeingTrusted() async throws {
+        let current = try await catalogue(engineVersion: 1)
+        let newer = try await catalogue(engineVersion: 2)
+        XCTAssertTrue(current.matchesLocalArithmetic)
+        XCTAssertFalse(newer.matchesLocalArithmetic)
+    }
+
+    /// The runtime detector for a catalogue that names a crop differently from
+    /// the rest of the app — which is what arriving in English would look like.
+    ///
+    /// This asserts the COMPARISON works, not that the server agrees. Nothing
+    /// in a unit test can assert the latter: the strings come off a server, and
+    /// a fixture written here compared against a mapping written here would
+    /// agree with itself.
+    func testADisagreeingCropNameIsDetected() async throws {
+        let agreeing = try await catalogue()
+        XCTAssertTrue(agreeing.labelsDisagreeingWithCommodityName.isEmpty)
+
+        let english = try await catalogue(wheatName: "Wheat")
+        let rows = english.labelsDisagreeingWithCommodityName
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.key, "wheat")
+        XCTAssertEqual(rows.first?.fetched, "Wheat")
+        XCTAssertEqual(rows.first?.ours, "Пшеница")
     }
 }

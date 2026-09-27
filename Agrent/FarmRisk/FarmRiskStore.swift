@@ -129,6 +129,30 @@ final class FarmRiskStore {
 
     func clearServerQuoteNotice() { serverQuoteNotice = nil }
 
+    /// The products and their tariffs. Cached, so a preview still works with
+    /// no signal — calculating offline is fine, only SENDING needs a
+    /// connection.
+    private(set) var catalogue: LoadState<InsuranceCatalogue> = .loading
+
+    func readCatalogue() async {
+        await CachedResource.loadShowingCacheFirst(
+            InsuranceCatalogueAPI.path,
+            decode: InsuranceCatalogueAPI.decode,
+            publish: { [weak self] state in
+                self?.catalogue = state
+                // Logged, not shown. A farmer can do nothing about it and it
+                // does not make the preview wrong — the TARIFF is still the
+                // server's. It makes two screens disagree about what a crop is
+                // called, which is a thing for whoever reads the logs.
+                for row in state.value?.labelsDisagreeingWithCommodityName ?? [] {
+                    Log.api.error("""
+                        insurance catalogue names \(row.key, privacy: .public) as                         "\(row.fetched, privacy: .public)" where CommodityName says                         "\(row.ours, privacy: .public)" — change the server's                         messages/ entry rather than hardcoding either side
+                        """)
+                }
+            }
+        )
+    }
+
     /// THE IDEMPOTENCY KEY, and the one rule that makes it worth having.
     ///
     /// Minted at the first send and KEPT across retries while the inputs are
@@ -154,7 +178,8 @@ final class FarmRiskStore {
     }
 
     func ask(_ parcelID: String, area: Area? = nil,
-             quote: CreateLead.Quote? = nil) async {
+             quote: CreateLead.Quote? = nil,
+             shownPremiumCents: Int? = nil) async {
         guard mayAsk, !asking.contains(parcelID) else { return }
         let row = parcels.value?.first { $0.id == parcelID }
         asking.insert(parcelID)
@@ -177,7 +202,8 @@ final class FarmRiskStore {
             )
             pendingKey = nil
             askedParcelIDs.insert(parcelID)
-            serverQuoteNotice = Self.correctionNotice(sent: quote, got: created.quote)
+            serverQuoteNotice = Self.correctionNotice(
+                shownPremiumCents: shownPremiumCents, got: created.quote)
         } catch {
             // NO SUCCESS-ON-REPLAY BRANCH ANY MORE. A 409 used to mean "this
             // parcel was already asked about" and was recorded as success; the
@@ -203,20 +229,25 @@ final class FarmRiskStore {
 
     /// Nil when there is nothing to explain.
     ///
+    /// TAKES THE FIGURE THAT WAS ON SCREEN rather than recomputing it. The
+    /// question is "did the farmer read a different number from the one that
+    /// was sent", and only the form knows what it displayed — it computed the
+    /// estimate from the catalogue's tariff for the chosen product. Recomputing
+    /// here would be a second description of one thing, and it could quietly
+    /// use a different tariff than the one the preview used.
+    ///
     /// Compares only the PREMIUM. The instalment split follows from it, so two
-    /// equal premiums cannot disagree on the parts unless the server changed its
-    /// splitting rule — and if it did, the premium is still the number a farmer
-    /// is owed an explanation about.
-    static func correctionNotice(sent: CreateLead.Quote?,
+    /// equal premiums cannot disagree on the parts unless the server changed
+    /// its splitting rule — and if it did, the premium is still the number a
+    /// farmer is owed an explanation about.
+    static func correctionNotice(shownPremiumCents: Int?,
                                  got: CreatedLead.ServerQuote?) -> String? {
-        guard sent != nil, let got else { return nil }
-        guard let estimate = InsurancePremium.quote(
-            sumInsuredCents: sent!.sumInsuredCents, instalments: sent!.instalments),
-              estimate.premiumCents != got.premiumCents
+        guard let shown = shownPremiumCents, let got,
+              shown != got.premiumCents
         else { return nil }
 
         return "Изчислението на сървъра е \(InsurancePremium.eur(got.premiumCents)), а не "
-             + "\(InsurancePremium.eur(estimate.premiumCents)). Запитването е изпратено със "
+             + "\(InsurancePremium.eur(shown)). Запитването е изпратено със "
              + "сумата на сървъра."
     }
 
