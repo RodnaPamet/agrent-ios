@@ -76,6 +76,10 @@ actor PendingOperations {
     ///   · 5xx — the server is unwell, not disagreeing
     ///   · 408, 429 — explicitly "try again"
     ///
+    /// A 429 stays in this list, and the operation sheet's «Запази за
+    /// по-късно» depends on it. What changed is what the DRAIN does with one:
+    /// it pauses the whole queue and spends no attempt — see `OutboxStore`.
+    ///
     /// Everything else is a decision the server has made. A 400 will be a
     /// 400 tomorrow; a 403 will be a 403.
     ///
@@ -86,7 +90,7 @@ actor PendingOperations {
     /// done, which is a different lie from the one this prevents.
     nonisolated static func isWorthRetrying(_ error: Error) -> Bool {
         if error is URLError { return true }
-        if case APIClient.APIError.http(let status, _, _, _) = error {
+        if case APIClient.APIError.http(let status, _, _, _, _) = error {
             return status >= 500 || status == 408 || status == 429
         }
         return false

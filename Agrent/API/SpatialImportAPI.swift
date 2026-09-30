@@ -76,13 +76,22 @@ enum SpatialImportAPI {
     /// space is what separates them, it is stricter than `isHumanSentence`, and
     /// it is applied ONLY on these routes — where the spec documents the bare
     /// body as prose — rather than globally.
+    ///
+    /// ── The rebuild FORWARDS the wait ──
+    ///
+    /// This is the one line in the app where dropping `retryAfterSeconds`
+    /// compiles: the label has a default, so a rebuild that leaves it out
+    /// throws a 429 that has silently forgotten how long the server asked for.
+    /// `testHumanisedKeepsRetryAfter` holds it.
     static func humanised(_ error: Error) -> Error {
-        guard case APIClient.APIError.http(let status, let code, let message, let params) = error,
+        guard case APIClient.APIError.http(
+                let status, let code, let message, let params, let retryAfterSeconds) = error,
               message == nil,
               let code,
               code.contains(" ")
         else { return error }
         return APIClient.APIError.http(
-            status: status, code: nil, message: code, params: params)
+            status: status, code: nil, message: code, params: params,
+            retryAfterSeconds: retryAfterSeconds)
     }
 }

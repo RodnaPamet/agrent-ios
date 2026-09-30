@@ -83,6 +83,15 @@ enum Log {
     /// the server composed, it interpolates ids today, and it is exactly the
     /// kind of field that grows a name or an email in it one day without
     /// anyone thinking about this file.
+    ///
+    /// The `Retry-After` wait IS kept — `APIError.http(429, RATE_LIMITED,
+    /// retry-after 12s)`. It is a number the server chose from its own
+    /// clock, so rules 1 to 3 have nothing to say about it. It reaches the
+    /// log through `RateLimitPause.absorb`, which writes this summary as each
+    /// 429 closes a pause — the one fact that explains why the outbox then
+    /// went quiet. `failure` above never sees it: its only caller is the
+    /// transport catch in `APIClient.perform`, and an `APIError.http` is
+    /// built after that returns.
     static func summary(for error: Error) -> String {
         switch error {
         case let api as APIClient.APIError:
@@ -91,9 +100,9 @@ enum Log {
             case .conflict: return "APIError.conflict"
             case .clientTooOld: return "APIError.clientTooOld"
             case .notModified: return "APIError.notModified"
-            case .http(let status, let code, _, _):
-                return code.map { "APIError.http(\(status), \($0))" }
-                    ?? "APIError.http(\(status))"
+            case .http(let status, let code, _, _, let retryAfter):
+                let parts = [String(status), code, retryAfter.map { "retry-after \($0)s" }]
+                return "APIError.http(\(parts.compactMap { $0 }.joined(separator: ", ")))"
             }
         case let url as URLError:
             return "URLError(\(url.code.rawValue))"

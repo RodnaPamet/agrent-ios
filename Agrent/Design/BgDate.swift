@@ -47,6 +47,18 @@ enum BgDate {
         date.formatted(.dateTime.day().month(.wide).locale(locale))
     }
 
+    /// 14:32 — a clock time, for a promise about later today.
+    ///
+    /// Twenty-four hour because the LOCALE is: measured, bg_BG gives "14:32"
+    /// and "9:05" where en_US gives "2:32 PM" for the same instants. Whether
+    /// a phone switched to 12-hour time overrides an explicitly named locale
+    /// has NOT been checked on a device. Here rather than at the call site,
+    /// because the CI step that keeps dates in this file fails any
+    /// `.formatted(.dateTime…)` written anywhere else.
+    static func time(_ date: Date) -> String {
+        date.formatted(.dateTime.hour().minute().locale(locale))
+    }
+
     /// `"2026-09-19"` → that calendar day.
     ///
     /// The agro endpoints answer with a date-only string, which is a DAY and

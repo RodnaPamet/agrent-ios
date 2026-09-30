@@ -54,6 +54,22 @@ final class OutboxRetryPolicyTests: XCTestCase {
         XCTAssertTrue(PendingOperations.isWorthRetrying(
             APIClient.APIError.http(status: 500, code: nil, message: nil)))
     }
+
+    /// A 429 is BOTH: still worth retrying — the sheet's «Запази за
+    /// по-късно» is offered on it — and a wait, which is what pauses the
+    /// queue instead of spending an attempt.
+    func testA429IsRetriableAndPausesTheQueue() {
+        let error = APIClient.APIError.http(
+            status: 429, code: "RATE_LIMITED", message: nil, retryAfterSeconds: 12)
+        XCTAssertTrue(PendingOperations.isWorthRetrying(error))
+        XCTAssertEqual(RateLimitGate.wait(for: error), .seconds(12))
+
+        // A 503 with the same header stays an ordinary, COUNTED transient.
+        let unwell = APIClient.APIError.http(
+            status: 503, code: nil, message: nil, retryAfterSeconds: 12)
+        XCTAssertTrue(PendingOperations.isWorthRetrying(unwell))
+        XCTAssertNil(RateLimitGate.wait(for: unwell))
+    }
 }
 
 final class PendingOperationTests: XCTestCase {
@@ -121,6 +137,12 @@ final class PendingOperationTests: XCTestCase {
     ///     worked out what a queued cost means after the operator has moved
     ///     on and possibly re-entered it by hand. Until someone does, the
     ///     outbox stays out of the books.
+    ///   - exchange MESSAGES, once they exist. Their send honours a key, so a
+    ///     replay would be safe — and it would still be wrong: a message is a
+    ///     deliberate act addressed to somebody, sent at a moment the operator
+    ///     chose. Nothing sends one on the app's schedule, not even after a
+    ///     429 (`RateLimitPause.messages` has no callback, on purpose). The
+    ///     names below are the path builders messaging is expected to add.
     func testOnlyFieldOperationsCanBeQueued() {
         let source = try? String(
             contentsOf: URL(fileURLWithPath: #filePath)
@@ -134,6 +156,11 @@ final class PendingOperationTests: XCTestCase {
         for forbidden in ["listingsPath", "inquiriesPath", "createListing"] {
             XCTAssertFalse(text?.contains(forbidden) == true,
                            "the outbox can replay \(forbidden), which honours no key")
+        }
+        for forbidden in ["threadsPath", "threadPath", "openThreadPath", "messagesPath",
+                          "messagePath", "readPath", "closePath", "blockPath"] {
+            XCTAssertFalse(text?.contains(forbidden) == true,
+                           "the outbox can send \(forbidden) — a message is never queued")
         }
         XCTAssertFalse(
             text?.contains("CostsAPI") == true,
@@ -169,5 +196,141 @@ final class OutboxFlushCoalescingTests: XCTestCase {
                       "the drain must take another turn, not return")
         XCTAssertFalse(text.contains("guard !isFlushing else { return }"),
                        "a concurrent flush is being dropped again")
+    }
+}
+
+/// The outbox under a 429 — agrent-ios#112.
+///
+/// Source checks, in the style of the coalescing test above, because the
+/// store is a singleton over the real disk and the real network, and this
+/// suite has no seam that answers a POST with a 429. What the checks cannot
+/// see — that `absorb` is true for a 429 and for nothing else — is held
+/// behaviourally in `RateLimitPauseTests.testOnlyA429ClosesIt`.
+@MainActor
+final class OutboxRateLimitTests: XCTestCase {
+
+    private var source: String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Agrent/Core/OutboxStore.swift")
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+
+    /// A 429 SPENDS NO ATTEMPT and rewrites nothing.
+    ///
+    /// The whole fix is the ORDER inside the drain's catch: absorbed and out
+    /// before the bump, so the item is left exactly as it was. After the bump,
+    /// every 429 of a reconnect burst would count against an item the server
+    /// never even looked at — harmless only for as long as nothing caps
+    /// attempts.
+    func testA429SpendsNoAttempt() {
+        let text = source
+        guard let absorb = text.range(of: "if pause.absorb(error) { break }"),
+              let bump = text.range(of: "item.attempts += 1") else {
+            return XCTFail("positive control: the absorb and the bump are both in the drain")
+        }
+        XCTAssertLessThan(absorb.lowerBound, bump.lowerBound,
+                          "the attempt is spent before the 429 is absorbed")
+        XCTAssertEqual(text.components(separatedBy: "item.attempts += 1").count - 1, 1,
+                       "a second place spends attempts")
+        XCTAssertEqual(text.components(separatedBy: "pause.absorb(").count - 1, 1,
+                       "a second place absorbs, so the one checked may not be the one that runs")
+    }
+
+    /// NO SESSION REFUSES NOTHING.
+    ///
+    /// `notSignedIn` is thrown before a request leaves, so the server never
+    /// saw the item, and refused is permanent. The pause's alarm outlives the
+    /// signed-in screen, which is what made a drain with no token reachable:
+    /// before this stop, signing out inside a pause stamped every queued
+    /// spray refused. The stop must come before the bump for the same reason
+    /// the 429's does.
+    func testNoSessionSpendsNoAttemptAndRefusesNothing() {
+        let text = source
+        guard let noSession = text.range(
+                of: "if case APIClient.APIError.notSignedIn = error { break }"),
+              let bump = text.range(of: "item.attempts += 1") else {
+            return XCTFail("positive control: the no-session stop and the bump are both in the drain")
+        }
+        XCTAssertLessThan(noSession.lowerBound, bump.lowerBound,
+                          "a drain with no session spends an attempt and refuses the item")
+
+        // Why the drain has to stop on it ITSELF: the retry policy calls it
+        // final, and final is what marks an item refused.
+        XCTAssertFalse(PendingOperations.isWorthRetrying(APIClient.APIError.notSignedIn))
+    }
+
+    /// NOTHING GOES OUT WHILE PAUSED. The pause is checked before anything
+    /// else in `flush()`, and the disarm is reached only by a pass that is
+    /// really starting — a flush that returns early must not cancel the alarm
+    /// that is the queue's only way back. A pause that closes mid-pass ends
+    /// the coalescing loop.
+    func testAPausedFlushSendsNothingAndReArms() {
+        let text = source
+        guard let paused = text.range(of: "guard !pause.isPaused else {"),
+              let flushing = text.range(of: "guard !isFlushing else {"),
+              let disarm = text.range(of: "pause.disarm()"),
+              let drain = text.range(of: "await drain()") else {
+            return XCTFail("positive control: flush's guards are where this expects them")
+        }
+        XCTAssertLessThan(paused.lowerBound, flushing.lowerBound,
+                          "the coalescing guard runs before the pause is checked")
+        XCTAssertLessThan(flushing.lowerBound, disarm.lowerBound,
+                          "a flush that returns early can cancel the alarm")
+        XCTAssertLessThan(disarm.lowerBound, drain.lowerBound)
+
+        // The paused branch re-arms rather than doing nothing.
+        let pausedBranch = text[paused.upperBound...].prefix(60)
+        XCTAssertTrue(pausedBranch.contains("pause.arm()"), String(pausedBranch))
+
+        XCTAssertTrue(text.contains("while needsAnotherPass && !pause.isPaused"),
+                      "a coalesced pass walks into a pause that closed mid-drain")
+    }
+
+    /// The alarm is what wakes the queue: the store wires its drain as the
+    /// pause's callback.
+    func testTheQueueDrainsWhenThePauseReopens() {
+        XCTAssertNotNil(OutboxStore.shared.pause.onReopen)
+        XCTAssertTrue(source.contains("pause.onReopen = { [weak self] in await self?.flush() }"))
+    }
+
+    private func read(_ path: String) -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(path)
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+
+    /// THE SHEET'S 429 IS THE OUTBOX'S 429. The live save posts to the same
+    /// route on the same budget, so the error that made the operator queue
+    /// the operation closes the outbox's pause — BEFORE the item joins the
+    /// queue, or the next foreground flush spends a request on it inside the
+    /// window. Deleting that one line fails nothing else in this suite.
+    func testTheSheetsRateLimitPausesTheQueueBeforeQueueing() {
+        let text = read("Agrent/Locations/ParcelOperationSheet.swift")
+        guard let absorb = text.range(of: "OutboxStore.shared.pause.absorb(failureError)"),
+              let enqueue = text.range(of: "OutboxStore.shared.enqueue(") else {
+            return XCTFail("the sheet no longer hands its failure to the outbox's pause")
+        }
+        XCTAssertLessThan(absorb.lowerBound, enqueue.lowerBound,
+                          "the item joins the queue before the pause closes")
+    }
+
+    /// THE BANNER HIDES «Изпрати» WHILE IT SHOWS THE WAIT, and says why.
+    ///
+    /// A tap inside the pause could only buy a guaranteed 429, and a control
+    /// that vanished says nothing to VoiceOver unless the reason is in the
+    /// description it sits beside. Source checks, because nothing here
+    /// renders the banner: reverting either line fails nothing else.
+    func testTheBannerReplacesTheButtonWithTheReason() {
+        let text = read("Agrent/Core/OutboxBanner.swift")
+        XCTAssertTrue(text.contains("outbox.refused.isEmpty && caption == nil"),
+                      "«Изпрати» is shown beside the caption that replaces it")
+        guard let sentence = text.range(of: "A11y.sentence(") else {
+            return XCTFail("positive control: the banner builds its spoken description")
+        }
+        let spoken = text[sentence.upperBound...].prefix(120)
+        XCTAssertTrue(spoken.contains("caption"),
+                      "VoiceOver is not told why there is no «Изпрати»: \(spoken)")
     }
 }

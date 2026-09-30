@@ -151,7 +151,7 @@ enum ParcelHistoryAPI {
     /// never worked. A predicate over an `Error` is testable without a
     /// network; a `catch` pattern buried in a request is not.
     static func isAlreadyDeleted(_ error: Error) -> Bool {
-        guard case APIClient.APIError.http(let status, _, _, _) = error else { return false }
+        guard case APIClient.APIError.http(let status, _, _, _, _) = error else { return false }
         return status == 404
     }
 

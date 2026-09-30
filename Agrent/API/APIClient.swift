@@ -138,8 +138,35 @@ actor APIClient {
         /// was rejected, the fields that were missing. Optional with a
         /// default so every existing construction still compiles and only
         /// the routes that send them have to care.
+        ///
+        /// `retryAfterSeconds` is the server's `Retry-After`, read off the
+        /// HEADER of a 429 or a 503 by `retryAfterSeconds(for:)` and nil
+        /// everywhere else. CARRIED, NOT ACTED ON: blocking a request inside
+        /// the networking layer for up to an hour is the caller's decision,
+        /// and the rule for what a wait means lives in `RateLimitGate`.
+        ///
+        /// ── A fifth value, not a `.rateLimited` case ──
+        ///
+        /// A new case would make every `.http(let status …)` match in the
+        /// app silently stop seeing 429s. `PendingOperations.isWorthRetrying`
+        /// reads `status == 429` as "try later"; behind a new case it would
+        /// call a rate-limited spray REFUSED. That is the guard that cannot
+        /// fire, which this repo has already paid for twice — `.http(409)`
+        /// matched against a client that only ever threw `.conflict`.
+        ///
+        /// Defaulted for the reason `params` gives, so constructions compile
+        /// unchanged. Four-element PATTERNS do not, and that is wanted: the
+        /// one site that would have compiled is a rebuild that omits the
+        /// label, `SpatialImportAPI.humanised`, and a test holds it.
         case http(status: Int, code: String?, message: String?,
-                  params: [String: String]? = nil)
+                  params: [String: String]? = nil,
+                  retryAfterSeconds: Int? = nil)
+
+        /// The wait the server asked for, whichever case this is.
+        var retryAfterSeconds: Int? {
+            if case .http(_, _, _, _, let seconds) = self { return seconds }
+            return nil
+        }
 
         /// DELIBERATELY NOT the operator-facing text.
         ///
@@ -158,7 +185,7 @@ actor APIClient {
                 "Тази версия на приложението е твърде стара. Обновете я."
             case .notModified:
                 "Данните не са променени."
-            case .http(let status, let code, _, _):
+            case .http(let status, let code, _, _, _):
                 code.map { "HTTP \(status) \($0)" } ?? "HTTP \(status)"
             }
         }
@@ -241,6 +268,108 @@ actor APIClient {
     /// exceptional one.
     static func envelope(from data: Data) -> ErrorEnvelope.Err? {
         (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error
+    }
+
+    // MARK: - Retry-After
+
+    /// The longest wait this client will honour, in seconds.
+    ///
+    /// An hour: the longest window or lockout among the server's presets
+    /// that this app can reach — `FarmRiskAPI.createLead` draws on an hourly
+    /// budget. A server asking for more than that is misconfigured, and
+    /// honouring it would park a farmer's field records for a day. At worst
+    /// the app asks again after an hour, is told to wait again, and does.
+    static let retryAfterCeiling = 3600
+
+    /// `Retry-After` off a 429 or a 503, in whole seconds — nil for any other
+    /// status, for a missing header, and for one this cannot read.
+    ///
+    /// ── The HEADER, never the body ──
+    ///
+    /// The middleware's 429 also puts `retryAfterSeconds` in the envelope, and
+    /// it is a NUMBER. A typed field on `ErrorEnvelope`'s object that ever
+    /// arrived mistyped would fail the whole decode and lose `code` and
+    /// `message` with it — the error path failing, which is how a 404 became
+    /// a blank screen once already. The header is the contract (RFC 9110,
+    /// and the spec's own 429 description); the body is an echo of it.
+    ///
+    /// ── Only 429 and 503 ──
+    ///
+    /// The statuses the header means something on, and the same pair the
+    /// web's `parseRetryAfterSeconds` reads. A 503's wait is carried
+    /// truthfully and then ignored by the outbox — see `RateLimitGate`.
+    ///
+    /// `value(forHTTPHeaderField:)` is case-insensitive, so the lowercase
+    /// `retry-after` an HTTP/2 response carries is found too. Tested rather
+    /// than assumed.
+    static func retryAfterSeconds(for response: HTTPURLResponse, now: Date = Date()) -> Int? {
+        guard response.statusCode == 429 || response.statusCode == 503 else { return nil }
+        return retryAfterSeconds(
+            header: response.value(forHTTPHeaderField: "Retry-After"),
+            responseDate: response.value(forHTTPHeaderField: "Date"),
+            now: now
+        )
+    }
+
+    /// The parse itself, PURE — every input passed in, so a test can hold the
+    /// server's clock and the device's apart.
+    ///
+    /// Two forms, per RFC 9110:
+    ///
+    ///     Retry-After: 12                              delay-seconds
+    ///     Retry-After: Tue, 29 Sep 2026 10:01:30 GMT   IMF-fixdate
+    ///
+    /// This server only ever sends the first, and at least 1 — except the
+    /// auth limiter, which does not clamp and can send "0". "0" is carried as
+    /// 0; flooring it is policy, and policy is `RateLimitGate`'s.
+    ///
+    /// DELAY-SECONDS IS DIGITS AND NOTHING ELSE. "-1", "1.5" and "12abc" are
+    /// not delay-seconds and read as nil, which is stricter than the web's
+    /// `parseInt` (that takes "12abc" as 12). A value too long for `Int` makes
+    /// `Int(_:)` answer nil rather than trap, and anything that long is
+    /// certainly past the ceiling, so it reads as the ceiling.
+    ///
+    /// AN HTTP-DATE IS MEASURED AGAINST THE RESPONSE'S OWN `Date`, not the
+    /// phone's clock. The two moments come from one clock, so the difference
+    /// is the wait the server meant whatever the device thinks the time is —
+    /// with the phone ten minutes fast, the device clock would have read a
+    /// 90-second wait as none at all. The device clock is the fallback for a
+    /// response with no `Date`. The obsolete RFC 850 and asctime forms read
+    /// as nil, and a caller then waits its own default.
+    static func retryAfterSeconds(header: String?, responseDate: String?, now: Date) -> Int? {
+        guard let text = header?.trimmingCharacters(in: .whitespaces), !text.isEmpty
+        else { return nil }
+
+        let digits = UInt8(ascii: "0")...UInt8(ascii: "9")
+        if text.utf8.allSatisfy({ digits.contains($0) }) {
+            guard let seconds = Int(text) else { return retryAfterCeiling }
+            return min(seconds, retryAfterCeiling)
+        }
+
+        guard let moment = imfFixdate(text) else { return nil }
+        let base = responseDate.flatMap { imfFixdate($0) } ?? now
+        let delta = moment.timeIntervalSince(base).rounded(.up)
+        // Clamped as a Double, BEFORE the conversion: `Int(_:)` traps on a
+        // value out of range, and a date is exactly where one comes from.
+        guard delta.isFinite else { return nil }
+        return Int(min(max(delta, 0), Double(retryAfterCeiling)))
+    }
+
+    /// `Tue, 29 Sep 2026 10:01:30 GMT` and only that.
+    ///
+    /// A formatter per call, not a shared one: this path runs roughly never,
+    /// and a `DateFormatter` is a mutable object that would be shared between
+    /// this actor and every test that calls the parser. `en_US_POSIX` so the
+    /// day and month names are read as the protocol spells them whatever the
+    /// device's language, and a Gregorian calendar so a phone set to another
+    /// one does not read 2026 as a different year.
+    private static func imfFixdate(_ text: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        return formatter.date(from: text.trimmingCharacters(in: .whitespaces))
     }
 
     func get<T: Decodable>(_ path: String, as _: T.Type) async throws -> T {
@@ -520,9 +649,13 @@ actor APIClient {
             throw APIError.clientTooOld
         default:
             let env = Self.envelope(from: data)
+            // `http` is the FINAL response — after the 401 → refresh → retry
+            // above — so the wait read here belongs to the answer being
+            // reported, not to the request it replaced.
             throw APIError.http(
                 status: http.statusCode, code: env?.code, message: env?.message,
-                params: env?.params
+                params: env?.params,
+                retryAfterSeconds: Self.retryAfterSeconds(for: http)
             )
         }
     }
@@ -781,9 +914,29 @@ actor APIClient {
                     // What was wrong was saying nothing true about it. Silence
                     // plus a generic sentence blaming the DATA is the worst of
                     // both, so the failure now names itself.
+                    //
+                    // AND IT CARRIES ITS WAIT. The token refresh is the auth
+                    // limiter's 10-a-minute tier, and its 429 surfaces from
+                    // `send` as the failure of the request that needed the
+                    // refresh — so the outbox pauses on it as it would on the
+                    // route's own 429. Right, not incidental: the next attempt
+                    // needs a refresh too. That limiter does not clamp, so "0"
+                    // is a real answer here and the floor is `RateLimitGate`'s.
+                    //
+                    // AND A 429 IS NOT GIVEN THE INVENTED CODE. A code is
+                    // looked up before `UserMessage`'s 429 rule, and this one
+                    // says «Излезте от менюто и влезте отново» — advice that
+                    // signs a farmer out, and signing back in goes through the
+                    // same auth limiter that just refused. The limiter's own
+                    // body carries `RATE_LIMITED`; only a 429 with no code — a
+                    // proxy's, or the other application on this hostname —
+                    // reached this, and without a code it now says what every
+                    // other 429 says.
                     throw APIError.http(status: status,
-                                        code: code ?? "TOKEN_REFRESH_FAILED",
-                                        message: nil)
+                                        code: code ?? (status == 429 ? nil : "TOKEN_REFRESH_FAILED"),
+                                        message: nil,
+                                        retryAfterSeconds: (response as? HTTPURLResponse)
+                                            .flatMap { Self.retryAfterSeconds(for: $0) })
                 }
 
                 Log.auth.error(
