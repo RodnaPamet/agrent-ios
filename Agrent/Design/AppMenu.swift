@@ -39,6 +39,7 @@ struct AppMenuButton<Extra: View>: View {
     @ViewBuilder var extra: Extra
 
     @State private var tabs = BottomTabsStore.shared
+    @State private var unread = ExchangeUnreadStore.shared
     @State private var showingAdmin = false
 
     /// Which overflow screen is open, if any. One piece of state rather
@@ -69,7 +70,14 @@ struct AppMenuButton<Extra: View>: View {
                     Button {
                         presented = surface
                     } label: {
-                        Label(surface.label, systemImage: surface.icon)
+                        // Борса off the bar takes its unread badge with it,
+                        // so the count rides on the row that opens it.
+                        Label(
+                            surface == .exchange
+                                ? MessagingPolicy.counted(surface.label, unread: unread.count)
+                                : surface.label,
+                            systemImage: surface.icon
+                        )
                     }
                 }
 

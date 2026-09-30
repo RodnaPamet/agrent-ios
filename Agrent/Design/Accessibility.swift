@@ -120,6 +120,26 @@ enum A11y {
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")
         static let importing = spokenNames("Импортирай", "Import")
+
+        // ── Exchange messaging (agrent-ios#114) ──
+        //
+        // NOT `send` and NOT `close`, and that is the reason these exist.
+        // `OutboxBanner` sits above every tab and its button is «Изпрати» /
+        // "Send", so a composer answering to the same two words would put two
+        // controls on one screen under one spoken name — Voice Control then
+        // numbers them, and the person who said "Send" has to read which is
+        // which. «Затвори» / "Close" is every sheet's way out; a conversation
+        // closed by a person trying to leave a sheet is closed for the other
+        // farm too.
+
+        /// The composer's send, which names its object.
+        static let sendMessage = spokenNames("Изпрати съобщението", "Send message")
+        /// Close THIS conversation — an act the other farm sees.
+        static let closeConversation = spokenNames("Затвори разговора", "Close conversation")
+        static let block = spokenNames("Блокирай", "Block")
+        static let unblock = spokenNames("Отблокирай", "Unblock")
+        /// Retract one of this farm's messages.
+        static let retract = spokenNames("Премахни", "Remove")
     }
 
     /// Join facts as speech: nils and blanks dropped, comma-separated, one

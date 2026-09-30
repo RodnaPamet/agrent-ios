@@ -231,8 +231,12 @@ final class SpokenVocabularyTests: XCTestCase {
             ("create", A11y.Spoken.create), ("publish", A11y.Spoken.publish),
             ("send", A11y.Spoken.send), ("done", A11y.Spoken.done),
             ("importing", A11y.Spoken.importing),
+            ("sendMessage", A11y.Spoken.sendMessage),
+            ("closeConversation", A11y.Spoken.closeConversation),
+            ("block", A11y.Spoken.block), ("unblock", A11y.Spoken.unblock),
+            ("retract", A11y.Spoken.retract),
         ]
-        XCTAssertEqual(vocabulary.count, 9)
+        XCTAssertEqual(vocabulary.count, 14)
         for (name, names) in vocabulary {
             XCTAssertEqual(names.count, 2, "\(name) should offer exactly two names")
             XCTAssertTrue(names[0].unicodeScalars.contains { $0.properties.isAlphabetic

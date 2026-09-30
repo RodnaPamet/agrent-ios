@@ -261,6 +261,25 @@ struct Conversation: Equatable, Sendable {
         if page.olderCursor == nil { exhausted = true }
     }
 
+    /// A retract THIS phone made, applied where the message sits.
+    ///
+    /// The refetch after a retract asks for the NEWEST page, so a message
+    /// retracted from scrollback is not in it and would keep its body and
+    /// its «Премахни» until the screen was left — the web's behaviour, and
+    /// a message the farmer has just been told is gone, still on screen. The
+    /// 200 is the server saying it is a tombstone now; this makes it one
+    /// here, in the shape the server will send it from now on.
+    mutating func tombstone(_ messageID: String) {
+        messages = messages.map { message in
+            guard message.id == messageID else { return message }
+            return ExchangeMessage(
+                id: message.id, senderTenantId: message.senderTenantId,
+                mine: message.mine, body: nil, deleted: true,
+                createdAt: message.createdAt
+            )
+        }
+    }
+
     private mutating func merge(_ incoming: [ExchangeMessage]) {
         var byID = Dictionary(messages.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         for message in incoming { byID[message.id] = message }

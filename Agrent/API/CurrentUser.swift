@@ -109,7 +109,17 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// somebody who could have used it.
     var isOperator: Bool { role?.uppercased() == "MECHANISATOR" }
 
-    var mayCreateOperations: Bool {
+    var mayCreateOperations: Bool { mayWrite }
+
+    /// The server's `canWrite` — `ROLE_ORDER >= 3` — as far as the OLDEST
+    /// membership knows, failing open for the reasons above.
+    ///
+    /// Named for what it is rather than for the first screen that needed it:
+    /// exchange messaging gates the same way (open, send, close, block,
+    /// unblock and retract are `assertCanWrite`; reading and marking read are
+    /// `assertCanRead`), and a second copy of this list would be a second
+    /// place for a new role to be forgotten.
+    var mayWrite: Bool {
         switch role?.uppercased() {
         case "MECHANISATOR", "READER", "AUDITOR": false
         default: true

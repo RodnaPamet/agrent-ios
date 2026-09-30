@@ -104,14 +104,22 @@ build — there is no macOS on the machine this was written on:
 
 ## Writes, and why they are shaped this way
 
-**Six writes send an `Idempotency-Key`**, and this said "every create" — which
-was aspirational and journal-scoped, and is contradicted by five `nil` call
-sites. The ones that send it: journal create, journal edit, farm-task,
-field-operation, task status, the exchange message send, and the grain cost
-create. The ones that do not: the parcel-history creates, exchange listings,
-admin, `POST /grain/contracts` and `POST /locations/:id/parcels` — the last of
-which says outright that a replayed create draws a second parcel. The rule is
-per ROUTE; see `ROADMAP.md` for the table.
+**Six writes send an `Idempotency-Key` kept across retries** — journal
+create, field operation (the offline queue replays each with its own id),
+task status, the grain cost create, the insurance lead, and the exchange
+message send (#114). This paragraph used to say "six" and list seven, three
+of which had no call site in the app: journal edit and farm-task create are
+routes that honour a key and that nothing here calls, and the message send
+did not exist yet. That was the SPEC's list of honouring routes read as the
+app's list of what it sends.
+
+Two more send a FRESH key per call — the inquiry and the catalogue item
+create — which protects nothing: `APIClient.post` mints one by default. The
+rest send none: the parcel-history creates, the exchange listing create,
+admin, and every messaging write but the send. `POST /grain/contracts` and
+`POST /locations/:id/parcels` honour none either — the last says outright that
+a replayed create draws a second parcel. The rule is per ROUTE; see
+`ROADMAP.md` for the table.
 
 Where it is sent, the server dedupes on it
 (`clientMutationId`, unique per tenant), so a request whose *response*
@@ -128,14 +136,18 @@ defect currently filed against the web app (#921).
 
 ## What it deliberately does not do yet
 
-- **No offline queue.** The web app has a 1,066-line service worker and an
-  outbox that is actively being corrected (ten open issues). Reimplementing
-  that natively is the expensive part of the migration and should not be
-  guessed at — it is the next decision, not the next commit.
+- **Only field operations are queued offline.** A spray or fertilisation
+  recorded with no signal is kept in `PendingOperations` (Application
+  Support, which iOS does not purge) and replayed with its own id as the
+  `Idempotency-Key` (#45). Nothing else is queued — never the listing create,
+  and not an exchange message, because a line of a negotiation delivered
+  hours after it was typed is not the line that was written. Nothing watches
+  the network: the queue drains at launch, on returning to the app, and from
+  the banner's «Изпрати» (#113).
 - No photos, no locations/equipment pickers, no edit or delete, no harvest
   fields. The create form covers four fields of a modal that has sixteen.
 - Tenant is hard-coded rather than read from `/api/auth/me`.
-- One page of results, no paging.
+- ~~One page of results, no paging.~~ The journal pages (PARITY.md Gap 6).
 
 ## Contract notes
 

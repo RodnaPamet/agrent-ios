@@ -137,9 +137,40 @@ Shipped and proven end to end on a device simulator (2026-09-21):
     that follows a vanished control does not cut it short — which is the
     documented behaviour, not an observed one;
   - `BgDate.time` on a phone set to 12-hour time;
-  - `RateLimitPause.messages` exists and nothing uses it: messaging is not
-    built. It is there so the first composer meets one pause per budget
-    rather than growing its own.
+  - ~~`RateLimitPause.messages` exists and nothing uses it: messaging is not
+    built.~~ The conversation's composer uses it (#114): a send's 429 pauses
+    the farm's message budget, the composer says until when, and nothing is
+    sent when it reopens. Never met a real 429 either.
+- **Exchange messaging's writes are built and NOT EXERCISED** (#114, PARITY
+  Gap 7): open a thread, send, close, block, unblock and retract. And
+  `read`, which fires on OPENING a conversation — so no real conversation
+  has been opened from this app, and every screen was checked only against
+  the synthetic fixtures under the seam, where every write is answered 501.
+  What that leaves unverified:
+  - `body` is plain text by READING `sanitizePlainText` (agri-saas
+    `exchange-messaging.ts:563`), not by rendering one; the first real
+    message is the first real test — the `notes` lesson above. Tombstones
+    and `mine` have never been seen on the wire either;
+  - the send key's replay (`replayed: true`) and `reopened` have never
+    come back from a server;
+  - the read race is INTERIM: a mark whose `readAt` passes the newest
+    message shown is followed by one refetch. Revisit this entry when the
+    server's `{upTo: messageId}` lands in `openapi.json`;
+  - spec gaps at 11b00118: open-thread's 200 (already open) is prose, not a
+    declared response; `Idempotency-Key` on the send is prose, not a
+    declared header parameter; `Retry-After` is declared on none of the 429
+    responses;
+  - **device-only checks, none done:** Борса's four sections as a row of
+    chips on a phone (measured in the simulator only: four segments ask for
+    464pt, a phone has 370, so the chips take over) and at the
+    accessibility sizes; the bubble colours — «Вие» is `Palette.onAccent` on
+    `Palette.accent`, a measured pair, but the other party's is the primary
+    label colour on `Palette.Chip.neutralFill`, measured by nobody, in light,
+    dark and Increase Contrast; the scroll to the newest message, with and
+    without Reduce Motion; the tab badge and the app menu row's «Борса (N)»;
+    Voice Control telling «Изпрати съобщението» / "Send message" apart from
+    the outbox banner's «Изпрати» / "Send"; the composer above the keyboard
+    and the tab bar at the accessibility sizes.
 
 ## Decisions locked
 
@@ -219,6 +250,14 @@ Shipped and proven end to end on a device simulator (2026-09-21):
    `api-keys`, `rbac` stay on the laptop. Nobody configures SAML on a phone.
 3. **Read-caching everywhere, no offline writes.** Every screen serves
    last-known data when offline and says so. Writes still require connectivity.
+
+   Two exceptions since, each deliberate. **Field operations ARE queued**
+   (#45): `PendingOperations`, replayed with their own id as the key. And
+   **exchange messaging is NOT read-cached** (#114, PARITY Gap 7): another
+   farm's words stay off the disk, as the web keeps them, so offline the
+   inbox and a conversation say «Няма интернет връзка.» rather than showing
+   a copy. Nor is a message queued: a line of a negotiation delivered hours
+   late is not the line that was written (`PendingOperations`' header).
 4. **Every English word an operator can see comes from the server.** Measured
    2026-09-22 over every user-visible string constructor in the app: the only
    non-Cyrillic literals are `Agrent`, a `·` separator, `%` and a currency-code
@@ -335,6 +374,16 @@ First real write path beyond the journal. All endpoints exist.
 `GET/POST /api/t/:slug/exchange/listings` · `/listings/[listingId]` ·
 `/inquiries` · `/my-listings`
 
+Messaging (#114, PARITY Gap 7) — nine operations, all tenant-scoped in the
+URL, ids only in the PATH, cursors and `limit` (1–100) the only query:
+`GET /threads` (`limit`, `cursor`) · `GET /threads/[threadId]` (`limit`,
+`before`) · `POST /listings/[listingId]/thread` (open or find; 201/200) ·
+`POST /threads/[threadId]/messages` (the one that honours
+`Idempotency-Key`) · `POST /threads/[threadId]/read` (no body) · `POST
+/threads/[threadId]/close` · `POST` and `DELETE /threads/[threadId]/block`
+· `DELETE /messages/[messageId]` (retract). None is cached; every write
+ships unfired.
+
 **Measured 2026-09-21, because this line was wrong:** the unprefixed
 `/api/exchange/listings` returns **404**. The routes are tenant-scoped in the
 URL — but the DATA is not: `ExchangeListing` is a GLOBAL table with no
@@ -344,7 +393,13 @@ separating your rows. `ExchangeInquiry` is the opposite: RLS-protected and
 private. The two must not share a UI that treats them alike.
 
 - Listings list + detail
-- Create inquiry (write — reuse the journal's `Idempotency-Key` discipline)
+- Create inquiry (write). NOT the journal's `Idempotency-Key` discipline,
+  which this line used to claim: the inquiry route reads no key, and the
+  app sends `post`'s fresh default per call. The domain is what dedupes —
+  one inquiry per (listing, farm).
+- Messaging: the inbox as Борса's fourth section, a conversation with
+  scrollback and a composer, close, block and unblock, retract, and
+  «message the other party» on a listing. Decisions in PARITY.md, Gap 7.
 - My listings / my interests
 
 Cross-tenant GLOBAL tables — no tenant scoping on these routes, unlike
@@ -540,9 +595,18 @@ answer.
 
 **Exchange moved after this list was written.** `POST
 /exchange/threads/[id]/messages` honours the header and returns an explicit
-`replayed: true`, so the line above is no longer true of exchange as a whole
-and the messaging client must send a key minted before the first attempt. The
-rest of exchange still does not.
+`replayed: true`, so the line above is no longer true of exchange as a whole.
+The rest of exchange still does not.
+
+**The messaging client (#114) sends one, and where it is minted matters.**
+`MessageSendKeys` mints it on the FIRST tap of Send for a (conversation,
+exact trimmed text), reuses it for every retry of that text, mints a new one
+when the text changes, and drops it on any 201 — `replayed: true` included,
+which the screen treats as delivered. It is passed to `ExchangeAPI
+.sendMessage` explicitly; `APIClient.post`'s default would mint a fresh key
+per attempt and defeat the replay. The server matches a replay on (sending
+farm, key) alone, so the key is never derived from the text. Unfired, like
+every messaging write.
 
 Two errors, and the inventory one is the dangerous direction. Inventory
 was listed as safe to retry and is not: a POST that times out and is sent

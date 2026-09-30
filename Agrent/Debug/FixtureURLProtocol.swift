@@ -42,9 +42,13 @@ import Foundation
 /// ── Writes are refused, and that is not caution ──
 ///
 /// `ExchangeAPI.createInquiry` posts a row AND emails the seller tenant's
-/// admins; `createListing` publishes to every tenant on the platform. Those
-/// ship built and unfired by a standing decision recorded on the functions
-/// themselves. Nothing reaches the network here in any case — the protocol
+/// admins; `createListing` publishes to every tenant on the platform; and
+/// every messaging write — open a thread, send, mark read, close, block,
+/// unblock, retract — is seen by another farm (#114). Those ship built and
+/// unfired by a standing decision recorded on the functions themselves. The
+/// conversation screen marks read on OPENING, so here it meets a 501 on
+/// every visit — and swallows it, which is what keeps it usable under the
+/// seam. Nothing reaches the network here in any case — the protocol
 /// answers before URLSession opens a socket — but a write is answered `501
 /// WRITE_REFUSED` rather than a cheerful 200, because a UI test that appears
 /// to save something is a UI test that will eventually be pointed at a

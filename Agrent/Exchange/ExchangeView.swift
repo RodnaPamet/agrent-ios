@@ -1,14 +1,16 @@
 import SwiftUI
 
 struct ExchangeView: View {
-    private enum Tab: String, CaseIterable, Identifiable {
-        case browse, mine, inquiries
+    enum Tab: String, CaseIterable, Identifiable {
+        case browse, mine, inquiries, messages
         var id: String { rawValue }
         var label: String {
             switch self {
             case .browse: "Обяви"
             case .mine: "Моите обяви"
             case .inquiries: "Моите заявки"
+            // PARITY GAP 7. The web's fourth section; iOS had three.
+            case .messages: "Съобщения"
             }
         }
     }
@@ -17,6 +19,8 @@ struct ExchangeView: View {
     @State private var listings = ExchangeListingsStore()
     @State private var mine = MyListingsStore()
     @State private var inquiries = MyInquiriesStore()
+    @State private var inbox = ExchangeInboxStore()
+    @State private var unread = ExchangeUnreadStore.shared
     @State private var posting = false
 
     /// Remembered per user, and the LIST is the default. The map answers
@@ -68,18 +72,15 @@ struct ExchangeView: View {
     @ViewBuilder
     private var stack: some View {
         let content = VStack(spacing: 0) {
-            Picker("Изглед", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.label).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-
+            ExchangeSectionPicker(selection: $tab, unread: unread.count)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
 
             switch tab {
             case .browse: browse
             case .mine: myListings
             case .inquiries: myInquiries
+            case .messages: ExchangeInboxView(store: inbox)
             }
         }
 
@@ -98,6 +99,7 @@ struct ExchangeView: View {
         case .browse: listings.state.freshness
         case .mine: mine.state.freshness
         case .inquiries: inquiries.state.freshness
+        case .messages: inbox.state.freshness
         }
     }
 
@@ -106,6 +108,9 @@ struct ExchangeView: View {
         case .browse: if listings.state.value == nil { await listings.load() }
         case .mine: if mine.state.value == nil { await mine.load() }
         case .inquiries: if inquiries.state.value == nil { await inquiries.load() }
+        // Nothing here: the inbox runs its own loop — load, then poll — for
+        // exactly as long as it is on screen. See `ExchangeInboxView`.
+        case .messages: break
         }
     }
 
@@ -324,6 +329,108 @@ struct ExchangeView: View {
 }
 
 // MARK: - Shared pieces
+
+/// Борса's four sections.
+///
+/// ── Four do not fit a phone's segmented control, MEASURED ──
+///
+/// `UISegmentedControl` gives every segment the width of the widest, and
+/// «Съобщения (3)» and «Моите заявки» are each about 95pt at the control's
+/// 13pt: the four ask for 464pt (read off the control's own
+/// `intrinsicContentSize` in the simulator, 2026-09-30), and an iPhone 17
+/// leaves 370 inside the page margins. A segmented control that runs out of
+/// room TRUNCATES, and «Моите о…» beside «Моите з…» is one word twice. The
+/// three segments this replaces needed about 330 and fitted.
+///
+/// So the house precedent: `ParcelMapView`'s scrolling row of chips, which
+/// keeps every section on screen — a menu (`TrendsView`'s answer to nine)
+/// would hide the one section with news behind a tap, and the count in its
+/// label is how a farmer finds it. Segments survive where they fit — an iPad,
+/// a wide window — through `ViewThatFits`.
+///
+/// At the ACCESSIBILITY sizes the chips are unconditional, not measured — the
+/// reasoning `AdaptiveRow` records: decided from the size, a later change to
+/// a label cannot quietly flip it back.
+///
+/// Not seen on a device; see ROADMAP.md's known-unverified list.
+struct ExchangeSectionPicker: View {
+    @Binding var selection: ExchangeView.Tab
+    let unread: Int
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var withoutColor
+
+    var body: some View {
+        if typeSize.isAccessibilitySize {
+            chips
+        } else {
+            ViewThatFits(in: .horizontal) {
+                Picker("Изглед", selection: $selection) {
+                    ForEach(ExchangeView.Tab.allCases) { tab in
+                        Text(label(for: tab)).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                chips
+            }
+        }
+    }
+
+    private var chips: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(ExchangeView.Tab.allCases) { tab in
+                    chip(tab)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollIndicators(.hidden)
+        // One container of buttons for VoiceOver, named as the picker was.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Изглед")
+    }
+
+    private func chip(_ tab: ExchangeView.Tab) -> some View {
+        let isSelected = selection == tab
+        return Button {
+            selection = tab
+        } label: {
+            // The fill is the only mark of the selected chip, so with
+            // Differentiate Without Colour it carries a tick as well.
+            HStack(spacing: 4) {
+                if isSelected && withoutColor {
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                }
+                Text(label(for: tab))
+            }
+            .font(.footnote.weight(.medium))
+            .fixedSize()
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            // The parcel map's chip, pair for pair: `onAccent` on `accent`,
+            // measured in `Palette`.
+            .background(isSelected ? Palette.accent : Palette.Chip.neutralFill, in: Capsule())
+            .foregroundStyle(isSelected ? Palette.onAccent : Color.primary)
+            .frame(minHeight: 44)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        // The NAME without the count, so Voice Control's «Съобщения» keeps
+        // matching as the count changes; the count is the value.
+        .accessibilityLabel(tab.label)
+        .accessibilityValue(tab == .messages && unread > 0
+            ? Plural.bg(unread, "непрочетен разговор", "непрочетени разговора")
+            : "")
+    }
+
+    /// The count lives in the label, where the web has no count at all, so
+    /// the section is findable from any of the other three.
+    private func label(for tab: ExchangeView.Tab) -> String {
+        tab == .messages ? MessagingPolicy.counted(tab.label, unread: unread) : tab.label
+    }
+}
 
 struct ListingRow: View {
     let listing: ExchangeListing
