@@ -108,10 +108,18 @@ struct AppMenuButton<Extra: View>: View {
         // action; presenting it modally says the same thing — you came here
         // on purpose and you will go back.
         .sheet(isPresented: $showingAdmin) { AdminView() }
-        // Each screen owns its own NavigationStack and Затвори button, the
-        // same shape AdminView already uses — the menu presents, the screen
-        // knows how to be presented.
-        .sheet(item: $presented) { $0.screen }
+        // Each screen owns its own NavigationStack, the same shape AdminView
+        // uses. The «Затвори» does NOT belong to the screen, though (#119):
+        // every surface can be a tab root or a menu sheet depending on the
+        // farmer's bar, and only this line knows which. The flag says so,
+        // and `closeWhenPresentedFromMenu` — inside each stack, where a
+        // toolbar item can reach the bar — draws the button from it.
+        //
+        // Per-screen buttons were how Борса ended up with none: the five
+        // screens that START as tabs never needed one until the customiser
+        // could move them, and the four that start here had one that did
+        // nothing whenever they were moved onto the bar.
+        .sheet(item: $presented) { $0.screen.environment(\.presentedFromMenu, true) }
     }
 }
 
@@ -128,16 +136,69 @@ extension View {
     /// riding along on every screen. That leaves one glyph in the bar
     /// instead of two, which is also what gives a Bulgarian title back the
     /// width it was losing.
+    ///
+    /// Also the way out when the menu presented this screen — every surface
+    /// with a menu is one that can be moved off the bar, so the two travel
+    /// together and a new surface cannot get one without the other.
     func appMenu() -> some View {
         toolbar {
             ToolbarItem(placement: .topBarTrailing) { AppMenuButton(extra: { EmptyView() }) }
         }
+        .closeWhenPresentedFromMenu()
     }
 
     /// The menu, plus items belonging to THIS screen.
     func appMenu<Extra: View>(@ViewBuilder extra: @escaping () -> Extra) -> some View {
         toolbar {
             ToolbarItem(placement: .topBarTrailing) { AppMenuButton(extra: extra) }
+        }
+        .closeWhenPresentedFromMenu()
+    }
+
+    /// «Затвори» in the leading slot, when — and only when — the app menu
+    /// presented this screen as a sheet.
+    ///
+    /// Apply it INSIDE the screen's `NavigationStack`: a toolbar item
+    /// outside the stack has no bar to go in, which is why the presentation
+    /// site sets a flag rather than adding the button itself. `.appMenu()`
+    /// already applies it; the surfaces with no menu (Тенденции, Новини,
+    /// Риск) call it directly.
+    func closeWhenPresentedFromMenu() -> some View {
+        modifier(MenuSheetClose())
+    }
+}
+
+extension EnvironmentValues {
+    /// Set by `AppMenuButton`'s sheet and by nothing else. FALSE BY DEFAULT
+    /// is the half that matters for tab roots: `MainTabView` sets nothing, so
+    /// a surface on the bar draws no «Затвори» — a button there would call
+    /// `dismiss()` on a screen nothing presented, and do nothing.
+    @Entry var presentedFromMenu = false
+}
+
+/// The #108 defect class, closed at the one place that knows.
+///
+/// A menu sheet with no «Затвори» cannot reliably be left: most surfaces are
+/// full-height `List`s or `ScrollView`s, so a downward drag scrolls the
+/// content and never reaches the sheet. #108 found that on Табло, #119 on
+/// Борса — where the inbox's conversations are pushed inside the same sheet,
+/// so they inherited it (their back button leads here, and now here has a
+/// way out).
+///
+/// `dismiss` is read at the root the modifier is applied to, so it closes
+/// the sheet rather than popping a pushed screen.
+private struct MenuSheetClose: ViewModifier {
+    @Environment(\.presentedFromMenu) private var presentedFromMenu
+    @Environment(\.dismiss) private var dismiss
+
+    func body(content: Content) -> some View {
+        content.toolbar {
+            if presentedFromMenu {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Затвори") { dismiss() }
+                        .accessibilityInputLabels(A11y.Spoken.close)
+                }
+            }
         }
     }
 }

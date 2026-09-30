@@ -9,7 +9,6 @@ import SwiftUI
 /// an enum rather than the server's string. See `TrendsStore.commodity`.
 struct TrendsView: View {
     @State private var store = TrendsStore()
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -35,12 +34,9 @@ struct TrendsView: View {
             .padding(.vertical, 12)
         }
         .inlineTitle("Тенденции")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-            }
-        }
+        // «Затвори» only when the app menu presented this — see
+        // `closeWhenPresentedFromMenu`. As a tab root it had one that did nothing.
+        .closeWhenPresentedFromMenu()
         .task { if store.prices.value == nil { await store.loadPrices() } }
         }
     }

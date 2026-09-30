@@ -8,7 +8,6 @@ import SwiftUI
 /// what happened this week. They share an API prefix and nothing else.
 struct NewsView: View {
     @State private var store = TrendsStore()
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.openURL) private var openURL
 
@@ -19,12 +18,9 @@ struct NewsView: View {
             content
         }
         .inlineTitle("Новини")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-            }
-        }
+        // «Затвори» only when the app menu presented this — see
+        // `closeWhenPresentedFromMenu`. As a tab root it had one that did nothing.
+        .closeWhenPresentedFromMenu()
         .task { if store.news.value == nil { await store.loadNews() } }
         }
     }
