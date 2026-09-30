@@ -13,7 +13,6 @@ import SwiftUI
 /// not his. So a block with nothing to say renders nothing, and the picker is
 /// where you learn a block exists.
 struct DashboardView: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var store = DashboardStore()
     @State private var preferences = DashboardPreferences.shared
     @State private var editing = false
@@ -42,31 +41,21 @@ struct DashboardView: View {
             .navigationTitle("Табло")
             .appMenu()
             .toolbar {
-                // «ЗАТВОРИ», WHICH THIS SCREEN WAS THE ONLY ONE WITHOUT.
+                // «ЗАТВОРИ» IS NOT HERE ANY MORE, AND THAT IS NOT #108 AGAIN.
                 //
-                // Табло is opened from the app menu as a `.sheet`, like Риск,
-                // Новини, Тенденции, Админ and the index explainer — and every
-                // one of those puts a «Затвори» in the leading slot. This one
-                // put the block picker there instead and shipped with no way
-                // back.
+                // #108 put one in this toolbar because Табло, opened from the
+                // menu as a full-screen `List`, could not be dragged away —
+                // the drag scrolls the rows. The button now comes from
+                // `.appMenu()` above, and only when the menu presented this
+                // screen (#119). Kept per screen it had two faults: as a tab
+                // root it was a «Затвори» that did nothing, and the five
+                // screens that were tab roots by default never grew one, so
+                // Борса moved to the menu reopened #108 exactly.
                 //
-                // A sheet can be dragged down in principle. Not this one in
-                // practice: it is a full-screen `List`, so a downward drag
-                // scrolls the rows and never reaches the sheet. The owner
-                // found it on the device — "once entered there is no way of
-                // coming back to the main menu" — which is exactly right.
-                //
-                // FLAGGED BEFORE IT SHIPPED AND MISFILED. A review of the
-                // screenshot harness noted that Табло has no dismiss, and I
-                // treated that as a fact the test had to cope with rather than
-                // a defect the screen had. The harness grew a drag-to-dismiss
-                // fallback and the app kept the bug. A finding about test
-                // plumbing and a finding about the product looked identical
-                // from inside the harness.
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                }
+                // The history that still applies: the harness once noted
+                // Табло had no dismiss and I treated it as a fact for the test
+                // to cope with rather than a defect of the screen. From inside
+                // a harness the two look identical.
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         editing = true

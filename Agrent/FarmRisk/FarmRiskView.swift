@@ -17,8 +17,6 @@ import SwiftUI
 /// happened once on Тенденции, where a price observed in July sat under a
 /// chart that looked like today.
 struct FarmRiskView: View {
-    @Environment(\.dismiss) private var dismiss
-
     /// Read so the readings row can stop being a fixed-width column at the
     /// accessibility sizes — see `reading(_:_:value:index:)`.
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -81,12 +79,9 @@ struct FarmRiskView: View {
                 .navigationDestination(item: $history) { parcel in
                     ParcelHistoryView(parcelID: parcel.id, parcelName: parcel.name)
                 }
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                }
+                // «Затвори» only when the app menu presented this — see
+                // `closeWhenPresentedFromMenu`. As a tab root it had one that did nothing.
+                .closeWhenPresentedFromMenu()
                 .task {
                     await store.loadWho()
                     if store.locations.value == nil { await store.loadLocations() }
