@@ -43,6 +43,15 @@ import XCTest
 ///     non-optional once;
 ///   - `items[].defaultUnit` has NO `name`, because `/items` does not send
 ///     one and `/units` does — the asymmetry that broke the product picker.
+///
+/// `exchange-threads` and `exchange-thread` (agrent-ios#114) are SYNTHETIC
+/// for a stronger reason than the rest: they are private messages between
+/// two farms, and no real conversation was captured, opened or written to
+/// make them. Their shape is the spec's (`ExchangeThreadSummary`,
+/// `ExchangeThread`, `ExchangeMessage`), and they carry a tombstone, a role
+/// this build does not know, a null `sellerDisplayName`, a null
+/// `olderCursor`, and a closed and a blocked thread — see
+/// `Tests/Fixtures/README.md`.
 final class FixtureSeamTests: XCTestCase {
 
     // MARK: - the seam is off unless asked for
@@ -96,6 +105,8 @@ final class FixtureSeamTests: XCTestCase {
             (CalculatorAPI.path, "calculator-sample"),
             (ExchangeAPI.listingsPath, "exchange-listings"),
             (ExchangeAPI.myListingsPath, "exchange-my-listings"),
+            (ExchangeAPI.threadsPath, "exchange-threads"),
+            (ExchangeAPI.threadPath(FixtureCatalogue.fixtureThreadID), "exchange-thread"),
         ]
         for (pathAndQuery, fixture) in expected {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
@@ -162,6 +173,55 @@ final class FixtureSeamTests: XCTestCase {
     func testTheParcelsKeyNamesTheLocationInTheListFixture() async throws {
         let locations = try await LocationsAPI.decodeList(from: try fixture("locations-list"))
         XCTAssertEqual(locations.map(\.id), [FixtureCatalogue.fixtureLocationID])
+    }
+
+    /// The conversation key names the thread the fixtures actually hold —
+    /// the conversation file's own id, and a row of the inbox file, so a
+    /// tap on that inbox row under the seam opens a conversation rather
+    /// than `NO_FIXTURE`.
+    func testTheThreadKeyNamesTheThreadInBothFixtures() async throws {
+        let thread = try await ExchangeAPI.decodeThread(from: try fixture("exchange-thread"))
+        XCTAssertEqual(thread.id, FixtureCatalogue.fixtureThreadID)
+        let inbox = try await ExchangeAPI.decodeThreads(from: try fixture("exchange-threads"))
+        XCTAssertTrue(inbox.threads.map(\.id).contains(FixtureCatalogue.fixtureThreadID))
+        let row = try XCTUnwrap(inbox.threads.first { $0.id == FixtureCatalogue.fixtureThreadID })
+        XCTAssertEqual(row.listingId, thread.listingId, "the two files disagree about the listing")
+    }
+
+    /// Paging and polling a conversation under the seam reach the same
+    /// recorded page, never `NO_FIXTURE`: the query is ignored on this route.
+    /// The fixture's `olderCursor` is null, so the app never asks for an
+    /// older page — this is what makes that robust rather than lucky.
+    func testMessagingPagesAndPollsStillFindTheirFixtures() {
+        for (pathAndQuery, fixture) in [
+            (ExchangeAPI.threadsPath(cursor: "opaque-cursor", limit: 50), "exchange-threads"),
+            (ExchangeAPI.threadPath(FixtureCatalogue.fixtureThreadID, before: "opaque", limit: 100),
+             "exchange-thread"),
+        ] {
+            let (path, query) = FixtureCatalogue.split(pathAndQuery)
+            XCTAssertNotNil(query)
+            XCTAssertEqual(FixtureCatalogue.fixtureName(path: path, query: query), fixture)
+        }
+    }
+
+    /// No messaging WRITE path has a fixture. The protocol refuses every
+    /// non-GET before it looks at the table, so this is the second fence, not
+    /// the first — but a GET-shaped entry on a write path would be a
+    /// fabricated success waiting for a verb change.
+    func testNoMessagingWritePathHasAFixture() {
+        let thread = FixtureCatalogue.fixtureThreadID
+        for pathAndQuery in [
+            ExchangeAPI.openThreadPath(listingID: "lst_synthetic_1"),
+            ExchangeAPI.messagesPath(threadID: thread),
+            ExchangeAPI.readPath(threadID: thread),
+            ExchangeAPI.closePath(threadID: thread),
+            ExchangeAPI.blockPath(threadID: thread),
+            ExchangeAPI.messagePath(messageID: "msg_synthetic_1"),
+            ExchangeAPI.threadPath("thr_that_does_not_exist"),
+        ] {
+            let (path, query) = FixtureCatalogue.split(pathAndQuery)
+            XCTAssertNil(FixtureCatalogue.fixtureName(path: path, query: query), pathAndQuery)
+        }
     }
 
     // MARK: - payloads
@@ -236,6 +296,8 @@ final class FixtureSeamTests: XCTestCase {
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),
         ("exchange-listings", { _ = try await ExchangeAPI.decodeListings(from: $0) }),
         ("exchange-my-listings", { _ = try await ExchangeAPI.decodeMyListings(from: $0) }),
+        ("exchange-threads", { _ = try await ExchangeAPI.decodeThreads(from: $0) }),
+        ("exchange-thread", { _ = try await ExchangeAPI.decodeThread(from: $0) }),
     ]
 
     /// A MISSING FIXTURE IS A FAILURE, NOT A SKIP.

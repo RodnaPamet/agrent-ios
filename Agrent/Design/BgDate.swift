@@ -59,6 +59,30 @@ enum BgDate {
         date.formatted(.dateTime.hour().minute().locale(locale))
     }
 
+    /// A message's time, as a conversation shows it:
+    ///
+    ///     today                 14:32
+    ///     earlier this year     21 септември, 14:32
+    ///     an earlier year       21 септември 2025 г., 14:32
+    ///
+    /// The clock alone for today, because a conversation read today is mostly
+    /// today's and the date is noise there. The day is added the moment it is
+    /// not today — a "14:32" that was yesterday's reads as an hour ago. The
+    /// year only when it differs, as `dayMonth` leaves it off for rows.
+    ///
+    /// "Today" is the DEVICE's today, in its zone — the same zone every form
+    /// here formats in, so the day the test is made against is the day shown.
+    /// `now` and `calendar` are parameters so a test can hold them; the app
+    /// takes the defaults. The screen and its VoiceOver label must both call
+    /// this, so the two cannot say different things (see the header).
+    static func messageTime(_ date: Date, now: Date = Date(),
+                            calendar: Calendar = .current) -> String {
+        if calendar.isDate(date, inSameDayAs: now) { return time(date) }
+        let sameYear = calendar.component(.year, from: date)
+            == calendar.component(.year, from: now)
+        return "\(sameYear ? dayMonth(date) : full(date)), \(time(date))"
+    }
+
     /// `"2026-09-19"` → that calendar day.
     ///
     /// The agro endpoints answer with a date-only string, which is a DAY and

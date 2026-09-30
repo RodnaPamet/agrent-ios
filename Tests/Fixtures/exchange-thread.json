@@ -1,0 +1,45 @@
+{
+  "id": "thr_synthetic_1",
+  "listingId": "lst_synthetic_1",
+  "listingCommodity": "wheat",
+  "role": "seller",
+  "lastMessageAt": "2026-09-28T09:15:00.000Z",
+  "closed": false,
+  "blocked": true,
+  "unreadCount": 1,
+  "olderCursor": null,
+  "messages": [
+    {
+      "id": "msg_synthetic_1",
+      "senderTenantId": "tnt_synthetic_buyer",
+      "mine": false,
+      "body": "Здравейте, пшеницата още ли е налична?",
+      "deleted": false,
+      "createdAt": "2026-09-27T08:00:00.000Z"
+    },
+    {
+      "id": "msg_synthetic_2",
+      "senderTenantId": "tnt_synthetic_owner",
+      "mine": true,
+      "body": "Да, 250 т.\nМоже оглед в четвъртък.",
+      "deleted": false,
+      "createdAt": "2026-09-27T08:30:00.000Z"
+    },
+    {
+      "id": "msg_synthetic_3",
+      "senderTenantId": "tnt_synthetic_buyer",
+      "mine": false,
+      "body": null,
+      "deleted": true,
+      "createdAt": "2026-09-27T09:00:00.000Z"
+    },
+    {
+      "id": "msg_synthetic_4",
+      "senderTenantId": "tnt_synthetic_buyer",
+      "mine": false,
+      "body": "Цена <300 € на тон?",
+      "deleted": false,
+      "createdAt": "2026-09-28T09:15:00.000Z"
+    }
+  ]
+}

@@ -57,6 +57,47 @@ final class BgDateTests: XCTestCase {
         XCTAssertFalse(BgDate.time(afternoon).contains("PM"))
     }
 
+    /// A message's time: the clock alone today, the day added otherwise, the
+    /// year only when it is not this year. Built in `Calendar.current`, which
+    /// is the zone `messageTime` decides "today" in and every form formats in,
+    /// so the assertions hold on any runner.
+    func testAMessageTimeCarriesTheDayOnlyWhenItIsNotToday() throws {
+        let calendar = Calendar.current
+        func at(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) throws -> Date {
+            try XCTUnwrap(calendar.date(from: DateComponents(
+                year: year, month: month, day: day, hour: hour, minute: minute)))
+        }
+        let now = try at(2026, 9, 30, 18, 0)
+
+        XCTAssertEqual(BgDate.messageTime(try at(2026, 9, 30, 14, 32), now: now), "14:32")
+        XCTAssertEqual(BgDate.messageTime(try at(2026, 9, 30, 0, 5), now: now), "0:05",
+                       "just after midnight is still today")
+        XCTAssertEqual(BgDate.messageTime(try at(2026, 9, 29, 23, 59), now: now),
+                       "29 септември, 23:59", "a minute before midnight is yesterday")
+        XCTAssertEqual(BgDate.messageTime(try at(2026, 1, 3, 9, 5), now: now), "3 януари, 9:05")
+        // ICU joins the year and «г.» with U+202F, a NARROW no-break space,
+        // so the abbreviation never wraps onto a line of its own. Spelled
+        // out, because it is invisible in the source and an ordinary space
+        // here fails with two strings that print identically.
+        XCTAssertEqual(BgDate.messageTime(try at(2025, 12, 31, 14, 32), now: now),
+                       "31 декември 2025\u{202F}г., 14:32")
+    }
+
+    /// Bulgarian and twenty-four hour whatever the process locale — the en_US
+    /// runner and an en_BG phone print the same thing.
+    func testAMessageTimeIsNeverEnglish() throws {
+        let calendar = Calendar.current
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 30, hour: 18)))
+        let earlier = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 11, hour: 15, minute: 7)))
+        let text = BgDate.messageTime(earlier, now: now)
+        XCTAssertEqual(text, "11 септември, 15:07")
+        for english in ["September", "Sep", "PM", "AM"] {
+            XCTAssertFalse(text.contains(english), text)
+        }
+    }
+
     /// The defect this class exists for, stated as a comparison: the raw
     /// idiom and the declared one must not disagree. On a device set to
     /// en_BG the first of these is English.

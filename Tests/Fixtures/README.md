@@ -109,3 +109,46 @@ What is NOT invented is the STRUCTURE. It was measured off the live wire on
 Coordinates are in central Bulgaria (~42.5°N 25.1°E) rather than the real farm
 (~43.1°N 24.2°E, Pleven): inside the country so latitude/longitude bounds
 assertions are meaningful, and nowhere near the real boundaries.
+
+## `exchange-threads.json` / `exchange-thread.json`
+
+**Synthetic, and there is no other option.** These are exchange MESSAGES —
+private conversations between two farms — and a real one is not publishable
+in a public repo, whoever's it is. Nothing was captured off the wire: no
+production thread was opened, read or written to produce them (the standing
+rule that every messaging write ships built and unfired, agrent-ios#114).
+
+What is NOT invented is the SHAPE. It is taken from agri-saas
+`src/generated/openapi.json` (`ExchangeThreadSummary`, `ExchangeThread`,
+`ExchangeMessage`, and the `listExchangeThreads` envelope) and checked against
+the usecase that builds the payloads,
+`src/app-layer/usecases/exchange-messaging.ts`. Every key the schemas list as
+`required` is present, including the ones that are present-and-null. Names,
+ids and texts are made up; the ids follow no real format beyond being
+strings, and nothing here is JWT-shaped (the CI credential scan covers
+fixtures).
+
+The hard cases, each on purpose:
+
+| case | where |
+|---|---|
+| tombstone — `deleted: true`, `body: null` | `exchange-thread.json`, `msg_synthetic_3` |
+| a role this build does not know (`broker`) → `.unknown` | `exchange-threads.json`, row 3 |
+| `sellerDisplayName: null` | `exchange-threads.json`, rows 2 and 3 |
+| `olderCursor: null` (the start is on this page) | `exchange-thread.json` |
+| `hasUnread: true` and `false` | rows 1 and 3 / row 2 |
+| `closed: true` | `exchange-threads.json`, row 2 |
+| `blocked: true` | `exchange-thread.json` |
+| a multi-line body, and one with `<` that must render verbatim | `msg_synthetic_2`, `msg_synthetic_4` |
+| a decimal-string quantity with a fraction (`"12.5"`) | row 2 |
+| `lastMessageAt` with and without non-zero milliseconds | rows 1 and 2 |
+
+`olderCursor` is null because the UI test seam matches on the PATH alone: a
+`before=` request would be answered with this same page, and a cursor here
+would send the conversation after an older page that is the newest one again.
+`thr_synthetic_1` is the thread both files share, and `FixtureCatalogue`
+serves the conversation under that id — `FixtureSeamTests` holds the two
+against each other.
+
+`listingRegionName` is in English because that is what the server sends — the
+listing's `regionName` is the English oblast name.

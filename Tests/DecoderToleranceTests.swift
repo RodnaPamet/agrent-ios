@@ -223,6 +223,69 @@ final class DecoderToleranceTests: XCTestCase {
         Probe("PricePoint", #"""
         {"date":"2026-09-18","price":229.5,"count":4}
         """#) { _ = try await APIClient.shared.decode($0, as: PricePoint.self) },
+
+        // ── Exchange messaging, agrent-ios#114 ──
+        //
+        // Every payload complete per the spec's `required`, including the
+        // present-and-null keys, and decoded through the route's own
+        // function where there is one. `ExchangeMessage` has its own probe
+        // because this file mutates top-level keys only: inside
+        // `ExchangeThread` it is never touched.
+        Probe("ExchangeThreadPage", #"""
+        {"threads":[{"id":"t","listingId":"l","listingCommodity":"wheat",
+          "listingRegionName":"Pleven","listingQuantityTonnes":"25",
+          "sellerDisplayName":null,"role":"seller",
+          "lastMessageAt":"2026-09-28T09:15:00.000Z","closed":false,"hasUnread":true}],
+         "nextCursor":null}
+        """#) { _ = try await ExchangeAPI.decodeThreads(from: $0) },
+
+        Probe("ExchangeThreadSummary", #"""
+        {"id":"t","listingId":"l","listingCommodity":"wheat",
+         "listingRegionName":"Pleven","listingQuantityTonnes":"25",
+         "sellerDisplayName":"Стопанство","role":"inquirer",
+         "lastMessageAt":"2026-09-28T09:15:00.000Z","closed":true,"hasUnread":false}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeThreadSummary.self) },
+
+        Probe("ExchangeThread", #"""
+        {"id":"t","listingId":"l","listingCommodity":"wheat","role":"seller",
+         "lastMessageAt":"2026-09-28T09:15:00.000Z","closed":false,"blocked":false,
+         "unreadCount":1,"olderCursor":"b3BhcXVl",
+         "messages":[{"id":"m","senderTenantId":"x","mine":false,"body":"Здравейте",
+           "deleted":false,"createdAt":"2026-09-28T09:15:00.000Z"}]}
+        """#) { _ = try await ExchangeAPI.decodeThread(from: $0) },
+
+        Probe("ExchangeMessage", #"""
+        {"id":"m","senderTenantId":"x","mine":true,"body":"Да",
+         "deleted":false,"createdAt":"2026-09-28T09:15:00.000Z"}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeMessage.self) },
+
+        Probe("ExchangeThreadOpened", #"""
+        {"id":"t","created":true}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeThreadOpened.self) },
+
+        Probe("ExchangeMessageSent", #"""
+        {"id":"m","createdAt":"2026-09-28T09:15:00.000Z","reopened":false,"replayed":false}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeMessageSent.self) },
+
+        Probe("ExchangeThreadRead", #"""
+        {"readAt":"2026-09-28T09:15:00.000Z"}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeThreadRead.self) },
+
+        Probe("ExchangeThreadClosed", #"""
+        {"closedAt":"2026-09-28T09:15:00.000Z","alreadyClosed":false}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeThreadClosed.self) },
+
+        Probe("ExchangePartyBlocked", #"""
+        {"blocked":true,"alreadyBlocked":false}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangePartyBlocked.self) },
+
+        Probe("ExchangePartyUnblocked", #"""
+        {"blocked":false}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangePartyUnblocked.self) },
+
+        Probe("ExchangeMessageRetracted", #"""
+        {"id":"m"}
+        """#) { _ = try await APIClient.shared.decode($0, as: ExchangeMessageRetracted.self) },
     ]
 
     // MARK: - The measurement
@@ -376,6 +439,38 @@ final class DecoderToleranceTests: XCTestCase {
         "NewsItem": ["category", "id", "publishedAt", "source", "title", "url"],
         "Unit": ["id", "key", "symbol"],
         "InputItem": ["category", "id", "name"],
+
+        // ── Checked 2026-09-30 against agri-saas 11b00118 (agrent-ios#114) ──
+        //
+        // Every set a strict SUBSET of its schema's `required`. What is left
+        // out, and why:
+        //
+        //   - present-and-null keys (`["string","null"]` AND required):
+        //     `nextCursor`, `sellerDisplayName`, `olderCursor`, `body`. Swift
+        //     optionals, so absent from these sets on purpose — the
+        //     `Parcel.absentFromImportAt` precedent. Copying the spec's lists
+        //     word for word would turn this suite red.
+        //   - `listingRegionName` and `listingQuantityTonnes`: required and
+        //     non-null in the spec, optional here, because an inbox row with
+        //     a commodity and a time is still worth showing.
+        //   - `unreadCount` and `senderTenantId`: nothing reads them.
+        //     `hasUnread` is the unread signal and `mine` decides the side.
+        //   - WRITE responses require only what a caller cannot do without;
+        //     the 2xx is the success, and a missing flag must not turn a
+        //     delivered message into an error a farmer retries.
+        "ExchangeThreadPage": ["threads"],
+        "ExchangeThreadSummary": ["closed", "hasUnread", "id", "lastMessageAt",
+                                  "listingCommodity", "listingId", "role"],
+        "ExchangeThread": ["blocked", "closed", "id", "lastMessageAt",
+                           "listingCommodity", "listingId", "messages", "role"],
+        "ExchangeMessage": ["createdAt", "deleted", "id", "mine"],
+        "ExchangeThreadOpened": ["id"],
+        "ExchangeMessageSent": ["id"],
+        "ExchangeThreadRead": ["readAt"],
+        "ExchangeThreadClosed": [],
+        "ExchangePartyBlocked": ["blocked"],
+        "ExchangePartyUnblocked": ["blocked"],
+        "ExchangeMessageRetracted": ["id"],
     ]
 
     /// THE GUARD. A field going non-optional turns this red and names it.

@@ -390,6 +390,47 @@ enum UserMessage {
         // grows a retry.
         "FORBIDDEN": "Нямате права за това действие.",
 
+        // ── Exchange messaging (agrent-ios#114) ──
+        //
+        // The server's sentences are English and the web has no Bulgarian
+        // for any of these — it shows one generic line per action — so they
+        // are written here. Three rules they follow:
+        //
+        // SIDE-NEUTRAL where the side is unknown. The server's `seller` means
+        // the LISTING'S OWNER, who is the one buying on a BUY listing, and no
+        // messaging payload says which. So «собственикът на обявата», never
+        // «продавачът», in a refusal that can meet either.
+        //
+        // FARM, not person, where the server checks the farm. Retract and the
+        // read pointer are per tenant: a colleague's message is "yours" to
+        // remove.
+        //
+        // NOTHING SAYS «В ТОЗИ РАЗГОВОР» about a limit. The send budget is
+        // the whole farm's, sixty a minute across every thread and device,
+        // and a 429 is said by status anyway — see `httpText`.
+        //
+        // Not the found-or-not-visible distinction: `THREAD_NOT_FOUND` is
+        // also what a farm that is not a party gets (row-level security hides
+        // the row), so it does not claim the conversation was deleted.
+        "THREAD_NOT_FOUND": "Разговорът не е намерен или не е достъпен за Вашето стопанство.",
+        // Defensive server-side and unreachable while its row-level security
+        // holds; worded so that it is true if it ever fires.
+        "THREAD_NOT_A_PARTY": "Вашето стопанство не е участник в разговора.",
+        "BLOCK_SELLER_ONLY": "Само собственикът на обявата може да блокира или отблокира.",
+        "LISTING_NOT_FOUND": "Обявата не беше намерена.",
+        "THREAD_OWN_LISTING": "Не можете да започнете разговор по собствената си обява.",
+        "THREAD_BLOCKED": "Собственикът на обявата не приема съобщения от Вашето стопанство.",
+        // Reached only when the server's sanitiser strips a draft the app
+        // thought had text — `<ivan@abv.bg>` is a tag to it — because the
+        // composer does not send a blank one.
+        "MESSAGE_EMPTY": "Съобщението е празно след проверката на сървъра. Напишете текст.",
+        // No number: the limit is 4000 UTF-16 units, which is not a count a
+        // farmer can check (an emoji is two to four), and the composer shows
+        // its own counter near it.
+        "MESSAGE_TOO_LONG": "Съобщението е твърде дълго. Съкратете го и опитайте отново.",
+        "MESSAGE_NOT_FOUND": "Съобщението не беше намерено.",
+        "MESSAGE_NOT_SENDER": "Можете да премахвате само съобщения, изпратени от Вашето стопанство.",
+
         // Batch 1.
         "CROP_PLAN_NOT_READY": "Планът за културите не е готов.",
         "FILE_EMPTY": "Файлът е празен.",
