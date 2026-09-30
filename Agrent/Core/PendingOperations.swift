@@ -5,13 +5,21 @@ import Foundation
 /// ── Why this can exist at all ──
 ///
 /// Idempotency in this API is PER-USECASE, not global. `field-operation`
-/// is one of the four that honours `Idempotency-Key` — so replaying a
-/// queued write with the SAME key cannot create a second operation, no
-/// matter how many times it is retried or how long after the fact.
+/// is one of the routes that honour `Idempotency-Key` (the table is in
+/// ROADMAP.md, "Writes: the rule is per-usecase") — so replaying a queued
+/// write with the SAME key cannot create a second operation, no matter how
+/// many times it is retried or how long after the fact.
 ///
 /// That is the whole licence for this file. The exchange listing create
 /// honours no key and has no natural key, so a replay puts a second offer
 /// on a public board: it must never be queued, and it is not.
+///
+/// An exchange MESSAGE is not queued either, although its send honours a
+/// key and a replay would be safe on the server (#114). Safe is not the
+/// question: a line of a negotiation arriving hours after it was typed, into
+/// a conversation that moved on while the phone had no signal, is a
+/// different message from the one the farmer wrote. The composer keeps the
+/// draft and says it was not sent; sending it later is the farmer's call.
 struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
     /// THE IDEMPOTENCY KEY, and the file name, and the identity.
     ///

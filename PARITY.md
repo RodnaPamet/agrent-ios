@@ -32,6 +32,10 @@ and gaps 1, 2, 4, 5 and 6 are closed. What remains is gap 3 and Phase 4
 admin. Each section below carries its own status; this header no longer
 speaks for all of them.
 
+**UPDATED 2026-09-30.** Gap 3 was closed by #30 on 2026-09-22 and this
+document was never told; it says so now. Gap 7, exchange messaging, is
+new and closed the same day it was opened.
+
 The original line read: *"every screen is applied and none is complete"*.
 That was true when written and is kept because the reason it was written
 still holds — a screen's polished appearance at default text size is not
@@ -113,12 +117,20 @@ Two things found on the way that the original entry did not anticipate:
 
 ## Exchange
 
-Web `exchange` (1159) + `exchange/my-listings` (394) + `exchange/my-interests`
-(213) · iOS `Exchange/ExchangeView.swift` (254) + `ListingDetailView.swift` (137)
+Web `exchange` (683) + `exchange/my-listings` (367) + `exchange/my-interests`
+(192) + `exchange/threads` (121) + `exchange/threads/[threadId]` (321) · iOS
+`Exchange/ExchangeView.swift` (601) + `ListingDetailView.swift` (209) +
+`NewListingView.swift` (269) + `ExchangeInboxView.swift` (141) +
+`ConversationView.swift` (417) + `MessagingStores.swift` (576) +
+`ExchangeMessaging.swift` (370). Line counts re-read 2026-09-30; the old
+header's (1159/394/213 and 254/137) had drifted.
 
-**Structurally ahead of the web, and right.** Three web pages are three
-tabs — Обяви / Моите обяви / Моите заявки — which is the correct mobile
-shape, not a shortfall.
+**Structurally ahead of the web, and right.** The web's four sections are
+four sections here — Обяви / Моите обяви / Моите заявки / Съобщения — which
+is the correct mobile shape, not a shortfall. Four do not fit a phone's
+segmented control (measured: they ask for 464pt where an iPhone 17 has
+370), so on a phone they are a scrolling row of chips, the parcel map's
+precedent; see `ExchangeSectionPicker`.
 
 ### Gap 2 — no search, no filter, no pagination — CLOSED 2026-09-22
 
@@ -144,10 +156,18 @@ and the conclusion was not: `Decimal` is exact. And `quantityTonnes`
 parsed with `Decimal(string:)` and no locale, which reads "12.5" as 125
 where `.` groups.
 
-### Gap 3 — cannot create a listing — STILL OPEN
+### Gap 3 — cannot create a listing — CLOSED 2026-09-22, recorded 2026-09-30
 
-The web posts to `/exchange/listings`. The app has `createInquiry` only, so
-**Моите обяви is read-only** — you can see your listings but not make one.
+Built, wired, and **ships unfired**: `NewListingView` behind «Нова обява»
+on Моите обяви, posting through `ExchangeAPI.createListing` (#30, bccf95b).
+This entry went on saying STILL OPEN for eight days because #30 landed
+after this document was written and nothing in that PR touched it — the
+laundering `ROADMAP.md` warns about, in the other direction: a closed gap
+reading as open is also a document that stopped being checked.
+
+What it said while open, kept because it is why the write took the shape
+it did: the web posts to `/exchange/listings`, and the app had
+`createInquiry` only.
 
 **Deliberately not built on a guess.** A listing is published to every
 tenant in the platform, so the write needs its schema read rather than
@@ -160,12 +180,133 @@ When it is built it ships **unfired**, like `createInquiry`. The owner
 authorising one cost row on his own books does not extend to posting an
 offer other farms can see.
 
-### Note — the inquiry write is still unexercised
+### Note — the inquiry write, and every messaging write, is unexercised
 
 `POST /exchange/inquiries` creates a production row **and emails another
 tenant's admins**. It has never been fired. That is a deliberate standing
 decision, not an oversight; it is recorded here so nobody closes it by
 accident while working through this list.
+
+The same decision covers every messaging write (Gap 7), each of which the
+OTHER farm sees:
+
+- **open a thread** — a row in the listing owner's inbox at once, unread
+  and empty, before a word is written; there is no way to delete it;
+- **send** — a message, plus a bell row and an email to their owners and
+  admins;
+- **close** — either party; **block** and **unblock** — the listing owner
+  only, and a block covers every listing between the two farms;
+- **retract** — a tombstone the other side sees where the message was;
+- **read** — fired by OPENING a conversation, not by a button, and it
+  moves the pointer for every member of the farm to the server's now. So
+  even viewing a real conversation from development is a production write,
+  and none has been opened. Under the UI test seam every one of these is
+  answered 501, which is the backstop, not the rule.
+
+### Gap 7 — no messaging — CLOSED 2026-09-30
+
+Web `exchange/threads` (121) + `exchange/threads/[threadId]` (321) · iOS
+`ExchangeInboxView.swift`, `ConversationView.swift`, `MessagingStores.swift`,
+`ExchangeMessaging.swift`, `ExchangeMessagingModels.swift`, and the nine
+operations in `ExchangeAPI.swift` (agrent-ios#114).
+
+**FULL PARITY, by the owner's ruling (#114):** the inbox as Борса's fourth
+section, the conversation with scrollback, reply, «message the other party»
+from a listing, close, block (the listing owner only) and unblock, and
+retract your own message — the ninth operation, `DELETE
+/exchange/messages/{id}`, which the issue's list of eight missed and the
+web offers as «Премахни». **The one-shot inquiry stays beside it**, as on
+the web, which renders both on someone else's listing: an inquiry is one
+message whose contact is revealed only if the owner accepts; a
+conversation reveals nothing and goes on.
+
+Read out of agri-saas at 11b00118 — the spec, `exchange-messaging.ts`,
+`ThreadsClient.tsx`, `ThreadClient.tsx` — not observed running. No real
+conversation has been opened (see the note above).
+
+**Owner decisions (2026-09-29, asked directly):**
+
+- **An unread badge on Борса** — the number of conversations with
+  something unread, refreshed at launch, on every return to the app and
+  whenever the inbox loads — plus the count in the «Съобщения» label and
+  «Ново» on each row. The web has only the row badge and the bell. When
+  Борса is off the bar, the app menu's row carries the count.
+- **Mark read on the first load AND again whenever a poll brings a message
+  from the other farm while the conversation is on screen.** The web marks
+  once per page mount, so a reply read on screen leaves «Ново» behind.
+  Failures are swallowed — the seam answers 501, and a failed mark is
+  nothing a farmer can act on.
+- **Confirmation before retract** (irreversible) **and before block** (it
+  covers every listing between the two farms, which the web neither
+  confirms nor says). Close stays one tap: the next message reopens it.
+  Unblock is not confirmed; it undoes itself.
+
+**Decisions taken in the work:**
+
+- **Nothing is cached on disk.** The web keeps `/exchange/threads` out of
+  its persistent cache on purpose — another farm's words must not outlive a
+  lost phone — and `ResponseCache` survives sign-out and is keyed on a
+  hard-coded tenant. Inbox and conversation are network-only, held in
+  memory; offline is an honest «Няма интернет връзка.», not yesterday's
+  copy. This is the one exchange read that does not follow the house's
+  cache-first rule, and a test holds it.
+- **Polling at the web's cadence** — 5 s for an open conversation, 30 s for
+  the inbox — but ONLY while the screen is on screen and the app active;
+  locked or backgrounded, nothing polls. A 429 waits the server's
+  `Retry-After` instead of the interval, never less than the interval.
+- **Wording is side-neutral wherever the side is unknown.** The payloads
+  carry no listing side, and «Вие продавате» / «Блокирай купувача» are
+  false on every BUY listing. So the inbox says «Вашата обява» / «Вие
+  питате», the action is «Блокирай» / «Отблокирай», and the blocked notices
+  name neither buyer nor seller. On the listing the side IS known:
+  «Съобщение до продавача» on a SELL listing, «Съобщение до купувача» on a
+  BUY one. The button is not tied to the listing being active — it is the
+  way back to a conversation on a listing that has closed.
+- **The web's localisation defects are not copied:** the commodity through
+  `CommodityName` (the web prints the slug), the region in Bulgarian
+  (`BulgarianRegion.name(english:)` — the inbox row has no code, so the
+  English is resolved through the bundled geometry), «т» (the web prints a
+  Latin «t»), times through `BgDate` in the phone's zone (the web: en-GB,
+  in UTC, two to three hours early), and a Bulgarian error state.
+- **4000, not 8000.** The spec says `maxLength: 8000`; the usecase refuses
+  anything over 4000 UTF-16 units after sanitising and trimming. The
+  composer counts the server's way — «👍🏽» is four — and shows a counter
+  only near the limit.
+- **`body` is plain text**, rendered verbatim: never markdown, never HTML.
+  A tombstone keeps its place and reads «Съобщението е премахнато».
+- **Sending:** one `Idempotency-Key` per (conversation, exact text), kept
+  across retries and dropped on any 201 — the web sends none, and its Send
+  button accepts a second click while the first is in flight. The draft
+  stays until the 201; there is no optimistic bubble; the conversation is
+  refetched after. A timeout says the outcome is unknown and that sending
+  again is safe, rather than «not sent». A 429 pauses the FARM's message
+  budget (60 a minute, every colleague) and the composer says until when;
+  nothing is ever sent automatically. `reopened` clears the closed notice.
+- **Merging, not replacing.** A poll merges the newest page into what is
+  loaded, by id, so scrollback survives it — the web loses messages from
+  the middle of a long conversation after loading older ones. One failed
+  poll does not replace the conversation with an error, as the web's does.
+- **The interim read race rule:** `POST …/read` takes no body and moves the
+  pointer to the server's now, so it can mark a message nobody saw. Until
+  the server accepts `{upTo}`, a mark whose `readAt` is after the newest
+  message shown is followed by one refetch.
+- **Write affordances are hidden from roles that cannot write** (READER,
+  AUDITOR; a MECHANISATOR has no Борса at all) — the composer, the actions,
+  «Премахни» and the listing's button. The server's 403 is still rendered:
+  `role` is the oldest membership's, and custom roles make it unreliable.
+- **Retract says what failed** when it fails; the web shows its SEND
+  failure. A message retracted from scrollback becomes a tombstone where it
+  is, where the web leaves it readable until the screen is reopened.
+- **A blocked inquirer cannot press Send.** The web lets them, and the
+  server refuses with `THREAD_BLOCKED` after spending the farm's budget.
+- **Scrolls to the newest message** on open and when one arrives — the
+  first animation in this app, so Reduce Motion turns it into a jump. The
+  web does no scroll management.
+
+**Not built, deliberately:** the bell and the email (the notification
+list is its own screen, and it does not exist on iOS); inbox paging past
+the server's first hundred (the web ignores `nextCursor` too); a draft or
+send key that survives leaving the conversation.
 
 ---
 
@@ -325,12 +466,17 @@ Per-parcel elements over MapKit is owed work.
 reading the environment to gate nothing would be an accessibility feature
 in name only.
 
+**Superseded 2026-09-30, for one screen.** The conversation (Gap 7)
+scrolls to a new message with an animation — the app's first — and reads
+`accessibilityReduceMotion`: with it on, the list jumps instead.
+
 ---
 
 ## What is left
 
-1. **Gap 3 — create a listing.** Blocked on the write schema, by choice
-   rather than by circumstance. Ships unfired when built.
+1. ~~**Gap 3 — create a listing.**~~ Closed by #30; recorded 2026-09-30.
+   Ships unfired. So does **Gap 7, messaging**, closed 2026-09-30 — every
+   write in it, and opening a conversation, is still the owner's first.
 2. **Phase 4 admin**, against the contract above. The only remaining
    stub screen, and it now has a home in the app menu rather than a tab.
 

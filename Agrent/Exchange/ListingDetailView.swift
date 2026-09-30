@@ -3,6 +3,9 @@ import SwiftUI
 struct ListingDetailView: View {
     let listing: ExchangeListing
     @State private var composing = false
+    @State private var opener = ListingThreadOpener()
+    @State private var openedThread: ConversationRoute?
+    @State private var user = CurrentUserStore.shared
 
     var body: some View {
         List {
@@ -70,10 +73,62 @@ struct ListingDetailView: View {
                     Button("Изпрати") { composing = true }
                 }
             }
+
+            if MessagingPolicy.offersMessageParty(
+                isOwn: listing.isOwn, mayWrite: MessagingPolicy.mayWrite(user.user)
+            ) {
+                messagePartySection
+            }
         }
         .inlineTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
         .sheet(isPresented: $composing) {
             InquiryComposeView(listing: listing)
+        }
+        .navigationDestination(item: $openedThread) { route in
+            ConversationView(threadID: route.threadID, commodity: listing.commodity)
+        }
+    }
+
+    /// PARITY GAP 7. «Message the other party», BESIDE the inquiry, as on the
+    /// web — the two are different things: an inquiry is one message whose
+    /// contact is revealed only if the owner accepts; a conversation reveals
+    /// nothing and goes on.
+    ///
+    /// OUTSIDE `isActive`, deliberately: on a listing that has closed this is
+    /// the way back to a conversation that already exists, and the route
+    /// applies no status rule.
+    ///
+    /// ── NOT FIRED ──
+    ///
+    /// The tap POSTs open-thread, which puts an empty, unread conversation in
+    /// the owner's inbox before a word is written. Built, wired, and never
+    /// pressed against production.
+    private var messagePartySection: some View {
+        let label = MessagingPolicy.messagePartyLabel(side: listing.side)
+        return Section {
+            Button {
+                Task {
+                    if let id = await opener.open(listingID: listing.id) {
+                        openedThread = ConversationRoute(threadID: id)
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(label.bulgarian)
+                    if opener.opening {
+                        Spacer()
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(opener.opening)
+            .accessibilityInputLabels(A11y.spokenNames(label.bulgarian, label.english))
+            if let failure = opener.failure {
+                Text(failure)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.error)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 }

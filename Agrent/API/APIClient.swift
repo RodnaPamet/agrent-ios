@@ -6,10 +6,20 @@ import Foundation
 ///
 /// 1. Refresh ONCE on a 401, then retry. Without the single-flight guard a
 ///    screen firing three requests at once refreshes three times and races.
-/// 2. Send `Idempotency-Key` on every create. The server dedupes on it
-///    (`LogEntry.clientMutationId`, unique per tenant), so a request whose
-///    RESPONSE was lost — the ordinary case on a tractor — replays without
-///    writing a second entry. A regulatory diary must not double-record.
+/// 2. Carry the CALLER's `Idempotency-Key`. Where a route honours one the
+///    server dedupes on it (`clientMutationId`, unique per tenant), so a
+///    request whose RESPONSE was lost — the ordinary case on a tractor —
+///    replays without writing a second row. A regulatory diary must not
+///    double-record.
+///
+///    It used to say "on every create", which was never true: honouring is
+///    per ROUTE (ROADMAP.md, "Writes: the rule is per-usecase"). The ones
+///    that pass a key kept across retries today: journal create, field
+///    operation (the outbox replays with the operation's own id), task
+///    status, the grain cost create, the insurance lead, and the exchange
+///    message send (#114, from `MessageSendKeys`). `post` still DEFAULTS to
+///    a fresh key per call, which protects nothing — a caller that needs
+///    dedupe must pass its own.
 actor APIClient {
     static let shared = APIClient()
 
@@ -431,7 +441,9 @@ actor APIClient {
     /// different reasons, and both are live:
     ///
     ///   - the route reads no header — parcel crop-seasons, weed
-    ///     observations, the exchange listing create, admin; or
+    ///     observations, the exchange listing create, admin, and every
+    ///     messaging write but the send (open a thread, read, close, block;
+    ///     each is idempotent in its domain instead); or
     ///   - it reads one but nothing here would ever send the same value
     ///     twice, so a key would read as protection that is not there.
     ///

@@ -79,6 +79,7 @@ struct AgrentApp: App {
 struct MainTabView: View {
     @State private var tabs = BottomTabsStore.shared
     @State private var outbox = OutboxStore.shared
+    @State private var unread = ExchangeUnreadStore.shared
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -96,6 +97,12 @@ struct MainTabView: View {
                 ForEach(tabs.bottomTabs) { surface in
                     surface.screen
                         .tabItem { Label(surface.label, systemImage: surface.icon) }
+                        // How many conversations have something unread
+                        // (PARITY GAP 7) — THREADS, not messages; 0 draws no
+                        // badge. The web has none; the owner asked for one.
+                        // When Борса is not on the bar the app menu's row
+                        // carries the count instead.
+                        .badge(surface == .exchange ? unread.count : 0)
                 }
             }
         }
@@ -109,6 +116,10 @@ struct MainTabView: View {
                     await outbox.flush()
                     Task.detached { await OfflinePrefetch.warm() }
                 }
+                // The badge, on every return: a reply that came in while the
+                // phone was in a pocket is exactly what it is for. No push
+                // exists to say so sooner.
+                Task { await unread.refresh() }
             }
         }
         .task {
@@ -135,6 +146,9 @@ struct MainTabView: View {
                 if let me = await CurrentUserStore.shared.load() {
                     tabs.adopt(me.bottomTabOrder, isOperator: me.isOperator)
                 }
+                // AFTER the user resolves, so a MECHANISATOR — who has no
+                // Борса — is not sent to collect a 403 for a badge.
+                await unread.refresh()
             }
             await outbox.flush()
             // DETACHED, not awaited.
