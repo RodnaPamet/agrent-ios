@@ -68,6 +68,15 @@ targets:
         # a device build wants YOUR team rather than a value committed here.
         # Xcode → Signing & Capabilities → Team, then it persists locally.
         CODE_SIGN_STYLE: Automatic
+        # The web app's mark (agri-saas `public/icon.svg`, #223): the gold
+        # seedling over field furrows on the #0b1220 shell. Rendered at
+        # 1024 px with the SVG's own rounded corners removed and no alpha —
+        # iOS applies its own mask, and an icon with transparency is refused
+        # by App Store Connect. To regenerate after a rebrand:
+        #   sed 's/rx="112" //' icon.svg > sq.svg
+        #   rsvg-convert -w 1024 -h 1024 -b '#0b1220' sq.svg -o AppIcon-1024.png
+        # then strip alpha (sips round-trip through JPEG).
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
         # TWO MECHANISMS FOR ONE GUARANTEE, because they fail differently.
         #
