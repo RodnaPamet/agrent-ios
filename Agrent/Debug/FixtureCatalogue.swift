@@ -73,15 +73,14 @@ enum FixtureCatalogue {
     /// reason `fixtureLocationID` is; `FixtureSeamTests` holds them against
     /// the parcels file.
     ///
-    /// ── The ids carry `_`, and the app double-encodes it ──
+    /// ── The ids carry `_`, which is what found agrent-ios#122 ──
     ///
-    /// `FarmRiskAPI.analysisPath` escapes the id against `.alphanumerics`,
-    /// so `par_holes` becomes `par%5Fholes`, and `APIClient.url(for:)` then
-    /// assigns that to `URLComponents.path` — which encodes the `%` again.
-    /// The wire carries `par%255Fholes` and `url.path` decodes it back to
-    /// exactly the string the builder produced, so the key below matches.
-    /// Real parcel ids are alphanumeric and never meet this; a synthetic one
-    /// with an underscore is the only thing that does.
+    /// `analysisPath` used to escape `_` and `url(for:)` escaped the `%`
+    /// again, so the wire carried `par%255Fholes` while `url.path` decoded it
+    /// back to the builder's string and this table matched anyway — the seam
+    /// could not see the bug it was routing around. `_` now passes through
+    /// untouched, and `byPath` keys on the DECODED path (see `decodedPath`),
+    /// which is what `FixtureURLProtocol` compares against.
     static let fixtureRiskParcels: [(parcelID: String, fixture: String)] = [
         ("par_holes", "risk-analysis-holes"),
         ("par_simple", "risk-analysis-simple"),
@@ -137,7 +136,17 @@ enum FixtureCatalogue {
         (DashboardAPI.taskTrendPath(days: DashboardAPI.DefaultWindow.tasks), "dashboard-task-trend"),
         (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
-    ) { split($0).path }
+    ) { decodedPath(split($0).path) }
+
+    /// A builder's path as `url.path` will report it.
+    ///
+    /// Builders return the PERCENT-ENCODED path (`URLEscape`), and
+    /// `FixtureURLProtocol` looks up `url.path`, which is DECODED. For every id
+    /// the fixtures use today the two spellings are identical; decoding here
+    /// keeps them identical for an id that escapes to something else.
+    static func decodedPath(_ path: String) -> String {
+        path.removingPercentEncoding ?? path
+    }
 
     /// Every fixture the table can name, for the test that proves each one
     /// exists in the bundle and decodes.

@@ -700,14 +700,31 @@ actor APIClient {
     /// exactly right in a debugger. Only `absoluteString` or `.query` shows the
     /// damage, and `.query` is nil.
     ///
-    /// The query is taken VERBATIM, so a caller interpolating a value into it
-    /// owns percent-encoding that value.
-    private static func url(for pathAndQuery: String) throws -> URL {
+    /// BOTH halves are taken VERBATIM, so a caller interpolating a value into
+    /// either owns percent-encoding it — through `URLEscape`, once.
+    ///
+    /// The path used to go through `comps.path`, the ENCODING setter, while
+    /// the query went through the verbatim one. A builder that escaped its id
+    /// (as it must, or a `/` in the id is a new segment and a `?` is the split
+    /// below) was therefore escaped twice: `par_holes` reached the server as
+    /// `par%255Fholes` (agrent-ios#122). `url.path` decodes it back to the
+    /// builder's own string, which is why neither the debugger nor the
+    /// fixture seam ever showed it. `PathEncodingTests` reads the wire form.
+    ///
+    /// Validated first because the verbatim setters TRAP on a malformed
+    /// string rather than returning nil — see `URLEscape.isPercentEncoded`.
+    /// Before this, a raw space in a query was a crash; now it is `badURL`.
+    static func url(for pathAndQuery: String) throws -> URL {
         guard var comps = URLComponents(url: Config.baseURL, resolvingAgainstBaseURL: false)
         else { throw URLError(.badURL) }
         let parts = pathAndQuery.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-        comps.path = String(parts[0])
-        comps.percentEncodedQuery = parts.count > 1 && !parts[1].isEmpty ? String(parts[1]) : nil
+        let path = String(parts[0])
+        let query = parts.count > 1 && !parts[1].isEmpty ? String(parts[1]) : nil
+        guard URLEscape.isPercentEncoded(path, allowed: .urlPathAllowed),
+              query.map({ URLEscape.isPercentEncoded($0, allowed: .urlQueryAllowed) }) ?? true
+        else { throw URLError(.badURL) }
+        comps.percentEncodedPath = path
+        comps.percentEncodedQuery = query
         guard let url = comps.url else { throw URLError(.badURL) }
         return url
     }

@@ -48,7 +48,7 @@ enum ExchangeAPI {
     /// Measured: the detail route returns a FLAT listing object, identical in
     /// shape to one row of the list — no envelope, no extra fields. So it
     /// decodes as `ExchangeListing` and needs no type of its own.
-    static func listingPath(_ id: String) -> String { "\(base)/listings/\(id)" }
+    static func listingPath(_ id: String) -> String { "\(base)/listings/\(segment(id))" }
 
     static func decodeListings(from data: Data) async throws -> ExchangeListingPage {
         try await APIClient.shared.decode(data, as: ExchangeListingPage.self)
@@ -319,13 +319,12 @@ enum ExchangeAPI {
     /// An id as ONE path segment. Server ids are cuids and pass through
     /// unchanged; the escaping is so that an id that ever carried a `/` or a
     /// `?` could not move the request to a different route or start a query
-    /// — `APIClient.url(for:)` splits on the first `?`.
+    /// — `APIClient.url(for:)` splits on the first `?`. This used to be its
+    /// own escaper, and was double-encoded for exactly the characters it
+    /// escaped until `url(for:)` took the path verbatim (#122).
     private static func segment(_ id: String) -> String {
-        id.addingPercentEncoding(withAllowedCharacters: segmentAllowed) ?? id
+        URLEscape.segment(id)
     }
-
-    private static let segmentAllowed = CharacterSet.alphanumerics
-        .union(CharacterSet(charactersIn: "-._~"))
 
     private static func withQuery(_ path: String, _ items: [String?]) -> String {
         let present = items.compactMap { $0 }
@@ -456,8 +455,6 @@ struct ExchangeQuery: Equatable, Sendable {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        return trimmed.addingPercentEncoding(
-            withAllowedCharacters: .alphanumerics
-        )
+        return URLEscape.queryValue(trimmed)
     }
 }

@@ -91,10 +91,12 @@ enum FarmRiskAPI {
     /// `?parcelId=` and was moved before this app ever called it: Apple's
     /// CFNetwork writes full URLs to the unified log unsuppressably, so an
     /// id in a query string is an id in the device log.
+    ///
+    /// Escaped once, by `URLEscape.segment`. It was escaped against
+    /// `.alphanumerics` and then again by `url(for:)`, so `par_holes` went
+    /// out as `par%255Fholes` — agrent-ios#122.
     static func analysisPath(_ parcelID: String) -> String {
-        let escaped = parcelID.addingPercentEncoding(
-            withAllowedCharacters: .alphanumerics) ?? parcelID
-        return "\(base)/agro/parcels/\(escaped)/analysis"
+        "\(base)/agro/parcels/\(URLEscape.segment(parcelID))/analysis"
     }
 
     /// Which parcels have already been asked about.

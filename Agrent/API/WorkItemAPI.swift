@@ -31,7 +31,7 @@ enum WorkItemAPI {
     /// subsystems, and a path segment is as visible there as a query is, but
     /// this id is a task's own opaque identifier rather than anything about
     /// a person. The rule bites on `?assignee=` and filters, not here.
-    static func detailPath(_ id: String) -> String { "\(base)/\(id)" }
+    static func detailPath(_ id: String) -> String { "\(base)/\(URLEscape.segment(id))" }
 
     static func decodeDetail(from data: Data) async throws -> WorkItem {
         try await APIClient.shared.decode(data, as: WorkItem.self)
@@ -66,7 +66,7 @@ extension WorkItemAPI {
 
     /// `POST`, not `PATCH`, and its own path rather than a field on a
     /// general task update.
-    static func statusPath(_ id: String) -> String { "\(base)/\(id)/status" }
+    static func statusPath(_ id: String) -> String { "\(detailPath(id))/status" }
 
     /// Change a task's status.
     ///

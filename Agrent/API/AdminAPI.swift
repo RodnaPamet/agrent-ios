@@ -19,11 +19,11 @@ enum AdminAPI {
     static var invitePath: String { "\(base)/invites" }
 
     static func deactivatePath(_ membershipID: String) -> String {
-        "\(base)/members/\(membershipID)/deactivate"
+        "\(base)/members/\(URLEscape.segment(membershipID))/deactivate"
     }
 
     static func reactivatePath(_ membershipID: String) -> String {
-        "\(base)/members/\(membershipID)/reactivate"
+        "\(base)/members/\(URLEscape.segment(membershipID))/reactivate"
     }
 
     static func decodeMembers(from data: Data) async throws -> [Membership] {
