@@ -128,6 +128,10 @@ struct ConversationView: View {
                         }
                         .id(message.id)
                     }
+                    notices
+                    // The conversation's END — below the notices, so every
+                    // scroll to "the newest" also shows what state it is in.
+                    Color.clear.frame(height: 0).id(Self.end)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 12)
@@ -142,14 +146,70 @@ struct ConversationView: View {
             //
             // The first animation in this app, so it asks Reduce Motion
             // first: with it on, the list jumps instead of sliding.
+            //
+            // To `end`, not to the message itself: the notices sit after the
+            // newest message, and anchoring the message to the bottom edge
+            // would leave «блокирахте…» just out of sight under the composer.
             .onChange(of: store.messages.last?.id) { old, new in
-                guard let new else { return }
-                if old == nil || reduceMotion {
-                    proxy.scrollTo(new, anchor: .bottom)
-                } else {
-                    withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(new, anchor: .bottom) }
-                }
+                guard new != nil else { return }
+                scrollToEnd(proxy, animated: old != nil)
             }
+            // A notice that APPEARS — the farmer's own «Блокирай» or
+            // «Затвори» from the toolbar — is scrolled to, so it is seen and
+            // reached next by VoiceOver without hunting down the list.
+            .onChange(of: store.blocked) { scrollToEnd(proxy, animated: true) }
+            .onChange(of: store.closed) { scrollToEnd(proxy, animated: true) }
+        }
+    }
+
+    private static let end = "conversation-end"
+
+    private func scrollToEnd(_ proxy: ScrollViewProxy, animated: Bool) {
+        if animated && !reduceMotion {
+            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(Self.end, anchor: .bottom) }
+        } else {
+            proxy.scrollTo(Self.end, anchor: .bottom)
+        }
+    }
+
+    /// Closed and blocked, as the LAST LINES OF THE CONVERSATION — not pinned
+    /// above the composer (agrent-ios#124).
+    ///
+    /// Pinned, at AX5 the blocked sentence wrapped to seven lines and left
+    /// room for one message: the notice was eating the thing it annotates,
+    /// and nothing could scroll it away. In the list it scrolls like
+    /// everything else, at every size — one layout, not a size switch; at the
+    /// default size it still sits right above the composer, because a
+    /// conversation opens at its end.
+    ///
+    /// Why this and not a one-line summary with the full text for VoiceOver:
+    /// the house `RefusalNote` is the WHOLE sentence, shown — «why you cannot»
+    /// is the part a farmer needs, and a sighted farmer at AX5 is exactly who
+    /// would lose it to a truncation. The empty-conversation note already
+    /// lives in this list the same way, and a messenger's «You blocked this
+    /// contact» is a line in the thread, not a banner.
+    ///
+    /// Each note is still ONE element with its text as its label, so
+    /// VoiceOver reads it after the newest message, and there is no control
+    /// in it for Voice Control to lose. A STATE, not an error: never red.
+    /// Closed refuses nothing — it only tells the farmer that writing reopens
+    /// it.
+    @ViewBuilder
+    private var notices: some View {
+        if store.closed {
+            RefusalNote(
+                text: mayWrite
+                    ? "Този разговор е затворен. Изпращането на съобщение го отваря отново."
+                    : "Този разговор е затворен.",
+                icon: "checkmark.bubble"
+            )
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        if store.blocked {
+            RefusalNote(text: MessagingPolicy.blockedNotice(role: store.role), icon: "hand.raised")
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -224,27 +284,16 @@ struct ConversationView: View {
         .disabled(store.acting)
     }
 
-    // MARK: - Footer: notices and the composer
+    // MARK: - Footer: the composer
 
     /// Pinned under the messages, on the bar material, the house's place for
     /// a bottom-anchored action. It rises with the keyboard.
+    ///
+    /// Only what answers a tap stays here: a failed action or send is the
+    /// reply to something the farmer just did, and is short. The closed and
+    /// blocked STATES moved into the list — see `notices`.
     private var footer: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // A STATE, not an error: `RefusalNote`, never red. Closed refuses
-            // nothing — it only tells the farmer that writing reopens it.
-            if store.closed {
-                RefusalNote(
-                    text: mayWrite
-                        ? "Този разговор е затворен. Изпращането на съобщение го отваря отново."
-                        : "Този разговор е затворен.",
-                    icon: "checkmark.bubble"
-                )
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            if store.blocked {
-                RefusalNote(text: MessagingPolicy.blockedNotice(role: store.role), icon: "hand.raised")
-                    .fixedSize(horizontal: false, vertical: true)
-            }
             if let failure = store.actionFailure {
                 failureLine(failure)
             }

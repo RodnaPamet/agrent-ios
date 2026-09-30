@@ -127,8 +127,8 @@ enum MessagingPolicy {
         return ("\(length) / \(limit)", "\(length) от \(limit) знака", length > limit)
     }
 
-    /// The notice above the composer on a blocked conversation, by who is
-    /// reading it.
+    /// The notice at the end of a blocked conversation (after the newest
+    /// message since agrent-ios#124), by who is reading it.
     ///
     /// SIDE-NEUTRAL, where the web says «купувач» and «продавач»: the payload
     /// carries no listing side, and on a BUY listing the owner is the one
