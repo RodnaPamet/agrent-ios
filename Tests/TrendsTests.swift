@@ -283,6 +283,112 @@ final class SeriesVocabularyTests: XCTestCase {
     func testUnknownRegionsKeepTheirCode() {
         XCTAssertEqual(SeriesVocabulary.region("SK"), "SK")
     }
+
+    // MARK: - Units (#121)
+    //
+    // One assertion per shape agri-saas can store — see the table on
+    // `unitHeading`. None of them may say its currency twice, and none of
+    // the known ones may reach the screen in English.
+
+    private func heading(_ unit: String, _ currency: String) -> String {
+        SeriesVocabulary.unitHeading(unit: unit, currency: currency)
+    }
+
+    /// EC cereals and Barchart MATIF: `EUR/t`.
+    func testEuroPerTonne() {
+        XCTAssertEqual(heading("EUR/t", "EUR"), "евро на тон")
+    }
+
+    /// EC oilseeds and the own-listings median: `<CUR>/t`, the currency
+    /// resolved per member state. BGN is named; the rest keep their code
+    /// rather than a guessed Bulgarian name — but still lose the doubling.
+    func testNationalCurrencyPerTonne() {
+        XCTAssertEqual(heading("BGN/t", "BGN"), "лева на тон")
+        XCTAssertEqual(heading("RON/t", "RON"), "RON на тон")
+        XCTAssertEqual(heading("HUF/t", "HUF"), "HUF на тон")
+    }
+
+    /// THE ONE IN THE ISSUE. The Oil Bulletin's diesel unit carries EUR,
+    /// and Табло used to prefix the currency field to it anyway.
+    func testDieselPerThousandLitres() {
+        XCTAssertEqual(heading("EUR/1000l", "EUR"), "евро на 1000 литра")
+        // The bulletin's own cell spelling, and a manual entry in lev.
+        XCTAssertEqual(heading("EUR/1000 l", "EUR"), "евро на 1000 литра")
+        XCTAssertEqual(heading("BGN/1000l", "BGN"), "лева на 1000 литра")
+    }
+
+    /// World Bank Pink Sheet — urea and DAP. `mt` is metric tonnes; before
+    /// this it showed as «USD/mt» on a Bulgarian screen.
+    func testFertiliserPerMetricTonne() {
+        XCTAssertEqual(heading("USD/mt", "USD"), "долар на тон")
+    }
+
+    /// Alpha Vantage sends a phrase, and its client falls back to `USD/t`.
+    /// The server's own test fixture spells the phrase with the ISO code.
+    func testAlphaVantagePhrasesAndFallback() {
+        XCTAssertEqual(heading("dollar per metric ton", "USD"), "долар на тон")
+        XCTAssertEqual(heading("USD per metric ton", "USD"), "долар на тон")
+        XCTAssertEqual(heading("USD/t", "USD"), "долар на тон")
+    }
+
+    func testPerHundredKilograms() {
+        XCTAssertEqual(heading("EUR/100kg", "EUR"), "евро на 100 кг")
+    }
+
+    /// A bare measure (the app's own fixtures) takes the separate field.
+    func testABareMeasureTakesTheCurrencyField() {
+        XCTAssertEqual(heading("t", "EUR"), "евро на тон")
+        XCTAssertEqual(heading("1000l", "EUR"), "евро на 1000 литра")
+    }
+
+    /// Case is not meaning for an ISO code — a manual entry typed `eur/t`.
+    func testLowercaseCodesAreStillCodes() {
+        XCTAssertEqual(heading("eur/t", "EUR"), "евро на тон")
+    }
+
+    /// `USd` is US CENTS. Treating it as USD is a factor of a hundred, so a
+    /// mixed-case code is not parsed — it passes through as sent, and since
+    /// it contains the field's letters it is not suffixed with them either.
+    func testMinorUnitCodesAreNotReadAsTheCurrency() {
+        XCTAssertEqual(heading("USd/bu", "USD"), "USd/bu")
+        XCTAssertEqual(heading("USd/t", "USD"), "USd/t")
+    }
+
+    /// If the unit's currency and the field disagree, one of them is wrong
+    /// and nothing here knows which. Both are shown rather than one chosen.
+    func testADisagreeingCurrencyShowsBothAsSent() {
+        XCTAssertEqual(heading("BGN/t", "EUR"), "BGN/t · EUR")
+    }
+
+    /// Unknown measure: verbatim, currency added only when it is missing —
+    /// the doubling guard survives for units this does not recognise.
+    func testUnknownUnitsPassThroughWithoutDoubling() {
+        XCTAssertEqual(heading("MYR/bu", "MYR"), "MYR/bu")
+        XCTAssertEqual(heading("bu", "USD"), "bu · USD")
+        XCTAssertEqual(heading("head", "EUR"), "head · EUR")
+    }
+
+    /// Табло's headline goes through the same words. This is the string the
+    /// issue saw as «1216,62 EUR/EUR/1000l».
+    func testTheDashboardHeadlineDoesNotDoubleTheCurrency() throws {
+        func series(_ unit: String, _ currency: String) throws -> PriceSeries {
+            let json = """
+            {"source":"s","region":"BG","stage":null,"unit":"\(unit)",
+             "currency":"\(currency)","label":null,"lastObservedAt":null,"points":[]}
+            """
+            return try JSONDecoder().decode(PriceSeries.self, from: Data(json.utf8))
+        }
+        XCTAssertEqual(try series("EUR/1000l", "EUR").headline(1216.62),
+                       "\(Num.text(1216.62)) евро на 1000 литра")
+        XCTAssertEqual(try series("EUR/t", "EUR").headline(208.62), "208,62 евро на тон")
+        XCTAssertEqual(try series("t", "EUR").headline(208.62), "208,62 евро на тон")
+        // Urea on Табло: World Bank is its only source, so the headline is
+        // in dollars — and after a number Bulgarian counts in the plural.
+        XCTAssertEqual(try series("USD/mt", "USD").headline(512), "512 долара на тон")
+        XCTAssertEqual(try series("BGN/t", "BGN").headline(400), "400 лева на тон")
+        // An unrecognised unit is still not doubled in the headline.
+        XCTAssertEqual(try series("MYR/bu", "MYR").headline(9), "9 MYR/bu")
+    }
 }
 
 /// Default visibility, and the fact that it stops once the reader has an

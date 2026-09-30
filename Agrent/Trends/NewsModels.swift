@@ -121,7 +121,9 @@ enum SeriesVocabulary {
         }
     }
 
-    /// A chart heading a Bulgarian farmer can read.
+    /// A unit a Bulgarian farmer can read. Тенденции's chart heading, its
+    /// VoiceOver label and Табло's price headline all come through here, so
+    /// the screens cannot disagree about what a unit says.
     ///
     /// The feeds send the unit in English — `"dollar per metric ton"`,
     /// `"EUR/1000l"` — and the first build put it on screen verbatim above
@@ -131,22 +133,122 @@ enum SeriesVocabulary {
     ///
     /// Also drops the redundant currency. `"EUR/t · EUR"` says EUR twice,
     /// and the second one is the only part that was ever a separate field.
+    /// Табло interpolated `currency/unit` itself and got «EUR/EUR/1000l» for
+    /// diesel (#121) — the reason this is the ONE composer.
+    ///
+    /// Parsed by shape, not looked up: the server stores units "as reported,
+    /// never normalised" (agri-saas `market-manual.schemas.ts`) and the
+    /// currency half varies by member state. What production can send, per
+    /// agri-saas `src/lib/market/*` and `jobs/market-prices-pull.ts`:
+    ///
+    ///     EC cereals, Barchart        EUR/t
+    ///     EC oilseeds, own listings   <CUR>/t      BGN, RON, HUF, PLN …
+    ///     EC Oil Bulletin (diesel)    EUR/1000l
+    ///     World Bank (urea, DAP)      USD/mt
+    ///     Alpha Vantage               its own phrase ("dollar per metric
+    ///                                 ton"), or USD/t when it sends none
+    ///     admin manual entry          anything ≤ 32 chars, e.g. BGN/1000l
+    ///
+    /// plus a bare `"t"` (the app's fixtures), which takes its currency from
+    /// the separate field. The lookup table this replaced knew six spellings
+    /// and showed urea as «USD/mt» and Romanian rapeseed as «RON/t».
     static func unitHeading(unit: String, currency: String) -> String {
-        let known: [String: String] = [
-            "eur/t": "евро на тон",
-            "eur/1000l": "евро на 1000 литра",
-            "eur/100kg": "евро на 100 кг",
-            "dollar per metric ton": "долар на тон",
-            "usd/t": "долар на тон",
-            "bgn/t": "лева на тон",
-        ]
-        if let named = known[unit.lowercased()] { return named }
+        words(unit: unit, currency: currency, afterNumber: false)
+    }
+
+    /// The same words for after a price — «512 долара на тон», where the
+    /// heading says «долар на тон». Bulgarian counts in the plural and a
+    /// price is practically never exactly one, so this does not try to be
+    /// clever about «1 долар».
+    static func priceUnit(unit: String, currency: String) -> String {
+        words(unit: unit, currency: currency, afterNumber: true)
+    }
+
+    private static func words(unit: String, currency: String, afterNumber: Bool) -> String {
+        let field = currency.uppercased()
+        if let shape = UnitShape(unit), let measure = measures[shape.measure] {
+            // A unit whose OWN currency disagrees with the field means the
+            // price is in one of them and nothing here can say which — so
+            // it falls through to showing both as sent rather than picking.
+            if shape.currency == nil || shape.currency == field {
+                let name = currencyName(shape.currency ?? field, afterNumber: afterNumber)
+                return "\(name) на \(measure)"
+            }
+        }
         // Unknown unit: show it as sent, with the currency, because an
         // invented translation of a unit is a claim about what is being
         // measured. Same rule as an unrecognised stage.
         return unit.localizedCaseInsensitiveContains(currency)
             ? unit
             : "\(unit) · \(currency)"
+    }
+
+    /// Keyed by the measure lowercased with spaces removed: the bulletin's
+    /// own cell reads `1000 l`, the stored unit `1000l`.
+    private static let measures: [String: String] = [
+        "t": "тон",
+        "mt": "тон",
+        "ton": "тон",
+        "tonne": "тон",
+        "metricton": "тон",
+        "1000l": "1000 литра",
+        "100kg": "100 кг",
+    ]
+
+    /// «долар на тон», «лева на тон» — the wording the old table set for a
+    /// heading. Only the dollar changes after a number: «евро» does not
+    /// inflect and «лева» already is the counting form (the table used it
+    /// for the heading too, and it stays for parity).
+    /// A currency without a Bulgarian name here keeps its ISO code: «RON на
+    /// тон» is neutral, a guessed «леи» is a claim (same rule as `region`).
+    private static func currencyName(_ code: String, afterNumber: Bool) -> String {
+        switch code {
+        case "EUR": "евро"
+        case "USD": afterNumber ? "долара" : "долар"
+        case "BGN": "лева"
+        default: code
+        }
+    }
+
+    /// `<currency>/<measure>`, `<currency> per <measure>`, or a bare measure.
+    private struct UnitShape {
+        /// ISO code, uppercased; nil when the unit carries none.
+        let currency: String?
+        /// Lowercased, spaces removed — the `measures` key.
+        let measure: String
+
+        init?(_ raw: String) {
+            let trimmed = raw.trimmingCharacters(in: .whitespaces)
+            let head: Substring?
+            let tail: Substring
+            if let slash = trimmed.firstIndex(of: "/") {
+                head = trimmed[..<slash]
+                tail = trimmed[trimmed.index(after: slash)...]
+            } else if let per = trimmed.range(of: " per ", options: .caseInsensitive) {
+                head = trimmed[..<per.lowerBound]
+                tail = trimmed[per.upperBound...]
+            } else {
+                head = nil
+                tail = Substring(trimmed)
+            }
+            measure = tail.lowercased().replacingOccurrences(of: " ", with: "")
+            guard let head else { currency = nil; return }
+            let token = head.trimmingCharacters(in: .whitespaces)
+            switch token.lowercased() {
+            case "dollar", "dollars", "us dollar", "$": currency = "USD"
+            case "euro", "euros", "€": currency = "EUR"
+            default:
+                // Mixed case is the market convention for MINOR units —
+                // `USd/bu` is US CENTS a bushel (commented out in agri-saas
+                // `barchart-client.ts`, one uncomment from production).
+                // Reading it as USD would be off by a hundred, so only an
+                // all-upper or all-lower code counts as a currency.
+                guard token.count == 3, token.allSatisfy(\.isLetter),
+                      token == token.uppercased() || token == token.lowercased()
+                else { return nil }
+                currency = token.uppercased()
+            }
+        }
     }
 
     static func region(_ raw: String) -> String {
