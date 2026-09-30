@@ -359,6 +359,7 @@ struct ExchangeSectionPicker: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityDifferentiateWithoutColor) private var withoutColor
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         if typeSize.isAccessibilitySize {
@@ -376,19 +377,55 @@ struct ExchangeSectionPicker: View {
         }
     }
 
+    /// ── The selected chip is always the one you can read (agrent-ios#124) ──
+    ///
+    /// A row that scrolls hides whatever is past its edge, and on a 402pt
+    /// phone that was «Съобщения» — the LAST chip, so the section the farmer
+    /// had just chosen sat clipped at «Съобщ…». So the row brings the
+    /// selection into view itself, at three moments:
+    ///
+    ///   - on appear: the picker is REBUILT whenever Борса leaves or enters
+    ///     the searchable «Обяви» branch, and a fresh row starts at its left
+    ///     edge whatever is selected;
+    ///   - on a selection change: a tap on a half-visible chip, or Voice
+    ///     Control's «Съобщения», which selects without scrolling anything;
+    ///   - on an unread change: «Съобщения» grows to «Съобщения (3)» when the
+    ///     count lands — AFTER the row appeared — and pushes its own end out.
+    ///
+    /// `anchor: nil`: `ScrollViewReader` then scrolls the LEAST that makes
+    /// the chip fully visible, so choosing a chip already on screen does not
+    /// jolt the row. (`scrollPosition(id:)` is iOS 17 too, but it aligns to
+    /// an edge; nothing here is from iOS 18 — the target is 17.)
+    ///
+    /// Reduce Motion: the conversation's rule — with it on, the row jumps.
+    /// The appear and the count are never animated: those are where the row
+    /// STARTS, not a movement the farmer caused.
     private var chips: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                ForEach(ExchangeView.Tab.allCases) { tab in
-                    chip(tab)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(ExchangeView.Tab.allCases) { tab in
+                        chip(tab).id(tab)
+                    }
                 }
+                .padding(.vertical, 2)
             }
-            .padding(.vertical, 2)
+            .onAppear { reveal(selection, proxy, animated: false) }
+            .onChange(of: selection) { _, new in reveal(new, proxy, animated: true) }
+            .onChange(of: unread) { reveal(selection, proxy, animated: false) }
         }
         .scrollIndicators(.hidden)
         // One container of buttons for VoiceOver, named as the picker was.
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Изглед")
+    }
+
+    private func reveal(_ tab: ExchangeView.Tab, _ proxy: ScrollViewProxy, animated: Bool) {
+        if animated && !reduceMotion {
+            withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(tab, anchor: nil) }
+        } else {
+            proxy.scrollTo(tab, anchor: nil)
+        }
     }
 
     private func chip(_ tab: ExchangeView.Tab) -> some View {
