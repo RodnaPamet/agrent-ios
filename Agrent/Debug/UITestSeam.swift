@@ -5,8 +5,11 @@ import Foundation
 ///
 /// ── What it is for, and what it is NOT ──
 ///
-/// `A11yShots/A11yShotsTests.swift` photographs real screens. It can only do
-/// that on a simulator somebody has already signed in on, because the app
+/// `A11yShots/A11yShotsTests.swift` photographs real screens, and since
+/// agrent-ios#115 it does so THROUGH this seam: it launches with
+/// `launchArgument` and every capture is a render of `Tests/Fixtures`. Before
+/// that it could only run on a simulator somebody had already signed in on,
+/// against production, because the app
 /// opens on `SignInView` unless `TokenStore.load()` finds tokens
 /// (`AgrentApp.swift`), and sign-in runs through `ASWebAuthenticationSession`
 /// against Google. A GitHub runner's simulator is new every run, so its
@@ -63,11 +66,15 @@ import Foundation
 /// was the reason for `stubTokens` rather than planting a token), so the
 /// session itself survives; the cache does not.
 enum UITestSeam {
-    /// The token `A11yShotsTests` would add to `app.launchArguments`.
+    /// The token `A11yShotsTests` adds to `app.launchArguments`.
     ///
-    /// Spelled once, here, and read by the CI guard as well as by the app —
-    /// a launch argument that exists as two string literals is a launch
-    /// argument that will eventually be two different strings.
+    /// Spelled once in the app, here, and read by the CI guard as well — a
+    /// launch argument that exists as two string literals is a launch
+    /// argument that will eventually be two different strings. The ONE copy
+    /// is `A11yShotsTests.seamArgument`, because a UI test target runs in its
+    /// own process and cannot link the app; it points back here, and a
+    /// mismatch fails that suite at its first assertion (the app would open
+    /// on `SignInView`).
     static let launchArgument = "AGRENT_UITEST_FIXTURES"
 
     /// Resolved ONCE, at first use, from the argument vector this process was

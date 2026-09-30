@@ -1,0 +1,14 @@
+{
+  "parcelId": "par_nogeom",
+  "name": "SYNTH-3",
+  "areaHa": 5.0,
+  "cropType": "Maize",
+  "configured": true,
+  "ndvi": null,
+  "ndmi": null,
+  "vegetation": "unknown",
+  "moisture": "unknown",
+  "overall": "unknown",
+  "acquiredDate": null,
+  "generatedAt": "2026-09-29T06:00:00.000Z"
+}

@@ -23,35 +23,52 @@ import XCTest
 /// which it cannot is written out in a comment on that issue — `gh issue view
 /// 97 --comments` — rather than in a document that lives outside the repo.
 ///
-/// ── Why this reaches anything at all, and the day it stops ──
+/// ── What it photographs: FIXTURES, not the farm (agrent-ios#115) ──
 ///
-/// The app opens on `SignInView` unless `TokenStore.load()` finds tokens in
-/// the Keychain (`AgrentApp.swift`), and there is NO test seam: a grep for
-/// `ProcessInfo`, launch arguments or a stubbed `AuthClient` across
-/// `Agrent/` and `Tests/` returns nothing. So this suite does not sign in.
-/// It relies on the simulator it runs against ALREADY holding a valid token,
-/// which the one on this machine does — verified 2026-09-26 by the app
-/// writing six fresh files into `Library/Caches/ResponseCache` within seconds
-/// of launch, i.e. by authenticated fetches against production succeeding.
+/// The app is launched with `AGRENT_UITEST_FIXTURES`, the DEBUG-only seam in
+/// `Agrent/Debug/UITestSeam.swift`. Under it the app skips `SignInView`,
+/// hands `APIClient` stub tokens that never leave the process, and
+/// `FixtureURLProtocol` answers every GET from `Tests/Fixtures` and every
+/// write with `501 WRITE_REFUSED` — before URLSession opens a socket.
 ///
-/// That makes this reproducible on this machine and NOT on CI, where the
-/// simulator is new every run. `assertSignedIn` fails with that sentence
-/// rather than photographing a sign-in screen and calling it coverage.
+/// Until #115 this suite had no seam. It launched bare, relied on the
+/// simulator's Keychain already holding the owner's token, and every capture
+/// was a live read of the production tenant. That had two costs, and the
+/// second is why it changed:
 ///
-/// ── Read-only, deliberately ──
+///   1. It needed a simulator somebody had signed in on, so it could not run
+///      anywhere else — a precondition this file used to fail loudly on.
+///   2. It could not photograph MESSAGING at all. Opening a conversation
+///      POSTs a mark-read that another farm sees, and a stray tap on
+///      «Съобщение до продавача» opens a thread in another farm's inbox. A
+///      read-only suite against production had to stay out of those screens.
 ///
-/// Everything here taps tab bar buttons and list rows, which are GETs against
-/// the owner's production tenant. Nothing taps «Нов запис», a save, a send or
-/// anything else that writes, and nothing should be added that does: this
-/// runs against the real farm's real data, not a fixture.
+/// The trade the owner accepted: the screenshots are now renders of
+/// SYNTHETIC payloads of the right shape. They evidence layout, contrast and
+/// Dynamic Type; they are no longer evidence of what the live tenant holds.
+/// The #97 coverage comment says which checklist items that changes.
 ///
-/// The screenshots therefore contain real locations, real parcel names and
-/// real boundaries. `scripts/a11y-shots.sh` writes them outside the
-/// repository for that reason. They must not be committed — this repo is
-/// public, and `Tests/Fixtures/README.md` records that publishing the real
-/// geometry is the owner's decision and the default is no.
+/// ── Read-only, STILL, even though nothing could land ──
+///
+/// Every write is refused by the seam, so a mistaken tap here would reach
+/// nothing. The suite still taps no save, send, close, block, retract,
+/// «Изпрати» or «Съобщение до …», and nothing should be added that does: a
+/// suite whose safety is ONE mechanism is a suite that becomes unsafe the day
+/// somebody runs it with that mechanism off. `assertSeamActive` is the check
+/// that it is on.
+///
+/// Output still goes outside the repository (`scripts/a11y-shots.sh`), now
+/// for tidiness rather than secrecy: the captures carry only fixture data,
+/// plus Apple's satellite imagery of the fixture's made-up coordinates.
 @MainActor
 final class A11yShotsTests: XCTestCase {
+
+    /// `UITestSeam.launchArgument`, COPIED — the one place it is.
+    ///
+    /// A UI test bundle runs in its own process and cannot link the app, so
+    /// it cannot read the constant. If the two ever disagree the app opens on
+    /// `SignInView`, and `assertSeamActive` fails naming this property.
+    private static let seamArgument = "AGRENT_UITEST_FIXTURES"
 
     /// A failed step leaves the app on an unknown screen, and the screenshots
     /// taken after it would be of that screen under the previous one's name.
@@ -65,15 +82,30 @@ final class A11yShotsTests: XCTestCase {
     /// once per SETTING. Three test methods would pay it per screen as well.
     func testCaptureTheScreensThatCarryTheChecklist() {
         let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        // TABLO'S BLOCKS, PINNED — in the argument domain, which is volatile.
+        //
+        // `DashboardPreferences` reads `dashboard.blocks` from UserDefaults,
+        // and the simulator keeps whatever somebody last chose in the picker.
+        // The first seam run photographed «Последни записи» and «Моите задачи»
+        // only — no briefing, no price chart, no task-trend chart — so the
+        // chart-legend and Bulgarian-axis items #97 settles from this capture
+        // were not on it. `-key value` puts the four default blocks in
+        // NSArgumentDomain for THIS process only: nothing is written to the
+        // app's defaults, and the next manual launch sees the owner's choice.
+        // Spelled as `DashboardBlock.defaultOrder`'s raw values, copied for
+        // the same can-not-link reason as `seamArgument`.
+        app.launchArguments += ["-dashboard.blocks", "(briefing, grainPrice, journal, taskTrend)"]
         app.launch()
 
-        assertSignedIn(app)
+        assertSeamActive(app)
 
         // Дневник, the launch screen. #97 asks whether a list row stacks at
         // AX sizes and whether the `·` between the values disappears with it;
         // this row is `JournalRow` → `AdaptiveRow` → `MetaRow`, the exact
         // shape PR #93 changed.
         capture("01-journal", app: app)
+        assertFixtureWorld(app)
 
         // ── The screens reached from the menu, done BEFORE Локации ──
         //
@@ -100,7 +132,10 @@ final class A11yShotsTests: XCTestCase {
         // "no Задачи button" for a farm that simply arranged its bar
         // differently.
         captureTabOrMenu("08-tasks", label: "Задачи", app: app)
-        captureTabOrMenu("09-exchange", label: "Борса", app: app)
+
+        // Борса, and from it the messaging screens #114 built and #115 made
+        // photographable. Its own method because it goes four screens deep.
+        captureExchangeAndMessaging(app)
 
         // Локации → a location's map: the one #97 calls "the one that matters
         // most", because Increase Contrast is what switches the near-solid
@@ -109,38 +144,32 @@ final class A11yShotsTests: XCTestCase {
                       "no «Локации» button in the tab bar")
         app.tabBars.buttons["Локации"].tap()
 
-        // 20 seconds because the list is a network read and `APIClient` gives
-        // a request 15 of them before it fails (APIClient.swift, the
-        // `timeoutIntervalForRequest = 15` note). A shorter wait here would
-        // report "no locations" for what is actually a slow answer.
+        // A fixture answers in milliseconds, so this wait is for the push and
+        // the first layout rather than a network. Kept at 20s anyway: it
+        // costs nothing on a pass, and a first launch on a cold simulator is
+        // slower than anyone expects.
         XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20),
-                      "Локации showed no rows within 20s — signed in, but the list did not load")
+                      "Локации showed no rows within 20s — locations-list.json did not load")
         capture("02-locations", app: app)
 
-        // WHICH LOCATION IS A CHOICE, and the default is the wrong one for the
-        // item that matters. On this tenant row 0 is «Sample field» — three
-        // parcels that project to one overlapping square — and row 1 is the
-        // owner's own farm, whose four fields are what #93 measured the label
-        // contrast against. Row 0 stays the default because it is the one row a
-        // non-empty list is guaranteed to have; `ROW=1 scripts/a11y-shots.sh`
-        // photographs the real farm instead.
-        let rows = app.cells
-        guard locationRow < rows.count else {
-            XCTFail("Локации has \(rows.count) rows; A11Y_LOCATION_ROW=\(locationRow) is out of range")
-            return
-        }
-        rows.element(boundBy: locationRow).tap()
+        // THE ONE LOCATION. `locations-list.json` holds exactly one —
+        // «Synthetic Land», three parcels: one with four holes, one plain, one
+        // with no geometry. There used to be a `ROW=` knob here to pick the
+        // owner's real farm over a sample field on the live tenant; in the
+        // fixture world there is nothing to pick between, so it is gone.
+        app.cells.firstMatch.tap()
 
         // There is no element to wait on inside either map — the satellite
         // modes are a MapKit view and the schematic is a `Canvas`, and both
         // are one opaque rectangle. The navigation bar's back button is the
-        // closest thing to a signal that the push completed, and then the
-        // parcels still have to arrive over the network.
+        // closest thing to a signal that the push completed. The parcels come
+        // from a fixture, but the SATELLITE tiles are still Apple's, fetched by
+        // MapKit outside the seam (see `FixtureURLProtocol`'s header).
         XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 20),
                       "the location did not push a screen")
         // A fixed wait, and it is a guess rather than a measurement: nothing
-        // published by the map says "the parcels are drawn". If a capture
-        // comes out empty this is the number to raise.
+        // published by the map says "the tiles are drawn". If a capture
+        // comes out blank this is the number to raise.
         Thread.sleep(forTimeInterval: 6)
         capture("03-parcel-map-precise", app: app)
 
@@ -228,11 +257,13 @@ final class A11yShotsTests: XCTestCase {
     ///
     /// `AppMenuButton` lists the overflow surfaces, then Админ, then a
     /// destructive «Изход» that calls `auth.signOut()` — which clears the
-    /// Keychain. This suite runs against a simulator somebody has SIGNED IN ON,
-    /// without the DEBUG seam, so a mis-tap there would destroy a real Google
-    /// session and every subsequent capture would be of `SignInView`.
+    /// Keychain. Under the seam `AuthClient.signOut` does less (see the note
+    /// on `AgrentApp.openingState`), but the simulator this runs on may well
+    /// be the owner's, holding a real Google session in that Keychain, and a
+    /// guard that relies on the seam being on is a guard that fails exactly
+    /// when the seam is not.
     ///
-    /// Every lookup below is by exact label. There is no `element(boundBy:)`
+    /// Every lookup below is by label. There is no `element(boundBy:)`
     /// anywhere in this file's menu handling, and there must not be.
     private func openMenu(_ app: XCUIApplication) -> Bool {
         let menu = app.buttons["Меню"]
@@ -251,10 +282,26 @@ final class A11yShotsTests: XCTestCase {
             XCTFail("this suite must never tap «Изход» — it would clear the Keychain")
             return false
         }
-        let row = app.buttons[label]
+        let row = labelled(label, in: app.buttons)
         guard row.waitForExistence(timeout: 5) else { return false }
         row.tap()
         return true
+    }
+
+    /// The button whose label IS `label`, or is `label` followed by a
+    /// counted suffix — «Борса (2)».
+    ///
+    /// `MessagingPolicy.counted` appends « (N)» to Борса's menu row and to
+    /// the «Съобщения» segment whenever a thread is unread, and
+    /// `exchange-threads.json` has two unread on purpose. An exact match would
+    /// find nothing; a bare BEGINSWITH would let «Борса» match a hypothetical
+    /// «Борсата …» row. So: exact, or exact plus « (».
+    ///
+    /// Still never «Изход»: nothing starts with a label that could be it.
+    private func labelled(_ label: String, in query: XCUIElementQuery) -> XCUIElement {
+        query.matching(NSPredicate(
+            format: "label == %@ OR label BEGINSWITH %@", label, "\(label) ("
+        )).firstMatch
     }
 
     /// Open a menu-presented screen, photograph it, and put it back.
@@ -277,7 +324,7 @@ final class A11yShotsTests: XCTestCase {
 
     /// A surface that is normally a tab, but need not be.
     private func captureTabOrMenu(_ name: String, label: String, app: XCUIApplication) {
-        let tab = app.tabBars.buttons[label]
+        let tab = labelled(label, in: app.tabBars.buttons)
         if tab.waitForExistence(timeout: 3) {
             tab.tap()
             XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20),
@@ -291,12 +338,180 @@ final class A11yShotsTests: XCTestCase {
         captureFromMenu(name, label: label, app: app)
     }
 
-    /// ТАБЛО HAS NO DISMISS BUTTON, which is why this is not just a tap.
+    // MARK: - Борса and messaging (agrent-ios#115)
+
+    /// Борса, a listing that is not ours, the inbox, and one conversation.
     ///
-    /// `DashboardView` has no «Затвори» and no `dismiss` of its own — the only
-    /// `@Environment(\.dismiss)` in that file belongs to `DashboardBlockPicker`.
-    /// So a sheet showing it can only be left by dragging it down. The other
-    /// five all have «Затвори» in the leading slot.
+    /// ── Why this could not exist before the seam ──
+    ///
+    /// Opening a conversation fires `POST /exchange/threads/{id}/read`, which
+    /// the other farm's members see as their message having been read. Against
+    /// production that is a write from a suite that promises none. Under the
+    /// seam it is answered `501 WRITE_REFUSED` inside the process and
+    /// `ConversationStore` swallows it, as it must for a real outage.
+    ///
+    /// ── What is NOT tapped, and must never be ──
+    ///
+    /// «Съобщение до продавача» (POSTs open-thread), «Изпрати» on the listing
+    /// (opens the inquiry composer, whose own «Изпрати» POSTs), the composer's
+    /// send, and «Действия» (close, block, unblock). Each is photographed
+    /// where it is visible and left alone. The seam would refuse all of them;
+    /// the suite does not rely on that.
+    ///
+    /// ── Which rows, and why by label ──
+    ///
+    /// The listing is `exchange-listings.json` row 1, the synthetic SUNFLOWER
+    /// one, because row 0 is `isOwn` and an own listing offers no «Съобщение
+    /// до …» at all. The conversation is `thr_synthetic_1`, the only thread
+    /// `FixtureCatalogue` serves, found by its seller name — the only inbox row
+    /// that has one. Tapping row 2 or 3 would open a `NO_FIXTURE` screen.
+    private func captureExchangeAndMessaging(_ app: XCUIApplication) {
+        // A tab by default (the bar comes from `auth-me.json`'s null
+        // `bottomTabOrder`, i.e. the default five), a menu row otherwise.
+        // Either way it may read «Борса (2)».
+        let tab = labelled("Борса", in: app.tabBars.buttons)
+        let isTab = tab.waitForExistence(timeout: 3)
+        if isTab {
+            tab.tap()
+        } else {
+            XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Борса")
+            XCTAssertTrue(tapMenuRow("Борса", in: app), "«Борса» is neither a tab nor a menu row")
+        }
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20),
+                      "Борса showed nothing")
+        Thread.sleep(forTimeInterval: 3)
+        capture("09-exchange", app: app)
+
+        captureListingWithMessageParty(app)
+        captureInboxAndConversation(app)
+
+        // Back to the launch tab WITHOUT popping the conversation. The way
+        // back is a navigation bar that also holds «Действия», and the one
+        // safe tap there is the one that is not needed: switching tabs leaves
+        // Борса's stack where it is and nothing below revisits it.
+        //
+        // As a menu SHEET it is different: switching tabs is impossible under
+        // a sheet, and #120's «Затвори» sits on the sheet's ROOT only. So pop
+        // once — `goBack` finds the back button by label and cannot land on
+        // «Действия» — and then close from the root.
+        if isTab {
+            app.tabBars.buttons["Дневник"].tap()
+        } else {
+            goBack(app, to: "Борса")
+            dismissSheet(app, named: "Борса")
+        }
+    }
+
+    /// The listing detail with «Съобщение до продавача» on it — photographed,
+    /// never tapped.
+    private func captureListingWithMessageParty(_ app: XCUIApplication) {
+        // The row's combined label is `A11y.sentence([crop, side, region])`, so
+        // it BEGINS with the crop. `.any` because a SwiftUI List row is not
+        // reliably a `.cell` with its label — see the Админ note below, where
+        // assuming so photographed the wrong row.
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Слънчоглед"))
+            .firstMatch
+        guard reveal(row, in: app, what: "the synthetic «Слънчоглед» listing") else { return }
+        row.tap()
+
+        let messageParty = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Съобщение до"))
+            .firstMatch
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 10),
+                      "the listing did not push a screen")
+        if reveal(messageParty, in: app, what: "«Съобщение до продавача»") {
+            capture("13-listing-message-party", app: app)
+        }
+        goBack(app, to: "Борса")
+    }
+
+    /// «Съобщения» → the inbox → `thr_synthetic_1`.
+    private func captureInboxAndConversation(_ app: XCUIApplication) {
+        // A segment «Съобщения (2)» when four fit, a chip «Съобщения» (count
+        // in its VALUE) when they do not or at an accessibility size —
+        // `ExchangeSectionPicker`. `labelled` answers both.
+        let section = labelled("Съобщения", in: app.buttons)
+        XCTAssertTrue(section.waitForExistence(timeout: 10),
+                      "no «Съобщения» segment or chip on Борса")
+        section.tap()
+
+        let thread = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Синтетично стопанство"))
+            .firstMatch
+        XCTAssertTrue(thread.waitForExistence(timeout: 10),
+                      "the inbox did not show thr_synthetic_1 — exchange-threads.json did not load")
+        Thread.sleep(forTimeInterval: 1)
+        capture("14-messages-inbox", app: app)
+
+        guard reveal(thread, in: app, what: "the thr_synthetic_1 inbox row") else { return }
+        thread.tap()
+
+        // The tombstone is the one message whose label is known in advance
+        // and unique to the conversation, so its arrival means the page
+        // decoded — not merely that a screen was pushed.
+        let tombstone = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Съобщението е премахнато"))
+            .firstMatch
+        XCTAssertTrue(tombstone.waitForExistence(timeout: 10),
+                      "the conversation did not render exchange-thread.json")
+        // Long enough for the mark-read POST to be refused and swallowed, so
+        // the capture is of the settled screen rather than of one mid-write.
+        Thread.sleep(forTimeInterval: 2)
+        capture("15-conversation", app: app)
+    }
+
+    /// Scroll until `element` is on screen, or say why not.
+    ///
+    /// At AX5 a list row can be several screens down and SwiftUI's `List` does
+    /// not create a row that far below the fold, so "does not exist" can mean
+    /// "not scrolled to yet". Six swipes — three was measured too few for the
+    /// listing detail's last section at AX5 — then a verdict: at an
+    /// ACCESSIBILITY size a miss is printed and the capture skipped — the
+    /// lesson the Админ swipe taught, where one unreachable row cost a whole
+    /// variant its screenshots — and at any other size it is a failure,
+    /// because there the screen fits and a miss is a real regression.
+    ///
+    /// A swipe is safe here in a way it was not on Админ: nothing on these
+    /// screens has a swipe action.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, what: String) -> Bool {
+        _ = element.waitForExistence(timeout: 5)
+        for _ in 0..<6 where !(element.exists && element.isHittable) {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1)
+        }
+        if element.exists && element.isHittable { return true }
+        if UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory {
+            print("SKIPPED \(what): not reachable at this text size after six swipes.")
+        } else {
+            XCTFail("\(what) is not on screen at a non-accessibility text size")
+        }
+        return false
+    }
+
+    /// Pop one screen by the back button, found by the title it returns to.
+    ///
+    /// NOT `navigationBars.buttons.firstMatch`: the conversation's bar also
+    /// holds «Действия», and on this screen the only thing a mis-tap could
+    /// open is a menu of writes. «Back» is the fallback the system uses when
+    /// the title does not fit.
+    private func goBack(_ app: XCUIApplication, to title: String) {
+        let back = app.navigationBars.buttons
+            .matching(NSPredicate(format: "label == %@ OR label == %@ OR label == %@",
+                                  title, "Back", "Назад"))
+            .firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "no back button to «\(title)»")
+        back.tap()
+        Thread.sleep(forTimeInterval: 1)
+    }
+
+    /// «Затвори» when there is one, a drag when there is not.
+    ///
+    /// Since #120 every surface the menu presents gets «Затвори» from the
+    /// presentation site (`closeWhenPresentedFromMenu`), Табло included — it
+    /// used to have none, which is why this fallback exists. The drag stays
+    /// for the case #120 does not cover: a screen PUSHED inside a menu sheet
+    /// (a conversation inside a Борса sheet) has a back button, not «Затвори».
     ///
     /// Tries the button first and falls back to the drag, rather than choosing
     /// per screen: one path that works for both is less to keep true than a
@@ -401,12 +616,21 @@ final class A11yShotsTests: XCTestCase {
         // So: scroll toward them first, and if they are still not reachable,
         // skip the swipe pair and say so. The #99 assertions run at the other
         // three sizes, and what AX5 is FOR is the layout capture above.
-        app.swipeUp()
-        Thread.sleep(forTimeInterval: 1)
-
+        //
+        // ONLY IF NEEDED. The unconditional swipe this used to be was tuned
+        // to the live tenant, whose member rows started lower. On the fixture
+        // (`admin-members.json`, four rows under an «Поканен» section) the
+        // owner is mid-screen at the default size, and a blind swipe scrolled
+        // it up under the navigation bar — unhittable, so the #99 pair was
+        // skipped at the one size where it must run. Measured on the first
+        // seam run, 2026-09-30.
         let ownerRow = app.descendants(matching: .other)
             .matching(NSPredicate(format: "label CONTAINS %@", "Собственик"))
             .firstMatch
+        if !(ownerRow.waitForExistence(timeout: 5) && ownerRow.isHittable) {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1)
+        }
         guard ownerRow.waitForExistence(timeout: 10), ownerRow.isHittable else {
             // NOT silent. The variant's output is short two files and this says
             // why, so a reader comparing directories is not left guessing.
@@ -472,42 +696,58 @@ final class A11yShotsTests: XCTestCase {
 
     // MARK: - helpers
 
-    /// Which row of Локации to open, from `A11Y_LOCATION_ROW`.
+    /// The seam is ON — checked from what is on screen, since this process
+    /// cannot read the app's `UITestSeam.isActive`.
     ///
-    /// `xcodebuild` passes an environment variable through to the test runner
-    /// when it is prefixed `TEST_RUNNER_`, and strips the prefix on the way in
-    /// — so `TEST_RUNNER_A11Y_LOCATION_ROW=1 xcodebuild test …` arrives here as
-    /// `A11Y_LOCATION_ROW`. That is the only channel: the runner is a separate
-    /// process, so a `-` launch argument would reach the app under test and not
-    /// this code.
+    /// Two signals, because each alone is ambiguous:
     ///
-    /// An unparseable value falls back to 0 rather than failing, because the
-    /// suite's job is screenshots and the row is a preference.
-    private var locationRow: Int {
-        ProcessInfo.processInfo.environment["A11Y_LOCATION_ROW"].flatMap(Int.init) ?? 0
-    }
-
-    /// Names the blocker in one sentence instead of letting the suite
-    /// photograph `SignInView` three times and look green.
-    private func assertSignedIn(_ app: XCUIApplication) {
-        let signInButton = app.buttons["Вход"]
-        // A short wait ON PURPOSE. `SignInView` is what the app shows while
-        // it is NOT signed in, so its appearance is the thing being ruled
-        // out; waiting 10 seconds for it would just slow every green run.
-        if signInButton.waitForExistence(timeout: 3) {
+    ///   1. NOT `SignInView`. Under the seam `AgrentApp.openingState` is
+    ///      `.signedIn` whatever the Keychain holds, so «Вход» on screen means
+    ///      the argument did not arrive — most likely `seamArgument` has
+    ///      drifted from `UITestSeam.launchArgument`.
+    ///   2. The FIXTURE journal. A simulator that happens to hold the owner's
+    ///      real token would pass (1) with the seam OFF and photograph
+    ///      production — the exact thing #115 moved away from. `journal-list.
+    ///      json` carries a type this build does not know, rendered «Друг вид»,
+    ///      which the live tenant's journal does not contain. Seeing it is the
+    ///      evidence this is the fixture world.
+    private func assertSeamActive(_ app: XCUIApplication) {
+        // A short wait ON PURPOSE: the thing being ruled out.
+        if app.buttons["Вход"].waitForExistence(timeout: 3) {
             XCTFail("""
-            The app is on SignInView, so nothing behind auth can be captured.
+            The app is on SignInView, so the UI test seam is OFF.
 
-            This suite does not sign in and cannot: sign-in runs through \
-            ASWebAuthenticationSession against Google, and the app has no test \
-            seam — no launch argument, no stubbed AuthClient, no fixture-backed \
-            client. It needs a simulator whose Keychain already holds a valid \
-            token. Adding a seam is an app change with its own risk and is the \
-            owner's call, not this suite's.
+            This suite launches with `\(Self.seamArgument)`, which must equal \
+            `UITestSeam.launchArgument` in Agrent/Debug/UITestSeam.swift, and \
+            the app must be a DEBUG build — the seam is compiled out of Release.
             """)
         }
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 15),
-                      "no tab bar appeared within 15s — the app is neither signed in nor on SignInView")
+                      "no tab bar appeared within 15s")
+    }
+
+    /// Signal (2) above, run AFTER the Дневник capture because it scrolls.
+    ///
+    /// The «Друг вид» row is the fifth of five, and at AX5 a SwiftUI `List`
+    /// has not created a row that far below the fold — so it is looked for
+    /// with up to six swipes rather than waited on. Дневник has no swipe
+    /// actions, so a swipe here can only scroll. Left scrolled: every later
+    /// step starts from the navigation bar or the tab bar, which do not move.
+    private func assertFixtureWorld(_ app: XCUIApplication) {
+        let fixtureRow = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Друг вид"))
+            .firstMatch
+        _ = fixtureRow.waitForExistence(timeout: 5)
+        for _ in 0..<6 where !fixtureRow.exists {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTAssertTrue(fixtureRow.exists, """
+            Дневник does not show journal-list.json's «Друг вид» row, so this may \
+            be the LIVE tenant rather than the fixture seam. Stopping before \
+            anything is opened: the messaging captures below are safe only \
+            under the seam.
+            """)
     }
 
     /// The ambient settings go in the NAME, read back from the runner rather

@@ -1,0 +1,17 @@
+{
+  "aiConfigured": true,
+  "satelliteConfigured": true,
+  "satelliteAvailable": true,
+  "fieldCount": 3,
+  "briefing": {
+    "headline": "Един парцел показва воден стрес",
+    "summary": "SYNTH-1 е в добро състояние. SYNTH-2 показва понижена влажност спрямо предходното заснемане. За SYNTH-3 няма граница, затова няма и отчет.",
+    "actions": [
+      { "field": "SYNTH-2", "action": "Огледайте парцела за признаци на засушаване.", "priority": "high" },
+      { "field": "SYNTH-3", "action": "Качете границата на парцела, за да получава сателитен отчет.", "priority": "medium" },
+      { "field": null, "action": "Проверете прогнозата преди следващото пръскане.", "priority": "low" }
+    ]
+  },
+  "generatedAt": "2026-09-29T06:05:00.000Z",
+  "date": "2026-09-29"
+}

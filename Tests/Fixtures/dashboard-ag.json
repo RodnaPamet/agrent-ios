@@ -1,0 +1,46 @@
+{
+  "enabledModules": ["JOURNAL", "TASKS", "INVENTORY"],
+  "recentJournal": [
+    {
+      "id": "jrn_synthetic_dash_1",
+      "type": "INPUT_APPLICATION",
+      "title": "Пръскане срещу плевели — SYNTH-1",
+      "occurredAt": "2026-09-27T08:00:00.000Z"
+    },
+    {
+      "id": "jrn_synthetic_dash_2",
+      "type": "OBSERVATION",
+      "title": "Оглед на посевите",
+      "occurredAt": "2026-09-24"
+    },
+    {
+      "id": "jrn_synthetic_dash_3",
+      "type": "LAB_TEST",
+      "title": "Почвена проба",
+      "occurredAt": null
+    }
+  ],
+  "lowStock": [
+    {
+      "id": "itm_synthetic_low_1",
+      "name": "Примерен хербицид",
+      "quantityOnHand": "2.5",
+      "unitSymbol": "l"
+    }
+  ],
+  "myTasks": [
+    {
+      "id": "tsk_synthetic_dash_1",
+      "title": "Подготовка на сеялката",
+      "status": "IN_PROGRESS",
+      "dueAt": "2026-10-02T00:00:00.000Z"
+    }
+  ],
+  "achievements": {
+    "milestones": [
+      { "key": "first-field-mapped", "earned": true, "earnedAt": "2026-06-27T17:30:00.000Z" },
+      { "key": "first-harvest", "earned": false, "earnedAt": null }
+    ],
+    "streak": { "current": 3, "best": 9 }
+  }
+}

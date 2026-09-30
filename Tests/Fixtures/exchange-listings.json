@@ -18,6 +18,25 @@
       "createdAt": "2026-07-04T13:38:19.222Z",
       "expiresAt": null,
       "isOwn": true
+    },
+    {
+      "id": "lst_synthetic_other",
+      "side": "SELL",
+      "kind": "CULTURE",
+      "commodity": "sunflower",
+      "quantityTonnes": "80",
+      "pricePerTonne": "412.5",
+      "priceCurrency": "EUR",
+      "regionCode": "BG-18",
+      "regionName": "Ruse",
+      "lat": 43.84,
+      "lon": 25.95,
+      "description": "Синтетична обява: слънчоглед, реколта 2026, влага под 9%.",
+      "sellerDisplayName": "Примерна кооперация",
+      "status": "ACTIVE",
+      "createdAt": "2026-09-22T10:00:00.000Z",
+      "expiresAt": "2026-10-22T00:00:00.000Z",
+      "isOwn": false
     }
   ],
   "nextCursor": null

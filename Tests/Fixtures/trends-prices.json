@@ -1,0 +1,164 @@
+{
+  "commodity": "wheat",
+  "range": "3m",
+  "generatedAt": "2026-09-29T06:00:00.000Z",
+  "series": [
+    {
+      "source": "synthetic-feed",
+      "region": "BG",
+      "stage": null,
+      "unit": "t",
+      "currency": "EUR",
+      "label": "Синтетична борсова цена",
+      "lastObservedAt": "2026-09-28",
+      "points": [
+        {
+          "date": "2026-07-06",
+          "price": 205.0,
+          "count": 3
+        },
+        {
+          "date": "2026-07-13",
+          "price": 208.14,
+          "count": 3
+        },
+        {
+          "date": "2026-07-20",
+          "price": 210.9,
+          "count": 3
+        },
+        {
+          "date": "2026-07-27",
+          "price": 212.99,
+          "count": 3
+        },
+        {
+          "date": "2026-08-03",
+          "price": 214.2,
+          "count": 3
+        },
+        {
+          "date": "2026-08-10",
+          "price": 214.46,
+          "count": 3
+        },
+        {
+          "date": "2026-08-17",
+          "price": 213.85,
+          "count": 3
+        },
+        {
+          "date": "2026-08-24",
+          "price": 212.61,
+          "count": 3
+        },
+        {
+          "date": "2026-08-31",
+          "price": 211.05,
+          "count": 3
+        },
+        {
+          "date": "2026-09-07",
+          "price": 209.54,
+          "count": 3
+        },
+        {
+          "date": "2026-09-14",
+          "price": 208.46,
+          "count": 3
+        },
+        {
+          "date": "2026-09-21",
+          "price": 208.09,
+          "count": 3
+        },
+        {
+          "date": "2026-09-28",
+          "price": 208.62,
+          "count": 3
+        }
+      ]
+    },
+    {
+      "source": "synthetic-feed",
+      "region": "EU",
+      "stage": null,
+      "unit": "t",
+      "currency": "EUR",
+      "label": null,
+      "lastObservedAt": "2026-09-21",
+      "points": [
+        {
+          "date": "2026-07-06",
+          "price": 214.0,
+          "count": 3
+        },
+        {
+          "date": "2026-07-13",
+          "price": 216.06,
+          "count": 3
+        },
+        {
+          "date": "2026-07-20",
+          "price": 217.87,
+          "count": 3
+        },
+        {
+          "date": "2026-07-27",
+          "price": 219.23,
+          "count": 3
+        },
+        {
+          "date": "2026-08-03",
+          "price": 220.0,
+          "count": 3
+        },
+        {
+          "date": "2026-08-10",
+          "price": 220.14,
+          "count": 3
+        },
+        {
+          "date": "2026-08-17",
+          "price": 219.7,
+          "count": 3
+        },
+        {
+          "date": "2026-08-24",
+          "price": 218.84,
+          "count": 3
+        },
+        {
+          "date": "2026-08-31",
+          "price": 217.77,
+          "count": 3
+        },
+        {
+          "date": "2026-09-07",
+          "price": 216.73,
+          "count": 3
+        },
+        {
+          "date": "2026-09-14",
+          "price": 215.97,
+          "count": 3
+        },
+        {
+          "date": "2026-09-21",
+          "price": 215.69,
+          "count": 3
+        }
+      ]
+    },
+    {
+      "source": "synthetic-global",
+      "region": "GLOBAL",
+      "stage": null,
+      "unit": "t",
+      "currency": "USD",
+      "label": null,
+      "lastObservedAt": null,
+      "points": []
+    }
+  ]
+}

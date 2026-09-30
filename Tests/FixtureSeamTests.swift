@@ -52,6 +52,13 @@ import XCTest
 /// this build does not know, a null `sellerDisplayName`, a null
 /// `olderCursor`, and a closed and a blocked thread — see
 /// `Tests/Fixtures/README.md`.
+///
+/// `admin-*`, `insurance-leads`, `risk-analysis-*`, `dashboard-*` and
+/// `trends-*` (agrent-ios#115) are SYNTHETIC too, added when A11yShots moved
+/// onto this seam so Админ, Риск, Табло and Новини photograph a render rather
+/// than a 501. Same rule: invented values, the model's shape. `admin-farm-
+/// profile`'s ЕГН is ten zeros — month 00 is not a date, so it cannot be
+/// anybody's — and it is still only ever photographed masked.
 final class FixtureSeamTests: XCTestCase {
 
     // MARK: - the seam is off unless asked for
@@ -107,6 +114,19 @@ final class FixtureSeamTests: XCTestCase {
             (ExchangeAPI.myListingsPath, "exchange-my-listings"),
             (ExchangeAPI.threadsPath, "exchange-threads"),
             (ExchangeAPI.threadPath(FixtureCatalogue.fixtureThreadID), "exchange-thread"),
+            // agrent-ios#115 — the four menu screens A11yShots photographs.
+            (AdminAPI.membersPath, "admin-members"),
+            (AdminAPI.farmProfilePath, "admin-farm-profile"),
+            (FarmRiskAPI.leadsPath, "insurance-leads"),
+            (FarmRiskAPI.analysisPath("par_holes"), "risk-analysis-holes"),
+            (FarmRiskAPI.analysisPath("par_simple"), "risk-analysis-simple"),
+            (FarmRiskAPI.analysisPath("par_nogeom"), "risk-analysis-nogeom"),
+            (DashboardAPI.agPath, "dashboard-ag"),
+            (DashboardAPI.taskTrendPath(days: DashboardAPI.DefaultWindow.tasks),
+             "dashboard-task-trend"),
+            (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
+            (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
+            (TrendsAPI.newsPath(.all), "trends-news"),
         ]
         for (pathAndQuery, fixture) in expected {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
@@ -150,11 +170,18 @@ final class FixtureSeamTests: XCTestCase {
     /// shows a server error instead of invented farm data.
     func testUncoveredRoutesHaveNoFixture() {
         for pathAndQuery in [
-            DashboardAPI.agPath,
             "/api/t/\(Config.tenantSlug)/admin",
             WorkItemAPI.detailPath("tsk_fixture_1"),
             LocationsAPI.parcelsPath("loc_that_does_not_exist"),
+            FarmRiskAPI.analysisPath("par_that_does_not_exist"),
+            InsuranceCatalogueAPI.path,
             "/api/auth/token/refresh",
+            // THE QUERY DECIDES on these two (#115): the wheat fixture must
+            // not answer a maize chart, and «Всички» must not answer a
+            // category filter. Each is a different request and has no payload.
+            TrendsAPI.pricesPath(.maize, range: .month3),
+            TrendsAPI.pricesPath(.wheat, range: .year1),
+            TrendsAPI.newsPath(.policy),
         ] {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
             XCTAssertNil(
@@ -173,6 +200,27 @@ final class FixtureSeamTests: XCTestCase {
     func testTheParcelsKeyNamesTheLocationInTheListFixture() async throws {
         let locations = try await LocationsAPI.decodeList(from: try fixture("locations-list"))
         XCTAssertEqual(locations.map(\.id), [FixtureCatalogue.fixtureLocationID])
+    }
+
+    /// The Риск keys name the parcels the parcels fixture actually holds, and
+    /// each reading file is about the parcel it is served for.
+    ///
+    /// Both halves matter. `FarmRiskStore.readRisks` asks once per ROW of
+    /// `locations-parcels.json`, so a parcel missing from the catalogue is a
+    /// `NO_FIXTURE` row in the capture; and a reading whose own `parcelId`
+    /// names a different parcel would render under the wrong name without
+    /// anything failing, because the store files it by the row it asked for.
+    func testTheRiskKeysNameTheParcelsInTheParcelsFixture() async throws {
+        let parcels = try await LocationsAPI.decodeParcels(from: try fixture("locations-parcels"))
+        XCTAssertEqual(
+            Set(parcels.parcels.map(\.id)),
+            Set(FixtureCatalogue.fixtureRiskParcels.map(\.parcelID)),
+            "every parcel on the Риск screen needs a reading, and no reading may name a ghost"
+        )
+        for (parcelID, name) in FixtureCatalogue.fixtureRiskParcels {
+            let risk = try await FarmRiskAPI.decodeAnalysis(from: try fixture(name))
+            XCTAssertEqual(risk.parcelId, parcelID, "\(name).json is about another parcel")
+        }
     }
 
     /// The conversation key names the thread the fixtures actually hold —
@@ -298,6 +346,20 @@ final class FixtureSeamTests: XCTestCase {
         ("exchange-my-listings", { _ = try await ExchangeAPI.decodeMyListings(from: $0) }),
         ("exchange-threads", { _ = try await ExchangeAPI.decodeThreads(from: $0) }),
         ("exchange-thread", { _ = try await ExchangeAPI.decodeThread(from: $0) }),
+        ("admin-members", { _ = try await AdminAPI.decodeMembers(from: $0) }),
+        ("admin-farm-profile", { _ = try await AdminAPI.decodeFarmProfile(from: $0) }),
+        ("insurance-leads", { _ = try await FarmRiskAPI.decodeLeads(from: $0) }),
+        ("risk-analysis-holes", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
+        ("risk-analysis-simple", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
+        ("risk-analysis-nogeom", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
+        ("dashboard-ag", { _ = try await DashboardAPI.decodeAg(from: $0) }),
+        ("dashboard-task-trend", { _ = try await DashboardAPI.decodeTaskTrend(from: $0) }),
+        ("dashboard-field-briefing", { _ = try await DashboardAPI.decodeFieldBriefing(from: $0) }),
+        // No named decode function on these two routes: `DashboardStore` and
+        // `TrendsStore` call `APIClient.shared.decode(_:as:)` inline, so that
+        // is what runs here.
+        ("trends-prices", { _ = try await APIClient.shared.decode($0, as: PricesResponse.self) }),
+        ("trends-news", { _ = try await APIClient.shared.decode($0, as: NewsResponse.self) }),
     ]
 
     /// A MISSING FIXTURE IS A FAILURE, NOT A SKIP.

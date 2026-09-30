@@ -30,11 +30,19 @@ import Foundation
 ///
 /// ── What is deliberately absent ──
 ///
-/// Every write route, and every read this repo has no recorded payload for:
-/// the dashboard, trends, news, admin, farm risk, the agro tile routes and
-/// the task detail. They are answered `501 NO_FIXTURE` by
+/// Every write route, and every read this repo has no payload for: the agro
+/// tile routes, parcel history, the task detail, the insurance catalogue,
+/// every Тенденции price other than Табло's wheat, and every news filter
+/// other than «Всички». They are answered `501 NO_FIXTURE` by
 /// `FixtureURLProtocol` and the screen shows the ordinary server-error state.
 /// A screenshot of that is a true report; a fabricated 200 would not be.
+///
+/// Табло, Новини, Риск and Админ WERE on that list until agrent-ios#115 put
+/// the screenshot harness on this seam. They now have SYNTHETIC payloads —
+/// invented, and labelled as invented in `Tests/Fixtures/README.md` — which
+/// is a different claim from "recorded": what those four captures evidence
+/// is layout, contrast and Dynamic Type over a payload of the right SHAPE,
+/// not what the live tenant holds.
 enum FixtureCatalogue {
     /// The only location `locations-list.json` contains.
     ///
@@ -54,9 +62,45 @@ enum FixtureCatalogue {
     /// production.
     static let fixtureThreadID = "thr_synthetic_1"
 
+    /// The three parcels `locations-parcels.json` holds, each with its own
+    /// Риск reading (agrent-ios#115).
+    ///
+    /// One fixture PER parcel rather than one for all three, because
+    /// `FarmRiskStore.readRisks` asks once per row and a shared answer would
+    /// photograph three identical chips — which is exactly the screen whose
+    /// three levels, the stale-reading caveat and the «Няма отчет» absence
+    /// the checklist wants to see side by side. Spelled by hand for the same
+    /// reason `fixtureLocationID` is; `FixtureSeamTests` holds them against
+    /// the parcels file.
+    ///
+    /// ── The ids carry `_`, and the app double-encodes it ──
+    ///
+    /// `FarmRiskAPI.analysisPath` escapes the id against `.alphanumerics`,
+    /// so `par_holes` becomes `par%5Fholes`, and `APIClient.url(for:)` then
+    /// assigns that to `URLComponents.path` — which encodes the `%` again.
+    /// The wire carries `par%255Fholes` and `url.path` decodes it back to
+    /// exactly the string the builder produced, so the key below matches.
+    /// Real parcel ids are alphanumeric and never meet this; a synthetic one
+    /// with an underscore is the only thing that does.
+    static let fixtureRiskParcels: [(parcelID: String, fixture: String)] = [
+        ("par_holes", "risk-analysis-holes"),
+        ("par_simple", "risk-analysis-simple"),
+        ("par_nogeom", "risk-analysis-nogeom"),
+    ]
+
     /// Routes whose QUERY changes which payload is correct. Consulted first.
+    ///
+    /// Prices and news joined `units-rate` here for #115, and for its reason:
+    /// the query names WHICH commodity and WHICH category. Matched on the path
+    /// alone, Тенденции's maize chart would draw the wheat fixture under the
+    /// word «Царевица» and Новини's «Политика» filter would show market news
+    /// — screenshots that look fine and are wrong. Only the exact request the
+    /// captured screens make (Табло's wheat over three months, Новини's
+    /// unfiltered first page) is answered; any other is `NO_FIXTURE`.
     static let byPathAndQuery: [String: String] = table([
         (LocationsAPI.rateUnitsPath, "units-rate"),
+        (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
+        (TrendsAPI.newsPath(.all), "trends-news"),
     ]) { $0 }
 
     /// Routes matched on the path alone.
@@ -73,7 +117,27 @@ enum FixtureCatalogue {
         (ExchangeAPI.myListingsPath, "exchange-my-listings"),
         (ExchangeAPI.threadsPath, "exchange-threads"),
         (ExchangeAPI.threadPath(fixtureThreadID), "exchange-thread"),
-    ]) { split($0).path }
+        // ── Added for agrent-ios#115, so A11yShots can run on the seam ──
+        //
+        // Every screen the harness photographs from the menu — Риск, Новини,
+        // Табло, Админ — used to be `NO_FIXTURE` here, which was right while
+        // nothing photographed them under the seam: an error state is a true
+        // report. Once the harness moved onto the seam those captures would
+        // have been four pictures of «Грешка от сървъра», so each GET they
+        // make got a SYNTHETIC payload. Provenance in Tests/Fixtures/README.md.
+        //
+        // Админ's invites view (`AdminAPI.invitesPath`) is the same PATH as
+        // the members list and nothing calls it today; if something starts
+        // to, it belongs in `byPathAndQuery` with its own fixture, or it will
+        // be answered with the members.
+        (AdminAPI.membersPath, "admin-members"),
+        (AdminAPI.farmProfilePath, "admin-farm-profile"),
+        (FarmRiskAPI.leadsPath, "insurance-leads"),
+        (DashboardAPI.agPath, "dashboard-ag"),
+        (DashboardAPI.taskTrendPath(days: DashboardAPI.DefaultWindow.tasks), "dashboard-task-trend"),
+        (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
+    ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
+    ) { split($0).path }
 
     /// Every fixture the table can name, for the test that proves each one
     /// exists in the bundle and decodes.

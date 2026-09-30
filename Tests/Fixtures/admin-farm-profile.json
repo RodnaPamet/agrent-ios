@@ -1,0 +1,15 @@
+{
+  "producerName": "Синтетично стопанство ЕООД",
+  "eik": "000000000",
+  "egn": "0000000000",
+  "urn": "URN-SYNTHETIC-0001",
+  "address": "ул. Примерна 1",
+  "settlement": "с. Примерно",
+  "municipality": "Примерна",
+  "registrationPlace": null,
+  "registrationEkatte": null,
+  "odbhCity": null,
+  "agricultureDirectorateCity": null,
+  "sizeHa": 39.758,
+  "grainProduced": ["wheat", "maize"]
+}
