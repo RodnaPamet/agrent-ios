@@ -29,10 +29,7 @@ enum JournalAPI {
         // Percent-encoded by the caller, because `APIClient.url(for:)` takes
         // the query VERBATIM — its header says so, and a cursor is opaque
         // server output that may legitimately contain `+` or `=`.
-        let escaped = cursor.addingPercentEncoding(
-            withAllowedCharacters: .alphanumerics
-        ) ?? cursor
-        return "\(base)?limit=50&cursor=\(escaped)"
+        return "\(base)?limit=50&cursor=\(URLEscape.queryValue(cursor))"
     }
 
     /// The route returns a paginated envelope when `limit` is present and a

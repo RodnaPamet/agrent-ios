@@ -5,11 +5,11 @@ enum SpatialImportAPI {
     private static var base: String { "/api/t/\(Config.tenantSlug)/locations" }
 
     static func uploadPath(locationID: String) -> String {
-        "\(base)/\(locationID)/spatial-import"
+        "\(base)/\(URLEscape.segment(locationID))/spatial-import"
     }
 
     static func jobPath(locationID: String, jobID: String) -> String {
-        "\(base)/\(locationID)/spatial-import/\(jobID)"
+        "\(uploadPath(locationID: locationID))/\(URLEscape.segment(jobID))"
     }
 
     /// Stage the file and queue the parse.

@@ -22,11 +22,19 @@ enum ParcelHistoryAPI {
     private static var base: String { "/api/t/\(Config.tenantSlug)/agro/parcels" }
 
     static func cropSeasonsPath(_ parcelID: String) -> String {
-        "\(base)/\(parcelID)/crop-seasons"
+        "\(base)/\(URLEscape.segment(parcelID))/crop-seasons"
     }
 
     static func weedObservationsPath(_ parcelID: String) -> String {
-        "\(base)/\(parcelID)/weed-observations"
+        "\(base)/\(URLEscape.segment(parcelID))/weed-observations"
+    }
+
+    static func cropSeasonPath(parcelID: String, seasonID: String) -> String {
+        "\(cropSeasonsPath(parcelID))/\(URLEscape.segment(seasonID))"
+    }
+
+    static func weedObservationPath(parcelID: String, observationID: String) -> String {
+        "\(weedObservationsPath(parcelID))/\(URLEscape.segment(observationID))"
     }
 
     /// `201 { id }` — the created row's id and nothing else, so a screen that
@@ -69,12 +77,10 @@ enum ParcelHistoryAPI {
             ("operationsBefore", operationsBefore),
             ("weedsBefore", weedsBefore),
         ] {
-            guard let value, let encoded = value.addingPercentEncoding(
-                withAllowedCharacters: .alphanumerics
-            ) else { continue }
-            query.append("\(name)=\(encoded)")
+            guard let value else { continue }
+            query.append("\(name)=\(URLEscape.queryValue(value))")
         }
-        let base = "\(Self.base)/\(parcelID)/history"
+        let base = "\(Self.base)/\(URLEscape.segment(parcelID))/history"
         return query.isEmpty ? base : "\(base)?\(query.joined(separator: "&"))"
     }
 
@@ -111,13 +117,13 @@ enum ParcelHistoryAPI {
     /// agronomic record. Nothing here should tell a farmer it is erased.
     static func deleteCropSeason(parcelID: String, seasonID: String) async throws {
         try await deleteTreatingMissingAsDone(
-            "\(cropSeasonsPath(parcelID))/\(seasonID)"
+            cropSeasonPath(parcelID: parcelID, seasonID: seasonID)
         )
     }
 
     static func deleteWeedObservation(parcelID: String, observationID: String) async throws {
         try await deleteTreatingMissingAsDone(
-            "\(weedObservationsPath(parcelID))/\(observationID)"
+            weedObservationPath(parcelID: parcelID, observationID: observationID)
         )
     }
 

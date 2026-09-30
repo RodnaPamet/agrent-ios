@@ -9,7 +9,9 @@ enum LocationsAPI {
     /// The parcels live HERE, not on the location detail: that route returns a
     /// flat row with no `parcels` key at all. The optional-parcels DTO on the
     /// server documents `getLocationWithParcels`, which nothing calls.
-    static func parcelsPath(_ locationID: String) -> String { "\(base)/\(locationID)/parcels" }
+    static func parcelsPath(_ locationID: String) -> String {
+        "\(base)/\(URLEscape.segment(locationID))/parcels"
+    }
 
     static func decodeList(from data: Data) async throws -> [Location] {
         try await APIClient.shared.decode(data, as: [Location].self)
@@ -63,7 +65,7 @@ enum LocationsAPI {
     /// Where a field operation is posted. Named so the outbox can replay
     /// to the same place without reconstructing it from a literal.
     static func operationsPath(_ locationID: String) -> String {
-        "\(base)/\(locationID)/operations"
+        "\(base)/\(URLEscape.segment(locationID))/operations"
     }
 
     static func createOperation(
@@ -76,12 +78,17 @@ enum LocationsAPI {
         )
     }
 
+    /// One parcel, for the inline crop edit.
+    static func parcelPath(locationID: String, parcelID: String) -> String {
+        "\(parcelsPath(locationID))/\(URLEscape.segment(parcelID))"
+    }
+
     /// Inline crop edit from the parcel sheet.
     static func setCropType(
         locationID: String, parcelID: String, cropType: String?
     ) async throws -> Data {
         try await APIClient.shared.patchReturningData(
-            "\(base)/\(locationID)/parcels/\(parcelID)",
+            parcelPath(locationID: locationID, parcelID: parcelID),
             body: ["cropType": cropType]
         )
     }
