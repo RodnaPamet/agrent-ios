@@ -1,13 +1,14 @@
 #!/bin/bash
 #
-# Screenshots of four real screens at four accessibility settings, for the
-# device checklist in issue #97.
+# Screenshots of the app's screens at four accessibility settings, for the
+# device checklist in issue #97 — rendered from SYNTHETIC fixtures through the
+# UI test seam, not from the live tenant (agrent-ios#115).
 #
-#     scripts/a11y-shots.sh          # row 0 of Локации
-#     ROW=1 scripts/a11y-shots.sh    # a different location
+#     scripts/a11y-shots.sh                                  # the booted device
+#     UDID=<udid> scripts/a11y-shots.sh                    # a specific one
 #
-# Other knobs, all optional: UDID (default: the booted device), OUT_DIR,
-# DERIVED.
+# Knobs, all optional: UDID (default: the one booted device; it must be
+# booted), OUT_DIR, DERIVED.
 #
 # ── What this is answering ──
 #
@@ -29,19 +30,27 @@
 # which it cannot, is written out in a comment on issue #97 — run
 # `gh issue view 97 --comments`. Read that before ticking anything.
 #
-# ── The one precondition, and it is a real one ──
+# ── What it runs against: the fixture seam (#115) ──
 #
-# The app opens on `SignInView` unless the Keychain already holds tokens, and
-# there is no test seam to fake that — no launch argument, no stub client.
-# So this runs against a simulator SOMEBODY HAS ALREADY SIGNED IN ON. That is
-# true of this machine and is not true of CI. The suite fails with that
-# sentence rather than photographing the sign-in screen.
+# The suite launches the app with `AGRENT_UITEST_FIXTURES` (see
+# Agrent/Debug/UITestSeam.swift). The app skips sign-in, every GET is answered
+# from Tests/Fixtures and every write gets 501 before a socket opens. So:
 #
-# Consequence: every screenshot is of the owner's live production tenant, over
-# real authenticated reads. Output therefore goes OUTSIDE the repository by
-# default and must not be committed — this repo is public, and
-# Tests/Fixtures/README.md records that publishing real field boundaries is
-# the owner's decision, defaulting to no.
+#   - NO signed-in simulator is needed. Any booted simulator will do, a fresh
+#     one included. (This used to be the one real precondition, and the
+#     reason the suite was pinned to the owner's machine.)
+#   - The screenshots show SYNTHETIC data, never the live tenant. That is what
+#     let the messaging screens in: opening a conversation POSTs a mark-read,
+#     which against production another farm would see.
+#   - The suite asserts the seam is on before it opens anything.
+#
+# One cost on the simulator you point it at: the app still writes its
+# ResponseCache, so on a simulator that holds the owner's real session the
+# cached payloads become fixture bytes until the next real fetch. The session
+# itself is untouched. See the warning in UITestSeam.swift.
+#
+# Output goes OUTSIDE the repository by default and is not committed — there
+# is nothing secret in it any more, but screenshots are not source.
 #
 set -u
 
@@ -53,23 +62,22 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Outside the repository, deliberately — see the note about real field
-# boundaries above. `${TMPDIR}` on macOS ends in a slash and `/tmp` does not,
-# so the trailing one is stripped rather than assumed either way.
+# Outside the repository, deliberately — screenshots are output, not source.
+# `${TMPDIR}` on macOS ends in a slash and `/tmp` does not, so the trailing
+# one is stripped rather than assumed either way.
 TMP_BASE="${TMPDIR:-/tmp}"; TMP_BASE="${TMP_BASE%/}"
 OUT_DIR="${OUT_DIR:-$TMP_BASE/agrent-a11y-shots}"
 DERIVED="${DERIVED:-$TMP_BASE/agrent-a11y-derived}"
-ROW="${ROW:-0}"
 
 # The booted device, unless told otherwise. `simctl` accepts the literal
 # string "booted", but the UDID is resolved here so the summary at the end
 # names the device that was actually photographed.
 #
-# MORE THAN ONE BOOTED DEVICE IS AN ERROR, NOT A COIN TOSS. The precondition
-# below is a simulator somebody has signed in on, and only one of the ones
-# booted here holds a token. Taking whichever came first out of simctl's JSON
-# would fail three screens later with "the app is on SignInView", which reads
-# as a broken suite rather than as the wrong device.
+# MORE THAN ONE BOOTED DEVICE IS AN ERROR, NOT A COIN TOSS. Sign-in no longer
+# decides which one works — the seam makes any of them work — but this script
+# CHANGES the device's text size, contrast and appearance for several minutes,
+# and a second booted simulator is usually somebody else's: another session's
+# test run, or the owner's. Flipping theirs to AX5 mid-run is the failure.
 if [ -z "${UDID:-}" ]; then
   BOOTED="$(xcrun simctl list devices booted -j | python3 -c 'import json,sys
 for runtime in json.load(sys.stdin)["devices"].values():
@@ -79,8 +87,8 @@ for runtime in json.load(sys.stdin)["devices"].values():
     0) echo "No booted simulator. Boot one in Simulator.app, or set UDID=…" >&2
        exit 1 ;;
     1) UDID="$(printf "%s\n" "$BOOTED" | awk '{print $1}')" ;;
-    *) { echo "More than one booted simulator, and only the one you have signed"
-         echo "in on can reach anything. Pick it with UDID=…:"
+    *) { echo "More than one booted simulator. This script changes the device's"
+         echo "accessibility settings while it runs, so pick one with UDID=…:"
          printf "%s\n" "$BOOTED" | sed 's/^/    /'; } >&2
        exit 1 ;;
   esac
@@ -103,7 +111,7 @@ trap restore EXIT
 
 # name | content_size | increase_contrast | appearance
 #
-# Four runs, ~45 seconds each, because each one is a fresh install and launch
+# Four runs, each a fresh install and launch, because
 # and there is no way to change these settings from inside the test process.
 # The pairs are the ones #97 asks to COMPARE:
 #   default vs ax5             — does a row stack, does the `·` go
@@ -119,7 +127,7 @@ VARIANTS=(
 mkdir -p "$OUT_DIR"
 echo "device:     $UDID"
 echo "output:     $OUT_DIR"
-echo "location:   row $ROW of Локации"
+echo "data:       Tests/Fixtures via AGRENT_UITEST_FIXTURES (synthetic, not the live tenant)"
 echo "before:     content_size=$ORIGINAL_SIZE increase_contrast=$ORIGINAL_CONTRAST appearance=$ORIGINAL_APPEARANCE"
 echo
 
@@ -136,11 +144,11 @@ for variant in "${VARIANTS[@]}"; do
   log="$OUT_DIR/$name.log"
   rm -rf "$result" "$OUT_DIR/$name"
 
-  # `TEST_RUNNER_` is the prefix xcodebuild strips before handing an
-  # environment variable to the UI test runner — see `locationRow` in
-  # A11yShotsTests.swift. The runner is its own process, so this is the only
-  # way in.
-  TEST_RUNNER_A11Y_LOCATION_ROW="$ROW" \
+  # The seam's launch argument is NOT passed here: `xcodebuild test` has no
+  # flag for the app-under-test's arguments, and the suite sets it on
+  # `XCUIApplication.launchArguments` itself. (A `ROW=` knob used to ride in
+  # on `TEST_RUNNER_A11Y_LOCATION_ROW`; the fixture has one location, so it
+  # went.)
   xcodebuild test \
     -project "$REPO/Agrent.xcodeproj" \
     -scheme AgrentA11yShots \
@@ -154,7 +162,7 @@ for variant in "${VARIANTS[@]}"; do
     FAILED=1
     echo "$name: FAILED after $(( $(date +%s) - started ))s — $log"
     # The assertion text, not the last 60 lines of build noise. The suite's
-    # one expected failure (an unsigned-in simulator) says so in a sentence.
+    # likeliest failure — the seam not switching on — says so in a sentence.
     #
     # `unable to find utility "simctl"` is filtered out: xcodebuild prints it
     # only on a failure, while collecting diagnostics from the simulator in a

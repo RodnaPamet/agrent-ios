@@ -151,6 +151,14 @@ targets:
 # So: `Agrent` keeps doing exactly what it did — build the app, run
 # `AgrentTests` — and the screenshots live in a scheme of their own that only
 # ever runs when somebody asks for it by name.
+#
+# SINCE agrent-ios#115 THE REASON ABOVE NO LONGER HOLDS, and the split stays
+# anyway. The suite launches through the fixture seam, so an empty Keychain
+# no longer stops it. What still keeps it off CI: it runs four times per
+# `scripts/a11y-shots.sh` with the device's settings changed between runs,
+# which `xcodebuild test -scheme Agrent` cannot express, and its output is
+# photographs for a human to look at, not a pass/fail anyone has asked CI to
+# gate on. Putting it on CI is a separate decision, not a side effect.
 schemes:
   Agrent:
     build:

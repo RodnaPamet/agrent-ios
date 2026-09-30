@@ -31,13 +31,18 @@ import Foundation
 ///
 /// ── A request with no fixture gets 501, not a plausible 200 ──
 ///
-/// The catalogue covers eleven read routes. Everything else — the dashboard,
-/// trends, admin, farm risk, task detail, the agro tile routes — has no
-/// recorded payload in this repo, and inventing one would put a screenshot of
-/// made-up farm data in front of somebody as if it were a render of real
-/// data. So an uncovered route is answered `501 NO_FIXTURE`, the screen shows
-/// its ordinary server-error state, and the log names the path. A seam whose
-/// gaps are invisible is a seam that reports coverage it does not have.
+/// The catalogue covers the reads the screenshot harness walks and nothing
+/// more. Everything else — task detail, parcel history, the agro tile routes,
+/// the insurance catalogue — has no payload in this repo. So an uncovered
+/// route is answered `501 NO_FIXTURE`, the screen shows its ordinary
+/// server-error state, and the log names the path. A seam whose gaps are
+/// invisible is a seam that reports coverage it does not have.
+///
+/// Табло, Новини, Риск and Админ were in that list until agrent-ios#115 moved
+/// A11yShots onto this seam; they now have SYNTHETIC payloads, invented for
+/// the purpose and labelled so in `Tests/Fixtures/README.md`. A screenshot of
+/// them is a render of made-up data, and the harness's #97 comment says so
+/// rather than letting it pass for the live tenant.
 ///
 /// ── Writes are refused, and that is not caution ──
 ///

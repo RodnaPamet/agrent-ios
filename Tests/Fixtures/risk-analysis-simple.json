@@ -1,0 +1,14 @@
+{
+  "parcelId": "par_simple",
+  "name": "SYNTH-2",
+  "areaHa": 2.28,
+  "cropType": null,
+  "configured": true,
+  "ndvi": 0.318,
+  "ndmi": -0.041,
+  "vegetation": "watch",
+  "moisture": "stress",
+  "overall": "stress",
+  "acquiredDate": "2026-08-30",
+  "generatedAt": "2026-09-29T06:00:00Z"
+}

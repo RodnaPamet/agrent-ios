@@ -25,7 +25,13 @@ final class ExchangeModelsTests: XCTestCase {
         let page = try await APIClient.shared.decode(
             fixture("exchange-listings"), as: ExchangeListingPage.self
         )
-        XCTAssertEqual(page.rows.count, 1)
+        // Two: row 0 is the captured production row every test below reads
+        // through `.first`; row 1 is SYNTHETIC, added for agrent-ios#115 so
+        // the screenshot harness has a listing that is NOT the viewer's own
+        // and therefore shows «Съобщение до продавача». See
+        // Tests/Fixtures/README.md.
+        XCTAssertEqual(page.rows.count, 2)
+        XCTAssertFalse(page.rows[1].isOwn)
         XCTAssertNil(page.nextCursor)
     }
 

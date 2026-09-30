@@ -1,0 +1,98 @@
+[
+  {
+    "id": "mem_synthetic_owner",
+    "userId": "usr_fixture_owner",
+    "tenantId": "ten_synthetic",
+    "role": "OWNER",
+    "status": "ACTIVE",
+    "customRole": null,
+    "customRoleId": null,
+    "agronomistCertNo": null,
+    "applicatorCertNo": null,
+    "provisionedByOrgId": null,
+    "user": {
+      "id": "usr_fixture_owner",
+      "name": "Иван Фикстуров",
+      "email": "owner@example.invalid",
+      "image": null
+    },
+    "invitedBy": null,
+    "invitedAt": null,
+    "deactivatedAt": null,
+    "activeSessionCount": 2,
+    "createdAt": "2026-06-27T17:20:00.000Z",
+    "updatedAt": "2026-09-20T08:00:00.000Z"
+  },
+  {
+    "id": "mem_synthetic_admin",
+    "userId": "usr_fixture_admin",
+    "tenantId": "ten_synthetic",
+    "role": "ADMIN",
+    "status": "ACTIVE",
+    "customRole": null,
+    "customRoleId": null,
+    "agronomistCertNo": null,
+    "applicatorCertNo": null,
+    "provisionedByOrgId": null,
+    "user": {
+      "id": "usr_fixture_admin",
+      "name": "Мария Примерова",
+      "email": "admin@example.invalid",
+      "image": null
+    },
+    "invitedBy": { "id": "usr_fixture_owner", "name": "Иван Фикстуров" },
+    "invitedAt": "2026-07-01T09:00:00Z",
+    "deactivatedAt": null,
+    "activeSessionCount": 1,
+    "createdAt": "2026-07-01T09:00:00Z",
+    "updatedAt": "2026-07-02T10:30:00.000Z"
+  },
+  {
+    "id": "mem_synthetic_invited",
+    "userId": "usr_fixture_invited",
+    "tenantId": "ten_synthetic",
+    "role": "MECHANISATOR",
+    "status": "INVITED",
+    "customRole": null,
+    "customRoleId": null,
+    "agronomistCertNo": null,
+    "applicatorCertNo": null,
+    "provisionedByOrgId": null,
+    "user": {
+      "id": "usr_fixture_invited",
+      "name": null,
+      "email": "operator@example.invalid",
+      "image": null
+    },
+    "invitedBy": { "id": "usr_fixture_owner", "name": "Иван Фикстуров" },
+    "invitedAt": "2026-09-25T14:00:00.000Z",
+    "deactivatedAt": null,
+    "activeSessionCount": null,
+    "createdAt": "2026-09-25T14:00:00.000Z",
+    "updatedAt": "2026-09-25T14:00:00.000Z"
+  },
+  {
+    "id": "mem_synthetic_former",
+    "userId": "usr_fixture_former",
+    "tenantId": "ten_synthetic",
+    "role": "EDITOR",
+    "status": "DEACTIVATED",
+    "customRole": null,
+    "customRoleId": null,
+    "agronomistCertNo": null,
+    "applicatorCertNo": null,
+    "provisionedByOrgId": null,
+    "user": {
+      "id": "usr_fixture_former",
+      "name": "Петър Тестов",
+      "email": "former@example.invalid",
+      "image": null
+    },
+    "invitedBy": null,
+    "invitedAt": null,
+    "deactivatedAt": "2026-08-15T12:00:00.000Z",
+    "activeSessionCount": 0,
+    "createdAt": "2026-06-30T08:00:00.000Z",
+    "updatedAt": "2026-08-15T12:00:00.000Z"
+  }
+]

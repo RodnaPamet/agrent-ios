@@ -152,3 +152,63 @@ against each other.
 
 `listingRegionName` is in English because that is what the server sends — the
 listing's `regionName` is the English oblast name.
+
+## The screenshot harness's fixtures (agrent-ios#115)
+
+`admin-members.json`, `admin-farm-profile.json`, `insurance-leads.json`,
+`risk-analysis-{holes,simple,nogeom}.json`, `dashboard-ag.json`,
+`dashboard-task-trend.json`, `dashboard-field-briefing.json`,
+`trends-prices.json`, `trends-news.json`, and **row 1** of
+`exchange-listings.json`.
+
+**Synthetic, all of them.** They exist because `A11yShots` now launches
+through the UI test seam (`AGRENT_UITEST_FIXTURES`) instead of against the
+production tenant, and the screens it photographs from the menu — Админ, Риск,
+Табло, Новини — had no payload, so each capture would have been a 501. Nothing
+was captured off the wire to make them and no production route was called.
+
+What is NOT invented is the SHAPE: each file is written against the Swift
+model that decodes it (`Membership`, `FarmProfile`, `ParcelRisk`,
+`InsuranceLeads`, `AgDashboard`, `FarmTaskTrend`, `FieldBriefingPayload`,
+`PricesResponse`, `NewsResponse`), and `FixtureSeamTests` puts each through the
+app's own decode for that route. The models were themselves measured off the
+wire when they were written, so this is one step removed from the server —
+weaker than the calculator fixture's provenance, and said so here.
+
+Rules held, because this repo is public:
+
+- **Names** are invented and read as such («Иван Фикстуров», «Мария
+  Примерова», «Примерна кооперация»). E-mail addresses are on `.invalid`, the
+  TLD reserved never to resolve. News links are on `news.example.invalid`.
+- **The ЕГН is ten zeros.** Month 00 is not a date, so it is nobody's number.
+  The harness still never taps «Покажи»; the capture shows dots. The ЕИК is
+  nine zeros and the УРН is spelled `URN-SYNTHETIC-0001`.
+- **No geometry.** The Риск readings are per-parcel numbers for the three
+  parcels `locations-parcels.json` already holds, keyed by their ids.
+- **Nothing JWT-shaped**, which the CI credential scan checks anyway.
+
+The cases, each on purpose:
+
+| case | where |
+|---|---|
+| the LAST active owner (no deactivate action, #99) and an admin (the positive control) | `admin-members.json` rows 0 and 1 |
+| `INVITED` with `name: null` and a role `MECHANISATOR`; a `DEACTIVATED` row | rows 2 and 3 |
+| dates with and without fractional seconds | `admin-members.json`, `risk-analysis-simple.json` |
+| all three Риск levels plus `unknown` with `configured: true` (a parcel with no boundary) | `risk-analysis-*` |
+| a reading 30 days older than its `generatedAt` — past `Staleness.concerning` | `risk-analysis-simple.json` |
+| a parcel already asked about (`par_simple`) | `insurance-leads.json` |
+| a journal row with a date-only `occurredAt`, and one with null | `dashboard-ag.json` |
+| two price series in one unit/currency group and a third, pointless one in another (USD) | `trends-prices.json` |
+| `unit: "t"` — the EC grain feed's spelling, not `EUR/t`: Табло prints `currency/unit`, so `EUR/t` rendered «EUR/EUR/t» | `trends-prices.json` |
+| a news summary carrying the feed's attribution line (`cleanedSummary` strips it), a null summary, and a category this build does not name | `trends-news.json` |
+| a listing that is NOT yours — the only way to reach «Съобщение до продавача» | `exchange-listings.json` row 1 |
+
+`exchange-listings.json` row 0 is still the scrubbed production row the file
+was captured with; `ExchangeModelsTests` reads it through `.first`. Row 1 was
+appended for the harness and is invented from end to end. Its `lat`/`lon` is
+a point inside Ruse oblast, not any farm's location.
+
+`trends-prices.json` and `trends-news.json` answer ONE query each —
+`commodity=wheat&range=3m` and `limit=50` with no category — because the
+query names the commodity and the category, and a path-only match would draw
+wheat under «Царевица». See `FixtureCatalogue.byPathAndQuery`.
