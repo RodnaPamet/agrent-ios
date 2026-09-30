@@ -62,16 +62,6 @@ enum ExchangeAPI {
         try await APIClient.shared.decode(data, as: [ExchangeInquiry].self)
     }
 
-    /// NOT EXERCISED. This creates a production row AND emails the seller
-    /// tenant's admins, so it ships built and unfired by deliberate decision:
-    /// the first real operator send is the first real test. Nothing in
-    /// development or CI may call it.
-    ///
-    /// No `Idempotency-Key`, and that is correct rather than an omission. The
-    /// DOMAIN is idempotent by construction — `@@unique([listingId,
-    /// inquirerTenantId])` means a tenant can express interest in a listing at
-    /// most once — which is stronger than a header, because it holds even
-    /// against a client that never sends one.
     /// NOT EXERCISED, by the same standing decision as `createInquiry`: a
     /// listing is published to every tenant in the platform. Built, wired,
     /// and the first real send is the owner's.
@@ -81,12 +71,265 @@ enum ExchangeAPI {
         )
     }
 
+    /// NOT EXERCISED. This creates a production row AND emails the seller
+    /// tenant's admins, so it ships built and unfired by deliberate decision:
+    /// the first real operator send is the first real test. Nothing in
+    /// development or CI may call it.
+    ///
+    /// (This comment used to sit above `createListing`, one function up, so
+    /// the listing create read as the inquiry's and the inquiry had none.)
+    ///
+    /// No `Idempotency-Key` is RELIED ON, and that is correct rather than an
+    /// omission. The route reads none — `post` still sends its default, which
+    /// the server ignores — and the DOMAIN is idempotent by construction:
+    /// `@@unique([listingId, inquirerTenantId])` means a tenant can express
+    /// interest in a listing at most once, which is stronger than a header
+    /// because it holds even against a client that never sends one.
     static func createInquiry(listingID: String, message: String) async throws -> ExchangeInquiry {
         try await APIClient.shared.post(
             "\(base)/inquiries",
             body: CreateInquiry(listingId: listingID, message: message),
             as: ExchangeInquiry.self
         )
+    }
+
+    // MARK: - Messaging (agrent-ios#114)
+    //
+    // Nine operations: the inbox, one conversation page, open-a-thread, send,
+    // mark read, close, block, unblock, and retract one message. Every WRITE
+    // below ships BUILT AND UNFIRED, like `createInquiry`: each one is seen by
+    // another farm (a thread appears in their inbox the moment it is OPENED,
+    // with no message sent), so nothing in development, CI or A11yShots may
+    // call one against production. Under the UI test seam every write is
+    // answered 501 `WRITE_REFUSED`, which is the backstop, not the rule.
+    //
+    // NONE OF THESE IS CACHED. The web keeps `/exchange/threads` out of its
+    // persistent cache on purpose — private text from another farm must not
+    // outlive a lost phone — and `ResponseCache` survives sign-out. Readers
+    // call `APIClient.shared.data(for:)` and decode here; nothing hands these
+    // paths to `CachedResource`.
+    //
+    // ── What goes in a URL ──
+    //
+    // CFNetwork logs full request URLs. Thread and message ids are opaque and
+    // appear in logged paths already. The only query values are a page size
+    // and an opaque cursor — base64url of `<timestamp>|<row id>`, so an id in
+    // effect, and nothing a person typed. Message TEXT only ever travels in a
+    // body.
+
+    /// The page size the server accepts: whole numbers, 1 to 100.
+    ///
+    /// The server clamps out-of-range values itself, but it runs a bare
+    /// `Number()` with no integer check, so `2.5` or `NaN` would reach Prisma's
+    /// `take` and come back a 500. Taking an `Int` and clamping here means this
+    /// client can only ever send a value the server handles.
+    static let messagingPageSizes = 1...100
+
+    static func clampedPageSize(_ limit: Int) -> Int {
+        min(max(limit, messagingPageSizes.lowerBound), messagingPageSizes.upperBound)
+    }
+
+    /// The inbox's first page with the server's default size (100), and no
+    /// query at all — the key `FixtureCatalogue` serves the inbox under.
+    static var threadsPath: String { threadsRoot }
+
+    /// Spelled once, and not as `threadsPath` inside the builders below: that
+    /// name is both a property and a function here, and a bare reference to
+    /// it from inside one of them is the kind of overload a reader has to
+    /// stop and resolve.
+    private static var threadsRoot: String { "\(base)/threads" }
+
+    /// The inbox, paged. `cursor` is the previous page's `nextCursor`; nil or
+    /// blank asks for the first page. `limit` nil leaves the server's default.
+    ///
+    /// Keyset paging over `lastMessageAt`, which MOVES when a message arrives:
+    /// a thread bumped between two page fetches jumps above the cursor and is
+    /// missing from the later page. Refresh from the top and dedupe by id.
+    static func threadsPath(cursor: String?, limit: Int? = nil) -> String {
+        withQuery(threadsRoot, [
+            limit.map { "limit=\(clampedPageSize($0))" },
+            ExchangeQuery.escape(cursor).map { "cursor=\($0)" },
+        ])
+    }
+
+    /// The newest page of one conversation — the page a poll asks for.
+    static func threadPath(_ threadID: String) -> String {
+        "\(threadsRoot)/\(segment(threadID))"
+    }
+
+    /// An OLDER page: `before` is the previous page's `olderCursor`.
+    ///
+    /// A malformed `before` returns the NEWEST page with a 200, not an error —
+    /// which is why `Conversation.mergeOlder` treats a page with nothing new
+    /// as the end rather than appending it.
+    static func threadPath(_ threadID: String, before: String?, limit: Int? = nil) -> String {
+        withQuery(threadPath(threadID), [
+            limit.map { "limit=\(clampedPageSize($0))" },
+            ExchangeQuery.escape(before).map { "before=\($0)" },
+        ])
+    }
+
+    /// Open (or find) this farm's thread on a listing. Under `listings`, not
+    /// `threads`: the thread does not have an id until this answers.
+    static func openThreadPath(listingID: String) -> String {
+        "\(base)/listings/\(segment(listingID))/thread"
+    }
+
+    static func messagesPath(threadID: String) -> String {
+        "\(threadPath(threadID))/messages"
+    }
+
+    static func readPath(threadID: String) -> String {
+        "\(threadPath(threadID))/read"
+    }
+
+    static func closePath(threadID: String) -> String {
+        "\(threadPath(threadID))/close"
+    }
+
+    /// POST blocks, DELETE unblocks — one path, two verbs.
+    static func blockPath(threadID: String) -> String {
+        "\(threadPath(threadID))/block"
+    }
+
+    /// Retract: under `messages`, not under the thread. A message id is
+    /// enough for the server to find its thread.
+    static func messagePath(messageID: String) -> String {
+        "\(base)/messages/\(segment(messageID))"
+    }
+
+    // MARK: Messaging — reads
+
+    static func decodeThreads(from data: Data) async throws -> ExchangeThreadPage {
+        try await APIClient.shared.decode(data, as: ExchangeThreadPage.self)
+    }
+
+    static func decodeThread(from data: Data) async throws -> ExchangeThread {
+        try await APIClient.shared.decode(data, as: ExchangeThread.self)
+    }
+
+    // MARK: Messaging — writes (BUILT AND UNFIRED)
+
+    /// NOT EXERCISED. Creates a thread the listing's owner sees at once, as
+    /// UNREAD, with no message in it and no notification — an outward-facing
+    /// write on its own. Built and unfired; nothing in development or CI may
+    /// call it.
+    ///
+    /// No body is read by the route; `{}` is sent, as the web does, because
+    /// `APIClient` has no bodiless POST. No `Idempotency-Key`: the domain is
+    /// idempotent — one thread per (listing, inquiring farm) — and a second
+    /// call answers 200 `created: false` with the same id. Two first opens
+    /// racing may answer 409 (unverified); one retry resolves it.
+    static func openThread(listingID: String) async throws -> ExchangeThreadOpened {
+        let data = try await APIClient.shared.postReturningData(
+            openThreadPath(listingID: listingID), body: NoBody(), idempotencyKey: nil
+        )
+        return try await APIClient.shared.decode(data, as: ExchangeThreadOpened.self)
+    }
+
+    /// NOT EXERCISED. Delivers a message to another farm and notifies its
+    /// owners and admins. Built and unfired; nothing in development or CI may
+    /// call it.
+    ///
+    /// ── The key is the caller's, and it is REQUIRED ──
+    ///
+    /// `APIClient.post` defaults `idempotencyKey` to a fresh UUID per CALL,
+    /// which would make every retry a new message. So this takes the key
+    /// explicitly, from `MessageSendKeys`, which keeps one key per (thread,
+    /// exact text) across retries and drops it on any 201.
+    ///
+    /// The server matches a replay on (sending farm, key) ALONE — not the
+    /// thread, not the text — so a key reused for different text returns the
+    /// ORIGINAL message as `replayed: true`. That is why the key is minted,
+    /// never derived from the text: the same «Да» sent to two threads would
+    /// otherwise collapse into the first. `MessageSendKey` can only be
+    /// minted, so an empty or text-derived key cannot reach this call.
+    ///
+    /// `text` is sent as given; pass `MessageBody.validate`'s trimmed text.
+    static func sendMessage(
+        threadID: String, text: String, idempotencyKey: MessageSendKey
+    ) async throws -> ExchangeMessageSent {
+        try await APIClient.shared.post(
+            messagesPath(threadID: threadID),
+            body: SendExchangeMessage(body: text),
+            as: ExchangeMessageSent.self,
+            idempotencyKey: idempotencyKey.value
+        )
+    }
+
+    /// NOT EXERCISED against production from development or CI: it moves the
+    /// read pointer of EVERY member of this farm, not only this user's.
+    ///
+    /// No body (the route reads none) and no key: the pointer only ever moves
+    /// forward to the server's own now, so a repeat is harmless. Callers
+    /// SWALLOW its failure — the seam answers it 501, and a failed mark is
+    /// not something a farmer can act on.
+    static func markRead(threadID: String) async throws -> ExchangeThreadRead {
+        let data = try await APIClient.shared.postReturningData(
+            readPath(threadID: threadID), body: NoBody(), idempotencyKey: nil
+        )
+        return try await APIClient.shared.decode(data, as: ExchangeThreadRead.self)
+    }
+
+    /// NOT EXERCISED. Either party may close; it refuses nothing afterwards
+    /// and the next message from either side reopens it. Idempotent — a
+    /// second close answers `alreadyClosed: true` — so no key.
+    static func closeThread(threadID: String) async throws -> ExchangeThreadClosed {
+        let data = try await APIClient.shared.postReturningData(
+            closePath(threadID: threadID), body: NoBody(), idempotencyKey: nil
+        )
+        return try await APIClient.shared.decode(data, as: ExchangeThreadClosed.self)
+    }
+
+    /// NOT EXERCISED. The listing owner only (`BLOCK_SELLER_ONLY` otherwise).
+    /// Blocks the other FARM across every listing between the two, not just
+    /// this thread — which is why the screen confirms first. Idempotent
+    /// (`alreadyBlocked`), so no key.
+    static func blockParty(threadID: String) async throws -> ExchangePartyBlocked {
+        let data = try await APIClient.shared.postReturningData(
+            blockPath(threadID: threadID), body: NoBody(), idempotencyKey: nil
+        )
+        return try await APIClient.shared.decode(data, as: ExchangePartyBlocked.self)
+    }
+
+    /// NOT EXERCISED. Lifts the farm-pair block everywhere. Always answers
+    /// `{blocked: false}`, blocked or not. A DELETE carries no key.
+    static func unblockParty(threadID: String) async throws -> ExchangePartyUnblocked {
+        let data = try await APIClient.shared.deleteReturningData(blockPath(threadID: threadID))
+        return try await APIClient.shared.decode(data, as: ExchangePartyUnblocked.self)
+    }
+
+    /// NOT EXERCISED. Irreversible from the app — the screen confirms first.
+    /// A soft delete: the message becomes a tombstone for both parties. A
+    /// message already retracted answers 200 too. The 404 is NOT swallowed
+    /// (`deleteReturningData`'s rule): here it means "not visible to this
+    /// farm", and the id came from a page this client just read.
+    static func retractMessage(messageID: String) async throws -> ExchangeMessageRetracted {
+        let data = try await APIClient.shared.deleteReturningData(
+            messagePath(messageID: messageID)
+        )
+        return try await APIClient.shared.decode(data, as: ExchangeMessageRetracted.self)
+    }
+
+    // MARK: Messaging — helpers
+
+    /// `{}` — what the web sends to the routes that read no body.
+    private struct NoBody: Encodable {}
+
+    /// An id as ONE path segment. Server ids are cuids and pass through
+    /// unchanged; the escaping is so that an id that ever carried a `/` or a
+    /// `?` could not move the request to a different route or start a query
+    /// — `APIClient.url(for:)` splits on the first `?`.
+    private static func segment(_ id: String) -> String {
+        id.addingPercentEncoding(withAllowedCharacters: segmentAllowed) ?? id
+    }
+
+    private static let segmentAllowed = CharacterSet.alphanumerics
+        .union(CharacterSet(charactersIn: "-._~"))
+
+    private static func withQuery(_ path: String, _ items: [String?]) -> String {
+        let present = items.compactMap { $0 }
+        return present.isEmpty ? path : path + "?" + present.joined(separator: "&")
     }
 }
 
@@ -204,6 +447,12 @@ struct ExchangeQuery: Equatable, Sendable {
     /// caller owns percent-encoding any value it interpolates. A search
     /// term is arbitrary operator input, so this is not optional.
     func escaped(_ value: String?) -> String? {
+        Self.escape(value)
+    }
+
+    /// The same escaping, for callers with no query to hand — the messaging
+    /// cursors, which travel in a query string exactly as the board's do.
+    static func escape(_ value: String?) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

@@ -43,6 +43,17 @@ enum FixtureCatalogue {
     /// not exist.
     static let fixtureLocationID = "loc_synthetic_1"
 
+    /// The only conversation `exchange-thread.json` holds, and the first row
+    /// of `exchange-threads.json`. Any other thread id is `NO_FIXTURE`, for
+    /// the reason above.
+    ///
+    /// Every messaging WRITE — open, send, read, close, block, unblock,
+    /// retract — stays absent from this table and is answered 501
+    /// `WRITE_REFUSED`. A conversation screen under the seam therefore sees
+    /// its automatic mark-read fail, and must swallow that as it would in
+    /// production.
+    static let fixtureThreadID = "thr_synthetic_1"
+
     /// Routes whose QUERY changes which payload is correct. Consulted first.
     static let byPathAndQuery: [String: String] = table([
         (LocationsAPI.rateUnitsPath, "units-rate"),
@@ -60,6 +71,8 @@ enum FixtureCatalogue {
         (CalculatorAPI.path, "calculator-sample"),
         (ExchangeAPI.listingsPath, "exchange-listings"),
         (ExchangeAPI.myListingsPath, "exchange-my-listings"),
+        (ExchangeAPI.threadsPath, "exchange-threads"),
+        (ExchangeAPI.threadPath(fixtureThreadID), "exchange-thread"),
     ]) { split($0).path }
 
     /// Every fixture the table can name, for the test that proves each one

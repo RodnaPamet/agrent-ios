@@ -1,0 +1,41 @@
+{
+  "threads": [
+    {
+      "id": "thr_synthetic_1",
+      "listingId": "lst_synthetic_1",
+      "listingCommodity": "wheat",
+      "listingRegionName": "Pleven",
+      "listingQuantityTonnes": "250",
+      "sellerDisplayName": "Синтетично стопанство",
+      "role": "seller",
+      "lastMessageAt": "2026-09-28T09:15:00.000Z",
+      "closed": false,
+      "hasUnread": true
+    },
+    {
+      "id": "thr_synthetic_2",
+      "listingId": "lst_synthetic_2",
+      "listingCommodity": "sunflower",
+      "listingRegionName": "Ruse",
+      "listingQuantityTonnes": "12.5",
+      "sellerDisplayName": null,
+      "role": "inquirer",
+      "lastMessageAt": "2026-09-27T16:40:12.345Z",
+      "closed": true,
+      "hasUnread": false
+    },
+    {
+      "id": "thr_synthetic_3",
+      "listingId": "lst_synthetic_3",
+      "listingCommodity": "barley",
+      "listingRegionName": "Dobrich",
+      "listingQuantityTonnes": "40",
+      "sellerDisplayName": null,
+      "role": "broker",
+      "lastMessageAt": "2026-09-20T07:05:00.000Z",
+      "closed": false,
+      "hasUnread": true
+    }
+  ],
+  "nextCursor": null
+}
