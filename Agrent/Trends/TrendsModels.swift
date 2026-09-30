@@ -109,6 +109,16 @@ struct PriceSeries: Decodable, Identifiable, Equatable, Sendable {
     /// either as "the" Bulgarian diesel price would misprice fuel by half
     /// on the screen a farmer uses to plan a season's costs.
     var id: String { "\(source)|\(region)|\(stage ?? "")" }
+
+    /// «1216,62 евро на 1000 литра» — a price in this series' unit, for a
+    /// screen that shows one number rather than a chart (Табло).
+    ///
+    /// Here rather than in the view so it can be tested: the view's own
+    /// `currency/unit` interpolation read «EUR/EUR/1000l» for diesel and every
+    /// other unit that carries its currency (#121), and nothing could see it.
+    func headline(_ price: Double) -> String {
+        "\(Num.text(price)) \(SeriesVocabulary.priceUnit(unit: unit, currency: currency))"
+    }
 }
 
 extension Array where Element == PriceSeries {

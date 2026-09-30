@@ -247,7 +247,10 @@ struct DashboardView: View {
         if let chosen = store.chosenPriceSeries, let latest = chosen.series.points.last {
             Section(preferences.priceCommodity.label) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(Num.text(latest.price)) \(chosen.series.currency)/\(chosen.series.unit)")
+                    // Тенденции's unit wording, not a `currency/unit` of our
+                    // own: every input's unit already carries its currency,
+                    // and interpolating read «1216,62 EUR/EUR/1000l» (#121).
+                    Text(chosen.series.headline(latest.price))
                         .font(.title3.weight(.semibold))
 
                     // The series' own identity, because two Bulgarian diesel

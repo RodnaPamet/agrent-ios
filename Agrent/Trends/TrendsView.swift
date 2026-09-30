@@ -220,7 +220,9 @@ struct TrendsView: View {
             // every series' latest value and age as text, so the screen is
             // not chart-only — but say what this is rather than leaving an
             // unlabelled rectangle.
-            .accessibilityLabel("Графика на цените, \(group.unit), \(group.currency)")
+            // The heading's words, not the raw pair: `EUR/1000l, EUR` was
+            // the doubled currency of #121 spoken, in English, by VoiceOver.
+            .accessibilityLabel("Графика на цените, \(SeriesVocabulary.unitHeading(unit: group.unit, currency: group.currency))")
             .accessibilityHint("Стойностите са изброени под графиката")
 
             ForEach(group.series) { series in
