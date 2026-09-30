@@ -147,7 +147,7 @@ final class SpatialImportTests: XCTestCase {
     /// only on the routes whose spec documents the bare body as prose.
     func testASingleTokenCodeIsNotMistakenForAMessage() {
         let raw = APIClient.APIError.http(status: 401, code: "invalid_grant", message: nil)
-        guard case APIClient.APIError.http(_, let code, let message, _) =
+        guard case APIClient.APIError.http(_, let code, let message, _, _) =
                 SpatialImportAPI.humanised(raw) else {
             return XCTFail("shape changed")
         }
@@ -159,7 +159,7 @@ final class SpatialImportTests: XCTestCase {
     func testACanonicalEnvelopeIsUntouched() {
         let raw = APIClient.APIError.http(
             status: 409, code: "STALE_DATA", message: "Changed on the server")
-        guard case APIClient.APIError.http(_, let code, let message, _) =
+        guard case APIClient.APIError.http(_, let code, let message, _, _) =
                 SpatialImportAPI.humanised(raw) else {
             return XCTFail("shape changed")
         }

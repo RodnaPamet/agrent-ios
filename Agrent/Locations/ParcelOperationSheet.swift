@@ -73,6 +73,10 @@ struct ParcelOperationSheet: View {
     @State private var failureIsRetriable = false
     @State private var queued = false
 
+    /// The error behind `failure`, kept for ONE reason: a 429 that is then
+    /// queued for later closes the outbox's pause — see `queueForLater`.
+    @State private var failureError: Error?
+
     /// Minted ONCE per logical operation and reused across retries. A new
     /// key per attempt defeats the dedupe entirely.
     @State private var idempotencyKey = UUID().uuidString
@@ -345,6 +349,7 @@ struct ParcelOperationSheet: View {
         guard canSave else { return }
         saving = true
         failure = nil
+        failureError = nil
         defer { saving = false }
         do {
             _ = try await LocationsAPI.createOperation(
@@ -354,6 +359,7 @@ struct ParcelOperationSheet: View {
         } catch {
             failure = UserMessage.text(for: error)
             failureIsRetriable = PendingOperations.isWorthRetrying(error)
+            failureError = error
         }
     }
 
@@ -364,11 +370,24 @@ struct ParcelOperationSheet: View {
     /// or the app being killed, and in a field the wait for signal can be
     /// hours. This is the difference between "your work is safe while you
     /// stand here holding the phone" and "your work is safe".
+    ///
+    /// ── A 429 here is the outbox's 429 too ──
+    ///
+    /// The live save and the outbox post to the SAME route and draw on the
+    /// same budget, so a queued item that knew nothing of the refusal would
+    /// be sent by the next foreground flush inside the window — a request
+    /// spent to be told the same thing. So the error closes the outbox's
+    /// pause before the item joins the queue, and the banner shows the wait
+    /// instead of «Изпрати». Any other error is not a 429 and changes
+    /// nothing. «Запиши» stays enabled: a live retry is the operator's call,
+    /// and «повторното изпращане не създава втора операция» is still true of
+    /// one.
     private func queueForLater() async {
         guard let body = try? await APIClient.shared.encodeBody(draft) else {
             failure = "Операцията не можа да бъде запазена на устройството."
             return
         }
+        if let failureError { OutboxStore.shared.pause.absorb(failureError) }
         await OutboxStore.shared.enqueue(PendingOperation(
             id: idempotencyKey,
             locationID: locationID,

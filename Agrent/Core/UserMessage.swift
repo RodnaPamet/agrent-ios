@@ -24,7 +24,11 @@ import Foundation
 enum UserMessage {
     static func text(for error: Error) -> String {
         switch error {
-        case APIClient.APIError.http(let status, let code, let message, let params):
+        // The wait is NOT read here. This line is static — it sits on a
+        // screen until something replaces it — and a count on a static line
+        // goes stale while the person reads it. The surfaces that honour a
+        // pause say when, from the pause itself: `rateLimited` below.
+        case APIClient.APIError.http(let status, let code, let message, let params, _):
             return httpText(status: status, code: code, message: message, params: params)
 
         case let api as APIClient.APIError:
@@ -70,14 +74,86 @@ enum UserMessage {
     ///    category — but it is English, so it is second.
     /// 3. A sentence derived from the STATUS. Says what kind of failure it
     ///    was and nothing it cannot support.
+    ///
+    /// A 429 skips the second: its prose is boilerplate, and English. See the
+    /// status rule inside.
     static func httpText(status: Int, code: String?, message: String?,
                          params: [String: String]? = nil) -> String {
         // A sentence about THIS failure, when the server named what went
         // wrong. Only for codes that have one — see `interpolated`.
         if let code, let built = interpolated(code: code, params: params) { return built }
         if let code, let known = bulgarian[code] { return known }
+        // ── A 429 IS SAID BY STATUS, whatever prose came with it ──
+        //
+        // Measured by running this function on the server's own bodies: the
+        // middleware's 429 carries `RATE_LIMITED`, which is in neither table,
+        // and a message that IS a sentence — "Too many requests. Retry after
+        // 12 seconds." — so the server-message source passed it through.
+        // Every 429 from the middleware and the read limiter reached the
+        // farmer in English, and so would a thrown `RateLimitedError`, whose
+        // "Too many requests" is a sentence too. The status sentence was
+        // reachable only for a body with no usable message at all — the auth
+        // limiter's bare string, or a proxy's page.
+        //
+        // A status rule rather than a `RATE_LIMITED` entry, for the reason
+        // `isHumanSentence` gives: an entry fixes today's producers, and the
+        // next limiter with a new code would be English again. A 429's prose
+        // is boilerplate, and its one real fact — the wait — travels in the
+        // header, where `APIClient` reads it.
+        if status == 429 { return statusText(429) }
         if let message, isHumanSentence(message) { return message }
         return statusText(status)
+    }
+
+    // MARK: - The server asked us to wait
+
+    /// For a surface that HONOURS the pause and can say when it ends.
+    ///
+    /// ≤ 2 minutes it is the status sentence verbatim — «след малко» is what
+    /// this app already says, it needs no timer, and it avoids "след 0
+    /// секунди", which is what a relative formatter says at the end of a
+    /// countdown. Longer, it names the clock time — see `whenRetry`.
+    static func rateLimited(remaining: Duration, now: Date = Date()) -> String {
+        "Твърде много заявки. Опитайте отново \(whenRetry(remaining: remaining, now: now))."
+    }
+
+    /// The outbox banner's line while the queue waits.
+    ///
+    /// IT NEVER ASKS THE FARMER TO ACT. The queue resumes by itself at the
+    /// server's moment, so «опитайте отново» would send a person to press a
+    /// button that is not there — the banner hides «Изпрати» for the length
+    /// of the pause. And it is not phrased as their fault: the budget the
+    /// outbox draws on is the phone's public address, which a carrier shares
+    /// with strangers.
+    ///
+    /// «Изпращането», not «операциите се изпращат», so the line agrees with
+    /// one queued operation and with twenty.
+    static func outboxRateLimited(remaining: Duration, now: Date = Date()) -> String {
+        "Твърде много заявки. Изпращането продължава автоматично "
+            + "\(whenRetry(remaining: remaining, now: now))."
+    }
+
+    /// «след малко», or «в 14:33».
+    ///
+    /// A CLOCK TIME, NOT A COUNT, because nothing re-renders this line every
+    /// second and a count would be wrong by the time it was read. A clock time
+    /// stays true for as long as it is on screen.
+    ///
+    /// ROUNDED UP to the minute, so the promise is never earlier than the
+    /// gate: a queue that resumes at 14:32:11 is shown as «в 14:33», never as
+    /// «в 14:32» with a farmer watching nothing happen for eleven seconds. The
+    /// reference date is a UTC minute boundary and every zone in use today is
+    /// offset from UTC by whole minutes, so a UTC minute is a local one.
+    ///
+    /// Computed from `remaining` at render time, so a wall clock changed
+    /// during the pause moves only this label — the pause itself runs on
+    /// `ContinuousClock` and does not notice.
+    private static func whenRetry(remaining: Duration, now: Date) -> String {
+        let seconds = remaining / .seconds(1)
+        guard seconds > 120 else { return "след малко" }
+        let moment = now.addingTimeInterval(seconds).timeIntervalSinceReferenceDate
+        let minute = (moment / 60).rounded(.up) * 60
+        return "в \(BgDate.time(Date(timeIntervalSinceReferenceDate: minute)))"
     }
 
     /// Would a person read this as language, or as an identifier?

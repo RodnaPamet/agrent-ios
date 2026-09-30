@@ -93,6 +93,53 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   **CLOSED 2026-09-21: 11, confirmed on screen by the owner.** Matches the
   production count exactly (`INPUT_APPLICATION` 9 + `ACTIVITY` 2), so the
   database prediction and the rendered list agree.
+- **`Retry-After` (#112) is held by unit tests and has never met a real
+  429.** What changed: `APIClient` reads the header — never the body — on a
+  429 or 503 and carries it as a fifth value on `APIError.http`; every 429
+  now reads in Bulgarian, where the server's English sentence used to reach
+  the farmer; and the outbox pauses the whole queue in memory, spends no
+  attempt on a 429 and wakes itself at the server's moment
+  (`Agrent/Core/RateLimit.swift`). The pause's alarm is the first trigger
+  that outlives the signed-in screen, and a review found what that exposed:
+  signed out inside a pause, the alarm drained with no token and stamped
+  every queued spray REFUSED — permanently, for records the server never
+  saw. A drain now stops on `notSignedIn` and touches nothing, which also
+  covers the older case of a session that dies mid-drain. No seam answers a
+  429 or carries `Retry-After` — the unit suite runs with no seam at all,
+  and the UI-test fixture protocol serves recorded GETs with 200 and refuses
+  everything else with 501 — so the chain is proven in pieces: the parser
+  against built responses, the pause against a fake clock, the drain's order
+  by a source check, never end to end. Not verified:
+  - the alarm across a real suspension. `ContinuousClock` counts the time
+    away by contract; nobody has watched it on a device, and the foreground
+    flush is the backstop if it does not;
+  - whether production responses carry `Date`. It matters only for the date
+    form of `Retry-After`, which this server never sends;
+  - whether Upstash's sliding window counts rejected hits, which decides how
+    long a streak of 429s lasts;
+  - the banner's new line, «Изпращането продължава автоматично …», is new
+    copy and not yet the owner's. It HAS been rendered — `OutboxBanner.swift`
+    compiled against stand-ins for the store, inside `MainTabView`'s stack,
+    on the iPhone 17e simulator, at Large, xxxLarge, accessibility3 and
+    accessibility5 in both orientations — and that is what capped the
+    banner: at accessibility5 the caption had left the tab 122 points in
+    portrait and 42 in landscape. The banner now scrolls inside half the
+    height, the tab keeps 332 and 141, and nothing moved at Large or
+    xxxLarge. What is left at accessibility5, measured and not fixed: the
+    caption sits below the banner's own fold, and «Изпращането» and
+    «автоматично» break mid-word, as the headline and «Изпрати» already
+    did there. Stacking the row at accessibility sizes would end the breaks
+    but push «Изпрати» below the fold in landscape, so it waits with the
+    caption's order and length for the owner;
+  - neither the sentence VoiceOver reads for the banner nor the
+    announcement «Изпрати» now makes when its own pass meets a 429 has been
+    heard on a device. The announcement is high priority so the focus move
+    that follows a vanished control does not cut it short — which is the
+    documented behaviour, not an observed one;
+  - `BgDate.time` on a phone set to 12-hour time;
+  - `RateLimitPause.messages` exists and nothing uses it: messaging is not
+    built. It is there so the first composer meets one pause per budget
+    rather than growing its own.
 
 ## Decisions locked
 

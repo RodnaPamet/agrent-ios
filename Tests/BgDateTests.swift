@@ -41,6 +41,22 @@ final class BgDateTests: XCTestCase {
         XCTAssertFalse(BgDate.dayMonth(september11).contains("2026"))
     }
 
+    /// A clock time, for the pause caption's «в 14:33». Twenty-four hour and
+    /// no AM/PM whatever the process locale — the en_US runner and a bg_BG
+    /// phone must print the same thing. Built in `Calendar.current` because
+    /// `time` formats in the device's zone, so the hour constructed is the
+    /// hour shown on any runner.
+    func testTheClockTimeIsTwentyFourHourWhateverTheProcessLocaleIs() throws {
+        let calendar = Calendar.current
+        let afternoon = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 29, hour: 14, minute: 32)))
+        let morning = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 29, hour: 9, minute: 5)))
+        XCTAssertEqual(BgDate.time(afternoon), "14:32")
+        XCTAssertEqual(BgDate.time(morning), "9:05")
+        XCTAssertFalse(BgDate.time(afternoon).contains("PM"))
+    }
+
     /// The defect this class exists for, stated as a comparison: the raw
     /// idiom and the declared one must not disagree. On a device set to
     /// en_BG the first of these is English.
