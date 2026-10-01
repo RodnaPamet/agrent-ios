@@ -219,20 +219,31 @@ final class ExchangeUnreadStore {
         if let me = CurrentUserStore.shared.user, me.isOperator { return }
         refreshing = true
         defer { refreshing = false }
+        let epoch = SessionEpoch.current
         do {
             let data = try await APIClient.shared.data(for: ExchangeAPI.threadsPath)
-            apply(try await ExchangeAPI.decodeThreads(from: data).threads)
+            apply(try await ExchangeAPI.decodeThreads(from: data).threads, asOf: epoch)
         } catch {
             // Kept. See above.
         }
     }
 
-    func apply(_ threads: [ExchangeThreadSummary]) {
+    /// `asOf` is REQUIRED, so no caller can apply a page without saying
+    /// which session fetched it: a page that started under A and lands
+    /// after Изход is A's farm's threads, and is dropped (`SessionEpoch`).
+    func apply(_ threads: [ExchangeThreadSummary], asOf epoch: Int) {
+        guard SessionEpoch.isCurrent(epoch) else { return }
         unreadThreadIDs = Set(threads.filter(\.hasUnread).map(\.id))
     }
 
     func markedRead(_ threadID: String) {
         unreadThreadIDs.remove(threadID)
+    }
+
+    /// No badge — part of `SessionReset`. The farm whose threads these were
+    /// may not be the next account's.
+    func reset() {
+        unreadThreadIDs = []
     }
 }
 
@@ -267,11 +278,12 @@ final class ExchangeInboxStore {
     @discardableResult
     func load() async -> Error? {
         if state.value == nil { state = .loading }
+        let epoch = SessionEpoch.current
         do {
             let data = try await APIClient.shared.data(for: ExchangeAPI.threadsPath)
             let page = try await ExchangeAPI.decodeThreads(from: data)
             state = .loaded(page.threads, .fresh)
-            ExchangeUnreadStore.shared.apply(page.threads)
+            ExchangeUnreadStore.shared.apply(page.threads, asOf: epoch)
             return nil
         } catch {
             if Task.isCancelled { return nil }

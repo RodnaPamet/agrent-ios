@@ -89,6 +89,17 @@ final class BottomTabsStore {
         self.isOperator = isOperator
     }
 
+    /// Never chosen, not an operator, nothing pending — part of
+    /// `SessionReset`. The order is the departing USER's (it came from their
+    /// `/me`), and so is the operator flag; the next account's arrives with
+    /// its own `/me`.
+    func reset() {
+        stored = nil
+        isOperator = false
+        isSaving = false
+        saveFailure = nil
+    }
+
     /// Returns whether the write landed.
     ///
     /// The caller needs to know. A sheet that dismisses on failure takes
@@ -104,7 +115,8 @@ final class BottomTabsStore {
         stored = Array(order)
         isSaving = true
         saveFailure = nil
-        defer { isSaving = false }
+        let epoch = SessionEpoch.current
+        defer { if SessionEpoch.isCurrent(epoch) { isSaving = false } }
         do {
             _ = try await APIClient.shared.put(
                 BottomTabsAPI.path,
@@ -113,6 +125,9 @@ final class BottomTabsStore {
             )
             return true
         } catch {
+            // A rollback that lands after Изход would restore the departing
+            // user's bar for the next one.
+            guard SessionEpoch.isCurrent(epoch) else { return false }
             stored = previous
             saveFailure = UserMessage.text(for: error)
             return false

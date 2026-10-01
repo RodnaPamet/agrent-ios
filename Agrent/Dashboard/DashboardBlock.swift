@@ -132,16 +132,39 @@ final class DashboardPreferences {
     private(set) var blocks: [DashboardBlock]
     private(set) var priceCommodity: ChartableCommodity
 
-    private init() {
-        let stored = UserDefaults.standard.stringArray(forKey: Self.blocksKey)
+    /// Where the arrangement is kept. `.standard` in the app; a throwaway
+    /// suite in tests, which must not rewrite the simulator's real one.
+    private let defaults: UserDefaults
+
+    private convenience init() { self.init(defaults: .standard) }
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+        let stored = defaults.stringArray(forKey: Self.blocksKey)
         // An unrecognised raw value is DROPPED, not fatal: a block removed in a
         // later build must not strand a saved arrangement, the same rule
         // `AppSurface` applies to a bar order saved on the web.
         let restored = stored?.compactMap(DashboardBlock.init(rawValue:))
         blocks = restored ?? DashboardBlock.defaultOrder
 
-        let commodity = UserDefaults.standard.string(forKey: Self.priceCommodityKey)
+        let commodity = defaults.string(forKey: Self.priceCommodityKey)
         priceCommodity = commodity.flatMap(ChartableCommodity.init(rawValue:)) ?? .wheat
+    }
+
+    /// The defaults, and the stored keys REMOVED — part of `SessionReset`.
+    ///
+    /// Removed rather than overwritten with the default order, so the next
+    /// person is "never chose" and not "chose exactly the default": the
+    /// difference decides whether a block added in a later build is offered.
+    ///
+    /// Reset although it is stored per device: it is a person's arrangement,
+    /// not a property of the phone, and the crop the price block follows says
+    /// something about the departing user's farm. See `SessionReset`.
+    func reset() {
+        defaults.removeObject(forKey: Self.blocksKey)
+        defaults.removeObject(forKey: Self.priceCommodityKey)
+        blocks = DashboardBlock.defaultOrder
+        priceCommodity = .wheat
     }
 
     func isOn(_ block: DashboardBlock) -> Bool { blocks.contains(block) }
@@ -155,17 +178,17 @@ final class DashboardPreferences {
         } else {
             blocks.append(block)
         }
-        UserDefaults.standard.set(blocks.map(\.rawValue), forKey: Self.blocksKey)
+        defaults.set(blocks.map(\.rawValue), forKey: Self.blocksKey)
     }
 
     func move(from source: IndexSet, to destination: Int) {
         blocks.move(fromOffsets: source, toOffset: destination)
-        UserDefaults.standard.set(blocks.map(\.rawValue), forKey: Self.blocksKey)
+        defaults.set(blocks.map(\.rawValue), forKey: Self.blocksKey)
     }
 
     func select(_ commodity: ChartableCommodity) {
         priceCommodity = commodity
-        UserDefaults.standard.set(commodity.rawValue, forKey: Self.priceCommodityKey)
+        defaults.set(commodity.rawValue, forKey: Self.priceCommodityKey)
     }
 
     /// For tests, which must not inherit whatever this device has stored.
@@ -176,6 +199,9 @@ final class DashboardPreferences {
     }
 
     private init(blocks: [DashboardBlock], commodity: ChartableCommodity) {
+        // A suite nobody else reads: an ephemeral store's toggles and its
+        // `reset()` must not reach the device's real arrangement.
+        self.defaults = UserDefaults(suiteName: "DashboardPreferences.ephemeral.\(UUID().uuidString)") ?? .standard
         self.blocks = blocks
         self.priceCommodity = commodity
     }

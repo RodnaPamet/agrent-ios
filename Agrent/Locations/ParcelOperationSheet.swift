@@ -391,6 +391,11 @@ struct ParcelOperationSheet: View {
         await OutboxStore.shared.enqueue(PendingOperation(
             id: idempotencyKey,
             locationID: locationID,
+            // WHO recorded it, so it is sent only under their session and
+            // parked — not sent, not shown — while anyone else is signed in
+            // (agri-saas#1191 P0.9). `canSave` requires `me`, so this is
+            // never nil from here.
+            ownerUserID: me?.id,
             parcelSummary: "\(parcel.name) · \(kind.label)",
             payload: body,
             createdAt: Date(),
