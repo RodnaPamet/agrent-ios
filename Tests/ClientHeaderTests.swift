@@ -20,18 +20,21 @@ final class ClientHeaderTests: XCTestCase {
                        "a one-component version is major.0, not `ios/1`")
     }
 
-    func testAVersionOutsideTheGrammarIsSentAsZeroNotDropped() {
+    /// Not `ios/0.0`: that parses, so the server would count it as a real
+    /// version. No header is bucketed as `unknown`, which is the truth.
+    func testAVersionOutsideTheGrammarSendsNoHeader() {
         for bad in [nil, "", "1.0+481", "1.x", "1234.0", "1.2345", "٣.١", " 1.0", "1..0"] {
-            XCTAssertEqual(ClientHeader.make(shortVersion: bad), "ios/0.0", "\(bad ?? "nil")")
+            XCTAssertNil(ClientHeader.make(shortVersion: bad), "\(bad ?? "nil")")
         }
     }
 
     func testEveryProducedValueMatchesTheServersGrammar() {
-        for v in ["0.1.0", "1", "1.12", "999.999", "2.3.4", "garbage", nil] {
+        for v in ["0.1.0", "1", "1.12", "999.999", "2.3.4"] {
             let header = ClientHeader.make(shortVersion: v)
-            XCTAssertTrue(matchesGrammar(header), header)
+            XCTAssertTrue(header.map(matchesGrammar) ?? false, "\(v) → \(header ?? "nil")")
         }
-        XCTAssertTrue(matchesGrammar(ClientHeader.value), "the running bundle's value: \(ClientHeader.value)")
+        let running = try? XCTUnwrap(ClientHeader.value, "this build's version must be readable")
+        XCTAssertTrue(running.map(matchesGrammar) ?? false, "the running bundle's value: \(running ?? "nil")")
         // Negative control: the checker does reject what the server rejects.
         for wrong in ["iOS/1.0", "ios/1.0.3", "ios/1.0+481", "ios/1"] {
             XCTAssertFalse(matchesGrammar(wrong), wrong)

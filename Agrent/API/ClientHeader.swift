@@ -28,19 +28,25 @@ import Foundation
 ///
 /// The server buckets an absent value as `unknown` and anything it does not
 /// recognise as `other` — never a 4xx. So a version this file computes
-/// wrongly degrades a counter, not the app. That is also why a version that
-/// does not fit the grammar is SENT AS `ios/0.0` rather than dropped or
-/// clipped: the platform is still true, and a nonsense version is easier
-/// to spot in the counter than a missing header.
+/// wrongly degrades a counter, not the app.
+///
+/// ── An unreadable version sends NO header ──
+///
+/// It first sent `ios/0.0`, on the theory that a nonsense version is easy
+/// to spot. The server session pointed out the flaw (2026-10-01): `0.0`
+/// PARSES, so it is counted as a real version — indistinguishable from "we
+/// could not read it", and colliding with a genuine 0.0. An absent header
+/// is bucketed as `unknown`, which is exactly what it is.
 enum ClientHeader {
     static let name = "X-Agrent-Client"
 
     /// Computed once — the bundle does not change while the app runs.
-    static let value: String = make(shortVersion:
+    static let value: String? = make(shortVersion:
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
 
-    /// `0.1.0` → `ios/0.1`. Pure, so the grammar is testable without a bundle.
-    static func make(shortVersion: String?) -> String {
+    /// `0.1.0` → `ios/0.1`; nil when the version does not fit the grammar.
+    /// Pure, so the grammar is testable without a bundle.
+    static func make(shortVersion: String?) -> String? {
         let parts = (shortVersion ?? "").split(separator: ".", omittingEmptySubsequences: false)
         func component(_ i: Int) -> String? {
             guard i < parts.count else { return nil }
@@ -51,14 +57,17 @@ enum ClientHeader {
         }
         // A bare "1" is major 1, minor 0 — Apple allows a one-component
         // CFBundleShortVersionString, and "ios/1" would not match the grammar.
-        guard let major = component(0) else { return "ios/0.0" }
+        guard let major = component(0) else { return nil }
         let minor = parts.count > 1 ? component(1) : "0"
-        guard let minor else { return "ios/0.0" }
+        guard let minor else { return nil }
         return "ios/\(major).\(minor)"
     }
 
     /// The single place a request gets the header.
+    /// Every request goes through here, even when there is nothing to send —
+    /// so "every request is stamped" stays one rule with no exceptions.
     static func stamp(_ request: inout URLRequest) {
+        guard let value else { return }
         request.setValue(value, forHTTPHeaderField: name)
     }
 }
