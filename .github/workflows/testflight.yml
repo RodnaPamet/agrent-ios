@@ -1,0 +1,264 @@
+name: TestFlight
+
+# Archives a Release build, proves the UI test seam is not in it, and uploads
+# it to App Store Connect, where it appears under TestFlight. Setup the owner
+# does once — app record, API key, the secrets below — is in docs/testflight.md.
+#
+# ── Never on a PR or a push to master ──
+#
+# An upload is outward-facing and cannot be taken back: a build number, once
+# used, is spent for that version. So it runs when someone asks — the Actions
+# tab's "Run workflow" — or when a `v*` tag is pushed, which is also somebody
+# asking, in a way that leaves a name in the history.
+#
+# ── Signing: automatic, through the App Store Connect API key ──
+#
+# Three secrets and one variable, and that is the smallest set that works:
+#
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (secrets), APPLE_TEAM_ID (variable)
+#
+# The upload needs an App Store Connect credential whichever way signing goes,
+# and the API key is the only one that needs no Apple ID password or 2FA. With
+# `-allowProvisioningUpdates` the SAME key also lets xcodebuild register the
+# App ID, make the provisioning profile, and sign the export with the team's
+# cloud-managed Apple Distribution certificate — which never leaves Apple.
+#
+# Manual signing would ADD a .p12, its password, a provisioning profile, and a
+# temporary keychain password to that set, and a profile that expires every
+# year and a certificate whose private key now lives in GitHub. Nothing about
+# this app (no extensions, no special entitlements) needs the control manual
+# signing buys.
+#
+# The team ID is a VARIABLE, not a secret, because it is not one: it is printed
+# in every signed binary. It is still not committed, for the same reason
+# project.yml commits no DEVELOPMENT_TEAM — the team is the owner's account,
+# not a property of the code.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+# One upload at a time, and never cancelled halfway: a cancelled run can leave
+# an upload half-processed in App Store Connect with its build number spent.
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: Archive and upload
+    runs-on: macos-15
+    # An environment, so the owner can add "required reviewers" in Settings →
+    # Environments → testflight and make every upload wait for a click. It
+    # works without that; GitHub creates the environment on first use, and
+    # repository-level secrets are visible to it.
+    environment: testflight
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before anything slow. A missing secret otherwise surfaces twenty
+      # minutes in, as an authentication error from deep inside xcodebuild
+      # that does not say which value was empty.
+      - name: The credentials are configured
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          [ -n "$ASC_KEY_ID" ]    || missing="$missing ASC_KEY_ID(secret)"
+          [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID(secret)"
+          [ -n "$ASC_KEY_P8" ]    || missing="$missing ASC_KEY_P8(secret)"
+          [ -n "$APPLE_TEAM_ID" ] || missing="$missing APPLE_TEAM_ID(variable)"
+          if [ -n "$missing" ]; then
+            echo "::error::Not configured:$missing — see docs/testflight.md."
+            exit 1
+          fi
+          # The commonest paste error: the key ID where the file belongs.
+          case "$ASC_KEY_P8" in
+            *"BEGIN PRIVATE KEY"*) ;;
+            *) echo "::error::ASC_KEY_P8 must be the whole .p8 file, BEGIN/END lines included."
+               exit 1 ;;
+          esac
+          echo "All four are set."
+
+      # The same selection as ci.yml, so a TestFlight build is made by the
+      # toolchain CI verified. See the comment there for why it is pinned to
+      # the newest Xcode and DEVELOPER_DIR is set explicitly.
+      - name: Select Xcode
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$NEWEST" ] || NEWEST=/Applications/Xcode.app
+          echo "DEVELOPER_DIR=$NEWEST/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Selected: $NEWEST"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        run: |
+          xcodebuild -version
+          xcodegen generate
+
+      # ── The two numbers ──
+      #
+      # MARKETING_VERSION is read from project.yml, which stays the one place
+      # it is written; it is not overridden on the command line, only read so
+      # it can be checked and reported.
+      #
+      # The BUILD number must rise for every upload of a version, and
+      # project.yml's `1` cannot. `run_number.run_attempt` does: run_number
+      # increases with every run of this workflow and never repeats, and
+      # Apple compares CFBundleVersion component-wise, so a re-run of run 12
+      # (12.2) is still above its failed first attempt (12.1) and below run 13
+      # (13.1). A re-run of a run that DID upload would otherwise be refused
+      # as a duplicate — the attempt number is what prevents that.
+      #
+      # A pushed tag must name the version it builds. `v0.2.0` on a tree
+      # whose project.yml says 0.1.0 is a mistake in one of the two, and
+      # uploading would publish the wrong one.
+      - name: Versions
+        id: version
+        run: |
+          MARKETING=$(sed -nE 's/^ *MARKETING_VERSION: *"?([0-9.]+)"? *$/\1/p' project.yml | head -1)
+          [ -n "$MARKETING" ] || { echo "::error::No MARKETING_VERSION in project.yml"; exit 1; }
+          BUILD="${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$MARKETING" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match MARKETING_VERSION $MARKETING in project.yml."
+            exit 1
+          fi
+          echo "marketing=$MARKETING" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "Agrent $MARKETING ($BUILD)"
+
+      # The key file is written where xcodebuild is told to look, never into
+      # the checkout, and removed by the last step whether or not this run
+      # succeeded. 0600 because a runner is a shared machine for its lifetime.
+      - name: Write the API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          KEY="$RUNNER_TEMP/asc/AuthKey_${ASC_KEY_ID}.p8"
+          mkdir -p "$RUNNER_TEMP/asc"
+          ( umask 077; printf '%s\n' "$ASC_KEY_P8" > "$KEY" )
+          echo "ASC_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+
+      # THE CONTROL FOR THE SEAM SCAN below — see seam-scan.py. A Debug build
+      # for the simulator: unsigned, fast, and the one product where every
+      # seam symbol is known to be. Built FIRST so the archive is the last
+      # thing compiled and nothing overwrites it.
+      - name: Build the Debug control
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Agrent.xcodeproj -scheme Agrent -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath "$RUNNER_TEMP/debug-dd" \
+            | tee debug.log | grep -E "error:|\*\* BUILD" \
+            || { echo "::error::the Debug build failed"; tail -60 debug.log; exit 1; }
+
+      # `archive` uses the Release configuration (project.yml's scheme says
+      # so, and the guards job checks the exclusion lives under `Release:`).
+      #
+      # DEVELOPMENT_TEAM and CURRENT_PROJECT_VERSION are passed here rather
+      # than written into project.yml: the first is the owner's, the second
+      # is this run's.
+      #
+      # On a fresh runner there is no signing identity at all.
+      # -allowProvisioningUpdates with the API key lets Xcode create what the
+      # archive step needs; the DISTRIBUTION signature is applied at export,
+      # from Apple's cloud-managed certificate.
+      - name: Archive
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Agrent.xcodeproj -scheme Agrent -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/Agrent.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/release-dd" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build }}" \
+            | tee archive.log | grep -E "error:|warning:|\*\* ARCHIVE" \
+            || { echo "::error::the archive failed"; tail -80 archive.log; exit 1; }
+
+      # What App Store Connect would refuse, checked on the runner, where the
+      # failure is red and named, rather than in an email after a green run.
+      - name: The archive passes the upload checks
+        run: |
+          python3 .github/scripts/check-app-bundle.py \
+            "$RUNNER_TEMP/Agrent.xcarchive/Products/Applications/Agrent.app" \
+            "${{ steps.version.outputs.marketing }}" "${{ steps.version.outputs.build }}"
+
+      # THE SAME SCAN as ci.yml's "The UI test seam cannot reach Release",
+      # over the ONE product that certainly reaches phones. CI proves the
+      # Release configuration is clean for the simulator; this proves the
+      # binary about to be uploaded is. If it fails, nothing is uploaded —
+      # the export step below never runs.
+      - name: The UI test seam is not in the archive
+        run: |
+          python3 .github/scripts/seam-scan.py \
+            "$RUNNER_TEMP/Agrent.xcarchive/Products/Applications/Agrent.app" \
+            "$RUNNER_TEMP/debug-dd/Build/Products/Debug-iphonesimulator/Agrent.app"
+
+      # Export and upload in one call (`destination: upload` in the plist).
+      # The team ID goes into a COPY of the options under $RUNNER_TEMP, so
+      # the committed file never holds it.
+      - name: Export and upload to App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          set -o pipefail
+          OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          cp .github/testflight/ExportOptions.plist "$OPTIONS"
+          plutil -insert teamID -string "$APPLE_TEAM_ID" "$OPTIONS"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Agrent.xcarchive" \
+            -exportOptionsPlist "$OPTIONS" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            | tee export.log | grep -E "error:|warning:|Upload|\*\* EXPORT" \
+            || { echo "::error::export/upload failed"; tail -80 export.log; exit 1; }
+          {
+            echo "### Uploaded"
+            echo ""
+            echo "Agrent **${{ steps.version.outputs.marketing }} (${{ steps.version.outputs.build }})** — "
+            echo "App Store Connect processes it for 5–30 min before it appears under TestFlight."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"
+
+      # Logs only — not the archive. The archive is a signed build of the app,
+      # and a workflow artifact on a public repo is downloadable by anyone.
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          path: |
+            debug.log
+            archive.log
+            export.log
+          retention-days: 14
+          if-no-files-found: ignore

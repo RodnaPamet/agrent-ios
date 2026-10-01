@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Read by `xcodebuild -exportArchive` in .github/workflows/testflight.yml.
+
+  `teamID` is deliberately ABSENT. The workflow inserts it from the
+  APPLE_TEAM_ID repository variable (plutil -insert) into a copy under
+  $RUNNER_TEMP, for the same reason project.yml commits no
+  DEVELOPMENT_TEAM: the team is the owner's account, not a property of
+  the code, and this repo is public.
+
+  destination=upload: export and upload are ONE step. xcodebuild signs the
+  .ipa with the team's cloud-managed Apple Distribution certificate and
+  hands it straight to App Store Connect with the same API key — no .ipa
+  on the runner, no altool/Transporter, no Apple ID password.
+
+  manageAppVersionAndBuildNumber=false: the workflow sets the build number
+  itself (from the run number) and the marketing version comes from
+  project.yml. Left true, Xcode may silently bump CFBundleVersion at
+  export, and the number in TestFlight would match nothing in the logs.
+-->
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+	<!-- false: a build may also be offered to EXTERNAL testers (after
+	     Beta App Review). true would lock every build to internal testers
+	     and could not be undone for that build. -->
+	<key>testFlightInternalTestingOnly</key>
+	<false/>
+</dict>
+</plist>
