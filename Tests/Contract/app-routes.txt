@@ -7,6 +7,7 @@
 /api/account/bottom-tabs
 /api/auth/me
 /api/auth/native/exchange
+/api/auth/native/revoke
 /api/auth/native/start
 /api/auth/token/refresh
 /api/t/{tenantSlug}/admin/farm-profile

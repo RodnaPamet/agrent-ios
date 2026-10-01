@@ -64,6 +64,30 @@ final class RouteContractTests: XCTestCase {
     /// ordinary routes and in the inventory.
     private static let nextAuthAllowlist: Set<String> = []
 
+    /// Routes the app calls BEFORE agri-saas serves them: the server side is
+    /// an open PR, so the vendored snapshot cannot contain them yet.
+    ///
+    /// ── Why an allowlist, and not a snapshot refreshed from the PR branch ──
+    ///
+    /// The snapshot's claim is "agri-saas serves this", stamped with a commit.
+    /// Refreshed from an unmerged branch it would claim a route production
+    /// does not serve, stamped with a commit that may never land — and the
+    /// scheduled job, which reads the script's `REF`, would contradict it
+    /// on its next run. This list states the truth instead: the app calls a
+    /// route that is NOT served yet, on purpose, and only where a 404 (or
+    /// NextAuth's catch-all refusing it) is a harmless outcome.
+    ///
+    /// SELF-EXPIRING: `testPendingRoutesAreStillPending` fails once the
+    /// snapshot serves the route, so the refresh that brings it in must also
+    /// take it off this list. An entry cannot outlive its reason.
+    private static let pendingServerRoutes: [String: String] = [
+        // TODO(agri-saas#1206): drop once #1206 merges and the snapshot is
+        // refreshed. Best-effort and fire-and-forget after the local clear
+        // (`SessionRevocation`); until the route ships the request is refused
+        // and ignored, which leaves today's behaviour.
+        "/api/auth/native/revoke": "agri-saas#1206 (open): POST /api/auth/native/revoke",
+    ]
+
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
         // The web app's page routes the bottom tabs map onto, compared with
@@ -88,6 +112,7 @@ final class RouteContractTests: XCTestCase {
         let loc = "{locationId}", parcel = "{parcelId}", id = "{id}"
         var all: [(String, [String])] = [
             ("CurrentUser.swift", [MeAPI.path]),
+            ("SessionReset.swift", [SessionRevocation.path]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
             ("ExchangeAPI.swift", [
@@ -184,6 +209,10 @@ final class RouteContractTests: XCTestCase {
     private static func classify(_ template: String, in inventory: Inventory) -> (String, String?) {
         if nextAuthAllowlist.contains(template) { return ("nextauth (allowlisted)", nil) }
         guard let route = inventory.route(matching: template) else {
+            // Absent AND pending is the one tolerated absence. A pending route
+            // the snapshot HAS falls through to the ordinary outcomes (and
+            // `testPendingRoutesAreStillPending` asks for the entry's removal).
+            if pendingServerRoutes[template] != nil { return ("pending (allowlisted)", nil) }
             return ("ABSENT", "ABSENT   \(template) — agri-saas \(inventory.sha.prefix(12)) "
                     + "serves no route of this shape")
         }
@@ -217,6 +246,31 @@ final class RouteContractTests: XCTestCase {
                        "live, documented")
         XCTAssertEqual(Self.classify("/api/t/{tenantSlug}/nope", in: inv).0, "ABSENT")
         XCTAssertThrowsError(try Inventory.parse("gone documented /api/x"))
+    }
+
+    /// Every pending entry is (a) a path the app really builds, so the list
+    /// cannot hide a typo, and (b) still absent from the snapshot, so it
+    /// expires the moment the server ships the route.
+    func testPendingRoutesAreStillPending() throws {
+        let inventory = try Inventory.load()
+        let app = try Self.appTemplates()
+        for (template, why) in Self.pendingServerRoutes {
+            XCTAssertNotNil(app[template], "\(template) is allowlisted as pending but the app does not build it")
+            XCTAssertNil(inventory.route(matching: template),
+                         "\(template) is now in the snapshot (\(inventory.sha.prefix(12))); "
+                         + "remove it from pendingServerRoutes (\(why))")
+        }
+        // The classification itself, on a known inventory: pending tolerates
+        // ABSENT only; a retired route of the same shape still fails.
+        let inv = try Inventory.parse("""
+        # sha 0123
+        retired documented   /api/auth/native/revoke withdrawn
+        """)
+        XCTAssertEqual(Self.classify("/api/auth/native/revoke", in: inv).0, "RETIRED")
+        XCTAssertEqual(Self.classify("/api/auth/native/revoke",
+                                     in: Inventory(sha: "x", routes: [])).0, "pending (allowlisted)")
+        XCTAssertEqual(Self.classify("/api/auth/native/nope",
+                                     in: Inventory(sha: "x", routes: [])).0, "ABSENT")
     }
 
     /// The #130 path itself, pinned. If this ever matches, the matcher has
