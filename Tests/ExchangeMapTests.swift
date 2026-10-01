@@ -207,3 +207,34 @@ final class RegionAggregateTests: XCTestCase {
         XCTAssertEqual(BulgarianRegion.name(code: "bg-16"), "Пловдив", "lookup must fold case")
     }
 }
+
+/// The map view's offers open the same detail screen as the list view.
+///
+/// Source-reading, because the push is a view property with no runtime hook
+/// in a unit test. The owner could not tap the test listing under the map
+/// (2026-10-01): the rows there were region summaries only. This holds that
+/// every offer the map view shows — by region AND without one — is a link to
+/// `ListingDetailView` through the same `ListingRow` the list view uses.
+final class ExchangeMapOffersAreTappableTests: XCTestCase {
+    private func source(_ relative: String) throws -> String {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        return try String(contentsOf: root.appendingPathComponent(relative), encoding: .utf8)
+    }
+
+    func testEveryOfferUnderTheMapIsALinkToTheDetail() throws {
+        let map = try source("Agrent/Exchange/ExchangeMapView.swift")
+        XCTAssertTrue(map.contains("ListingDetailView(listing: listing)"),
+                      "an offer under the map must open the listing's detail")
+        XCTAssertTrue(map.contains("ListingRow(listing: listing)"),
+                      "the map's offer rows must be the list view's rows")
+        XCTAssertTrue(map.contains("offerLinks(region.listings)"),
+                      "each oblast section must list its offers, not only a summary")
+        XCTAssertTrue(map.contains("offerLinks(unplaceable)"),
+                      "offers without an oblast must still be openable")
+
+        // Positive control: the list view has the same link.
+        let list = try source("Agrent/Exchange/ExchangeView.swift")
+        XCTAssertTrue(list.contains("ListingDetailView(listing: listing)"))
+    }
+}
