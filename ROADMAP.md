@@ -295,6 +295,15 @@ proofs ran; see the commits for each.
   under storage pressure, so it cannot fill a disk. But that cuts both ways:
   the purge is the system's decision and can land right before an operator goes
   into a field. Bound it before Phase 3 puts map and parcel data in there.
+- ~~**URLSession's disk cache shadowed `ResponseCache`.**~~ **CLOSED (#134).**
+  `APIClient` was built from `URLSessionConfiguration.default`, whose
+  `URLCache.shared` is disk-backed, so every 2xx GET agri-saas served without
+  `no-store` — admin members, farm ЕГН/ЕИК/УРН, exchange threads — could land
+  in `Cache.db` regardless of what `ResponseCache` chose to skip. Now OFF
+  app-wide (owner, 2026-10-01): `NoURLCache`. Cost: no transparent
+  `If-None-Match`, so ETagged routes answer full 200s. Not verified: what an
+  old build actually left in a real device's `Cache.db` — the launch purge
+  removes it either way.
 - **No staleness ceiling.** Six-month-old data is served with its age shown.
   The age display is the mitigation and is probably right for a person who can
   judge — but it is a decision, not an oversight, and Phase 3 should revisit it

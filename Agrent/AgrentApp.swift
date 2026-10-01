@@ -10,6 +10,10 @@ struct AgrentApp: App {
     /// `BulgarianLayout`.
     init() {
         BulgarianLayout.install()
+        // Before any scene, for a different reason: before the first request.
+        // Purges what older builds left in Cache.db and replaces
+        // `URLCache.shared` with a zero-capacity one. See `NoURLCache` (#134).
+        NoURLCache.install()
     }
 
     /// Which screen the app opens on.

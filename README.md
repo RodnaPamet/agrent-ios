@@ -101,6 +101,12 @@ build — there is no macOS on the machine this was written on:
 - **Create** an entry: type, date, title, notes.
 - Tokens in the **Keychain**, refreshed automatically on 401, single-flight so
   three concurrent requests cause one refresh.
+- **One disk cache, on purpose.** `ResponseCache` keeps last-known-good reads
+  for offline. URLSession's own HTTP cache (`Cache.db`) is OFF app-wide —
+  every session starts from `NoURLCache.configuration()`, `URLCache.shared` is
+  purged and zeroed at launch, and index tiles load through the same no-cache
+  session (#134). A screen that keeps its data out of `ResponseCache` (admin,
+  messaging) is therefore not on disk at all. `NoURLCacheTests` holds it.
 
 ## Writes, and why they are shaped this way
 

@@ -376,7 +376,10 @@ struct SatelliteParcelMap: UIViewRepresentable {
             }
             guard let template else { return }
 
-            let overlay = MKTileOverlay(urlTemplate: template)
+            // `NoURLCache.TileOverlay`, not a bare `MKTileOverlay`: the
+            // tiles are clipped to the parcel outlines, and MapKit's own
+            // loader would decide for itself where to cache them (#134).
+            let overlay = NoURLCache.TileOverlay(urlTemplate: template)
             // FALSE, and this is the one that would be silently wrong.
             //
             // `true` tells MapKit these tiles ARE the map and it may stop

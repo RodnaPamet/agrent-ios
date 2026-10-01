@@ -124,7 +124,11 @@ final class AuthClient: NSObject {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(["code": code, "code_verifier": verifier])
 
-        let (data, response) = try await URLSession.shared.data(for: req)
+        // `NoURLCache.session`, not `URLSession.shared`: this POST is not
+        // cacheable, but its 200 carries the access AND refresh tokens, and
+        // "nothing lands in Cache.db" is cheaper to hold as a rule than to
+        // argue per request (#134).
+        let (data, response) = try await NoURLCache.session.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         Log.auth.info("native exchange → \(status, privacy: .public)")
         guard status == 200 else {
