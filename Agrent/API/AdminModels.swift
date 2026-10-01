@@ -205,6 +205,27 @@ struct FarmProfile: Decodable, Equatable, Sendable {
     /// `[]`, not `nil`, which is why it cannot join `isEmpty`'s array below.
     let grainProduced: [String]
 
+    /// The optimistic-lock version (agri-saas#1184). Sent back as `If-Match`
+    /// on the save, so a write made over a profile someone else has since
+    /// changed is a 409 rather than a silent overwrite.
+    ///
+    /// `0` IS A SENTINEL, not a version: GET answers an all-null body for a
+    /// tenant with no row, and reports 0 for it. No stored row ever carries 0
+    /// (the column defaults to 1), so `If-Match: 0` means exactly "create" —
+    /// and fails with a 409 if someone created the row first.
+    ///
+    /// OPTIONAL although the spec puts it in `required`. That is the safe
+    /// direction `DecoderToleranceTests` asks for: a server rolled back to
+    /// before #1184 omits it, and a non-optional would turn the whole profile
+    /// screen into an error over a field nobody reads on screen. nil means
+    /// "the server offered no lock" and the save goes UNGUARDED, which is
+    /// exactly what the server documents for an absent header — never a
+    /// guessed 0, which would be a create attempt over an existing row.
+    ///
+    /// `var` with a default so the memberwise init — the all-null stand-in
+    /// for a 403 and every test fixture — need not mention it.
+    var version: Int? = nil
+
     /// Nothing filled in at all, which is the state this tenant is in and
     /// needs saying rather than showing thirteen empty rows.
     ///

@@ -118,21 +118,36 @@ enum AdminAPI {
 
     private struct EmptyBody: Encodable {}
 
-    /// Replace the farm profile. `PUT /admin/farm-profile`, `admin.manage`
-    /// (OWNER and ADMIN), returning the stored profile AFTER normalisation.
+    /// Save the farm profile. `PUT /admin/farm-profile`, `admin.manage`
+    /// (OWNER and ADMIN), returning the stored profile AFTER normalisation —
+    /// with the NEW `version`, so the next save needs no re-GET.
     ///
-    /// A FULL REPLACE THAT LOOKS LIKE A PATCH (agri-saas#1176): every key the
-    /// body leaves out is nulled. `FarmProfileUpdate` always encodes all
-    /// thirteen — build it with `FarmProfileUpdate.build`, never by hand.
+    /// MERGE SEMANTICS since agri-saas#1176/#1181: an absent key is left
+    /// alone and an explicit null clears. `FarmProfileUpdate` still encodes
+    /// all thirteen — correct either way, and it does not depend on which
+    /// server build answers. Build it with `FarmProfileUpdate.build`.
     ///
-    /// No idempotency key and no If-Match: the route reads neither, and a
-    /// whole-object PUT is idempotent by construction (`APIClient.put`).
-    /// Concurrency is last-write-wins on the whole record — a known limit,
-    /// not something a header here could fix.
+    /// `If-Match: <body.expectedVersion>` (agri-saas#1184) — the version the
+    /// draft was built from, carried ON the body so it cannot be mixed up
+    /// with a newer version a refresh behind the sheet loaded. A stale one is
+    /// a 409 STALE_DATA → `APIError.conflict`, never a save. nil (a server
+    /// that reported no version) sends no header: unguarded, last-write-wins,
+    /// which the route documents as supported.
+    ///
+    /// No idempotency key: a whole-object PUT is idempotent by construction
+    /// (`APIClient.put`). A replay of a save that LANDED is a 409 now — the
+    /// version moved — which is the honest answer: reload and look.
     ///
     /// The path carries the tenant and nothing else. ЕГН, ЕИК and УРН travel
     /// in the BODY only — never a query string, which a proxy log would keep.
     static func saveFarmProfile(_ body: FarmProfileUpdate) async throws -> FarmProfile {
-        try await APIClient.shared.put(farmProfilePath, body: body, as: FarmProfile.self)
+        try await APIClient.shared.put(farmProfilePath, body: body,
+                                       ifMatch: body.expectedVersion, as: FarmProfile.self)
+    }
+
+    /// Re-read the profile. For the editor's reload after a 409.
+    static func fetchFarmProfile() async throws -> FarmProfile {
+        let data = try await APIClient.shared.data(for: farmProfilePath)
+        return try await decodeFarmProfile(from: data)
     }
 }

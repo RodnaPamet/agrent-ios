@@ -292,6 +292,28 @@ actor APIClient {
         (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error
     }
 
+    /// What a 409 becomes. Out of `send` so the mapping is a unit test: there
+    /// is no URLProtocol seam in `Tests/`, and "the versions come from
+    /// `error.details`, not the body root" is exactly the rule that silently
+    /// broke on the web (#922).
+    static func conflict(from data: Data) -> APIError {
+        let env = envelope(from: data)
+        return .conflict(
+            currentVersion: env?.details?.currentVersion,
+            expectedVersion: env?.details?.expectedVersion
+        )
+    }
+
+    /// The `If-Match` value for a version: the BARE integer, `5`.
+    ///
+    /// One spelling for every locked route. The journal and field-operations
+    /// routes accept only this; the farm profile also takes a strong tag
+    /// (`"5"`) but REFUSES a weak one (`W/"5"`) with a 400, and unlike the
+    /// other two it does not fall through to "no precondition" on a value it
+    /// cannot parse (agri-saas#1182). The bare integer is the one form all
+    /// three read the same way.
+    static func ifMatch(_ version: Int) -> String { String(version) }
+
     // MARK: - Retry-After
 
     /// The longest wait this client will honour, in seconds.
@@ -425,7 +447,7 @@ actor APIClient {
         let payload = try encoder.encode(body)
         let data = try await send(
             path: path, method: "PATCH", body: payload,
-            idempotencyKey: idempotencyKey, ifMatch: String(version)
+            idempotencyKey: idempotencyKey, ifMatch: Self.ifMatch(version)
         )
         return try decoder.decode(T.self, from: data)
     }
@@ -501,12 +523,18 @@ actor APIClient {
     /// sending it twice leaves the same state — so a key would be
     /// ceremony. Same reasoning `setTaskStatus` records for comparing
     /// state rather than replaying a request.
+    ///
+    /// `ifMatch` is OPTIONAL here, unlike `patch`, because the one locked PUT
+    /// (`/admin/farm-profile`, agri-saas#1184) documents an absent header as
+    /// a supported unguarded write — and the caller only has a version to send
+    /// when the server reported one. nil sends no header at all.
     func put<B: Encodable, T: Decodable>(
-        _ path: String, body: B, as _: T.Type
+        _ path: String, body: B, ifMatch version: Int? = nil, as _: T.Type
     ) async throws -> T {
         let payload = try encoder.encode(body)
         let data = try await send(
-            path: path, method: "PUT", body: payload, idempotencyKey: nil
+            path: path, method: "PUT", body: payload, idempotencyKey: nil,
+            ifMatch: version.map(Self.ifMatch)
         )
         // A 204 carries no body. `EmptyResponse` decodes nothing, but
         // JSONDecoder still refuses zero bytes, so an empty body becomes
@@ -662,11 +690,7 @@ actor APIClient {
         case 200..<300:
             return data
         case 409:
-            let env = Self.envelope(from: data)
-            throw APIError.conflict(
-                currentVersion: env?.details?.currentVersion,
-                expectedVersion: env?.details?.expectedVersion
-            )
+            throw Self.conflict(from: data)
         case 304:
             throw APIError.notModified
         case 426:

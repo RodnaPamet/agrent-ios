@@ -445,11 +445,11 @@ is the spec for limits. No separate written iOS plan exists in agri-saas
 
 What the client must get right, read from the route and usecase:
 
-- **A full replace that looks like a PATCH** (agri-saas#1176, open). Every
-  field is `.optional()`, but an ABSENT field is nulled. So the app always
-  reads, merges the edits and PUTs all thirteen keys with explicit nulls.
-  `UpdateFarmProfileRequest` in openapi.json is a stub; the request is modelled
-  from the zod schema.
+- **Merge semantics since agri-saas#1181** (fixing #1176): an ABSENT field
+  is left alone and an explicit null (or blank) clears. Before that an absent
+  field was nulled. The app still reads, merges the edits and PUTs all
+  thirteen keys with explicit nulls — correct under both. The request is
+  documented now (`UpdateFarmProfileRequest`, #1178).
 - **`admin.manage` on GET and PUT** — OWNER and ADMIN. The edit action shows
   only over a profile the GET returned.
 - **The response can differ from the request** (trim, `sanitizePlainText`,
@@ -457,8 +457,18 @@ What the client must get right, read from the route and usecase:
   server returned and says what moved.
 - **A negative `sizeHa` is a 400** from zod, not a stored null as the summary
   says — the usecase's null branch is unreachable over HTTP.
-- **Last write wins** on the whole record: no version, ETag or If-Match.
-  A known limit, recorded on #1176.
+- **Optimistic lock** (agri-saas#1184, client since 2026-10-01). GET
+  returns `version` (0 = no row yet; `If-Match: 0` creates). The save sends
+  `If-Match: <version the sheet opened on>` as a bare integer — carried on
+  the built body, not read from the store, so a refresh behind the sheet
+  cannot lend it a newer version. A 409 `STALE_DATA` (versions nested under
+  `error.details`) is never a save and never retried: the sheet says the
+  profile was changed by someone else and offers «Презареди», which
+  re-reads and re-applies the farmer's edits over the new profile, naming
+  any field both people changed (`FarmProfileRebase`). The response's
+  version is the next save's `If-Match`. `version` is decoded as optional:
+  a server without the lock is saved unguarded, as the route documents for
+  an absent header. The former "last write wins" limit is gone.
 
 iOS-only, on purpose: ЕГН masked with a reveal in view and edit (#110); an
 unparseable size refused instead of sent as null (the web's null clears it);

@@ -16,24 +16,20 @@ import Foundation
 //
 // ── WHAT THE SERVER REALLY DOES, read from the code, not the summary ──
 //
-//   OMITTED CLEARS TOO (agri-saas#1176, open). The schema says "every field
-//   is optional", which reads like PATCH. It is not: the usecase maps EVERY
-//   field through `norm(input[k])`, `norm(undefined)` is null, and an absent
-//   `grainProduced` becomes `[]`. A body that left out `egn` would erase the
-//   farm's ЕГН. So the body below always carries all thirteen keys, with
-//   explicit nulls — Swift's synthesised `Encodable` OMITS nil optionals,
-//   which would have been the same erase by another route. Never a per-field
-//   PUT.
+//   ABSENT IS LEFT ALONE NOW (agri-saas#1176, fixed by #1181). It used to
+//   clear: the usecase mapped every field through `norm(input[k])` and
+//   `norm(undefined)` was null, so a body that left out `egn` erased the
+//   farm's ЕГН. The body below STILL carries all thirteen keys with explicit
+//   nulls — correct under both semantics, so it does not matter which server
+//   build answers, and it is the read-modify-write the web page does too.
+//   Swift's synthesised `Encodable` omits nil optionals, which under the old
+//   semantics would have been the same erase by another route; it stays
+//   replaced. An explicit null still clears, and that is the one way to.
 //
-//   THE REQUEST IS MODELLED FROM THE ROUTE'S ZOD SCHEMA: on agri-saas main
-//   `components.schemas.UpdateFarmProfileRequest` is a stub with zero
-//   properties (also #1176). The limits below are `UpdateFarmProfileSchema`
-//   in `admin/farm-profile/route.ts`. agri-saas#1178 (unmerged at the time
-//   of writing) documents it: THIRTEEN properties, NONE required — and its
-//   own description says "absent is not leave alone". Checked 2026-10-01
-//   against #1178's head: its thirteen are exactly `FarmProfileText`'s
-//   eleven plus `sizeHa` and `grainProduced`. "None required" does NOT
-//   permit a subset.
+//   THE REQUEST IS DOCUMENTED NOW (#1178): `UpdateFarmProfileRequest` has
+//   the thirteen properties, none required, and the limits below match its
+//   `maxLength`s — exactly `FarmProfileText`'s eleven plus `sizeHa` and
+//   `grainProduced`.
 //
 //   A NEGATIVE SIZE IS A 400, not a stored null. The usecase does refuse a
 //   negative as null, but zod's `.nonnegative()` in the route rejects it
@@ -41,16 +37,21 @@ import Foundation
 //   before sending; the response diff still reports a size the server
 //   dropped, in case the two ever drift.
 //
-//   NO VERSION, NO ETag, NO If-Match, no `updatedAt` on the wire. Last
-//   writer wins on the WHOLE record: two admins editing at once lose one
-//   edit silently. A known limit, recorded on #1176 — not papered over with
-//   a client-side lock, which would only narrow the window and read as
-//   protection that is not there.
+//   OPTIMISTIC LOCK (agri-saas#1184). GET reports `version`; the save sends
+//   it back as `If-Match` (a bare integer) and a stale one is a 409
+//   STALE_DATA with `currentVersion` / `expectedVersion` under
+//   `error.details`. The editor then STOPS: no overwrite, no silent retry —
+//   it says someone else saved, and «Презареди» re-reads the profile and
+//   re-applies the farmer's edits over it (`FarmProfileRebase`), naming any
+//   field both people changed. Before #1184 this was last-write-wins on the
+//   whole record and two admins lost an edit silently.
 //
-//   SAFE TO RETRY. A PUT of the whole object is idempotent by construction —
-//   a replay stores the same row (and writes one more audit line). So a
-//   timeout offers «Запази» again rather than the unknown-outcome warning
-//   the member writes need.
+//   SAFE TO RETRY, with one new answer. A PUT of the whole object is
+//   idempotent by construction, so a timeout offers «Запази» again rather
+//   than the unknown-outcome warning the member writes need. What changed
+//   with the lock: if the timed-out save DID land, the retry carries the
+//   old version and is a 409 — the conflict screen, not a lost write, and a
+//   reload shows the farmer their own save.
 
 /// The eleven text fields, in the WEB's order (`TEXT_FIELDS` in the page).
 ///
@@ -244,12 +245,23 @@ struct FarmProfileDraft: Equatable, Sendable {
 
 /// The PUT body: all thirteen keys, ALWAYS, nulls explicit.
 ///
-/// See the file header — an omitted key is erased server-side, so the
-/// synthesised `Encodable` (which omits nils) is replaced rather than trusted.
+/// See the file header — an omitted key used to be erased server-side, so
+/// the synthesised `Encodable` (which omits nils) is replaced rather than
+/// trusted.
 struct FarmProfileUpdate: Encodable, Equatable, Sendable {
     var text: [FarmProfileText: String?]
     var sizeHa: Double?
     var grainProduced: [String]
+
+    /// The version of the profile this body was BUILT OVER — the `If-Match`.
+    /// NOT ENCODED: it is a header, and the body schema has no `version`.
+    ///
+    /// Carried here rather than read from the store at send time, because
+    /// the store's copy can move under an open sheet (pull-to-refresh behind
+    /// it). Sending the newer version with edits made over the older one
+    /// would pass the lock and overwrite a change the farmer never saw —
+    /// precisely the lost update the lock exists for.
+    var expectedVersion: Int? = nil
 
     private struct Key: CodingKey {
         var stringValue: String
@@ -359,8 +371,86 @@ struct FarmProfileUpdate: Encodable, Equatable, Sendable {
         }
 
         if !problems.isEmpty { return .failure(Refusal(problems: problems)) }
-        return .success(FarmProfileUpdate(text: text, sizeHa: sizeHa, grainProduced: crops))
+        return .success(FarmProfileUpdate(text: text, sizeHa: sizeHa, grainProduced: crops,
+                                          expectedVersion: original.version))
     }
+}
+
+/// After a 409: the farmer's edits, re-applied over the profile as it is NOW.
+///
+/// The cheap way to keep unsaved edits through a reload, and it falls out of
+/// how `build` already works. An edit is "this field differs from what I was
+/// shown" — so it is judged against the OLD profile and carried across, while
+/// every field the farmer did not touch takes the NEW stored value. The
+/// other person's changes to fields this farmer left alone therefore survive
+/// the next save, instead of being written back over with stale values.
+///
+/// SAME-FIELD COLLISIONS ARE NAMED, NOT RESOLVED. Where both people changed
+/// one field, the farmer's value is kept in the box (it is what they typed)
+/// and a note says what the other person stored, so pressing «Запази» again
+/// is an informed overwrite rather than the silent one the lock prevents.
+/// Where both typed the SAME value there is nothing to say.
+struct FarmProfileRebase: Equatable {
+    let draft: FarmProfileDraft
+    let collisions: [String]
+
+    static func rebase(_ draft: FarmProfileDraft, from old: FarmProfile,
+                       onto fresh: FarmProfile) -> FarmProfileRebase {
+        let before = FarmProfileDraft(old)
+        let now = FarmProfileDraft(fresh)
+        var out = now
+        var collisions: [String] = []
+
+        /// Both sides moved the same value, to different places.
+        func collided<V: Equatable>(_ mine: V, _ was: V, _ theirs: V) -> Bool {
+            mine != was && theirs != was && theirs != mine
+        }
+
+        for field in FarmProfileText.allCases where draft[field] != before[field] {
+            out[field] = draft[field]
+            guard collided(draft[field], before[field], now[field]) else { continue }
+            if field == .egn {
+                // NEVER the value — the same rule as `FarmProfileSaveReport`:
+                // this is plain text on screen and in the accessibility tree.
+                collisions.append("«ЕГН» е променено и от друг потребител — проверете го.")
+            } else {
+                let theirs = now[field].isEmpty ? "празно" : "«\(now[field])»"
+                collisions.append("«\(field.label)»: друг потребител е записал \(theirs).")
+            }
+        }
+        if draft.sizeHa != before.sizeHa {
+            out.sizeHa = draft.sizeHa
+            if collided(draft.sizeHa, before.sizeHa, now.sizeHa) {
+                let theirs = now.sizeHa.isEmpty ? "празно" : "\(now.sizeHa) ха"
+                collisions.append("Размер: друг потребител е записал \(theirs).")
+            }
+        }
+        if draft.crops != before.crops {
+            out.crops = draft.crops
+            if collided(draft.crops, before.crops, now.crops) {
+                let theirs = now.crops.isEmpty ? "празно" : now.crops.joined(separator: ", ")
+                collisions.append("Култури: друг потребител е записал \(theirs).")
+            }
+        }
+        return FarmProfileRebase(draft: out, collisions: collisions)
+    }
+}
+
+/// The words for a 409 on the farm-profile save.
+///
+/// THERE IS NO CONFLICT SCREEN ELSEWHERE IN THIS APP TO COPY. The journal is
+/// read-and-create on iOS, and the one `.conflict` catch (opening a Борса
+/// thread) retries because there it is a duplicate, not a lost update. The
+/// wording starts from `APIError.conflict`'s own sentence — «Записът е
+/// променен на сървъра, докато го редактирахте.» — said about THIS record.
+enum FarmProfileConflict {
+    static let message = "Профилът е променен от друг потребител, докато го "
+        + "редактирахте. Промените ви не са записани."
+    static let advice = "«Презареди» показва записаното сега и запазва "
+        + "вашите промени в полетата, които сте редактирали."
+    static let reload = "Презареди"
+    /// After the reload, before the next save.
+    static let reloaded = "Профилът е презареден. Прегледайте и запазете отново."
 }
 
 /// What to tell the farmer after a save, from what the SERVER RETURNED.
