@@ -8,6 +8,12 @@ import SwiftUI
 /// which the web does not have; every other list in this app does.
 struct ExchangeInboxView: View {
     let store: ExchangeInboxStore
+    /// Takes the farmer to «Обяви». A conversation can only START from a
+    /// listing — the inbox lists the ones that exist — so an empty inbox
+    /// that only says so leaves the farmer nowhere to go. The owner could
+    /// not find where to write from (2026-10-01); this is the answer, on
+    /// the screen where the question is asked.
+    var showListings: () -> Void = {}
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -36,8 +42,13 @@ struct ExchangeInboxView: View {
             EmptyState(
                 "Няма разговори",
                 icon: "bubble.left.and.bubble.right",
-                message: "Все още няма разговори. Започнете от обява, която ви интересува."
-            )
+                message: "Разговор започва от обява на друго стопанство: отворете я и "
+                    + "натиснете «Съобщение до продавача»."
+            ) {
+                Button("Към обявите") { showListings() }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityInputLabels(A11y.spokenNames("Към обявите", "Listings"))
+            }
 
         case .loaded(let rows, _):
             List {

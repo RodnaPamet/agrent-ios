@@ -52,7 +52,7 @@ final class MenuSheetCloseTests: XCTestCase {
         }
         let modifier = String(menu[start.lowerBound...])
         XCTAssertTrue(modifier.contains("if presentedFromMenu {"))
-        XCTAssertTrue(modifier.contains("placement: .cancellationAction"))
+        XCTAssertTrue(modifier.contains("placement: .topBarTrailing"))
         XCTAssertTrue(modifier.contains(#"Button("Затвори") { dismiss() }"#))
         XCTAssertTrue(modifier.contains(".accessibilityInputLabels(A11y.Spoken.close)"))
         // Both `appMenu` overloads carry it, so a screen with a menu has it.

@@ -130,8 +130,8 @@ extension View {
     /// placement cannot drift between tabs — the drift is silent, because
     /// nobody opens all five in a row.
     ///
-    /// Moved from leading to trailing on the owner's instruction. The
-    /// bottom-row editor that used to sit in this slot has gone with it —
+    /// LEADING, on the owner's instruction (2026-10-01). It was leading
+    /// first, moved to trailing in #68, and went back. The bottom-row editor that used to sit in this slot has gone with it —
     /// it now lives inside Админ, where the other settings are, rather than
     /// riding along on every screen. That leaves one glyph in the bar
     /// instead of two, which is also what gives a Bulgarian title back the
@@ -142,7 +142,7 @@ extension View {
     /// together and a new surface cannot get one without the other.
     func appMenu() -> some View {
         toolbar {
-            ToolbarItem(placement: .topBarTrailing) { AppMenuButton(extra: { EmptyView() }) }
+            ToolbarItem(placement: .topBarLeading) { AppMenuButton(extra: { EmptyView() }) }
         }
         .closeWhenPresentedFromMenu()
     }
@@ -150,7 +150,7 @@ extension View {
     /// The menu, plus items belonging to THIS screen.
     func appMenu<Extra: View>(@ViewBuilder extra: @escaping () -> Extra) -> some View {
         toolbar {
-            ToolbarItem(placement: .topBarTrailing) { AppMenuButton(extra: extra) }
+            ToolbarItem(placement: .topBarLeading) { AppMenuButton(extra: extra) }
         }
         .closeWhenPresentedFromMenu()
     }
@@ -194,7 +194,11 @@ private struct MenuSheetClose: ViewModifier {
     func body(content: Content) -> some View {
         content.toolbar {
             if presentedFromMenu {
-                ToolbarItem(placement: .cancellationAction) {
+                // TRAILING, not `.cancellationAction`. In a sheet the system
+                // puts a cancellation action on the LEADING edge — where the
+                // menu glyph now sits — and two controls stacked in one corner
+                // read as one. The opposite corner keeps them apart.
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Затвори") { dismiss() }
                         .accessibilityInputLabels(A11y.Spoken.close)
                 }
