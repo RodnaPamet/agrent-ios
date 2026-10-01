@@ -1,0 +1,126 @@
+name: agri-saas routes
+
+# IS THE VENDORED ROUTE SNAPSHOT STILL WHAT THE SERVER SERVES? (agrent-ios#132)
+#
+# `RouteContractTests` checks every path the app builds against
+# Tests/Contract/agri-saas-routes.txt, a snapshot stamped with the agri-saas
+# commit it came from. A snapshot keeps PR CI here independent of the other
+# repo — the server changes about daily, and a live fetch would redden
+# unrelated PRs on its schedule. The price is that the snapshot goes stale
+# silently. This job is what makes it loud.
+#
+# NOT ON PULL REQUESTS, deliberately. It reads another repository's branch;
+# coupling a PR's verdict to that is exactly what the snapshot exists to
+# avoid. Schedule and manual dispatch only.
+#
+# It FAILS ON ANY DIFFERENCE, including the routine additive kind, because a
+# red run is the prompt to refresh the snapshot (run the script, commit, open
+# a PR — which then runs the real test on macOS). The log separates the
+# routine from the urgent: an app path the server no longer serves is an
+# ::error:: line of its own, ahead of the plain list of what changed.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agri-saas-routes
+  cancel-in-progress: true
+
+jobs:
+  diff:
+    name: Snapshot matches agri-saas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same script a developer runs, so the job cannot disagree with a
+      # local refresh about format. Which agri-saas branch it reads is set in
+      # the script (`REF`), not here.
+      - name: Regenerate from agri-saas
+        run: OUT="$RUNNER_TEMP/routes.txt" scripts/refresh-agri-saas-routes.sh
+
+      - name: Compare with the vendored snapshot
+        run: |
+          python3 - "$RUNNER_TEMP/routes.txt" <<'DIFF'
+          import os, re, sys
+
+          def load(path):
+              sha, routes = None, {}
+              for line in open(path, encoding='utf-8'):
+                  line = line.rstrip('\n')
+                  if line.startswith('# sha '):
+                      sha = line[6:]
+                  if not line or line.startswith('#'):
+                      continue
+                  status, doc, rest = line.split(None, 2)
+                  path, _, reason = rest.partition(' ')
+                  routes[path] = (status, doc, reason)
+              return sha, routes
+
+          # `{id}` and `{listingId}` are the same segment to a router. The app
+          # spells parameters its own way, so app paths are matched by shape.
+          def shape(p):
+              return re.sub(r'/\{[^/}]*\}(?=/|$)', '/{}', p)
+
+          old_sha, old = load('Tests/Contract/agri-saas-routes.txt')
+          new_sha, new = load(sys.argv[1])
+          app = [l.strip() for l in open('Tests/Contract/app-routes.txt', encoding='utf-8')
+                 if l.strip() and not l.startswith('#')]
+          # Live wins over retired: a server-side rename of a PARAMETER retires
+          # `/x/{id}` and adds `/x/{xId}`, one shape, and the app is fine.
+          by_shape = {}
+          for p, v in sorted(new.items(), key=lambda kv: kv[1][0] == 'live'):
+              by_shape[shape(p)] = (p, v)
+
+          out = []
+          def say(s=''):
+              print(s)
+              out.append(s)
+
+          say('vendored snapshot: agri-saas %s' % old_sha)
+          say('agri-saas now:     %s' % new_sha)
+
+          # The urgent part first: what the APP calls that is no longer served.
+          broken = []
+          for p in app:
+              hit = by_shape.get(shape(p))
+              if hit is None:
+                  broken.append('ABSENT  %s — the app builds it; agri-saas serves no route of this shape' % p)
+              elif hit[1][0] != 'live':
+                  broken.append('RETIRED %s (server: %s) — %s' % (p, hit[0], hit[1][2] or 'no reason given'))
+          for b in broken:
+              print('::error::App path no longer served: %s' % b)
+              out.append('- **%s**' % b)
+
+          added = sorted(set(new) - set(old))
+          removed = sorted(set(old) - set(new))
+          changed = sorted(p for p in set(old) & set(new) if old[p] != new[p])
+          for title, paths, fmt in (
+              ('Added', added, lambda p: '%s %s %s' % (new[p][0], new[p][1], p)),
+              ('Removed from the inventory (it is append-only; this should not happen)', removed, lambda p: p),
+              ('Changed status', changed, lambda p: '%s: %s/%s -> %s/%s %s' % (
+                  p, old[p][0], old[p][1], new[p][0], new[p][1], new[p][2])),
+          ):
+              if paths:
+                  say('')
+                  say('%s (%d):' % (title, len(paths)))
+                  for p in paths:
+                      say('  ' + fmt(p))
+
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as f:
+                  f.write('```\n' + '\n'.join(out) + '\n```\n')
+
+          if broken or added or removed or changed:
+              print('::error::Tests/Contract/agri-saas-routes.txt is stale. Refresh it with '
+                    'scripts/refresh-agri-saas-routes.sh and open a PR; RouteContractTests '
+                    'then runs against the new snapshot.')
+              sys.exit(1)
+          print('Snapshot matches agri-saas %s (only the stamped SHA may differ).' % new_sha)
+          DIFF
