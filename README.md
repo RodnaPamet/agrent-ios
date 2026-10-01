@@ -78,6 +78,10 @@ Then:
    A free Apple ID gives a 7-day provisioning profile; a paid account a year.
    Plug the iPhone in, pick it as the run destination, ⌘R.
 
+4. **TestFlight** builds come from CI, not from this machine — see
+   [`docs/testflight.md`](docs/testflight.md) for the one-time App Store
+   Connect setup and the secrets the workflow needs.
+
 ### What is most likely to fail on that first compile
 
 Two shapes, both in `AuthClient.swift`, flagged from reading rather than from a

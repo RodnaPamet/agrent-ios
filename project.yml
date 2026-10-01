@@ -94,6 +94,10 @@ targets:
       path: Agrent/Info.plist
       properties:
         CFBundleDisplayName: Agrent
+        # Every Xcode iOS template sets it and XcodeGen's generated plist does
+        # not; the processed Info.plist of an Xcode 26.6 archive lacked it.
+        # Declared so an App Store validator never has to infer it.
+        LSRequiresIPhoneOS: true
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
@@ -101,6 +105,31 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # iPAD GETS ALL FOUR, OR THE UPLOAD IS REFUSED. TARGETED_DEVICE_FAMILY
+        # is "1,2", so this is an iPad app too, and an iPad app that supports
+        # multitasking must declare upside-down portrait as well (ITMS-90474,
+        # "Invalid Bundle"). The key above applies to iPad when this one is
+        # absent, so without it the first TestFlight upload fails validation.
+        # The alternative, UIRequiresFullScreen, opts out of Split View and is
+        # deprecated as of iOS 26 — a worse trade than one more orientation.
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # EXPORT COMPLIANCE, answered once here instead of on every build in
+        # App Store Connect (without this key each TestFlight build sits at
+        # "Missing Compliance" until someone clicks through the questionnaire).
+        #
+        # `false` is the truthful answer, not the convenient one. The app's
+        # only encryption is (a) HTTPS through URLSession and the Keychain —
+        # both Apple's OS-provided implementations, which are exempt — and
+        # (b) CryptoKit SHA-256 for PKCE, cache filenames and idempotency
+        # keys, which is hashing, not encryption for confidentiality. If a
+        # future change adds its own cipher (e.g. encrypting files with
+        # CryptoKit AES/ChaChaPoly), this must become `true` and the owner
+        # must answer the export questions in App Store Connect.
+        ITSAppUsesNonExemptEncryption: false
         # The callback scheme. ASWebAuthenticationSession intercepts it, and
         # Config.swift's header requires it registered here too.
         CFBundleURLTypes:

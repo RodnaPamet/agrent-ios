@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  THE PRIVACY MANIFEST, because App Store Connect refuses an upload that
+  calls a "required reason" API without declaring why (ITMS-91053, enforced
+  since May 2024 — TestFlight included). Two of those APIs are in this app:
+
+    UserDefaults     @AppStorage in ExchangeView / ParcelMapView, and
+                     DashboardBlock's UserDefaults.standard — the farmer's
+                     own layout preferences, read and written by this app
+                     and nothing else.                          → CA92.1
+    File timestamp   ResponseCache reads .modificationDate /
+                     .contentModificationDateKey of its OWN files under
+                     Caches/ResponseCache, to show the age of cached data
+                     and to evict oldest-first.                 → C617.1
+
+  Everything else Apple lists (system boot time, disk space, active
+  keyboards) was searched for on 2026-10-01 and is not called. `.fileSizeKey`
+  is a file's size, not the volume's free space, so it is not "disk space".
+
+  A NEW CALL TO ONE OF THOSE APIs NEEDS A NEW ENTRY HERE, or the next upload
+  is refused. The list of categories and reasons is Apple's:
+  https://developer.apple.com/documentation/bundleresources/privacy-manifest-files/describing-use-of-required-reason-api
+
+  COLLECTED DATA describes what leaves the device: the signed-in account's
+  identifier and the farm records the user enters (journal, tasks, costs,
+  parcels), sent to app.agrent.bg for the app to function. Linked to the
+  user, never used for tracking, no third-party SDKs, no tracking domains.
+  This must agree with the "App Privacy" answers in App Store Connect.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeUserID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
