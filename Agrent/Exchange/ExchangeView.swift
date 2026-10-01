@@ -80,7 +80,7 @@ struct ExchangeView: View {
             case .browse: browse
             case .mine: myListings
             case .inquiries: myInquiries
-            case .messages: ExchangeInboxView(store: inbox)
+            case .messages: ExchangeInboxView(store: inbox, showListings: { tab = .browse })
             }
         }
 
