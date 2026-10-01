@@ -78,25 +78,36 @@ final class ResponseCacheTests: XCTestCase {
         await cache.removeAll()
     }
 
-    /// Keys are hashed, so neither the tenant nor the query reaches the disk
-    /// in the clear — and two tenants cannot collide on one path.
-    func testKeyIsHashedAndTenantScoped() {
-        let a = ResponseCache.key(tenant: "agrent", pathAndQuery: "/api/t/agrent/journal?limit=50")
-        let b = ResponseCache.key(tenant: "other", pathAndQuery: "/api/t/agrent/journal?limit=50")
-        let c = ResponseCache.key(tenant: "agrent", pathAndQuery: "/api/t/agrent/journal?limit=10")
+    /// Keys are hashed, so neither the user, the tenant nor the query reaches
+    /// the disk in the clear — and two tenants or two USERS cannot collide on
+    /// one path (agri-saas#1191 P0.9: a shared phone is the ordinary case).
+    func testKeyIsHashedAndScopedToUserAndTenant() {
+        let path = "/api/t/agrent/journal?limit=50"
+        let a = ResponseCache.key(scope: CacheScope(userID: "user-a", tenant: "agrent"), pathAndQuery: path)
+        let b = ResponseCache.key(scope: CacheScope(userID: "user-a", tenant: "other"), pathAndQuery: path)
+        let c = ResponseCache.key(scope: CacheScope(userID: "user-a", tenant: "agrent"),
+                                  pathAndQuery: "/api/t/agrent/journal?limit=10")
+        let d = ResponseCache.key(scope: CacheScope(userID: "user-b", tenant: "agrent"), pathAndQuery: path)
 
         XCTAssertNotEqual(a, b, "different tenants must not share a cache entry")
         XCTAssertNotEqual(a, c, "different queries are different resources")
+        XCTAssertNotEqual(a, d, "different users on one farm must not share a cache entry")
         XCTAssertFalse(a.contains("agrent"))
+        XCTAssertFalse(a.contains("user-a"))
         XCTAssertFalse(a.contains("limit"))
         XCTAssertEqual(a.count, 64, "SHA256 hex")
     }
 
-    /// The NUL separator stops ("ab","c") colliding with ("a","bc").
+    /// The NUL separators stop ("ab","c") colliding with ("a","bc") — in
+    /// either boundary.
     func testKeySeparatorPreventsConcatenationCollisions() {
         XCTAssertNotEqual(
-            ResponseCache.key(tenant: "ab", pathAndQuery: "c"),
-            ResponseCache.key(tenant: "a", pathAndQuery: "bc")
+            ResponseCache.key(scope: CacheScope(userID: "u", tenant: "ab"), pathAndQuery: "c"),
+            ResponseCache.key(scope: CacheScope(userID: "u", tenant: "a"), pathAndQuery: "bc")
+        )
+        XCTAssertNotEqual(
+            ResponseCache.key(scope: CacheScope(userID: "ab", tenant: "c"), pathAndQuery: "p"),
+            ResponseCache.key(scope: CacheScope(userID: "a", tenant: "bc"), pathAndQuery: "p")
         )
     }
 }

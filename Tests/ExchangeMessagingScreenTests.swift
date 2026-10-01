@@ -272,7 +272,8 @@ final class UnreadBadgeTests: XCTestCase {
     /// thread, however many times.
     func testTheBadgeCountsThreadsAndDropsOnMark() {
         let store = ExchangeUnreadStore()
-        store.apply([row("a", unread: true), row("b", unread: false), row("c", unread: true)])
+        store.apply([row("a", unread: true), row("b", unread: false), row("c", unread: true)],
+                    asOf: SessionEpoch.current)
         XCTAssertEqual(store.count, 2)
         store.markedRead("a")
         store.markedRead("a")

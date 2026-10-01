@@ -52,6 +52,12 @@ final class AuthClient: NSObject {
                 return
             }
             try await exchange(code: code, verifier: pkce.verifier)
+            // WHO, before the first screen. The identity keys the response
+            // cache and owns the outbox; until it is known both are off (see
+            // `SessionIdentity`). The phone has signal this instant — it just
+            // completed the exchange — so this is the cheapest moment there
+            // will be. Not fatal if it fails: `MainTabView` asks again.
+            _ = await CurrentUserStore.shared.load()
             state = .signedIn
             Log.auth.info("sign-in complete")
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
@@ -82,18 +88,39 @@ final class AuthClient: NSObject {
         // The seam does not read the Keychain — `APIClient` hands out
         // `UITestSeam.stubTokens` — so there is nothing of the seam's to
         // clear here and nothing to lose by not clearing it.
+        //
+        // The singletons ARE the seam's to reset — they hold fixture data in
+        // this process and nothing else — so the in-memory half of a real
+        // sign-out still runs. The response cache is NOT purged: under the
+        // seam its fixture entries are keyed on the fixture user, so the
+        // owner's real entries are not the seam's to delete either.
         if UITestSeam.isActive {
-            CurrentUserStore.shared.clear()
+            SessionReset.endSession(clearTokens: {}, cache: nil)
             state = .signedOut
             return
         }
         #endif
 
-        TokenStore.clear()
-        // The cached identity is per-session. Leaving it would let the
-        // next person to sign in on this device be assigned somebody
-        // else's operations.
-        CurrentUserStore.shared.clear()
+        // Read BEFORE the local clear, for the revoke seam below.
+        let refreshToken = TokenStore.load()?.refreshToken
+
+        // ── LOCAL FIRST, AND WHOLE ──
+        //
+        // Tokens, identity, every per-user singleton and the response cache
+        // (agri-saas#1191 P0.9 — see `SessionReset` for the list and the
+        // reason for each entry). Synchronous and network-free: this cannot
+        // fail for lack of signal, which is where a farm phone is when its
+        // owner hands it to the next person.
+        SessionReset.endSession()
+
+        // ── THEN the server, as a seam that does nothing yet ──
+        //
+        // `POST /api/auth/native/revoke` (this device's session only) is not
+        // built. NOT `/api/auth/logout`: that clears a web cookie and would
+        // revoke nothing. After the local clear, never awaited, so the
+        // network can neither delay nor undo the sign-out.
+        SessionRevocation.revokeThisDevice(refreshToken: refreshToken)
+
         state = .signedOut
     }
 
@@ -141,6 +168,10 @@ final class AuthClient: NSObject {
             throw AuthError.server(status: status, code: env?.code, message: env?.message)
         }
         let payload = try JSONDecoder().decode(ExchangeResponse.self, from: data)
+        // A sign-in starts from NOTHING, before the new pair is saved — not
+        // every session ends with Изход (a refused refresh clears only the
+        // tokens), and the next account must not inherit what that left.
+        SessionReset.beginFreshSession()
         TokenStore.save(Tokens(
             accessToken: payload.accessToken,
             refreshToken: payload.refreshToken,

@@ -46,11 +46,55 @@ enum TokenStore {
         return try? JSONDecoder().decode(Tokens.self, from: data)
     }
 
+    /// The tokens AND whose they were.
+    ///
+    /// The identity goes with them because an identity that outlives its
+    /// tokens is worse than none: the next sign-in would read and write the
+    /// cache under the previous person's key until its own `/me` answered.
+    /// Every path that clears tokens — Изход, and the 401 that kills a
+    /// refresh — therefore clears the owner too, without having to remember.
     static func clear() {
         SecItemDelete([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ] as CFDictionary)
+        SessionIdentity.shared.clear()
+    }
+
+    // MARK: - the owner (`SessionIdentity`'s persistence)
+
+    /// A second item under the same service rather than a field on `Tokens`:
+    /// the refresh path builds a fresh `Tokens` from the server's reply and
+    /// would silently drop a field it does not know about. The owner changes
+    /// at sign-in and sign-out only; the pair rotates every few minutes.
+    private static let ownerAccount = "owner"
+
+    static func saveOwner(_ userID: String?) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: ownerAccount,
+        ]
+        SecItemDelete(query as CFDictionary)
+        guard let userID else { return }
+        var add = query
+        add[kSecValueData as String] = Data(userID.utf8)
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(add as CFDictionary, nil)
+    }
+
+    static func loadOwner() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: ownerAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 }

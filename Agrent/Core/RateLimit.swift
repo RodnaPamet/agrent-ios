@@ -215,6 +215,20 @@ final class RateLimitPause {
         return task
     }
 
+    /// Open, with no alarm — part of `SessionReset`. The callback stays: it
+    /// is wiring (the outbox's drain), not anybody's data.
+    ///
+    /// Why a pause is reset at all: the messages budget is the departing
+    /// user's FARM's, and the next account may be on another. Resetting one
+    /// that was still right costs a single 429, which closes it again;
+    /// keeping one that is wrong blocks the next person's sends for a minute
+    /// with a countdown they did nothing to earn.
+    func reset() {
+        alarm?.cancel()
+        alarm = nil
+        gate.reopen()
+    }
+
     /// Cancel the alarm — a pass that is starting supersedes it — and reopen
     /// the gate if its moment has already come.
     func disarm() {

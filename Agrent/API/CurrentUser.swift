@@ -182,8 +182,14 @@ final class CurrentUserStore {
         if let user { return user }
         if let inFlight { return await inFlight.value }
 
+        // ── A `/me` that answers after Изход is not anybody's ──
+        //
+        // Started under A, resolved after A signed out: writing it to `user`
+        // would hand B A's identity — the field operation's `assigneeUserId`,
+        // the operator flag, the outbox's owner. So the epoch is captured
+        // here and the result is dropped if it has moved.
+        let epoch = SessionEpoch.current
         let task = Task<CurrentUser?, Never> {
-            defer { inFlight = nil }
             var resolved: CurrentUser?
             await CachedResource.loadShowingCacheFirst(MeAPI.path) { data in
                 try await MeAPI.decode(from: data)
@@ -193,7 +199,16 @@ final class CurrentUserStore {
                 // a network and the cached one when there is not.
                 if let value = state.value { resolved = value }
             }
-            if resolved == nil {
+            // `clear()` already let go of this task; touching `inFlight` now
+            // could release a NEWER session's request instead.
+            guard SessionEpoch.isCurrent(epoch) else { return nil }
+            inFlight = nil
+            if let resolved {
+                // The identity everything per-user is keyed on — the response
+                // cache and the outbox's owner. Adopted from the SERVER's
+                // answer, never from anything on disk that preceded it.
+                SessionIdentity.shared.adopt(resolved.id)
+            } else {
                 Log.auth.error("could not resolve current user, cached or live")
             }
             user = resolved
@@ -203,5 +218,16 @@ final class CurrentUserStore {
         return await task.value
     }
 
-    func clear() { user = nil }
+    /// Back to a fresh launch's state — part of `SessionReset`. The request
+    /// in flight is let go rather than cancelled: it may be the same one a
+    /// caller is awaiting, and the epoch guard above already discards it.
+    func clear() {
+        user = nil
+        inFlight = nil
+    }
+
+    #if DEBUG
+    /// For `SignOutHygieneTests`, which needs A signed in without a network.
+    func adoptForTesting(_ user: CurrentUser) { self.user = user }
+    #endif
 }

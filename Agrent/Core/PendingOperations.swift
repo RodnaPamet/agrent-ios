@@ -31,6 +31,42 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
 
     let locationID: String
 
+    /// WHO queued it — the `/api/auth/me` id of the user signed in when it
+    /// was recorded (agri-saas#1191 P0.9).
+    ///
+    /// ── Why it is needed ──
+    ///
+    /// A replay goes out under the CURRENT session's token, and the server
+    /// attributes a field operation to whoever that is: `createFieldOperation`
+    /// writes `ctx.userId` into the audit trail and `completedByUserId`, and
+    /// its idempotency lookup is scoped to the TENANT, not the user — there is
+    /// no server-side `queuedByUserId` check on this route to catch a
+    /// mismatch (`queuedByUserId` lives in the WEB client's outbox, #786/#932).
+    /// So on a shared phone, A's spray drained after B signs in would be filed
+    /// as B's, permanently, on a БАБХ record. The only guard is this field and
+    /// the drain's filter on it (`OutboxStore.belongs`).
+    ///
+    /// ── OPTIONAL, and it has to be ──
+    ///
+    /// Rows already on disk have no such key. A non-optional field — even
+    /// with a default — throws `keyNotFound` on every one of them, and
+    /// `all()`'s `try?` would then silently HIDE every queued spray: on disk,
+    /// never sent, never shown (see `OutboxStore.pause`'s note, measured).
+    /// Optional decodes a missing key as nil.
+    ///
+    /// ── nil means "from before this field existed" ──
+    ///
+    /// And it belongs to whoever is signed in next, who CLAIMS it (the drain
+    /// stamps their id on it before anything else). That is what the build
+    /// before this one would have done with it anyway, and in the case that
+    /// produces such a row — an update installed over a queue — the next
+    /// person signed in is overwhelmingly the person who queued it, since the
+    /// old Изход did not clear the queue but nobody had a reason to sign out
+    /// either. The web makes the same call for its unattributed rows in
+    /// `flushOutbox`. Claiming, rather than leaving it unowned, means it
+    /// cannot wander on to a THIRD account later.
+    var ownerUserID: String? = nil
+
     /// What to call it on screen. The parcel name and the kind of work —
     /// enough for a farmer to recognise which spray is waiting, without
     /// the outbox having to hold a second copy of the whole form.
@@ -143,6 +179,17 @@ actor PendingOperations {
 
     func update(_ operation: PendingOperation) {
         enqueue(operation)
+    }
+
+    /// Stamp `owner` on every row that has none — see
+    /// `PendingOperation.ownerUserID` for why unowned rows are the next
+    /// signed-in user's. Rows that already have an owner are never touched:
+    /// re-stamping one is exactly how A's spray would become B's.
+    func claimUnowned(for owner: String) {
+        for var operation in all() where operation.ownerUserID == nil {
+            operation.ownerUserID = owner
+            enqueue(operation)
+        }
     }
 
     private func fileURL(_ id: String) -> URL {

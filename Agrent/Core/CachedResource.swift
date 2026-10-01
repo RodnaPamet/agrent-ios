@@ -55,7 +55,13 @@ enum CachedResource {
         decode: @Sendable (Data) async throws -> T,
         publish: @MainActor @Sendable (LoadState<T>) -> Void
     ) async {
-        let key = ResponseCache.key(tenant: Config.tenantSlug, pathAndQuery: pathAndQuery)
+        // No known user, no cache — see `CacheScope`. The network answer is
+        // still published, so the screen works; it is just not remembered.
+        guard let scope = CacheScope.current() else {
+            await publish(await load(pathAndQuery, decode: decode))
+            return
+        }
+        let key = ResponseCache.key(scope: scope, pathAndQuery: pathAndQuery)
         let hit = await ResponseCache.shared.read(key)
         if let hit, showCachedFirst {
             if let value = try? await decode(hit.data) {
@@ -78,21 +84,34 @@ enum CachedResource {
         _ pathAndQuery: String,
         decode: @Sendable (Data) async throws -> T
     ) async -> LoadState<T> {
-        let key = ResponseCache.key(tenant: Config.tenantSlug, pathAndQuery: pathAndQuery)
+        // Captured ONCE, before the request. Whoever this request is for is
+        // whose cache it reads and writes — not whoever is signed in by the
+        // time the response arrives.
+        let scope = CacheScope.current()
+        let key = scope.map { ResponseCache.key(scope: $0, pathAndQuery: pathAndQuery) }
 
         do {
             let data = try await APIClient.shared.data(for: pathAndQuery)
             // Decode BEFORE writing. A payload we cannot read must never
             // become the thing we later fall back to.
             let value = try await decode(data)
-            await ResponseCache.shared.write(key, data)
+            // ── NOT WRITTEN IF THE SESSION CHANGED UNDER IT ──
+            //
+            // A request in flight at Изход — `OfflinePrefetch` is detached and
+            // outlives every screen — would otherwise land A's bytes AFTER the
+            // sign-out purge. They would be under A's key, so B could never
+            // read them, but they would be A's data at rest on a phone A has
+            // signed out of, which is what the purge is for.
+            if let key, CacheScope.current() == scope {
+                await ResponseCache.shared.write(key, data)
+            }
             return .loaded(value, .fresh)
         } catch APIClient.APIError.notModified {
             // Not a failure — the server just told us the cached copy is
             // current. So the cache is served as .fresh, NOT .stale: the age
             // shown to an operator should reflect how current the DATA is,
             // and the server has this second confirmed it is.
-            if let hit = await ResponseCache.shared.read(key),
+            if let key, let hit = await ResponseCache.shared.read(key),
                let value = try? await decode(hit.data) {
                 return .loaded(value, .fresh)
             }
@@ -100,6 +119,7 @@ enum CachedResource {
             // revalidate something it does not hold. Nothing to show.
             return .failed(UserMessage.text(for: APIClient.APIError.notModified))
         } catch {
+            guard let key else { return .failed(UserMessage.text(for: error)) }
             return await fallback(key: key, error: error, decode: decode)
         }
     }

@@ -59,12 +59,13 @@ import Foundation
 /// ── What it costs the simulator you point it at ──
 ///
 /// Read this before running it anywhere but a throwaway device. The app under
-/// the seam still writes `ResponseCache` to `Library/Caches` — fixture bytes,
-/// under the same keys the real payloads use. On a simulator that holds the
-/// owner's real session that REPLACES cached production data with fixtures
-/// until the next successful fetch. Nothing here touches the Keychain (that
-/// was the reason for `stubTokens` rather than planting a token), so the
-/// session itself survives; the cache does not.
+/// the seam still writes `ResponseCache` to `Library/Caches` — fixture bytes.
+/// Since agri-saas#1191 P0.9 they are keyed on the FIXTURE user's id
+/// (`CacheScope`; under the seam `SessionIdentity` is memory-only and learns
+/// that id from the fixture `/me`), so they no longer overwrite the owner's
+/// real entries — they sit beside them and age out under the byte budget.
+/// Nothing here touches the Keychain (that was the reason for `stubTokens`
+/// rather than planting a token), so the session itself survives.
 enum UITestSeam {
     /// The token `A11yShotsTests` adds to `app.launchArguments`.
     ///

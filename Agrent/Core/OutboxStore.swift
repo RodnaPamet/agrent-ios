@@ -2,11 +2,22 @@ import Foundation
 import Observation
 
 /// Drains the outbox.
+///
+/// ── Only the signed-in user's items, ever ──
+///
+/// `pending` holds what belongs to the user signed in NOW, and the drain
+/// sends nothing else (agri-saas#1191 P0.9). Another account's items are
+/// PARKED: still on disk, tagged with their owner, invisible to this one —
+/// not in the banner, not in the count, not sent — and they come back when
+/// their owner signs in again. Dropping them would destroy the only copy of
+/// a record of regulated work; sending them would file it under the wrong
+/// person (see `PendingOperation.ownerUserID`).
 @Observable
 @MainActor
 final class OutboxStore {
     static let shared = OutboxStore()
 
+    /// The signed-in user's items. Never anybody else's.
     private(set) var pending: [PendingOperation] = []
     private(set) var isFlushing = false
 
@@ -38,10 +49,67 @@ final class OutboxStore {
     /// never shown. Measured in scratch. Only an Optional field is safe.
     let pause = RateLimitPause()
 
-    private init() {
+    /// Seams for `SignOutHygieneTests`: the queue on disk, who is signed in,
+    /// and how one item is sent. The app uses the real three.
+    @ObservationIgnored private let queue: PendingOperations
+    @ObservationIgnored private let currentOwner: () -> String?
+    @ObservationIgnored private let send: (PendingOperation) async throws -> Void
+    @ObservationIgnored private let identify: () async -> Void
+
+    /// The identity is read on EVERY use, never captured: the same store
+    /// outlives every session on the phone.
+    ///
+    /// `identify` runs when a drain finds nobody's identity known. Without it
+    /// the launch flush of the first run after this build — tokens, no stored
+    /// owner yet — would find nothing to send, and nothing would ask again
+    /// until the next return to the foreground.
+    init(
+        queue: PendingOperations = .shared,
+        currentOwner: @escaping () -> String? = { SessionIdentity.shared.userID },
+        identify: @escaping () async -> Void = { _ = await CurrentUserStore.shared.load() },
+        send: @escaping (PendingOperation) async throws -> Void = OutboxStore.post
+    ) {
+        self.queue = queue
+        self.currentOwner = currentOwner
+        self.identify = identify
+        self.send = send
         // Whatever reopens the pause drains the queue: the alarm, at the
         // server's moment. Weakly, for form — the store is a singleton.
         pause.onReopen = { [weak self] in await self?.flush() }
+    }
+
+    static func post(_ item: PendingOperation) async throws {
+        _ = try await APIClient.shared.postRaw(
+            LocationsAPI.operationsPath(item.locationID),
+            body: item.payload,
+            // THE SAME KEY, every time, forever. This is what makes
+            // the whole queue safe — a replay of an operation the
+            // server already accepted returns the original rather
+            // than creating a second.
+            idempotencyKey: item.id
+        )
+    }
+
+    /// May the user signed in as `owner` see and send `item`?
+    ///
+    /// Pure, because it is the whole rule. FAILS CLOSED: with nobody's
+    /// identity known — between a sign-in and its first `/me`, or the first
+    /// launch after this build — nothing belongs to anybody, because "send
+    /// everything" is precisely the mistake (the web made it, #1005). An
+    /// unowned item belongs to whoever is known to be signed in; see
+    /// `PendingOperation.ownerUserID`.
+    nonisolated static func belongs(_ item: PendingOperation, to owner: String?) -> Bool {
+        guard let owner else { return false }
+        return item.ownerUserID == nil || item.ownerUserID == owner
+    }
+
+    /// Back to a fresh launch — part of `SessionReset`. The in-memory list
+    /// and the pause only: the QUEUE ON DISK is left exactly as it is, which
+    /// is what parks the departing user's items rather than destroying them.
+    func reset() {
+        pending = []
+        needsAnotherPass = false
+        pause.reset()
     }
 
     /// Items the server has REFUSED, which no amount of retrying will fix.
@@ -55,11 +123,19 @@ final class OutboxStore {
     var sendable: [PendingOperation] { pending.filter { !$0.isRefused } }
 
     func refresh() async {
-        pending = await PendingOperations.shared.all()
+        let owner = currentOwner()
+        // Pre-attribution rows become the signed-in user's — once, on disk —
+        // so they cannot drift to a third account later.
+        if let owner { await queue.claimUnowned(for: owner) }
+        let all = await queue.all()
+        // Re-read AFTER the await: an Изход during it must not publish the
+        // departing user's list into the next one's banner.
+        guard currentOwner() == owner else { return }
+        pending = all.filter { Self.belongs($0, to: owner) }
     }
 
     func enqueue(_ operation: PendingOperation) async {
-        await PendingOperations.shared.enqueue(operation)
+        await queue.enqueue(operation)
         await refresh()
     }
 
@@ -105,6 +181,7 @@ final class OutboxStore {
     }
 
     private func drain() async {
+        if currentOwner() == nil { await identify() }
         await refresh()
 
         for var item in pending where !item.isRefused {
@@ -112,17 +189,16 @@ final class OutboxStore {
             // sheet feeds it, because its live save spends the same budget —
             // and the next send would only confirm it.
             if pause.isPaused { break }
+            // ── WHOSE, CHECKED PER ITEM, NOT ONCE PER PASS ──
+            //
+            // `pending` was filtered when the pass began. A sign-out and a
+            // sign-in DURING the pass would otherwise send the rest of A's
+            // list under B's token — each send is an `await`, and a slow
+            // field connection makes them long ones. Stop, touch nothing.
+            if !Self.belongs(item, to: currentOwner()) { break }
             do {
-                _ = try await APIClient.shared.postRaw(
-                    LocationsAPI.operationsPath(item.locationID),
-                    body: item.payload,
-                    // THE SAME KEY, every time, forever. This is what makes
-                    // the whole queue safe — a replay of an operation the
-                    // server already accepted returns the original rather
-                    // than creating a second.
-                    idempotencyKey: item.id
-                )
-                await PendingOperations.shared.remove(item.id)
+                try await send(item)
+                await queue.remove(item.id)
             } catch {
                 // ── A 429 IS ABSORBED FIRST, AND THE ITEM IS NOT TOUCHED ──
                 //
@@ -162,7 +238,7 @@ final class OutboxStore {
                 item.lastAttemptAt = Date()
                 item.lastError = UserMessage.text(for: error)
                 item.isRefused = !PendingOperations.isWorthRetrying(error)
-                await PendingOperations.shared.update(item)
+                await queue.update(item)
                 if !item.isRefused {
                     // Network is down; the rest will fail identically.
                     break

@@ -814,6 +814,19 @@ actor APIClient {
     /// server exactly like a rejected credential.
     static func invalidatesToken(status: Int) -> Bool { status == 401 }
 
+    /// May a refresh that has just ANSWERED write its outcome to the Keychain?
+    ///
+    /// Only if the Keychain still holds the pair it started from. A refresh
+    /// is a network round trip, and Изход can happen inside it (agri-saas#1191
+    /// P0.9). Before this, a refresh that landed after a sign-out SAVED the
+    /// departing user's new pair back into an emptied Keychain — the next
+    /// launch opened signed in as them — and one refused after a NEW sign-in
+    /// cleared the new user's tokens. Pure, so the rule is held by a test
+    /// rather than by the timing of one.
+    static func mayCommitRefresh(seen: Tokens, stored: Tokens?) -> Bool {
+        stored?.refreshToken == seen.refreshToken
+    }
+
     static func refreshDecision(seen: Tokens, stored: Tokens?) -> RefreshDecision {
         guard let stored else { return .signedOut }
         return stored.refreshToken == seen.refreshToken
@@ -983,7 +996,13 @@ actor APIClient {
                 Log.auth.error(
                     "token refresh rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), clearing tokens"
                 )
-                TokenStore.clear()
+                // Only the pair this refresh was FOR. If the Keychain moved on
+                // meanwhile — Изход, or somebody else signed in — the dead token
+                // is not the one stored, and clearing would sign out the wrong
+                // session.
+                if Self.mayCommitRefresh(seen: seen, stored: TokenStore.load()) {
+                    TokenStore.clear()
+                }
                 throw APIError.notSignedIn
             }
             struct R: Decodable { let accessToken: String; let refreshToken: String; let expiresIn: Int }
@@ -993,7 +1012,14 @@ actor APIClient {
                 refreshToken: r.refreshToken,
                 expiresAt: Date().addingTimeInterval(TimeInterval(r.expiresIn))
             )
-            TokenStore.save(fresh)
+            // NOT saved if the session ended while this was in flight: that
+            // would resurrect a signed-out user's tokens. The pair is still
+            // returned to this caller, whose request was made under it.
+            if Self.mayCommitRefresh(seen: seen, stored: TokenStore.load()) {
+                TokenStore.save(fresh)
+            } else {
+                Log.auth.info("refresh answered after the session changed, not saved")
+            }
             return fresh
         }
         refreshTask = task

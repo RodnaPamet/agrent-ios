@@ -13,11 +13,17 @@ import Foundation
 ///     decoded models would also need a separate cache per type, where this is
 ///     one cache for every endpoint the app will ever add.
 ///
-///  2. KEYED ON TENANT, NOT JUST PATH. `Config.tenantSlug` is hard-coded to
-///     "agrent" today and will not always be. A cache keyed on path alone
-///     serves one farm's journal to another the moment a tenant switcher
-///     lands, and it would do it silently — the same shape as the database
-///     mixup that bit this project last week.
+///  2. KEYED ON USER AND TENANT, NOT JUST PATH (`CacheScope`). `Config.tenantSlug`
+///     is hard-coded to "agrent" today and will not always be; a cache keyed
+///     on path alone serves one farm's journal to another the moment a tenant
+///     switcher lands. And the USER is in the key because a farm phone is
+///     shared: until agri-saas#1191 P0.9 this survived sign-out keyed on the
+///     tenant alone, so account B signing in on A's phone was served A's
+///     cached journal, members and farm profile whenever the network was
+///     slower than the cache. The purge on sign-out (`SessionReset`) is the
+///     first line; the key is the one that holds when the purge does not run
+///     — a crash mid-sign-out, a refresh 401 that clears the tokens without
+///     Изход, an `OfflinePrefetch` write that lands after the purge.
 ///
 ///  3. THE QUERY IS PART OF THE KEY. `?limit=50` and `?limit=200` are
 ///     different resources, and a cache that ignores the query answers one
@@ -52,11 +58,18 @@ actor ResponseCache {
         self.byteBudget = byteBudget
     }
 
-    /// Hashed so the filename carries neither the tenant nor the query in the
-    /// clear. The NUL separator keeps `("ab", "c")` from colliding with
-    /// `("a", "bc")`.
-    static func key(tenant: String, pathAndQuery: String) -> String {
-        let material = "\(tenant)\u{0}\(pathAndQuery)"
+    /// Hashed so the filename carries neither the user, the tenant nor the
+    /// query in the clear. The NUL separators keep `("ab", "c")` from
+    /// colliding with `("a", "bc")`.
+    ///
+    /// The ONLY key function, and it takes a `CacheScope` — a value that
+    /// cannot be built without a user id. The tenant-only `key(tenant:…)` it
+    /// replaced is deleted rather than deprecated, so "cache something
+    /// without saying whose it is" is a compile error, not a review comment.
+    /// Entries written under the old keys are unreachable from here and age
+    /// out under the byte budget; the first Изход removes them outright.
+    static func key(scope: CacheScope, pathAndQuery: String) -> String {
+        let material = "\(scope.userID)\u{0}\(scope.tenant)\u{0}\(pathAndQuery)"
         return SHA256.hash(data: Data(material.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
@@ -101,6 +114,14 @@ actor ResponseCache {
         Log.cache.debug("evicted one entry")
     }
 
+    /// Everything, every user's. Called by `SessionReset` on Изход and on
+    /// every sign-in.
+    ///
+    /// All of it rather than the departing user's entries alone: at the
+    /// moment of a sign-out the only scope that SHOULD have entries is the
+    /// departing one, so anything else on disk is an orphan of a purge that
+    /// did not run — and the fix for a missed purge is a purge, not a filter
+    /// that preserves it. The cost is that A, signing back in, starts cold.
     func removeAll() {
         try? fileManager.removeItem(at: directory)
         Log.cache.debug("cleared")
@@ -152,5 +173,19 @@ actor ResponseCache {
 
     private func fileURL(_ key: String) -> URL {
         directory.appendingPathComponent(key, isDirectory: false)
+    }
+}
+
+/// Whose cache entry this is: the signed-in user and the farm.
+///
+/// Built only by `current()` in the app, which returns nil when nobody's
+/// identity is known — and nil means NO CACHE, not a shared one. See
+/// `SessionIdentity` for why unknown fails closed.
+struct CacheScope: Equatable, Sendable {
+    let userID: String
+    let tenant: String
+
+    static func current(identity: SessionIdentity = .shared) -> CacheScope? {
+        identity.userID.map { CacheScope(userID: $0, tenant: Config.tenantSlug) }
     }
 }
