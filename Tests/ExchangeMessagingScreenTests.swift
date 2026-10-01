@@ -186,7 +186,7 @@ final class ComposerTests: XCTestCase {
         XCTAssertFalse(canSend("Здравейте", refused: true))
     }
 
-    /// NOT `InquiryComposer.canSend`: there is no phase that a failure leaves
+    /// NOT the removed inquiry composer's `canSend`: there is no phase that a failure leaves
     /// behind. The same draft is sendable again as soon as nothing above
     /// holds it — which is what makes the kept key worth keeping.
     func testAFailedSendStaysSendable() {
@@ -382,18 +382,17 @@ final class MessagingSourceTests: XCTestCase {
         XCTAssertTrue(text.contains("sendKeys.delivered()"))
     }
 
-    /// The listing's button sits OUTSIDE the `isActive` branch — a closed
-    /// listing is the way back to its conversation.
+    /// The listing's button is NOT gated on the listing being active — a
+    /// closed listing is the way back to its conversation. Since the inquiry
+    /// was removed (2026-10-01) the detail view has no `isActive` branch at
+    /// all, so the check is that nothing in the file gates on it and that the
+    /// button's only condition is `offersMessageParty`.
     func testTheListingButtonIsNotGatedOnTheListingBeingOpen() throws {
         let text = try source("Agrent/Exchange/ListingDetailView.swift")
-        guard let active = text.range(of: "} else if listing.isActive {"),
-              let button = text.range(of: "MessagingPolicy.offersMessageParty(")
-        else { return XCTFail("either the inquiry branch or the button moved") }
-        let between = text[active.upperBound..<button.lowerBound]
-        // The `isActive` branch has closed, and the `if isOwn / else if`
-        // chain with it, before the button's condition begins.
-        XCTAssertGreaterThan(between.filter { $0 == "}" }.count,
-                             between.filter { $0 == "{" }.count)
+        XCTAssertTrue(text.contains("if MessagingPolicy.offersMessageParty("),
+                      "positive control: the button's condition moved")
+        XCTAssertFalse(text.contains("listing.isActive"),
+                       "the message button must not depend on the listing being open")
     }
 }
 

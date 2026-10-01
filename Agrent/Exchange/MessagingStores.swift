@@ -89,7 +89,7 @@ enum MessagingPolicy {
 
     /// Whether Send is live.
     ///
-    /// NOT `InquiryComposer.canSend`, which is `phase == .editing` and never
+    /// NOT the removed inquiry composer's `canSend`, which was `phase == .editing` and never
     /// comes back after a failure. Here a failed send stays sendable — that
     /// is the whole point of keeping its key — and what disables Send is only:
     /// nothing to send (blank, or over the server's limit), a send already in
@@ -288,7 +288,7 @@ final class ExchangeInboxStore {
 /// ── NOT FIRED ──
 ///
 /// Built, wired, and never sent. Writing to another farm is the owner's act,
-/// the same standing decision as `createInquiry`. And OPENING this screen
+/// the same standing decision as `createListing`. And OPENING this screen
 /// against production is a write too: it marks the conversation read.
 @Observable
 @MainActor

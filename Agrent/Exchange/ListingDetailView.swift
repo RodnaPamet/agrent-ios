@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ListingDetailView: View {
     let listing: ExchangeListing
-    @State private var composing = false
     @State private var opener = ListingThreadOpener()
     @State private var openedThread: ConversationRoute?
     @State private var user = CurrentUserStore.shared
@@ -57,21 +56,6 @@ struct ListingDetailView: View {
                         .font(.footnote)
                         .foregroundStyle(Palette.secondaryText)
                 }
-            } else if listing.isActive {
-                Section {
-                    // «Изпрати», not «Изпрати запитване» — the owner's
-                    // wording.
-                    //
-                    // Worth knowing rather than discovering: this button
-                    // OPENS the composer, and the one that actually sends
-                    // is `InquiryComposeView`'s own «Изпрати» in the sheet
-                    // it presents. So the same word now appears twice in
-                    // one flow, on a control that opens and a control that
-                    // sends. Asked for deliberately; if it ever reads
-                    // wrong, «Запитване» names the destination instead of
-                    // promising the action.
-                    Button("Изпрати") { composing = true }
-                }
             }
 
             if MessagingPolicy.offersMessageParty(
@@ -81,18 +65,17 @@ struct ListingDetailView: View {
             }
         }
         .inlineTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
-        .sheet(isPresented: $composing) {
-            InquiryComposeView(listing: listing)
-        }
         .navigationDestination(item: $openedThread) { route in
             ConversationView(threadID: route.threadID, commodity: listing.commodity)
         }
     }
 
-    /// PARITY GAP 7. «Message the other party», BESIDE the inquiry, as on the
-    /// web — the two are different things: an inquiry is one message whose
-    /// contact is revealed only if the owner accepts; a conversation reveals
-    /// nothing and goes on.
+    /// PARITY GAP 7. «Message the other party» — the ONLY action on another
+    /// farm's listing. The one-shot inquiry («Изпрати») stood beside it, as on
+    /// the web, until the owner removed it on 2026-10-01: a conversation does
+    /// everything an inquiry did and goes on, so two buttons offering to
+    /// contact the same farm was one too many. Inquiries already sent still
+    /// show under «Моите заявки».
     ///
     /// OUTSIDE `isActive`, deliberately: on a listing that has closed this is
     /// the way back to a conversation that already exists, and the route
@@ -128,81 +111,6 @@ struct ListingDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(Palette.error)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-/// Composing and sending an inquiry.
-///
-/// SHIPS FUNCTIONAL AND UNEXERCISED. Sending creates a production row and
-/// emails the seller tenant's admins, so nothing in development or CI may tap
-/// this: the owner's decision is that the first real operator send is the
-/// first real test. The button works for them; it has never been pressed here.
-struct InquiryComposeView: View {
-    let listing: ExchangeListing
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var composer = InquiryComposer()
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text(CommodityName.canonical(listing.commodity) ?? listing.commodity).font(.headline)
-                    Text(summary(side: listing.side, kind: listing.kind,
-                                 quantity: listing.quantityTonnes,
-                                 price: listing.pricePerTonne,
-                                 currency: listing.priceCurrency))
-                        .font(.footnote)
-                        .foregroundStyle(Palette.secondaryText)
-                }
-
-                Section("Съобщение") {
-                    TextEditor(text: $composer.message)
-                        .frame(minHeight: 120)
-                        .disabled(composer.phase != .editing)
-                }
-
-                switch composer.phase {
-                case .sent:
-                    Section {
-                        Label("Запитването е изпратено.", systemImage: "checkmark.circle")
-                            // 2.22:1 as `.green`. See `Palette.success`.
-                            .foregroundStyle(Palette.success)
-                        Text("Продавачът ще види контактите ви само ако приеме запитването.")
-                            .font(.footnote)
-                            .foregroundStyle(Palette.secondaryText)
-                    }
-                case .failed(let message):
-                    // `.red` is 3.55:1 on a white row; `Palette.error` is
-                    // 5.42:1 and is the app's one colour for "this broke".
-                    Section { Text(message).foregroundStyle(Palette.error) }
-                case .editing, .sending:
-                    EmptyView()
-                }
-            }
-            .inlineTitle("Ново запитване")
-            .interactiveDismissDisabled(composer.phase == .sending)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(composer.phase == .sent ? "Готово" : "Отказ") { dismiss() }
-                        // The word changes with the phase, so the name has to.
-                        .accessibilityInputLabels(composer.phase == .sent
-                            ? A11y.Spoken.done
-                            : A11y.Spoken.cancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if composer.phase == .sending {
-                        ProgressView()
-                    } else if composer.phase != .sent {
-                        Button("Изпрати") {
-                            Task { await composer.send(listingID: listing.id) }
-                        }
-                        .accessibilityInputLabels(A11y.Spoken.send)
-                        .disabled(!composer.canSend)
-                    }
-                }
             }
         }
     }

@@ -92,7 +92,7 @@ final class ExchangeMessagingPathTests: XCTestCase {
                       "the send must take a minted key, not a String")
         XCTAssertTrue(source.contains("idempotencyKey: idempotencyKey.value"),
                       "the send must hand its key to `post` rather than take the default")
-        XCTAssertTrue(source.contains("static func createInquiry"),
+        XCTAssertTrue(source.contains("static func createListing"),
                       "positive control: this is the file the exchange writes live in")
     }
 }

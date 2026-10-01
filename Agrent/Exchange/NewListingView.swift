@@ -17,7 +17,7 @@ import SwiftUI
 /// ── NOT FIRED ──
 ///
 /// Built, wired, and never sent. Publishing to other tenants is the
-/// owner's act, the same standing decision as `createInquiry`.
+/// owner's act, the same standing decision as `createListing`.
 struct NewListingView: View {
     let onPosted: () -> Void
 
