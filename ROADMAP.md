@@ -703,7 +703,10 @@ and "invite" is the whole "someone needs access and I'm not at my desk" case.
   (owner): Админ is an index of «Стопанство» → «Долна лента» → «Потребители».
 - Farm profile: the БАБХ identity block — EDITABLE since 2026-10-01, ported
   from the agreed web/server plan (agri-saas#1141, #1145; the full-replace
-  trap is agri-saas#1176). See PARITY.md, "Farm profile".
+  trap was agri-saas#1176, fixed by #1181). Saves are guarded by the
+  optimistic lock (`If-Match`, agri-saas#1184): a concurrent edit is a
+  conflict with a reload, no longer last-write-wins. See PARITY.md,
+  "Farm profile".
 
 **Membership has THREE statuses, not two:** `ACTIVE`, `INVITED`,
 `DEACTIVATED`. A UI that models this as a boolean cannot render a pending

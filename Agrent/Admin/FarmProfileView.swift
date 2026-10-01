@@ -47,9 +47,10 @@ struct FarmProfileView: View {
             }
             .sheet(isPresented: $editing) {
                 if let original = store.profile.value {
-                    FarmProfileEditView(original: original) { body, draft in
-                        try await store.saveProfile(body, typed: draft)
-                    }
+                    FarmProfileEditView(
+                        original: original,
+                        save: { body, draft in try await store.saveProfile(body, typed: draft) },
+                        reload: { try await store.reloadProfile() })
                 }
             }
             .privacyCover()
@@ -280,10 +281,14 @@ private struct EGNRow: View {
 /// SAVE IS READ-MODIFY-WRITE OF THE WHOLE OBJECT. The draft starts from the
 /// loaded profile; `FarmProfileUpdate.build` sends every untouched field back
 /// exactly as loaded and clears only a field the farmer emptied. Never a
-/// per-field PUT — an omitted key is an erased one (agri-saas#1176).
+/// per-field PUT — correct whether or not the server merges (agri-saas#1181).
+///
+/// THE OPTIMISTIC LOCK (agri-saas#1184): the save carries the version this
+/// sheet opened on. A 409 stops the sheet — nothing typed is lost and nothing
+/// is retried — until the farmer reloads; see `FarmProfileRebase`.
 struct FarmProfileEditView: View {
-    let original: FarmProfile
     let save: (FarmProfileUpdate, FarmProfileDraft) async throws -> Void
+    let reload: () async throws -> FarmProfile
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: FarmProfileDraft
@@ -294,10 +299,24 @@ struct FarmProfileEditView: View {
     @State private var failure: String?
     @State private var confirmingDiscard = false
 
+    /// The profile the draft is an edit OF — and so the version the save
+    /// sends. State, not a `let`: a reload after a 409 moves it to what is
+    /// stored now, and every "untouched" judgement moves with it.
+    @State private var original: FarmProfile
+    /// A 409 landed and has not been reloaded over. While true, «Запази» is
+    /// off: the same body with the same version can only 409 again, and a
+    /// save without the version would be the silent overwrite.
+    @State private var conflicted = false
+    @State private var reloading = false
+    /// Said once, after a reload: the fields both people changed.
+    @State private var reloadNotes: [String]?
+
     init(original: FarmProfile,
-         save: @escaping (FarmProfileUpdate, FarmProfileDraft) async throws -> Void) {
-        self.original = original
+         save: @escaping (FarmProfileUpdate, FarmProfileDraft) async throws -> Void,
+         reload: @escaping () async throws -> FarmProfile) {
         self.save = save
+        self.reload = reload
+        _original = State(initialValue: original)
         _draft = State(initialValue: FarmProfileDraft(original))
     }
 
@@ -311,6 +330,16 @@ struct FarmProfileEditView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if conflicted {
+                    conflictSection
+                } else if let reloadNotes {
+                    Section {
+                        Text(FarmProfileConflict.reloaded).font(.footnote)
+                        ForEach(reloadNotes, id: \.self) { note in
+                            Text(note).font(.footnote).foregroundStyle(Palette.warning)
+                        }
+                    }
+                }
                 if failure != nil || !problems.isEmpty {
                     Section {
                         ForEach(problems, id: \.message) { problem in
@@ -320,10 +349,14 @@ struct FarmProfileEditView: View {
                             Text(failure).font(.footnote).foregroundStyle(Palette.error)
                             // TRUE OF THIS WRITE, unlike the member writes. A
                             // whole-object PUT stores the same row however many
-                            // times it lands, so «Запази» again is safe.
-                            Text("Записът може да се повтори безопасно — повторното "
-                                 + "изпращане записва същите данни.")
-                                .font(.footnote).foregroundStyle(Palette.secondaryText)
+                            // times it lands, so «Запази» again is safe. NOT
+                            // said over a 409 whose reload failed: there
+                            // «Запази» is off and the way on is «Презареди».
+                            if !conflicted {
+                                Text("Записът може да се повтори безопасно — повторното "
+                                     + "изпращане записва същите данни.")
+                                    .font(.footnote).foregroundStyle(Palette.secondaryText)
+                            }
                         }
                     }
                 }
@@ -351,7 +384,7 @@ struct FarmProfileEditView: View {
                     Button("Отказ") {
                         if dirty { confirmingDiscard = true } else { dismiss() }
                     }
-                    .disabled(saving)
+                    .disabled(saving || reloading)
                     .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -361,8 +394,8 @@ struct FarmProfileEditView: View {
                         Button("Запази") { Task { await submit() } }
                             // Not live until something changed: saving an
                             // untouched profile is a write (and an audit row)
-                            // that says nothing.
-                            .disabled(!dirty)
+                            // that says nothing. Nor over an unreloaded 409.
+                            .disabled(!dirty || conflicted || reloading)
                             .accessibilityInputLabels(A11y.Spoken.save)
                     }
                 }
@@ -370,7 +403,7 @@ struct FarmProfileEditView: View {
             // THE UNSAVED-CHANGES GUARD. A swipe down is the same «leave» as
             // Отказ and must ask the same question; while saving, nothing
             // leaves, so a write in flight is never orphaned by a gesture.
-            .interactiveDismissDisabled(dirty || saving)
+            .interactiveDismissDisabled(dirty || saving || reloading)
             .confirmationDialog("Отхвърляне на промените?",
                                 isPresented: $confirmingDiscard,
                                 titleVisibility: .visible) {
@@ -557,6 +590,49 @@ struct FarmProfileEditView: View {
         newCrop = ""
     }
 
+    // MARK: Conflict
+
+    /// The 409, said plainly, with the one way forward.
+    ///
+    /// NOT a «Запази» retry and not «Отхвърли»: the first would need the
+    /// newer version, which only a reload legitimately gives, and the second
+    /// throws away what was typed. Reload keeps it (`FarmProfileRebase`).
+    private var conflictSection: some View {
+        Section {
+            Text(FarmProfileConflict.message)
+                .font(.footnote).foregroundStyle(Palette.error)
+            Text(FarmProfileConflict.advice)
+                .font(.footnote).foregroundStyle(Palette.secondaryText)
+            if reloading {
+                ProgressView()
+            } else {
+                Button(FarmProfileConflict.reload) { Task { await reloadAfterConflict() } }
+            }
+        }
+    }
+
+    private func reloadAfterConflict() async {
+        reloading = true
+        defer { reloading = false }
+        do {
+            let fresh = try await reload()
+            // The edits move onto what is stored now; untouched fields take
+            // the other person's values, so the next save does not write
+            // their change back over with the stale one.
+            let rebased = FarmProfileRebase.rebase(draft, from: original, onto: fresh)
+            original = fresh
+            draft = rebased.draft
+            conflicted = false
+            failure = nil
+            reloadNotes = rebased.collisions
+            AccessibilityNotification.Announcement(FarmProfileConflict.reloaded).post()
+        } catch {
+            // Stays in the conflict state: the version is still stale, so
+            // «Запази» stays off and «Презареди» stays offered.
+            failure = UserMessage.text(for: error)
+        }
+    }
+
     // MARK: Save
 
     private func submit() async {
@@ -577,6 +653,12 @@ struct FarmProfileEditView: View {
                 try await save(body, draft)
                 AccessibilityNotification.Announcement(FarmProfileSaveReport.saved).post()
                 dismiss()
+            } catch APIClient.APIError.conflict {
+                // 409 STALE_DATA: someone saved since this sheet opened.
+                // Nothing was written; everything typed stays; NO retry.
+                reloadNotes = nil
+                conflicted = true
+                AccessibilityNotification.Announcement(FarmProfileConflict.message).post()
             } catch {
                 // Stays open with everything typed. A refused write whose
                 // message has gone reads as a write that worked — #921, in a

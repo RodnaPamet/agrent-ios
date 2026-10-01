@@ -11,5 +11,6 @@
   "odbhCity": null,
   "agricultureDirectorateCity": null,
   "sizeHa": 39.758,
-  "grainProduced": ["wheat", "maize"]
+  "grainProduced": ["wheat", "maize"],
+  "version": 3
 }

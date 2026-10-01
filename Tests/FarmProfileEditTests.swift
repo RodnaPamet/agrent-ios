@@ -10,7 +10,7 @@ import XCTest
 final class FarmProfileEditTests: XCTestCase {
 
     /// The properties of `UpdateFarmProfileRequest` as agri-saas#1178
-    /// documents them (13, none required — and absent CLEARS, #1176), which
+    /// documents them (13, none required; absent is left alone since #1181), which
     /// are the route's zod keys. Hard-coded rather than read from the spec at
     /// test time: the suite must not depend on another repository's branch.
     private let thirteen: Set<String> = [
@@ -63,10 +63,11 @@ final class FarmProfileEditTests: XCTestCase {
 
     // MARK: - The body: whole object, always
 
-    /// agri-saas#1176. An absent key is NULLED by the usecase, so a body that
-    /// omits one erases it. All thirteen, every time — including when every
-    /// value is null, which is exactly when the synthesised `Encodable` would
-    /// have dropped them all.
+    /// agri-saas#1176. An absent key WAS nulled by the usecase until #1181
+    /// made it "left alone"; all thirteen, every time, is correct under both
+    /// and does not depend on which server build answers — including when
+    /// every value is null, which is exactly when the synthesised `Encodable`
+    /// would have dropped them all.
     func testTheBodyAlwaysCarriesAllThirteenKeys() throws {
         let full = try json(body(profile()))
         XCTAssertEqual(Set(full.keys), thirteen)

@@ -31,6 +31,26 @@ final class AdminStore {
     /// it does not outlive the screen it describes.
     private(set) var lastSaveNotes: [String]?
 
+    /// The farm-profile network, as two closures so the lock is a unit test.
+    ///
+    /// There is no URLProtocol seam in `Tests/`, and the things worth pinning
+    /// — which version goes out as `If-Match`, that a 409 is not a save, that
+    /// the NEXT save carries the version the server returned — are all
+    /// decided here, above the wire. Defaulted to the real routes; only tests
+    /// pass anything else, and nothing in the suite sends the PUT.
+    private let sendProfile: (FarmProfileUpdate) async throws -> FarmProfile
+    private let fetchProfile: () async throws -> FarmProfile
+
+    init(
+        sendProfile: @escaping (FarmProfileUpdate) async throws -> FarmProfile
+            = AdminAPI.saveFarmProfile,
+        fetchProfile: @escaping () async throws -> FarmProfile
+            = AdminAPI.fetchFarmProfile
+    ) {
+        self.sendProfile = sendProfile
+        self.fetchProfile = fetchProfile
+    }
+
     func load() async {
         async let m: Void = loadMembers()
         async let p: Void = loadProfile()
@@ -68,8 +88,7 @@ final class AdminStore {
     private func loadProfile() async {
         if profile.value == nil { profile = .loading }
         do {
-            let data = try await APIClient.shared.data(for: AdminAPI.farmProfilePath)
-            profile = .loaded(try await AdminAPI.decodeFarmProfile(from: data), .fresh)
+            profile = .loaded(try await fetchProfile(), .fresh)
             canEditProfile = true
         } catch {
             // OFF ON ANY FAILURE, and the 403 branch below is why it matters:
@@ -99,21 +118,37 @@ final class AdminStore {
 
     /// Save the WHOLE profile and show what the server stored.
     ///
-    /// `body` comes from `FarmProfileUpdate.build`, which is read-modify-write
-    /// over the loaded profile — see `FarmProfileEditing.swift` for why a
-    /// partial body would erase the rest (agri-saas#1176).
+    /// `body` comes from `FarmProfileUpdate.build`: read-modify-write over the
+    /// profile the editor opened on, carrying THAT profile's version as
+    /// `expectedVersion` — the `If-Match`. Not `profile.value?.version`,
+    /// which a refresh behind the sheet may have moved on.
     ///
     /// THE RESPONSE REPLACES THE SCREEN, not the draft. The server trims,
     /// sanitises and de-duplicates, so the submitted values are not
     /// necessarily the stored ones; keeping them would show a profile the
-    /// database does not hold. Same rule the web's save follows.
+    /// database does not hold. Same rule the web's save follows. It also
+    /// carries the NEW version, and because the next editor opens on
+    /// `profile.value`, the next save sends it with no re-GET.
     ///
-    /// Throws for the sheet to show and stay open. Safe to retry: a PUT of
-    /// the whole object stores the same row twice.
+    /// Throws for the sheet to show and stay open. A 409 throws
+    /// `APIError.conflict` and leaves `profile` UNTOUCHED: nothing was saved,
+    /// and the sheet — not this — decides whether to reload.
     func saveProfile(_ body: FarmProfileUpdate, typed draft: FarmProfileDraft) async throws {
-        let saved = try await AdminAPI.saveFarmProfile(body)
+        let saved = try await sendProfile(body)
         profile = .loaded(saved, .fresh)
         lastSaveNotes = FarmProfileSaveReport.notes(draft: draft, saved: saved)
+    }
+
+    /// Re-read the profile after a 409, for the editor to rebase onto.
+    ///
+    /// Updates the screen behind the sheet as well, so cancelling out of the
+    /// editor afterwards shows what is stored now rather than what was
+    /// stale. Throws to the sheet: a failed reload must not look like one
+    /// that brought back nothing new.
+    func reloadProfile() async throws -> FarmProfile {
+        let fresh = try await fetchProfile()
+        profile = .loaded(fresh, .fresh)
+        return fresh
     }
 
     func clearSaveNotes() { lastSaveNotes = nil }

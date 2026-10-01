@@ -148,14 +148,15 @@ final class DecoderToleranceTests: XCTestCase {
            "flagged":2,"jobRunId":"run1"}}
         """#) { _ = try await APIClient.shared.decode($0, as: JobRunEnvelope.self) },
 
-        // The farm profile, thirteen fields all in `required` — twelve
-        // nullable, and `grainProduced` neither nullable nor optional.
+        // The farm profile, fourteen fields all in `required` — twelve
+        // nullable, `grainProduced` neither nullable nor optional, and the
+        // lock's `version`.
         Probe("FarmProfile", #"""
         {"producerName":"Иван Петров","egn":"7501011234","eik":"203912345",
          "urn":"1234567","address":"ул. Дунав 3","municipality":"Плевен",
          "settlement":"Плевен","agricultureDirectorateCity":"Плевен",
          "registrationPlace":"Плевен","registrationEkatte":"56722",
-         "odbhCity":"Плевен","sizeHa":124.5,"grainProduced":["wheat"]}
+         "odbhCity":"Плевен","sizeHa":124.5,"grainProduced":["wheat"],"version":3}
         """#) { _ = try await AdminAPI.decodeFarmProfile(from: $0) },
 
         // The catalogue, whose `commodity` is the only optional field.
@@ -407,6 +408,12 @@ final class DecoderToleranceTests: XCTestCase {
         // null and is in `required`, so it is the only key this model cannot
         // do without, and modelling it as an optional would describe a state
         // the server cannot produce.
+        //
+        // `version` (agri-saas#1184, checked 2026-10-01) is `integer` and in
+        // `required`, yet NOT here: the model takes it as `Int?` so a server
+        // without the lock still loads the screen, and nil saves unguarded —
+        // the route's documented absent-header behaviour. Requiring it would
+        // trade a working read for a lock the server did not offer.
         "FarmProfile": ["grainProduced"],
         "SpatialImportAccepted": ["fileRecordId", "format", "jobId", "status"],
         "ExchangeInquiry": ["id"],
