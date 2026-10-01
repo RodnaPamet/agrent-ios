@@ -390,6 +390,14 @@ enum UserMessage {
         // grows a retry.
         "FORBIDDEN": "Нямате права за това действие.",
 
+        // Every zod refusal, app-wide: `toApiErrorResponse` answers a
+        // `ZodError` with this code and the English "Invalid request payload",
+        // which IS a sentence, so `isHumanSentence` passed it straight to the
+        // farmer. Met first on the farm-profile editor, whose client-side
+        // checks mirror the route's schema — reaching this there means the two
+        // have drifted, and the farmer still needs a sentence they can read.
+        "VALIDATION_ERROR": "Сървърът не прие данните. Проверете полетата и опитайте отново.",
+
         // ── Exchange messaging (agrent-ios#114) ──
         //
         // The server's sentences are English and the web has no Bulgarian

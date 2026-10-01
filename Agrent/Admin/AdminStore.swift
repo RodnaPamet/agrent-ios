@@ -16,6 +16,21 @@ final class AdminStore {
     private(set) var members: LoadState<[Membership]> = .loading
     private(set) var profile: LoadState<FarmProfile> = .loading
 
+    /// Whether THIS reader may edit the farm profile.
+    ///
+    /// Derived from the GET, not from a role. GET and PUT sit behind the same
+    /// `requirePermission('admin.manage')` (OWNER and ADMIN), so a profile the
+    /// server would show is a profile it would take a write for — and a 403
+    /// on the read is a 403 on the write. Asking `/me` for a role and mapping
+    /// it here would be a second copy of the server's permission table, which
+    /// is the copy that drifts.
+    private(set) var canEditProfile = false
+
+    /// What the last save changed, for the profile page to say once.
+    /// nil until a save lands; cleared when the profile page goes away so
+    /// it does not outlive the screen it describes.
+    private(set) var lastSaveNotes: [String]?
+
     func load() async {
         async let m: Void = loadMembers()
         async let p: Void = loadProfile()
@@ -55,7 +70,14 @@ final class AdminStore {
         do {
             let data = try await APIClient.shared.data(for: AdminAPI.farmProfilePath)
             profile = .loaded(try await AdminAPI.decodeFarmProfile(from: data), .fresh)
+            canEditProfile = true
         } catch {
+            // OFF ON ANY FAILURE, and the 403 branch below is why it matters:
+            // it substitutes an all-null profile so the section reads «още не
+            // са попълнени». An editor opened on THAT would read-modify-write
+            // thirteen nulls over the real record. The editor only ever starts
+            // from a profile the server actually sent.
+            canEditProfile = false
             // A 403 here is already carried by `access`; do not also show a
             // second failure for the same cause.
             if AdminAPI.isForbidden(error) {
@@ -74,6 +96,27 @@ final class AdminStore {
             }
         }
     }
+
+    /// Save the WHOLE profile and show what the server stored.
+    ///
+    /// `body` comes from `FarmProfileUpdate.build`, which is read-modify-write
+    /// over the loaded profile — see `FarmProfileEditing.swift` for why a
+    /// partial body would erase the rest (agri-saas#1176).
+    ///
+    /// THE RESPONSE REPLACES THE SCREEN, not the draft. The server trims,
+    /// sanitises and de-duplicates, so the submitted values are not
+    /// necessarily the stored ones; keeping them would show a profile the
+    /// database does not hold. Same rule the web's save follows.
+    ///
+    /// Throws for the sheet to show and stay open. Safe to retry: a PUT of
+    /// the whole object stores the same row twice.
+    func saveProfile(_ body: FarmProfileUpdate, typed draft: FarmProfileDraft) async throws {
+        let saved = try await AdminAPI.saveFarmProfile(body)
+        profile = .loaded(saved, .fresh)
+        lastSaveNotes = FarmProfileSaveReport.notes(draft: draft, saved: saved)
+    }
+
+    func clearSaveNotes() { lastSaveNotes = nil }
 
     private(set) var busy: Set<String> = []
     private(set) var writeError: String?
@@ -142,6 +185,11 @@ final class AdminStore {
     /// and exercising it should not need a network.
     func setMembersForTesting(_ rows: [Membership]) {
         members = .loaded(rows, .fresh)
+    }
+
+    func setProfileForTesting(_ value: FarmProfile, editable: Bool) {
+        profile = .loaded(value, .fresh)
+        canEditProfile = editable
     }
     #endif
 

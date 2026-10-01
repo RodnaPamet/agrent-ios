@@ -425,6 +425,44 @@ Two shapes the screen has to get right:
   has viewer accounts. It needs a screen that says so, not an empty list
   that reads as "no members".
 
+### Farm profile — editable since 2026-10-01, ported from the web/server plan
+
+The profile was read-only on iOS (#28, #111). It is now editable, and that is
+a PORT, not a new design: the write path was agreed with the agri-saas backend
+and already shipped there — agri-saas#1141 (web editor + usecase) and #1145
+(`PUT /admin/farm-profile` documented). The web page
+`src/app/t/[tenantSlug]/(app)/admin/farm-profile/page.tsx` is the spec for the
+fields, their order, labels, hints and save behaviour; the route's zod schema
+is the spec for limits. No separate written iOS plan exists in agri-saas
+(confirmed by both backend sessions).
+
+What the client must get right, read from the route and usecase:
+
+- **A full replace that looks like a PATCH** (agri-saas#1176, open). Every
+  field is `.optional()`, but an ABSENT field is nulled. So the app always
+  reads, merges the edits and PUTs all thirteen keys with explicit nulls.
+  `UpdateFarmProfileRequest` in openapi.json is a stub; the request is modelled
+  from the zod schema.
+- **`admin.manage` on GET and PUT** — OWNER and ADMIN. The edit action shows
+  only over a profile the GET returned.
+- **The response can differ from the request** (trim, `sanitizePlainText`,
+  grain de-duplication, Decimal(12,3) rounding), so the screen shows what the
+  server returned and says what moved.
+- **A negative `sizeHa` is a 400** from zod, not a stored null as the summary
+  says — the usecase's null branch is unreachable over HTTP.
+- **Last write wins** on the whole record: no version, ETag or If-Match.
+  A known limit, recorded on #1176.
+
+iOS-only, on purpose: ЕГН masked with a reveal in view and edit (#110); an
+unparseable size refused instead of sent as null (the web's null clears it);
+a privacy cover in the app switcher on the profile screens.
+
+### Members — their own page since 2026-10-01
+
+Owner's request: Админ is now an index of three rows — «Стопанство» (the
+profile), «Долна лента», «Потребители» (with a count). The member list moved
+unchanged to its own pushed page.
+
 ---
 
 ## Design status — the AX3 failures are FIXED

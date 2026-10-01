@@ -117,4 +117,22 @@ enum AdminAPI {
     }
 
     private struct EmptyBody: Encodable {}
+
+    /// Replace the farm profile. `PUT /admin/farm-profile`, `admin.manage`
+    /// (OWNER and ADMIN), returning the stored profile AFTER normalisation.
+    ///
+    /// A FULL REPLACE THAT LOOKS LIKE A PATCH (agri-saas#1176): every key the
+    /// body leaves out is nulled. `FarmProfileUpdate` always encodes all
+    /// thirteen — build it with `FarmProfileUpdate.build`, never by hand.
+    ///
+    /// No idempotency key and no If-Match: the route reads neither, and a
+    /// whole-object PUT is idempotent by construction (`APIClient.put`).
+    /// Concurrency is last-write-wins on the whole record — a known limit,
+    /// not something a header here could fix.
+    ///
+    /// The path carries the tenant and nothing else. ЕГН, ЕИК and УРН travel
+    /// in the BODY only — never a query string, which a proxy log would keep.
+    static func saveFarmProfile(_ body: FarmProfileUpdate) async throws -> FarmProfile {
+        try await APIClient.shared.put(farmProfilePath, body: body, as: FarmProfile.self)
+    }
 }

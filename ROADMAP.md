@@ -691,8 +691,11 @@ invite is its own resource at the admin root. A phone screen built against the
 shape written here would have 404'd on the one action the screen exists for,
 and "invite" is the whole "someone needs access and I'm not at my desk" case.
 
-- Members: list, invite, deactivate
-- Farm profile: the БАБХ identity block
+- Members: list, invite, deactivate — on their own page since 2026-10-01
+  (owner): Админ is an index of «Стопанство» → «Долна лента» → «Потребители».
+- Farm profile: the БАБХ identity block — EDITABLE since 2026-10-01, ported
+  from the agreed web/server plan (agri-saas#1141, #1145; the full-replace
+  trap is agri-saas#1176). See PARITY.md, "Farm profile".
 
 **Membership has THREE statuses, not two:** `ACTIVE`, `INVITED`,
 `DEACTIVATED`. A UI that models this as a boolean cannot render a pending

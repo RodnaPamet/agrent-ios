@@ -120,6 +120,12 @@ enum A11y {
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")
         static let importing = spokenNames("Импортирай", "Import")
+        /// The farm profile's way into its editor.
+        static let edit = spokenNames("Редактирай", "Edit")
+        /// The unsaved-changes guard's way out. NOT `cancel`: «Отказ» is what
+        /// opened this question, and the answer that throws the edits away
+        /// must not answer to the same word that asked it.
+        static let discard = spokenNames("Отхвърли промените", "Discard")
 
         // ── Exchange messaging (agrent-ios#114) ──
         //
