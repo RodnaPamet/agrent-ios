@@ -1,14 +1,27 @@
 import SwiftUI
 
-/// Members and the farm's identity block.
+/// Админ: the farm, the app, the people — three rows.
 ///
 /// Reached from the app menu rather than a tab: five tab slots exist before
 /// iOS collapses the rest into "More", and this is a monthly action while
-/// Задачи is a daily one. Опрerator frequency decides the tab bar.
+/// Задачи is a daily one. Operator frequency decides the tab bar.
+///
+/// ── THREE ROWS, IN THE OWNER'S ORDER (2026-10-01) ──
+///
+///     «Стопанство»   → the farm profile, which can now be edited
+///     «Долна лента»  → the bottom-bar editor
+///     «Потребители»  → the members, with their count
+///
+/// This screen used to BE the member list, with the farm's identity block
+/// under it. Each now has its own page (`FarmProfileView`, `MembersView`) and
+/// this one is the index. The farm comes first because it is what the
+/// administration is OF; the members are the longest page and go last.
+///
+/// One store for all three. The rows show a member count and the producer's
+/// name, so they read the same data the pages do — and a deactivation on the
+/// members page is reflected in the count on the way back.
 struct AdminView: View {
     @State private var store = AdminStore()
-    @State private var revealEGN = false
-    @State private var inviting = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -19,18 +32,6 @@ struct AdminView: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Затвори") { dismiss() }
                         .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                    if store.access == .allowed {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button { inviting = true } label: {
-                                Label("Покани", systemImage: "person.badge.plus")
-                            }
-                        }
-                    }
-                }
-                .sheet(isPresented: $inviting) {
-                    InviteMemberView { email, role in
-                        try await store.invite(email: email, role: role)
                     }
                 }
                 .task { await store.load() }
@@ -46,6 +47,10 @@ struct AdminView: View {
             // READER gets a 403 by design. An empty list would say "this
             // farm has no members", which is a false statement about the
             // farm rather than a true one about the reader.
+            //
+            // The farm profile row is hidden with the rest, not shown and
+            // then refused: its GET needs `admin.manage`, which is the same
+            // OWNER/ADMIN pair, so a reader who gets here cannot open it.
             EmptyState(
                 "Нямате достъп до този раздел",
                 icon: "lock",
@@ -54,478 +59,59 @@ struct AdminView: View {
 
         case .allowed:
             List {
+                Section { farmRow }.pageRow()
                 // The bottom-row editor, moved off every screen's toolbar
                 // and into the one place that holds settings.
-                Section("Приложение") { TabCustomiserRow() }.pageRow()
-                membersSection.pageRow()
-                farmProfileSection.pageRow()
+                Section { TabCustomiserRow() }.pageRow()
+                Section { membersRow }.pageRow()
             }
             .refreshable { await PullToRefresh.bounded { await store.load() } }
             .pageBackground()
         }
     }
 
-    // MARK: - Members
-
-    @ViewBuilder
-    private var membersSection: some View {
-        switch store.members {
-        case .loading:
-            Section("Достъп") { ProgressView() }
-
-        case .failed(let message):
-            Section("Достъп") {
-                ErrorState(message: message) { await store.load() }
-            }
-
-        case .loaded(let all, _) where all.isEmpty:
-            Section("Достъп") {
-                Text("Няма членове.").font(.footnote).foregroundStyle(Palette.secondaryText)
-            }
-
-        case .loaded(let all, _):
-            if let writeUnknown = store.writeUnknown {
-                Section {
-                    // Not "it failed". The lookup filters ACTIVE, so a
-                    // replay of a deactivation that already landed 404s —
-                    // after a timeout the app cannot tell which happened,
-                    // and the list below is the authority.
-                    Label("Неясен резултат", systemImage: "questionmark.circle")
-                        .foregroundStyle(Palette.error)
-                    Text(writeUnknown).font(.footnote).foregroundStyle(Palette.secondaryText)
-                    Text("Връзката прекъсна. Проверете статуса в списъка по-долу — той е меродавен.")
-                        .font(.footnote).foregroundStyle(Palette.secondaryText)
+    /// The producer's name as the row's value: it says WHICH farm, and it is
+    /// the one field that appears on public filings anyway. Never an
+    /// identifier — the ЕИК, ЕГН and УРН stay one tap away, behind the page
+    /// that knows how to show them.
+    private var farmRow: some View {
+        NavigationLink {
+            FarmProfileView(store: store)
+        } label: {
+            LabeledContent {
+                switch store.profile {
+                case .loading:
+                    ProgressView()
+                case .failed:
+                    Text("Неуспешно зареждане")
+                case .loaded(let profile, _):
+                    Text(profile.isEmpty
+                         ? "Непопълнено"
+                         : (profile.producerName ?? ""))
+                        .lineLimit(1)
                 }
-            }
-            if let writeError = store.writeError {
-                Section {
-                    Text(writeError).font(.footnote).foregroundStyle(Palette.error)
-                }
-            }
-            ForEach(store.grouped(all), id: \.0) { status, rows in
-                Section(status.label) {
-                    ForEach(rows) { member in
-                        MemberRow(member: member)
-                            // FULL SWIPE OFF, which is the owner's ruling and
-                            // closes a real hole.
-                            //
-                            // `allowsFullSwipe` defaults to TRUE, so a
-                            // brisk swipe across a row fired the first
-                            // destructive action directly — deactivating a
-                            // member, removing their access to the farm, with
-                            // no tap and no confirmation.
-                            //
-                            // The comment below reasons carefully about a TAP
-                            // ("a button on every row invites a tap that was
-                            // not meant") and nobody considered the gesture
-                            // that reveals it. Same shape as the rest of this
-                            // week: the care went into the case somebody
-                            // pictured.
-                            //
-                            // Found by writing a UI test that swipes this row,
-                            // and realising the test itself would have
-                            // deactivated somebody real.
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                actions(for: member)
-                            }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Deactivate and reactivate, as swipe actions rather than buttons in
-    /// the row: this is a rare, consequential action on a screen that is
-    /// mostly read, and a button on every row invites a tap that was not
-    /// meant.
-    ///
-    /// The control is ABSENT on the last active owner rather than present
-    /// and refused. The server counts them live and a database trigger
-    /// backs it; counting here too means an admin never taps a thing that
-    /// cannot work.
-    @ViewBuilder
-    private func actions(for member: Membership) -> some View {
-        if store.busy.contains(member.id) {
-            EmptyView()
-        } else if member.status == .active {
-            if store.isLastOwner(member) {
-                // agrent-ios#99 — SAY WHY, RATHER THAN SPRINGING BACK SILENTLY.
-                //
-                // The destructive action stays ABSENT for the last active
-                // owner: the server counts them live with a database trigger
-                // behind it, and an action that cannot work should not be
-                // offered. That reasoning is sound for a TAP and leaves a
-                // swipe with nothing at all — the row bounces back, which is
-                // indistinguishable from a swipe that did not register, so the
-                // admin swipes again harder.
-                //
-                // NOT A BUTTON. A `Label` in a swipe slot, so the guard is not
-                // weakened by making the refusal look actionable, and VoiceOver
-                // has something to announce where there was silence.
-                //
-                // A DISABLED BUTTON, AND NOT BY PREFERENCE. The owner asked
-                // for something that is NOT a button, and SwiftUI does not
-                // offer one here.
-                //
-                // Measured rather than read, by photographing real swipes on
-                // this screen:
-                //
-                //     a bare `Label` in the slot      renders NOTHING
-                //     a disabled `Button`             renders
-                //     a real Button (the control)     renders «Деактивирай»
-                //
-                // The control is what makes the first line mean anything. An
-                // earlier in-process probe reached the opposite conclusion —
-                // or rather reached no conclusion and read as one — because
-                // its known-good Button ALSO came back empty, so its empty
-                // results were evidence of nothing.
-                //
-                // THE COST, since it is a real one: VoiceOver announces this
-                // as a dimmed button rather than as text. A farmer hears
-                // something that sounds actionable and is not. That is worse
-                // than plain text and better than the silence it replaces,
-                // where a swipe sprang back with no explanation and the admin
-                // swiped again harder.
-                //
-                // The spoken label carries the whole sentence; the visible one
-                // is short because a swipe slot is narrow.
-                Button {} label: {
-                    Label("Последният собственик", systemImage: "lock")
-                }
-                .disabled(true)
-                .tint(Color(.systemGray3))
-                .accessibilityLabel("Последният собственик не може да се деактивира")
-            } else {
-                Button(role: .destructive) {
-                    Task { await store.setActive(member, active: false) }
-                } label: {
-                    Label("Деактивирай", systemImage: "person.slash")
-                }
-            }
-        } else if member.status == .deactivated {
-            Button {
-                Task { await store.setActive(member, active: true) }
             } label: {
-                Label("Активирай", systemImage: "person.badge.clock")
-            }
-            .tint(Palette.accent)
-        }
-    }
-
-    // MARK: - Farm profile
-
-    @ViewBuilder
-    private var farmProfileSection: some View {
-        switch store.profile {
-        case .loading:
-            Section("Стопанство") { ProgressView() }
-
-        case .failed(let message):
-            Section("Стопанство") {
-                Text(message).font(.footnote).foregroundStyle(Palette.error)
-            }
-
-        case .loaded(let profile, _) where profile.isEmpty:
-            Section("Стопанство") {
-                Text("Данните за стопанството още не са попълнени.")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.secondaryText)
-            }
-
-        case .loaded(let profile, _):
-            Section("Стопанство") {
-                field("Производител", profile.producerName)
-                field("ЕИК", profile.eik)
-                egnField(profile.egn)
-                field("Адрес", profile.address)
-                field("Населено място", profile.settlement)
-                field("Община", profile.municipality)
-                field("Място на регистрация", profile.registrationPlace)
-                field("ЕКАТТЕ", profile.registrationEkatte)
-                field("ОДБХ", profile.odbhCity)
-                field("Областна дирекция", profile.agricultureDirectorateCity)
-
-                // ── The holding, as opposed to the producer above ──
-                //
-                // Read-only, which is the owner's ruling. A write path is a
-                // different size of job: a blank string CLEARS a field on the
-                // server rather than being ignored, so it needs
-                // read-modify-write of the whole object, and the response can
-                // legitimately differ from what was sent because the server
-                // trims, refuses a negative size as null, and drops blank and
-                // duplicate crops. None of that is needed to SHOW them.
-                field("УРН", profile.urn)
-                sizeField(profile.sizeHa)
-                grainField(profile.grainProduced)
+                Label("Стопанство", systemImage: "building.2")
             }
         }
     }
 
-    /// An EGN is a national identity number, and this is the one field where
-    /// the mobile context genuinely differs from the web's.
-    ///
-    /// The web renders it plainly, which is right on a laptop. A phone is
-    /// read over shoulders in a co-op office or a queue, so it is masked
-    /// with an explicit reveal — still shown, still one tap, and not sitting
-    /// on screen for anyone standing behind the operator.
-    ///
-    /// Masked by DIGIT COUNT, not by a fixed run of dots: showing the wrong
-    /// length would make a wrong value look plausible when revealed.
-    @ViewBuilder
-    private func egnField(_ egn: String?) -> some View {
-        if let egn, !egn.isEmpty {
-            LabeledContent("ЕГН") {
-                HStack(spacing: 10) {
-                    Text(revealEGN ? egn : String(repeating: "•", count: egn.count))
-                        .font(.body.monospacedDigit())
-                    Button(revealEGN ? "Скрий" : "Покажи") { revealEGN.toggle() }
-                        .font(.footnote)
+    /// The count is of the rows the page lists — invited and deactivated
+    /// included — so tapping through never shows a different number of
+    /// people than the row promised.
+    private var membersRow: some View {
+        NavigationLink {
+            MembersView(store: store)
+        } label: {
+            LabeledContent {
+                if let all = store.members.value {
+                    Text("\(all.count)").monospacedDigit()
+                } else if case .loading = store.members {
+                    ProgressView()
                 }
+            } label: {
+                Label("Потребители", systemImage: "person.2")
             }
-            // The number itself is never in the label. VoiceOver reads
-            // aloud, and a national ID spoken in a shared space is the
-            // same exposure this masking exists to avoid.
-            //
-            // ── AND `children: .ignore` SWALLOWED THE ONLY CONTROL ──
-            //
-            // Collapsing the row to one element discarded the «Покажи»
-            // Button with everything else, so the hint promised a double tap
-            // that did nothing: the element carried no action. The ЕГН could
-            // not be revealed by VoiceOver at all, the button was absent from
-            // the Switch Control and Full Keyboard focus order, and Voice
-            // Control had no element named «Покажи» to act on. Reachable only
-            // by a finger on the exact glyphs.
-            //
-            // Found by two independent lenses of an accessibility audit, which
-            // is the corroboration that made it worth trusting: the privacy
-            // instinct was right and the side effect was invisible from
-            // either one alone.
-            //
-            // The action restores it without putting the digits back into
-            // speech — the label still says only whether it is shown.
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(revealEGN ? "ЕГН, показано" : "ЕГН, скрито")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { revealEGN.toggle() }
-            // What a Voice Control user SEES on the button, so «Покажи» works
-            // as spoken. The visible word is not in the accessibility label
-            // and would otherwise match nothing.
-            .accessibilityInputLabels(revealEGN
-                ? A11y.spokenNames("Скрий", "ЕГН", "Hide")
-                : A11y.spokenNames("Покажи", "ЕГН", "Show"))
-            .accessibilityHint(revealEGN ? "Скрива номера" : "Показва номера")
-        }
-    }
-
-    /// Declared hectares, and NOTHING when it was never declared.
-    ///
-    /// A DECLARED ZERO IS SHOWN. `field` hides an empty string because an
-    /// absent name is nothing to say; a zero here is something the farm told
-    /// the state, and hiding it would make "declared nothing" and "declared
-    /// nothing yet" the same row. So this branches on nil, not on falsity.
-    @ViewBuilder
-    private func sizeField(_ hectares: Double?) -> some View {
-        if let hectares {
-            LabeledContent("Размер") {
-                Text(Area(hectares: hectares).text)
-                    .multilineTextAlignment(.trailing)
-            }
-        }
-    }
-
-    /// The declared crops, through `CommodityName`.
-    ///
-    /// The wire carries the server's slugs — `wheat`, `barley` — and this app
-    /// has a CI step requiring any file touching a commodity to resolve it,
-    /// because eight sites once printed the server's English at an operator
-    /// whose app is otherwise entirely Bulgarian and the owner found it rather
-    /// than a test. `freeText` rather than `canonical`: a crop the mapping
-    /// does not know is shown as it came rather than dropped, since a farm
-    /// declaring something unusual should not see a shorter list than it
-    /// filed.
-    ///
-    /// `[]` is the empty case and renders nothing — the array is never nil,
-    /// so there is no third state to handle.
-    @ViewBuilder
-    private func grainField(_ crops: [String]) -> some View {
-        if !crops.isEmpty {
-            LabeledContent("Култури") {
-                Text(crops.map { CommodityName.freeText($0) ?? $0 }
-                        .joined(separator: ", "))
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func field(_ label: String, _ value: String?) -> some View {
-        if let value, !value.trimmingCharacters(in: .whitespaces).isEmpty {
-            LabeledContent(label) {
-                Text(value)
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
-
-struct MemberRow: View {
-    let member: Membership
-
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(member.user.displayName ?? "—")
-                .font(.headline)
-                .fixedSize(horizontal: false, vertical: true)
-
-            AdaptiveRow { roleChip; meta }
-        }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(A11y.sentence([
-            member.user.displayName,
-            member.role.label,
-            member.status == .active ? nil : member.status.label,
-            sessionText,
-            member.invitedBy?.name.map { "поканен от \($0)" },
-        ]))
-    }
-
-    private var roleChip: some View {
-        CategoryChip(
-            text: member.role == .unknown ? member.role.rawValue : member.role.label,
-            foreground: Palette.Chip.inputText,
-            background: Palette.Chip.inputFill
-        )
-    }
-
-    /// "is this account actually being used" is the question behind most
-    /// deactivations, and the session count is the only thing on screen
-    /// that answers it.
-    private var sessionText: String? {
-        guard let count = member.activeSessionCount, count > 0 else { return nil }
-        return Plural.bg(count, "активна сесия", "активни сесии")
-    }
-
-    @ViewBuilder
-    private var meta: some View {
-        MetaRow {
-            if let email = member.user.email, !email.isEmpty {
-                // Middle truncation keeps the domain visible, which is the
-                // half that identifies the person when a list is all one
-                // farm's staff. At the accessibility sizes there is no half
-                // left to keep — "и…bg" identifies nobody — so it wraps.
-                Text(email)
-                    .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
-                    .truncationMode(.middle)
-            }
-            if let sessionText {
-                if member.user.email != nil { MetaSeparator() }
-                Text(sessionText)
-            }
-        }
-        .font(.footnote)
-        .foregroundStyle(Palette.secondaryText)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
-/// Invite somebody to the farm.
-///
-/// ── This one MAY be retried, unlike every other write in the app ──
-///
-/// There is a `@@unique([tenantId, email])` and the usecase writes
-/// through it, so re-inviting an address with a pending invite UPSERTS
-/// rather than creating a second row. A replay therefore produces one
-/// invitation and one extra email — embarrassing, not harmful.
-///
-/// That is the opposite trade from the cost form and the listing form,
-/// where a duplicate is a permanent wrong row. Here, refusing to retry
-/// costs more than it saves, so a failure offers "Опитай пак" rather
-/// than a warning about unknown outcomes.
-private struct InviteMemberView: View {
-    let send: (String, MembershipRole) async throws -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var email = ""
-    @State private var role: MembershipRole = .reader
-    @State private var sending = false
-    @State private var failure: String?
-
-    /// Deliberately not a full address validator. The server validates,
-    /// and a client-side regex that rejects a legitimate address is worse
-    /// than one round trip — this only catches the empty and obviously
-    /// unfinished cases so the button is not live before there is
-    /// anything to send.
-    private var canSend: Bool {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !sending && trimmed.contains("@") && !trimmed.hasSuffix("@")
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Имейл") {
-                    TextField("name@example.com", text: $email)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                }
-                Section("Роля") {
-                    Picker("Роля", selection: $role) {
-                        // `unknown` is this client's sentinel for a role
-                        // the server added and this build has not heard
-                        // of. It can arrive; it must never be offered.
-                        ForEach(MembershipRole.allCases.filter { $0 != .unknown }, id: \.self) {
-                            Text($0.label).tag($0)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                }
-                if let failure {
-                    Section {
-                        Text(failure).font(.footnote).foregroundStyle(Palette.error)
-                        Text("Поканата може да се изпрати отново безопасно — повторното изпращане не създава втора покана.")
-                            .font(.footnote).foregroundStyle(Palette.secondaryText)
-                    }
-                }
-            }
-            .inlineTitle("Покани член")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ") { dismiss() }
-                        .disabled(sending)
-                        .accessibilityInputLabels(A11y.Spoken.cancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if sending {
-                        ProgressView()
-                    } else {
-                        Button("Изпрати") { Task { await submit() } }
-                            .disabled(!canSend)
-                            .accessibilityInputLabels(A11y.Spoken.send)
-                    }
-                }
-            }
-            .interactiveDismissDisabled(sending)
-        }
-    }
-
-    private func submit() async {
-        sending = true
-        failure = nil
-        defer { sending = false }
-        do {
-            try await send(email.trimmingCharacters(in: .whitespacesAndNewlines), role)
-            dismiss()
-        } catch {
-            // Stays open. A refused write whose message has gone reads as
-            // a write that worked — #921, in a different form.
-            failure = UserMessage.text(for: error)
         }
     }
 }

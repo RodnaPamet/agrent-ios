@@ -532,15 +532,32 @@ final class A11yShotsTests: XCTestCase {
                       "«\(label)» would not close — the run cannot continue from here")
     }
 
-    /// Админ, MASKED, and the swipe that #99 is about.
+    /// Админ's three rows, the farm profile MASKED (page and editor), the
+    /// members page, and the swipe that #99 is about.
+    ///
+    /// ── Since 2026-10-01 these are three screens, not one ──
+    ///
+    /// Админ is an index now: «Стопанство», «Долна лента», «Потребители».
+    /// The profile and the members each push their own page, so this walks
+    /// into each and back rather than photographing one long list.
     ///
     /// ── The ЕГН is never revealed ──
     ///
-    /// A member row carries a national identity number behind «Покажи».
-    /// `AdminView` draws dots until that is tapped, so simply never tapping it
-    /// means no identity number is written to a PNG — the row's layout,
-    /// contrast and Dynamic Type are all still visible, which is what the audit
-    /// changed. The owner chose this over skipping the screen or revealing it.
+    /// The farm profile carries a national identity number behind «Покажи».
+    /// `FarmProfileView` and its editor draw dots until that is tapped, so
+    /// simply never tapping it means no identity number is written to a PNG —
+    /// the row's layout, contrast and Dynamic Type are all still visible, which
+    /// is what the audit changed. The owner chose this over skipping the
+    /// screen or revealing it. (On the seam the number is a synthetic run of
+    /// zeros anyway; the rule is kept because it is the rule.)
+    ///
+    /// ── The editor is OPENED and never SAVED ──
+    ///
+    /// «Запази» is a PUT of the whole profile. On the seam it would get 501,
+    /// but a suite that taps a write button and relies on the seam to catch
+    /// it is one launch-argument typo from writing to production. Nothing
+    /// here is typed into the form either, so «Отказ» closes it without the
+    /// unsaved-changes question.
     ///
     /// There is no assertion that the digits are absent, and that is honest
     /// rather than lazy: the guarantee is that nothing taps «Покажи», which is
@@ -559,13 +576,57 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20),
                       "Админ did not present a sheet")
         Thread.sleep(forTimeInterval: 4)
+        capture("10-admin", app: app)
+
+        // ── «Стопанство», the first row ──
+        //
+        // A NavigationLink's label is the row's combined text — «Стопанство,
+        // Синтетично стопанство ЕООД» on the fixture — so BEGINSWITH, not ==.
+        let farmRow = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Стопанство"))
+            .firstMatch
+        XCTAssertTrue(farmRow.waitForExistence(timeout: 10), "no «Стопанство» row on Админ")
+        farmRow.tap()
+        XCTAssertTrue(app.navigationBars["Профил на стопанството"].waitForExistence(timeout: 10),
+                      "«Стопанство» did not push the farm profile")
+        Thread.sleep(forTimeInterval: 1)
 
         // No assertion that the digits are absent. `x && false` would have
         // been one that cannot fail, which is the defect this repo has spent a
         // week removing — and there is nothing honest to assert here anyway:
         // the guarantee is that this method never taps «Покажи», which is a
         // property of the code above and not of the image below.
-        capture("10-admin-masked", app: app)
+        capture("13-admin-farm-profile-masked", app: app)
+
+        // The editor, opened and photographed, then left by «Отказ». The
+        // button is asserted rather than optional: the seam serves a profile
+        // the server "sent", so an admin must be offered the edit — its
+        // absence would be the regression.
+        let edit = app.navigationBars.buttons["Редактирай"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5),
+                      "no «Редактирай» over a profile the server sent")
+        edit.tap()
+        let cancel = app.navigationBars.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), "the editor did not open")
+        Thread.sleep(forTimeInterval: 1)
+        capture("14-admin-farm-profile-edit", app: app)
+        // NOT «Запази». See the doc comment: this suite never taps a write.
+        cancel.tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 10),
+                      "«Отказ» on an untouched editor did not close it — the "
+                      + "unsaved-changes guard is firing without changes")
+        goBack(app, to: "Админ")
+
+        // ── «Потребители», the last row ──
+        let membersRow = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Потребители"))
+            .firstMatch
+        XCTAssertTrue(membersRow.waitForExistence(timeout: 10), "no «Потребители» row on Админ")
+        membersRow.tap()
+        XCTAssertTrue(app.navigationBars["Потребители"].waitForExistence(timeout: 10),
+                      "«Потребители» did not push the members page")
+        Thread.sleep(forTimeInterval: 1)
+        capture("15-admin-members", app: app)
 
         // THE SWIPE, AND WHY IT IS SAFE ONLY SINCE `allowsFullSwipe: false`.
         //
@@ -586,10 +647,12 @@ final class A11yShotsTests: XCTestCase {
         // nobody named at the call site.
         // THE OWNER'S ROW, BY LABEL — not `cells.firstMatch`.
         //
-        // The first cell on this screen is «Долна лента» under «Приложение»,
-        // which has no swipe actions at all. Swiping it photographed an
-        // untouched screen and looked like a successful capture; only opening
-        // the image showed the swipe had answered a different question.
+        // The first cell on this screen USED TO BE «Долна лента» under
+        // «Приложение», which has no swipe actions at all — the members shared
+        // Админ with it until 2026-10-01. Swiping it photographed an untouched
+        // screen and looked like a successful capture; only opening the image
+        // showed the swipe had answered a different question. The members page
+        // has no other rows now, and matching by label still holds.
         //
         // The row carries a combined label built by `A11y.sentence`, which
         // includes the role — so «Собственик» finds the owner, who is also the
@@ -606,8 +669,9 @@ final class A11yShotsTests: XCTestCase {
         // AT AX5 THE MEMBER ROWS ARE BELOW THE FOLD, and this used to cost the
         // whole variant.
         //
-        // «Долна лента» alone fills most of an accessibility5 screen, so the
-        // first member row starts off-screen. The swipe checks then failed the
+        // «Долна лента» alone filled most of an accessibility5 screen when it
+        // shared the list, so the first member row started off-screen. On
+        // its own page the «Поканен» section still comes first. The swipe checks then failed the
         // test, `continueAfterFailure` is false, and the run produced ZERO
         // screenshots for the one text size the Dynamic Type items are about.
         // A check that cannot run taking the captures down with it is the worst
@@ -637,6 +701,7 @@ final class A11yShotsTests: XCTestCase {
             print("SKIPPED the #99 swipe checks: no hittable «Собственик» row at this "
                   + "text size. Expected at the accessibility sizes; if it happens at "
                   + "the default size, access is refused or the row label changed.")
+            goBack(app, to: "Админ")
             dismissSheet(app, named: "Админ")
             return
         }
@@ -691,6 +756,7 @@ final class A11yShotsTests: XCTestCase {
                   + "could not have done if the gesture were not landing.")
         }
 
+        goBack(app, to: "Админ")
         dismissSheet(app, named: "Админ")
     }
 
