@@ -53,8 +53,22 @@ struct ExchangeMapView: View {
                         .foregroundStyle(Palette.secondaryText)
                 }
             } else {
-                Section("По области") {
-                    ForEach(regions) { RegionRow(region: $0) }
+                // ── ONE SECTION PER OBLAST, AND THE OFFERS ARE IN IT ──
+                //
+                // This used to be a single «По области» section of summary
+                // rows — «Добрич · 1 обява · 210 EUR / т» — and nothing on
+                // the map screen opened an offer. The owner found the test
+                // listing here, could not tap it, and had to leave the map to
+                // reach it (2026-10-01). The summary stays as the section's
+                // first row; the offers follow it as the SAME `ListingRow`
+                // and the SAME push to `ListingDetailView` the list view
+                // uses, so both views lead to one detail screen and one
+                // «Съобщение до …» button.
+                ForEach(regions) { region in
+                    Section {
+                        RegionRow(region: region)
+                        offerLinks(region.listings)
+                    }
                 }
             }
 
@@ -68,7 +82,21 @@ struct ExchangeMapView: View {
                             + " не се показват на картата.",
                         icon: "mappin.slash"
                     )
+                    // And reachable: not on the map is not the same as not
+                    // openable.
+                    offerLinks(unplaceable)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func offerLinks(_ offers: [ExchangeListing]) -> some View {
+        ForEach(offers) { listing in
+            NavigationLink {
+                ListingDetailView(listing: listing)
+            } label: {
+                ListingRow(listing: listing)
             }
         }
     }
