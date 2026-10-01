@@ -84,8 +84,10 @@ enum FarmRiskAPI {
     private static var base: String { "/api/t/\(Config.tenantSlug)" }
 
     /// Per-parcel readings. ETagged server-side and cached per
-    /// (tenant, parcel, day) for six hours, so `If-None-Match` is worth
-    /// sending — `APIClient` already does.
+    /// (tenant, parcel, day) for six hours. `If-None-Match` would be worth
+    /// sending, and NOTHING SENDS IT: that used to happen invisibly through
+    /// URLSession's disk cache, which #134 turned off app-wide. A full 200
+    /// every time is the accepted cost; `ResponseCache` covers offline.
     ///
     /// The parcel id is a PATH SEGMENT, not a query parameter. It was
     /// `?parcelId=` and was moved before this app ever called it: Apple's

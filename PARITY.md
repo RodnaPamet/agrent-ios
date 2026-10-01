@@ -250,6 +250,9 @@ conversation has been opened (see the note above).
   memory; offline is an honest «Няма интернет връзка.», not yesterday's
   copy. This is the one exchange read that does not follow the house's
   cache-first rule, and a test holds it.
+  Until #134 that was only true of `ResponseCache`: URLSession's default
+  disk cache could still store a thread's 200 in `Cache.db`. It is now off
+  app-wide (`NoURLCache`), which is what makes "nothing on disk" true.
 - **Polling at the web's cadence** — 5 s for an open conversation, 30 s for
   the inbox — but ONLY while the screen is on screen and the app active;
   locked or backgrounded, nothing polls. A 429 waits the server's

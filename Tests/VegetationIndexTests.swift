@@ -104,7 +104,7 @@ final class VegetationIndexTests: XCTestCase {
     /// wrong field rather than an error, so this runs the substitution.
     func testMapKitSubstitutesTheEarthEngineTemplate() throws {
         let template = "https://earthengine.googleapis.com/v1/projects/p/maps/m/tiles/{z}/{x}/{y}"
-        let overlay = MKTileOverlay(urlTemplate: template)
+        let overlay = NoURLCache.TileOverlay(urlTemplate: template)
         let url = overlay.url(forTilePath: MKTileOverlayPath(x: 37, y: 22, z: 12, contentScaleFactor: 1))
         XCTAssertEqual(url.absoluteString,
                        "https://earthengine.googleapis.com/v1/projects/p/maps/m/tiles/12/37/22")
@@ -113,7 +113,7 @@ final class VegetationIndexTests: XCTestCase {
     /// Transparent-outside-the-parcel only works if Apple's imagery is still
     /// drawn underneath. `true` here turns the surroundings black.
     func testTilesDoNotReplaceMapContent() {
-        let overlay = MKTileOverlay(urlTemplate: "https://x/{z}/{x}/{y}")
+        let overlay = NoURLCache.TileOverlay(urlTemplate: "https://x/{z}/{x}/{y}")
         overlay.canReplaceMapContent = false
         XCTAssertFalse(overlay.canReplaceMapContent)
     }

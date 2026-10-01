@@ -76,8 +76,18 @@ actor APIClient {
     /// session and is set explicitly, because the failure it produces when
     /// true — waiting indefinitely rather than erroring — is precisely the
     /// behaviour this file exists to avoid.
-    private let session: URLSession = {
-        let configuration = URLSessionConfiguration.default
+    ///
+    /// ── And no URL cache (#134) ──
+    ///
+    /// Built from `NoURLCache.configuration()`, so `urlCache` is nil: no
+    /// response this session receives — the staff directory and ЕГН/ЕИК/УРН
+    /// included — reaches Cache.db. `ResponseCache` is the app's only disk
+    /// cache. A static function rather than an inline closure so
+    /// `NoURLCacheTests` can assert on the configuration itself.
+    private let session = URLSession(configuration: APIClient.sessionConfiguration())
+
+    static func sessionConfiguration() -> URLSessionConfiguration {
+        let configuration = NoURLCache.configuration()
         configuration.timeoutIntervalForRequest = 15
         configuration.waitsForConnectivity = false
         #if DEBUG
@@ -87,10 +97,10 @@ actor APIClient {
         // `URLProtocol.registerClass` is the usual incantation and does NOT
         // work here: it registers into the global list that `URLSession.shared`
         // consults, and this session is built from its own configuration, which
-        // carries its own `protocolClasses`. The one it would have caught is
-        // `AuthClient.exchange`, which does use `URLSession.shared` — and that
-        // path is unreachable under the seam, because the app never shows the
-        // sign-in screen that starts it.
+        // carries its own `protocolClasses`. It would not catch
+        // `AuthClient.exchange` either, which since #134 uses
+        // `NoURLCache.session` — and that path is unreachable under the seam
+        // anyway, because the app never shows the sign-in screen that starts it.
         //
         // PREPENDED rather than replacing the list: the default protocols still
         // handle anything `FixtureURLProtocol.canInit` declines, and `canInit`
@@ -102,8 +112,8 @@ actor APIClient {
                 [FixtureURLProtocol.self] + (configuration.protocolClasses ?? [])
         }
         #endif
-        return URLSession(configuration: configuration)
-    }()
+        return configuration
+    }
 
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -125,8 +135,10 @@ actor APIClient {
         case clientTooOld
         /// 304 Not Modified — the server confirms the cached copy is current.
         ///
-        /// Normally unreachable: URLSession revalidates its own HTTP cache and
-        /// hands the caller the stored 200 before this switch sees anything.
+        /// Unreachable today: the app sends no `If-None-Match` of its own, and
+        /// since #134 URLSession has no HTTP cache to revalidate from, so
+        /// nothing asks the server for a 304. Kept because a proxy or a
+        /// future conditional request could still produce one.
         /// But `default:` used to catch it and render "Грешка от сървъра
         /// (304)" on a screen whose data is perfectly fine, so the one path
         /// where it CAN surface produced an error for a success.
