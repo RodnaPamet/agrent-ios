@@ -770,6 +770,7 @@ actor APIClient {
         _ ifMatch: String?, _ tokens: Tokens, _ contentType: String? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         var req = URLRequest(url: try Self.url(for: path))
+        ClientHeader.stamp(&req)
         req.httpMethod = method
         req.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
         if let body {
@@ -916,6 +917,7 @@ actor APIClient {
             defer { refreshTask = nil }
             Log.auth.info("token refresh starting")
             var req = URLRequest(url: Config.baseURL.appending(path: "/api/auth/token/refresh"))
+            ClientHeader.stamp(&req)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONEncoder().encode(["refreshToken": seen.refreshToken])

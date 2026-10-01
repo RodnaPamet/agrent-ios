@@ -226,6 +226,7 @@ enum SessionRevocation {
     /// testable with no network. No `Authorization`; see above.
     static func request(refreshToken: String, baseURL: URL = Config.baseURL) -> URLRequest {
         var req = URLRequest(url: baseURL.appending(path: path))
+        ClientHeader.stamp(&req)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         // A one-key String dictionary cannot fail to encode; `try?` keeps the
