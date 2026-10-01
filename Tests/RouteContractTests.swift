@@ -300,7 +300,9 @@ final class RouteContractTests: XCTestCase {
                 }
             }
         }
-        XCTAssertGreaterThan(seen, 50, "positive control: the scanner stopped finding paths")
+        // A floor, not a count: 50 path literals as of the inquiry removal
+        // (2026-10-01). Well under that means the scanner broke, not the app.
+        XCTAssertGreaterThan(seen, 40, "positive control: the scanner stopped finding paths")
         XCTAssertTrue(uncovered.isEmpty,
                       "These path literals are not produced by any builder listed in "
                       + "RouteContractTests.built for their file, so the route guard never "

@@ -6,7 +6,7 @@ import SwiftUI
 /// ── NOT FIRED ──
 ///
 /// Built, wired, and never sent. Writing to another farm is the owner's act,
-/// the same standing decision as `createInquiry` — and merely OPENING this
+/// the same standing decision as `createListing` — and merely OPENING this
 /// screen marks the conversation read for every member of the farm. So no
 /// real conversation has been opened from development. The screenshot harness
 /// photographs this screen only because it runs on the fixture seam (#115):

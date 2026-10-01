@@ -60,8 +60,8 @@ enum AdminAPI {
     /// only cost is a second email to a colleague.
     ///
     /// That is stronger than a header, because it holds against a client
-    /// that never sends one — the same argument `createInquiry` makes from
-    /// its own unique constraint.
+    /// that never sends one — the same argument the inquiry route made from
+    /// its own unique constraint (one inquiry per tenant per listing).
     ///
     /// An address that is ALREADY an active member is a 400 with English
     /// prose and the generic code, so it surfaces through the status

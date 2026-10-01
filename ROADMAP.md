@@ -402,10 +402,9 @@ separating your rows. `ExchangeInquiry` is the opposite: RLS-protected and
 private. The two must not share a UI that treats them alike.
 
 - Listings list + detail
-- Create inquiry (write). NOT the journal's `Idempotency-Key` discipline,
-  which this line used to claim: the inquiry route reads no key, and the
-  app sends `post`'s fresh default per call. The domain is what dedupes —
-  one inquiry per (listing, farm).
+- ~~Create inquiry (write)~~ — REMOVED 2026-10-01 by the owner: messaging
+  replaced it on a listing, so the app offers one way to contact the other
+  farm. Inquiries already sent still list under «Моите заявки» (read-only).
 - Messaging: the inbox as Борса's fourth section, a conversation with
   scrollback and a composer, close, block and unblock, retract, and
   «message the other party» on a listing. Decisions in PARITY.md, Gap 7.

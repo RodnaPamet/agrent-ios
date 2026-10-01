@@ -123,8 +123,8 @@ routes that honour a key and that nothing here calls, and the message send
 did not exist yet. That was the SPEC's list of honouring routes read as the
 app's list of what it sends.
 
-Two more send a FRESH key per call — the inquiry and the catalogue item
-create — which protects nothing: `APIClient.post` mints one by default. The
+One more sends a FRESH key per call — the catalogue item create — which
+protects nothing: `APIClient.post` mints one by default. The
 rest send none: the parcel-history creates, the exchange listing create,
 admin, and every messaging write but the send. `POST /grain/contracts` and
 `POST /locations/:id/parcels` honour none either — the last says outright that

@@ -176,16 +176,15 @@ whether the decimals go out as numbers or strings. That last one is not
 inferable: the exchange READS are strings because those routes have no
 DTO, and `grain/costs` sends numbers because it has one.
 
-When it is built it ships **unfired**, like `createInquiry`. The owner
+When it is built it ships **unfired**, like the inquiry did. The owner
 authorising one cost row on his own books does not extend to posting an
 offer other farms can see.
 
-### Note — the inquiry write, and every messaging write, is unexercised
+### Note — every messaging write is unexercised from development
 
-`POST /exchange/inquiries` creates a production row **and emails another
-tenant's admins**. It has never been fired. That is a deliberate standing
-decision, not an oversight; it is recorded here so nobody closes it by
-accident while working through this list.
+The app no longer SENDS inquiries (removed 2026-10-01, see Gap 7); it still
+lists the ones already sent under «Моите заявки». `POST /exchange/inquiries`
+was never fired from development while it existed.
 
 The same decision covers every messaging write (Gap 7), each of which the
 OTHER farm sees:
@@ -215,10 +214,15 @@ section, the conversation with scrollback, reply, «message the other party»
 from a listing, close, block (the listing owner only) and unblock, and
 retract your own message — the ninth operation, `DELETE
 /exchange/messages/{id}`, which the issue's list of eight missed and the
-web offers as «Премахни». **The one-shot inquiry stays beside it**, as on
-the web, which renders both on someone else's listing: an inquiry is one
-message whose contact is revealed only if the owner accepts; a
-conversation reveals nothing and goes on.
+web offers as «Премахни».
+
+**The one-shot inquiry is GONE from the app — a deliberate divergence
+(owner, 2026-10-01).** It first stood beside messaging, as on the web,
+which renders both on someone else's listing. The owner then ruled it
+redundant: a conversation does what an inquiry did and goes on, so the
+listing offers one way to contact the other farm, «Съобщение до …».
+Inquiries already sent are still listed under «Моите заявки», read-only.
+The web keeps both; this app does not.
 
 Read out of agri-saas at 11b00118 — the spec, `exchange-messaging.ts`,
 `ThreadsClient.tsx`, `ThreadClient.tsx` — not observed running. No real

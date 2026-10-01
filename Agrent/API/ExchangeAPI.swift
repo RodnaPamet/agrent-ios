@@ -62,8 +62,8 @@ enum ExchangeAPI {
         try await APIClient.shared.decode(data, as: [ExchangeInquiry].self)
     }
 
-    /// NOT EXERCISED, by the same standing decision as `createInquiry`: a
-    /// listing is published to every tenant in the platform. Built, wired,
+    /// NOT EXERCISED: a listing is published to every tenant in the
+    /// platform. Built, wired,
     /// and the first real send is the owner's.
     static func createListing(_ draft: CreateExchangeListing) async throws -> Data {
         try await APIClient.shared.postReturningData(
@@ -71,33 +71,11 @@ enum ExchangeAPI {
         )
     }
 
-    /// NOT EXERCISED. This creates a production row AND emails the seller
-    /// tenant's admins, so it ships built and unfired by deliberate decision:
-    /// the first real operator send is the first real test. Nothing in
-    /// development or CI may call it.
-    ///
-    /// (This comment used to sit above `createListing`, one function up, so
-    /// the listing create read as the inquiry's and the inquiry had none.)
-    ///
-    /// No `Idempotency-Key` is RELIED ON, and that is correct rather than an
-    /// omission. The route reads none — `post` still sends its default, which
-    /// the server ignores — and the DOMAIN is idempotent by construction:
-    /// `@@unique([listingId, inquirerTenantId])` means a tenant can express
-    /// interest in a listing at most once, which is stronger than a header
-    /// because it holds even against a client that never sends one.
-    static func createInquiry(listingID: String, message: String) async throws -> ExchangeInquiry {
-        try await APIClient.shared.post(
-            "\(base)/inquiries",
-            body: CreateInquiry(listingId: listingID, message: message),
-            as: ExchangeInquiry.self
-        )
-    }
-
     // MARK: - Messaging (agrent-ios#114)
     //
     // Nine operations: the inbox, one conversation page, open-a-thread, send,
     // mark read, close, block, unblock, and retract one message. Every WRITE
-    // below ships BUILT AND UNFIRED, like `createInquiry`: each one is seen by
+    // below ships BUILT AND UNFIRED, like `createListing`: each one is seen by
     // another farm (a thread appears in their inbox the moment it is OPENED,
     // with no message sent), so nothing in development, CI or A11yShots may
     // call one against production. Under the UI test seam every write is
@@ -412,11 +390,6 @@ struct CreateExchangeListing: Encodable, Sendable {
         }
         return found
     }
-}
-
-struct CreateInquiry: Encodable, Sendable {
-    let listingId: String
-    let message: String
 }
 
 /// What the listings board is being asked for.

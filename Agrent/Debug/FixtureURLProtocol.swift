@@ -46,8 +46,7 @@ import Foundation
 ///
 /// ── Writes are refused, and that is not caution ──
 ///
-/// `ExchangeAPI.createInquiry` posts a row AND emails the seller tenant's
-/// admins; `createListing` publishes to every tenant on the platform; and
+/// `createListing` publishes to every tenant on the platform; and
 /// every messaging write — open a thread, send, mark read, close, block,
 /// unblock, retract — is seen by another farm (#114). Those ship built and
 /// unfired by a standing decision recorded on the functions themselves. The
