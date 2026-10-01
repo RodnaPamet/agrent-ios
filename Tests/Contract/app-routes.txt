@@ -1,0 +1,60 @@
+# Every API path template the app builds, in this app's parameter spelling.
+# CHECKED, not generated: RouteContractTests.testTheAppRoutesFileIsCurrent
+# fails when this differs from what the builders produce, and prints the
+# exact lines. Read by .github/workflows/agri-saas-routes.yml, which runs on
+# Linux and cannot run the suite, to say which removed server paths the app
+# still calls.
+/api/account/bottom-tabs
+/api/auth/me
+/api/auth/native/exchange
+/api/auth/native/start
+/api/auth/token/refresh
+/api/t/{tenantSlug}/admin/farm-profile
+/api/t/{tenantSlug}/admin/invites
+/api/t/{tenantSlug}/admin/members
+/api/t/{tenantSlug}/admin/members/{membershipId}/deactivate
+/api/t/{tenantSlug}/admin/members/{membershipId}/reactivate
+/api/t/{tenantSlug}/agro/locations/{locationId}/evi-tiles
+/api/t/{tenantSlug}/agro/locations/{locationId}/gndvi-tiles
+/api/t/{tenantSlug}/agro/locations/{locationId}/ndmi-tiles
+/api/t/{tenantSlug}/agro/locations/{locationId}/ndre-tiles
+/api/t/{tenantSlug}/agro/locations/{locationId}/ndvi-tiles
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/analysis
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/crop-seasons
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/crop-seasons/{seasonId}
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/history
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations/{observationId}
+/api/t/{tenantSlug}/dashboard/ag
+/api/t/{tenantSlug}/dashboard/task-trend
+/api/t/{tenantSlug}/exchange/inquiries
+/api/t/{tenantSlug}/exchange/listings
+/api/t/{tenantSlug}/exchange/listings/{listingId}
+/api/t/{tenantSlug}/exchange/listings/{listingId}/thread
+/api/t/{tenantSlug}/exchange/messages/{messageId}
+/api/t/{tenantSlug}/exchange/my-listings
+/api/t/{tenantSlug}/exchange/threads
+/api/t/{tenantSlug}/exchange/threads/{threadId}
+/api/t/{tenantSlug}/exchange/threads/{threadId}/block
+/api/t/{tenantSlug}/exchange/threads/{threadId}/close
+/api/t/{tenantSlug}/exchange/threads/{threadId}/messages
+/api/t/{tenantSlug}/exchange/threads/{threadId}/read
+/api/t/{tenantSlug}/grain/calculator
+/api/t/{tenantSlug}/grain/costs
+/api/t/{tenantSlug}/insurance/leads
+/api/t/{tenantSlug}/insurance/products
+/api/t/{tenantSlug}/items
+/api/t/{tenantSlug}/journal
+/api/t/{tenantSlug}/locations
+/api/t/{tenantSlug}/locations/{locationId}/operations
+/api/t/{tenantSlug}/locations/{locationId}/parcels
+/api/t/{tenantSlug}/locations/{locationId}/parcels/{parcelId}
+/api/t/{tenantSlug}/locations/{locationId}/spatial-import
+/api/t/{tenantSlug}/locations/{locationId}/spatial-import/{jobId}
+/api/t/{tenantSlug}/reports/field-briefing
+/api/t/{tenantSlug}/tasks
+/api/t/{tenantSlug}/tasks/{id}
+/api/t/{tenantSlug}/tasks/{id}/status
+/api/t/{tenantSlug}/trends/news
+/api/t/{tenantSlug}/trends/prices
+/api/t/{tenantSlug}/units
