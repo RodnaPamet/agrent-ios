@@ -150,6 +150,7 @@ final class AuthClient: NSObject {
 
     private func exchange(code: String, verifier: String) async throws {
         var req = URLRequest(url: Config.baseURL.appending(path: "/api/auth/native/exchange"))
+        ClientHeader.stamp(&req)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(["code": code, "code_verifier": verifier])
