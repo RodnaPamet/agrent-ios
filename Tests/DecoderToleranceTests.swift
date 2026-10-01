@@ -287,6 +287,16 @@ final class DecoderToleranceTests: XCTestCase {
         Probe("ExchangeMessageRetracted", #"""
         {"id":"m"}
         """#) { _ = try await APIClient.shared.decode($0, as: ExchangeMessageRetracted.self) },
+
+        // `/api/auth/me`, the envelope. Its first probe, added with
+        // `featureFlags` (agri-saas#1209) — the field whose ABSENCE has to be
+        // survivable, because an older server omits it.
+        Probe("CurrentUser", #"""
+        {"user":{"id":"u","name":"А","email":"a@example.invalid","role":"OWNER",
+          "bottomTabOrder":["/tasks"]},
+         "tenant":{"id":"t","name":"Ферма","slug":"agrent"},
+         "featureFlags":{"social.dm":true}}
+        """#) { _ = try await MeAPI.decode(from: $0) },
     ]
 
     // MARK: - The measurement
@@ -478,6 +488,16 @@ final class DecoderToleranceTests: XCTestCase {
         "ExchangePartyBlocked": ["blocked"],
         "ExchangePartyUnblocked": ["blocked"],
         "ExchangeMessageRetracted": ["id"],
+
+        // ── Checked 2026-10-01 against agri-saas #1209 (feat/p0-4-feature-flags) ──
+        //
+        // ONE of the three the spec requires (`user`, `tenant`,
+        // `featureFlags`). `tenant` is not modelled at all — see the
+        // `CurrentUser` header for the trap it is. `featureFlags` is required
+        // by the spec and deliberately NOT here: absent means all off (a
+        // server from before #1209), and a map this build cannot read must
+        // cost the flags rather than the identity the spray sheet needs.
+        "CurrentUser": ["user"],
     ]
 
     /// THE GUARD. A field going non-optional turns this red and names it.

@@ -38,6 +38,10 @@ import Foundation
 ///                                      minute; a pause that is reset when it
 ///                                      was right for B costs exactly one 429,
 ///                                      which closes it again.
+///     · `FeatureFlags.shared`       — the flags `/me` resolved for A's
+///                                      cohort (agri-saas#1209). Never on disk,
+///                                      so the reset is the whole of it; B's own
+///                                      `/me` adopts B's.
 ///     · `DashboardPreferences.shared` — the Табло arrangement and the price
 ///                                      block's crop. Stored per DEVICE (there
 ///                                      is no server key), but it is a person's
@@ -134,6 +138,7 @@ enum SessionReset {
         OutboxStore.shared.reset()
         RateLimitPause.messages.reset()
         DashboardPreferences.shared.reset()
+        FeatureFlags.shared.reset()
     }
 }
 
@@ -157,17 +162,46 @@ enum SessionEpoch {
     static func isCurrent(_ epoch: Int) -> Bool { epoch == current }
 }
 
-/// Server-side revocation — THE SEAM, not the call.
+/// Server-side revocation: end THIS DEVICE's session on agri-saas
+/// (agri-saas#1191 P0.9, the server half; the route is agri-saas#1206).
 ///
-/// ── TODO(agri-saas#1191 P0.9): `POST /api/auth/native/revoke` ──
+/// ── Best-effort, fire-and-forget, AFTER the local clear ──
 ///
-/// The endpoint does NOT exist yet; Agri-SaaS backend 2 is building it. The
-/// owner's decision fixes its scope: it revokes ONLY this device's session —
-/// the refresh token's session family — not the user's other devices. When
-/// it lands, this sends `{ "refreshToken": … }` on `NoURLCache.session`, in a
-/// detached task, and ignores the answer: by the time it runs the tokens are
-/// already gone from this phone, and a failure here must never be able to
-/// undo or delay that.
+/// By the time this runs `SessionReset.endSession()` has already removed the
+/// tokens, the identity and every per-user singleton. Nothing here can undo
+/// or delay that: it is a detached task, never awaited, and its answer is
+/// only logged. ONE attempt, no retry loop. Offline, the request fails and
+/// the refresh token dies with the Keychain item it was in — nothing on this
+/// phone can present it again, and the server expires it on its own
+/// schedule. A retry would be SAFE (the route answers 200 even for an unknown
+/// token, RFC 7009, so a second attempt cannot error for work the first
+/// already did), but a retry queue that outlives the sign-out would be the
+/// one piece of A's credential still on the phone after A left, which is
+/// exactly what sign-out exists to prevent.
+///
+/// ── What it revokes: the session the credential DESCENDS FROM ──
+///
+/// The server ends the session the refresh token hangs from, plus every token
+/// on it — not the account; the person's other phones stay signed in, per the
+/// owner's "only this phone" decision. The caveat #1206 states, kept here so
+/// nobody has to discover it: a native credential is a CHILD of the session
+/// the browser sign-in created. `AuthClient.present` sets
+/// `prefersEphemeralWebBrowserSession = false`, so that browser is Safari's
+/// shared cookie jar; if the person was already signed in to app.agrent.bg in
+/// Safari on this phone, the native session descends from THAT login and this
+/// ends it too. The blast radius is the session the credential descends from,
+/// which usually coincides with the device and is not guaranteed to. A web
+/// login on the SAME phone is within "only this phone", so it is accepted
+/// rather than engineered around.
+///
+/// ── Unauthenticated, by the route's construction ──
+///
+/// The refresh token IS the credential (`security: NO_AUTH` in the spec, the
+/// pre-auth rate-limit tier, like `/token/refresh`), so no `Authorization`
+/// header is sent — and there is none to send: the access token was cleared
+/// with the rest. On `NoURLCache.session` rather than `APIClient` for the
+/// same reason: no bearer, no refresh-on-401, no fixture seam, nothing in
+/// Cache.db.
 ///
 /// ── NOT `/api/auth/logout` ──
 ///
@@ -176,13 +210,64 @@ enum SessionEpoch {
 /// that LOOKS server-side and is not. A source guard in
 /// `SignOutHygieneTests` keeps it out of the sign-out path.
 ///
-/// Until the endpoint exists the refresh token simply dies with the
-/// Keychain item: nothing on this phone can present it again, and the server
-/// expires it on its own schedule.
+/// ── Until agri-saas#1206 deploys ──
+///
+/// The route is on an open PR. Until it ships, the request falls through to
+/// NextAuth's `/api/auth/[...nextauth]` catch-all and is refused, and that
+/// answer is ignored like any other: the outcome is today's (the token dies
+/// with the Keychain item). `RouteContractTests.pendingServerRoutes` carries
+/// the path until the vendored route snapshot has it.
 enum SessionRevocation {
-    static func revokeThisDevice(refreshToken: String?) {
-        // TODO(agri-saas#1191 P0.9): POST /api/auth/native/revoke — not yet built.
-        // Intentionally does nothing today.
-        _ = refreshToken
+    /// `POST`, body `{ "refreshToken": "…" }` — the field name in both the
+    /// route (`'refreshToken' in body`) and its `NativeRevokeRequest` schema.
+    static let path = "/api/auth/native/revoke"
+
+    /// The request as a pure value, so its path, method, headers and body are
+    /// testable with no network. No `Authorization`; see above.
+    static func request(refreshToken: String, baseURL: URL = Config.baseURL) -> URLRequest {
+        var req = URLRequest(url: baseURL.appending(path: path))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // A one-key String dictionary cannot fail to encode; `try?` keeps the
+        // builder non-throwing for a caller that must not branch on it.
+        req.httpBody = try? JSONEncoder().encode(["refreshToken": refreshToken])
+        // Short: nobody waits on it, but a detached request hanging for the
+        // session default (60s) keeps the token in memory that much longer.
+        req.timeoutInterval = 15
+        return req
+    }
+
+    /// Fire once and return at once. `send` is the seam for tests, which
+    /// must never reach a real server; the app passes nothing.
+    ///
+    /// `refreshToken` is read by the caller BEFORE the local clear — after
+    /// it, the Keychain has nothing left to read.
+    @discardableResult
+    static func revokeThisDevice(
+        refreshToken: String?,
+        send: @escaping @Sendable (URLRequest) async throws -> Int = SessionRevocation.sendOnce
+    ) -> Task<Void, Never>? {
+        // Nothing to present (a refused refresh already cleared it), or an
+        // empty string the route would answer 400 to: no request at all.
+        guard let refreshToken, !refreshToken.isEmpty else { return nil }
+        let req = request(refreshToken: refreshToken)
+        return Task.detached(priority: .utility) {
+            do {
+                let status = try await send(req)
+                // The status and nothing else: a 200 says nothing about
+                // whether a token matched (RFC 7009), and no token material
+                // is ever logged.
+                Log.auth.info("native revoke → \(status, privacy: .public)")
+            } catch {
+                Log.auth.info("native revoke not sent: \(Log.summary(for: error), privacy: .public)")
+            }
+        }
+    }
+
+    /// The real send: one request on the cache-less session, status out.
+    @Sendable
+    static func sendOnce(_ req: URLRequest) async throws -> Int {
+        let (_, response) = try await NoURLCache.session.data(for: req)
+        return (response as? HTTPURLResponse)?.statusCode ?? -1
     }
 }

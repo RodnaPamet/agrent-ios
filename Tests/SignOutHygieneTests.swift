@@ -130,6 +130,7 @@ final class SignOutHygieneTests: XCTestCase {
         OutboxStore.shared.pause.absorb(tooMany)
         DashboardPreferences.shared.select(.sunflower)
         if !DashboardPreferences.shared.isOn(.tasks) { DashboardPreferences.shared.toggle(.tasks) }
+        FeatureFlags.shared.adopt(["social.dm": true])   // A's cohort, not B's
 
         // Positive controls: A really is visible everywhere before Изход, so
         // the emptiness below is the reset's doing and not the fixture's.
@@ -140,6 +141,7 @@ final class SignOutHygieneTests: XCTestCase {
         XCTAssertTrue(RateLimitPause.messages.isPaused)
         XCTAssertTrue(OutboxStore.shared.pause.isPaused)
         XCTAssertEqual(DashboardPreferences.shared.priceCommodity, .sunflower)
+        XCTAssertTrue(FeatureFlags.shared.isOn("social.dm"))
         for path in paths {
             let hit = await cache.read(ResponseCache.key(scope: scopeA, pathAndQuery: path))
             XCTAssertNotNil(hit, "positive control: A's \(path) is cached")
@@ -165,6 +167,8 @@ final class SignOutHygieneTests: XCTestCase {
         XCTAssertTrue(OutboxStore.shared.pending.isEmpty)
         XCTAssertEqual(DashboardPreferences.shared.blocks, DashboardBlock.defaultOrder)
         XCTAssertEqual(DashboardPreferences.shared.priceCommodity, .wheat)
+        XCTAssertFalse(FeatureFlags.shared.isOn("social.dm"), "A's feature flags survived")
+        XCTAssertTrue(FeatureFlags.shared.resolved.isEmpty)
         for key in dashboardKeys {
             XCTAssertNil(UserDefaults.standard.object(forKey: key), "\(key) survived")
         }
@@ -420,8 +424,9 @@ final class SignOutHygieneTests: XCTestCase {
 
     // MARK: - sign-out and sign-in, as written
 
-    /// Local first, whole, and with no network in front of it; the revoke is
-    /// a seam after it; the web's cookie logout is nowhere.
+    /// Local first, whole, and with no network in front of it; the revoke
+    /// (agri-saas#1206) runs after it, detached, once; the web's cookie
+    /// logout is nowhere.
     func testSignOutIsLocalFirstAndTheRevokeIsASeam() throws {
         let auth = read("Agrent/Auth/AuthClient.swift")
         guard let start = auth.range(of: "func signOut() {"),
@@ -447,17 +452,69 @@ final class SignOutHygieneTests: XCTestCase {
         XCTAssertFalse(appSources().contains { Self.code($0.text).contains("/api/auth/logout") },
                        "/api/auth/logout clears a web cookie and revokes nothing native")
 
-        // The seam names its endpoint and does nothing yet.
+        // The refresh token is captured BEFORE the clear deletes it. After,
+        // the Keychain read returns nil and the revoke silently sends nothing.
+        guard let capture = real.range(of: "let refreshToken = TokenStore.load()?.refreshToken") else {
+            return XCTFail("positive control: signOut reads the refresh token where this expects it")
+        }
+        XCTAssertLessThan(capture.lowerBound, local.lowerBound,
+                          "the refresh token is read after the local clear has deleted it")
+
+        // The revoke itself: one detached attempt, nothing awaited in front of
+        // the caller, no retry, no bearer.
         let reset = read("Agrent/Auth/SessionReset.swift")
-        guard let seam = reset.range(of: "static func revokeThisDevice(refreshToken: String?) {") else {
-            return XCTFail("positive control: the revoke seam exists")
+        guard let seam = reset.range(of: "static func revokeThisDevice("),
+              let seamEnd = reset[seam.upperBound...].range(of: "\n    }\n") else {
+            return XCTFail("positive control: the revoke exists where this expects it")
         }
-        let seamBody = String(reset[seam.upperBound...].prefix(300))
-        XCTAssertTrue(seamBody.contains("TODO(agri-saas#1191 P0.9): POST /api/auth/native/revoke"))
-        for request in ["APIClient", "URLSession", "NoURLCache", "Task"] {
-            XCTAssertFalse(seamBody.contains(request),
-                           "the revoke seam now does \(request) work — update this test with the contract")
+        let seamBody = Self.code(String(reset[seam.upperBound..<seamEnd.lowerBound]))
+        XCTAssertTrue(seamBody.contains("Task.detached"), "the revoke is no longer detached")
+        guard let detached = seamBody.range(of: "Task.detached") else { return }
+        XCTAssertFalse(seamBody[..<detached.lowerBound].contains("await"),
+                       "the revoke awaits before detaching, so sign-out would wait on it")
+        for loop in ["while ", "for ", "repeat ", "retry", "Task.sleep"] {
+            XCTAssertFalse(seamBody.contains(loop), "the revoke grew a retry (`\(loop)`): it is one attempt")
         }
+        XCTAssertFalse(Self.code(reset).contains("Authorization"),
+                       "the revoke route is NO_AUTH; the refresh token in the body is the credential")
+    }
+
+    /// The revoke returns before its request has done anything — with a
+    /// sender that never answers, the call still comes straight back, so the
+    /// sign-out after it is not held up. Runtime, not source.
+    func testTheRevokeDoesNotBlockItsCaller() async {
+        let started = expectation(description: "the request was handed to the sender")
+        let task = SessionRevocation.revokeThisDevice(refreshToken: "rt-A") { req in
+            XCTAssertEqual(req.url?.path, "/api/auth/native/revoke")
+            started.fulfill()
+            try await Task.sleep(for: .seconds(3600))   // never answers
+            return 200
+        }
+        // Reaching this line at all is the assertion: the call did not wait.
+        XCTAssertNotNil(task, "a present token sends a request")
+        await fulfillment(of: [started], timeout: 5)
+        task?.cancel()
+
+        // Nothing to present → no request, and nothing to wait on either.
+        XCTAssertNil(SessionRevocation.revokeThisDevice(refreshToken: nil) { _ in
+            XCTFail("sent with no token"); return 0
+        })
+        XCTAssertNil(SessionRevocation.revokeThisDevice(refreshToken: "") { _ in
+            XCTFail("sent an empty token, which the route answers 400"); return 0
+        })
+    }
+
+    /// An offline revoke is one failure, logged and dropped — not a throw out
+    /// of sign-out, and not a second attempt.
+    func testAFailedRevokeIsOneAttempt() async {
+        final class Count: @unchecked Sendable { var n = 0 }
+        let count = Count()
+        let task = SessionRevocation.revokeThisDevice(refreshToken: "rt-A") { _ in
+            count.n += 1
+            throw URLError(.notConnectedToInternet)
+        }
+        await task?.value
+        XCTAssertEqual(count.n, 1)
     }
 
     /// A sign-in starts from nothing, before the new pair is saved.
@@ -540,7 +597,7 @@ final class SignOutHygieneTests: XCTestCase {
             "CurrentUserStore.shared", "BottomTabsStore.shared", "ExchangeUnreadStore.shared",
             "OutboxStore.shared", "RateLimitPause.messages", "DashboardPreferences.shared",
             "APIClient.shared", "ResponseCache.shared", "PendingOperations.shared",
-            "SessionIdentity.shared",
+            "SessionIdentity.shared", "FeatureFlags.shared",
         ]
         XCTAssertTrue(known.isSubset(of: found), "the scan misses: \(known.subtracting(found).sorted())")
 

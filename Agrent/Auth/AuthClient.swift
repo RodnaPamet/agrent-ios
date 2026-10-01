@@ -101,7 +101,8 @@ final class AuthClient: NSObject {
         }
         #endif
 
-        // Read BEFORE the local clear, for the revoke seam below.
+        // Read BEFORE the local clear, for the revoke below: `endSession`
+        // deletes the Keychain item, and after it there is nothing to send.
         let refreshToken = TokenStore.load()?.refreshToken
 
         // ── LOCAL FIRST, AND WHOLE ──
@@ -113,12 +114,14 @@ final class AuthClient: NSObject {
         // owner hands it to the next person.
         SessionReset.endSession()
 
-        // ── THEN the server, as a seam that does nothing yet ──
+        // ── THEN the server, best-effort ──
         //
-        // `POST /api/auth/native/revoke` (this device's session only) is not
-        // built. NOT `/api/auth/logout`: that clears a web cookie and would
-        // revoke nothing. After the local clear, never awaited, so the
-        // network can neither delay nor undo the sign-out.
+        // `POST /api/auth/native/revoke` (agri-saas#1206): this device's
+        // session only, one attempt in a detached task. NOT
+        // `/api/auth/logout`: that clears a web cookie and would revoke
+        // nothing. After the local clear and never awaited, so the network
+        // can neither delay nor undo the sign-out — see `SessionRevocation`,
+        // including what "this device's session" can reach in Safari.
         SessionRevocation.revokeThisDevice(refreshToken: refreshToken)
 
         state = .signedOut

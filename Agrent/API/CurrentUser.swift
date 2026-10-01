@@ -58,7 +58,22 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// location known, the second read is noise.
     let bottomTabOrder: [String]?
 
-    private enum Outer: String, CodingKey { case user }
+    /// Runtime feature flags as the server resolved them for this caller
+    /// (agri-saas#1209) — at the ENVELOPE root, beside `user`, not inside it.
+    ///
+    /// DO NOT READ THIS FOR A DECISION; read `FeatureFlags.shared.isOn`. This
+    /// value may have come from the on-disk copy of `/me` (cache-first), and
+    /// flags must not outlive their launch. `CurrentUserStore` hands only a
+    /// FRESH answer's flags to `FeatureFlags`; see that type for why.
+    ///
+    /// Optional, and decoded with `try?`, although the #1209 spec makes it
+    /// `required`: an older server omits it (= all off), and a map this build
+    /// cannot read must cost the flags, never the identity — `/me` failing to
+    /// decode would leave the spray sheet with no `assigneeUserId`.
+    /// `DecoderToleranceTests` holds `CurrentUser` to requiring `user` only.
+    let featureFlags: [String: Bool]?
+
+    private enum Outer: String, CodingKey { case user, featureFlags }
     private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder }
 
     init(from decoder: Decoder) throws {
@@ -69,6 +84,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.email = try user.decodeIfPresent(String.self, forKey: .email)
         self.role = try user.decodeIfPresent(String.self, forKey: .role)
         self.bottomTabOrder = try user.decodeIfPresent([String].self, forKey: .bottomTabOrder)
+        self.featureFlags = (try? outer.decodeIfPresent([String: Bool].self, forKey: .featureFlags)) ?? nil
     }
 
     /// May this person create a field operation?
@@ -127,12 +143,13 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     }
 
     init(id: String, name: String?, email: String?, role: String?,
-         bottomTabOrder: [String]? = nil) {
+         bottomTabOrder: [String]? = nil, featureFlags: [String: Bool]? = nil) {
         self.id = id
         self.name = name
         self.email = email
         self.role = role
         self.bottomTabOrder = bottomTabOrder
+        self.featureFlags = featureFlags
     }
 }
 
@@ -148,10 +165,11 @@ enum MeAPI {
 /// Cached for the session, because identity does not change under an
 /// operator mid-spray.
 ///
-/// NOT through `ResponseCache`: that writes raw bytes to disk, and this
-/// response is the operator's own name and email. It is one call per
-/// launch and is held in memory only — the same reasoning that keeps the
-/// members list off the disk.
+/// It IS through `ResponseCache` (see `load()` — the 15-second offline launch
+/// is why), scoped to the user by `CacheScope` and purged at Изход. That
+/// matters for `featureFlags`, which ride in the same bytes: only a FRESH
+/// answer's flags reach `FeatureFlags`, so a cached `/me` serves the identity
+/// across launches and never the flags.
 @Observable
 @MainActor
 final class CurrentUserStore {
@@ -191,6 +209,13 @@ final class CurrentUserStore {
         let epoch = SessionEpoch.current
         let task = Task<CurrentUser?, Never> {
             var resolved: CurrentUser?
+            // The flags from a NETWORK answer only. `.loaded(_, .fresh)` is
+            // what `CachedResource.load` returns for a 200 (the app sends no
+            // `If-None-Match`, so a 304 does not arise); the cache-first
+            // publish and the offline fallback are both `.stale`. Stale
+            // flags are a kill switch that did not reach this phone, so they
+            // are never adopted — see `FeatureFlags`.
+            var freshFlags: [String: Bool]??
             await CachedResource.loadShowingCacheFirst(MeAPI.path) { data in
                 try await MeAPI.decode(from: data)
             } publish: { state in
@@ -198,6 +223,7 @@ final class CurrentUserStore {
                 // LAST publish wins, which is the fresh one when there is
                 // a network and the cached one when there is not.
                 if let value = state.value { resolved = value }
+                if case .loaded(let value, .fresh) = state { freshFlags = .some(value.featureFlags) }
             }
             // `clear()` already let go of this task; touching `inFlight` now
             // could release a NEWER session's request instead.
@@ -212,6 +238,10 @@ final class CurrentUserStore {
                 Log.auth.error("could not resolve current user, cached or live")
             }
             user = resolved
+            // Outer nil: no fresh answer, keep what the session has (all off
+            // at launch). Inner nil: a fresh answer from a server with no
+            // `featureFlags` key, which `adopt` reads as all off.
+            if let freshFlags { FeatureFlags.shared.adopt(freshFlags) }
             return resolved
         }
         inFlight = task
