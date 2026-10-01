@@ -148,17 +148,22 @@ struct IndexTiles: Decodable, Equatable, Sendable {
 }
 
 enum AgroAPI {
-    /// `locationId` is REQUIRED. Tiles are clipped to that location's
-    /// parcel geometry, so imagery appears only over the farm's own
-    /// fields — empty space outside them is correct, not a load failure.
+    /// `locationId` is REQUIRED, and since agri-saas#1087 it is a PATH
+    /// SEGMENT, not a query parameter: CFNetwork writes the whole URL,
+    /// query included, to the device's unified log, and the server moved
+    /// the id out of the query for that reason. The old flat route
+    /// (`/agro/<index>-tiles?locationId=`) no longer exists — it 404'd,
+    /// `tiles` came back nil, and the overlay silently never mounted
+    /// (#130). Tiles are clipped to that location's parcel geometry, so
+    /// imagery appears only over the farm's own fields — empty space
+    /// outside them is correct, not a load failure.
     ///
     /// No `date` parameter: the server defaults to today and adapts
     /// backwards, which is the behaviour wanted. Passing one would also
     /// put a date in a URL for no gain.
     static func path(_ index: VegetationIndex, locationID: String) -> String {
-        let escaped = locationID.addingPercentEncoding(
-            withAllowedCharacters: .alphanumerics) ?? locationID
-        return "/api/t/\(Config.tenantSlug)/agro/\(index.rawValue)-tiles?locationId=\(escaped)"
+        "/api/t/\(Config.tenantSlug)/agro/locations/"
+            + "\(URLEscape.segment(locationID))/\(index.rawValue)-tiles"
     }
 
     /// Deliberately NOT through `CachedResource`.

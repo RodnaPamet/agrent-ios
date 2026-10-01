@@ -16,15 +16,19 @@ final class VegetationIndexTests: XCTestCase {
 
     func testPathIsTheEndpointTheServerPublished() {
         let path = AgroAPI.path(.ndvi, locationID: "cmqwmqdqv000101kwxdxval23")
-        XCTAssertTrue(path.hasSuffix("/agro/ndvi-tiles?locationId=cmqwmqdqv000101kwxdxval23"), path)
+        XCTAssertTrue(path.hasSuffix("/agro/locations/cmqwmqdqv000101kwxdxval23/ndvi-tiles"), path)
     }
 
     /// `locationId` is required — tiles are clipped to that location's
-    /// parcels, and a request without it is not a wider map, it is a 400.
-    func testEveryIndexCarriesTheLocation() {
+    /// parcels. Since agri-saas#1087 it is a path segment, and NOTHING may
+    /// ride in the query: the flat `?locationId=` route 404s (#130), and an
+    /// id in a query string reaches the device log.
+    func testEveryIndexCarriesTheLocationInThePath() {
         for index in VegetationIndex.allCases {
-            XCTAssertTrue(AgroAPI.path(index, locationID: "abc").contains("locationId=abc"))
-            XCTAssertTrue(AgroAPI.path(index, locationID: "abc").contains("/agro/\(index.rawValue)-tiles"))
+            let path = AgroAPI.path(index, locationID: "abc")
+            XCTAssertTrue(path.contains("/agro/locations/abc/"), path)
+            XCTAssertFalse(path.contains("?"), path)
+            XCTAssertTrue(AgroAPI.path(index, locationID: "abc").hasSuffix("/\(index.rawValue)-tiles"))
         }
     }
 
