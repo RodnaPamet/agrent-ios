@@ -1,16 +1,22 @@
 import SwiftUI
 
-/// Админ: the farm, the app, the people — three rows.
+/// Админ: the farm, the app, the people — and, last, what the phone resolved.
 ///
 /// Reached from the app menu rather than a tab: five tab slots exist before
 /// iOS collapses the rest into "More", and this is a monthly action while
 /// Задачи is a daily one. Operator frequency decides the tab bar.
 ///
-/// ── THREE ROWS, IN THE OWNER'S ORDER (2026-10-01) ──
+/// ── FOUR ROWS, IN THE OWNER'S ORDER (2026-10-01, 2026-10-02) ──
 ///
 ///     «Стопанство»   → the farm profile, which can now be edited
 ///     «Долна лента»  → the bottom-bar editor
 ///     «Потребители»  → the members, with their count
+///     «Диагностика»  → the resolved feature flags, read-only
+///
+/// «Диагностика» goes BELOW the members because it is the owner's
+/// measuring instrument, not farm administration, and it is hidden with the
+/// rest on `.forbidden`: a reader has no business with the flag cohort, and
+/// this screen is the admin gate it is behind. See `DiagnosticsView`.
 ///
 /// This screen used to BE the member list, with the farm's identity block
 /// under it. Each now has its own page (`FarmProfileView`, `MembersView`) and
@@ -64,6 +70,7 @@ struct AdminView: View {
                 // and into the one place that holds settings.
                 Section { TabCustomiserRow() }.pageRow()
                 Section { membersRow }.pageRow()
+                Section { diagnosticsRow }.pageRow()
             }
             .refreshable { await PullToRefresh.bounded { await store.load() } }
             .pageBackground()
@@ -113,5 +120,18 @@ struct AdminView: View {
                 Label("Потребители", systemImage: "person.2")
             }
         }
+    }
+
+    /// No value on the row: a flag count would invite reading it as "how much
+    /// is on", and the page is one tap away. The hint says what is behind it,
+    /// because «Диагностика» alone does not.
+    private var diagnosticsRow: some View {
+        NavigationLink {
+            DiagnosticsView()
+        } label: {
+            Label("Диагностика", systemImage: "stethoscope")
+        }
+        .accessibilityHint("Показва флаговете на функциите, получени от сървъра")
+        .accessibilityInputLabels(A11y.spokenNames("Диагностика", "Diagnostics"))
     }
 }

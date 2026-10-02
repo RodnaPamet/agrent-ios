@@ -61,6 +61,51 @@ final class FeatureFlagsTests: XCTestCase {
         XCTAssertFalse(FeatureFlags.shared.isOn("social.dm"), "A's flags survived sign-out")
     }
 
+    // MARK: - the diagnostics stamp
+
+    /// Each adoption stamps its own time — including `{}` and nil, which are
+    /// fresh answers too (the kill switch arriving IS the measurement).
+    func testEveryAdoptionIsStamped() {
+        let flags = FeatureFlags()
+        XCTAssertNil(flags.lastFreshAt, "a store with no fresh answer claims one")
+        let first = Date(timeIntervalSince1970: 1_000)
+        let second = Date(timeIntervalSince1970: 2_000)
+        flags.adopt(["social.dm": true], at: first)
+        XCTAssertEqual(flags.lastFreshAt, first)
+        flags.adopt([:], at: second)
+        XCTAssertEqual(flags.lastFreshAt, second, "the kill switch's arrival was not stamped")
+        flags.adopt(nil, at: first)
+        XCTAssertEqual(flags.lastFreshAt, first)
+    }
+
+    /// Sign-out clears the stamp with the map: B's «Диагностика» must not show
+    /// A's last answer as B's.
+    func testSignOutClearsTheStamp() {
+        FeatureFlags.shared.adopt(["social.dm": true])
+        XCTAssertNotNil(FeatureFlags.shared.lastFreshAt, "positive control")
+        SessionReset.resetUserState()
+        XCTAssertNil(FeatureFlags.shared.lastFreshAt, "A's last fresh /me survived sign-out")
+    }
+
+    /// The readout goes into screenshots in issue threads. It reads the flags
+    /// and the client header and NOTHING that knows who the person is — held
+    /// by source because a leak is one innocent-looking `Text` away. And it
+    /// only reads: no adopt, reset or request from that screen.
+    func testTheDiagnosticsPageShowsNothingPersonal() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let code = SignOutHygieneTests.code(try String(
+            contentsOf: root.appendingPathComponent("Agrent/Admin/DiagnosticsView.swift"), encoding: .utf8))
+        XCTAssertTrue(code.contains("FeatureFlags.shared"), "positive control: read the right file")
+        XCTAssertTrue(code.contains("BgDate.clockSeconds"), "the time is not formatted through BgDate")
+        XCTAssertTrue(code.contains("ClientHeader.value"))
+        for personal in ["CurrentUserStore", "SessionIdentity", "TokenStore", "CacheScope",
+                         ".user", "userID", "email", "token", "egn", "ЕГН",
+                         "adopt(", "reset(", "CachedResource", "APIClient"] {
+            XCTAssertFalse(code.localizedCaseInsensitiveContains(personal),
+                           "«Диагностика» reaches for \(personal)")
+        }
+    }
+
     // MARK: - decoding `/me`
 
     private func me(_ tail: String) async throws -> CurrentUser {
@@ -103,14 +148,14 @@ final class FeatureFlagsTests: XCTestCase {
 
     /// Only a FRESH `/me` reaches the store — the cached copy on disk may be
     /// from a previous launch, and stale flags are a kill switch that did not
-    /// arrive. Source, because the policy is one line inside `load()`'s
+    /// arrive. Source, because the policy is one line inside `resolveCacheFirst`'s
     /// publish closure and has no seam of its own.
     func testOnlyAFreshMeIsAdopted() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent("Agrent/API/CurrentUser.swift"),
                                 encoding: .utf8)
         let code = SignOutHygieneTests.code(source)
-        XCTAssertTrue(code.contains("if case .loaded(let value, .fresh) = state { freshFlags = .some(value.featureFlags) }"),
+        XCTAssertTrue(code.contains("if case .loaded(let value, .fresh) = state { resolution.freshFlags = .some(value.featureFlags) }"),
                       "flags are taken from a publish that is not known to be fresh")
         // One adoption site, `commit`, behind both producers. The store's
         // `flags` is `FeatureFlags.shared` in the app (the init's fallback).

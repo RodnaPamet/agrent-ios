@@ -57,6 +57,18 @@ final class BgDateTests: XCTestCase {
         XCTAssertFalse(BgDate.time(afternoon).contains("PM"))
     }
 
+    /// The diagnostics clock: HH:mm:ss, zero-padded and 24-hour everywhere —
+    /// a measurement set beside a server log line cannot read "9:05".
+    func testTheSecondsClockIsFixedWidth() throws {
+        let calendar = Calendar.current
+        let morning = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 2, hour: 9, minute: 5, second: 7)))
+        let evening = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 2, hour: 21, minute: 45, second: 59)))
+        XCTAssertEqual(BgDate.clockSeconds(morning), "09:05:07")
+        XCTAssertEqual(BgDate.clockSeconds(evening), "21:45:59")
+    }
+
     /// A message's time: the clock alone today, the day added otherwise, the
     /// year only when it is not this year. Built in `Calendar.current`, which
     /// is the zone `messageTime` decides "today" in and every form formats in,
