@@ -52,13 +52,20 @@ enum OfflinePrefetch {
     /// parallel requests compete for the same scrap of bandwidth and all
     /// of them time out; one at a time, the early ones land.
     static func warm() async {
-        // Who is signed in, so a cold launch in a field has it. Without
-        // this the identity cache is written only by the launch task's own
-        // call, which never succeeds if the first launch of the day is
-        // already out of signal — and the spray sheet's save gate needs it.
-        _ = await CachedResource.load(MeAPI.path) {
-            try await MeAPI.decode(from: $0)
-        }
+        // Who is signed in — WAITED FOR, never asked.
+        //
+        // This was a `/me` of its own, past `CurrentUserStore`, so the cache
+        // a cold launch in a field reads its identity from was written even
+        // if the launch task's call failed. But it ran at exactly the moments
+        // the store asks anyway (launch `load()`, foreground `refresh()`), so
+        // it doubled every one of them, and the store's own request writes
+        // the same cache entry on a 200. See `CurrentUserStore.settled`.
+        //
+        // Awaited FIRST, still, for a reason the old call never served: the
+        // writes below are keyed on the identity (`CacheScope`), which only
+        // the store adopts. Waiting for its answer means a fresh install's
+        // catalogue lands under the user it belongs to rather than nowhere.
+        _ = await CurrentUserStore.shared.settled()
         let locations = await CachedResource.load(LocationsAPI.listPath) {
             try await LocationsAPI.decodeList(from: $0)
         }

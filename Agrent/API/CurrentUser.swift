@@ -183,16 +183,61 @@ final class CurrentUserStore {
     /// later request — would win.
     @ObservationIgnored private var inFlight: Task<CurrentUser?, Never>?
 
-    /// Seams for `CurrentUserRefreshTests`: the network-only `/me`, and where
-    /// a resolved answer is adopted. The app uses the real four. Tabs is a
-    /// closure rather than a store because `BottomTabsStore` has a private
-    /// init and no second instance to hand in.
+    /// Seams for `CurrentUserRefreshTests`: the two producers of `/me` — the
+    /// cache-first one `load()` uses and the network-only one `refresh()`
+    /// uses — and where a resolved answer is adopted. The app uses the real
+    /// five. Tabs is a closure rather than a store because `BottomTabsStore`
+    /// has a private init and no second instance to hand in.
+    ///
+    /// BOTH producers are seams, and that is what lets a test COUNT: every
+    /// `/api/auth/me` this app sends is one call of one of these two closures
+    /// (a source guard holds `MeAPI.path` to this file), so a fake that counts
+    /// its calls counts the requests a launch or a foreground would send.
+    @ObservationIgnored private let fetchCacheFirst: @MainActor () async -> Resolution
     @ObservationIgnored private let fetchFresh: @MainActor () async -> LoadState<CurrentUser>
     @ObservationIgnored private let identity: SessionIdentity
     @ObservationIgnored private let flags: FeatureFlags
     @ObservationIgnored private let adoptTabs: @MainActor (CurrentUser) -> Void
 
+    /// What the cache-first read settled on: the user from the LAST publish
+    /// that carried one (the network's when there is a network, the disk's
+    /// when there is not), and the flags from a `.fresh` publish only.
+    ///
+    /// `freshFlags` — outer nil: no network answer arrived, so no flags may be
+    /// adopted. Inner nil: a fresh answer from a server with no `featureFlags`
+    /// key. See `commit`.
+    struct Resolution {
+        var user: CurrentUser?
+        var freshFlags: [String: Bool]??
+    }
+
+    /// The real cache-first `/me`: published from disk first, then the network.
+    ///
+    /// The flags from a NETWORK answer only. `.loaded(_, .fresh)` is what
+    /// `CachedResource.load` returns for a 200 (the app sends no
+    /// `If-None-Match`, so a 304 does not arise); the cache-first publish and
+    /// the offline fallback are both `.stale`. Stale flags are a kill switch
+    /// that did not reach this phone, so they are never adopted — see
+    /// `FeatureFlags`.
+    @MainActor
+    static func resolveCacheFirst() async -> Resolution {
+        var resolution = Resolution()
+        await CachedResource.loadShowingCacheFirst(MeAPI.path) { data in
+            try await MeAPI.decode(from: data)
+        } publish: { state in
+            // Cache first, then the network answer if it differs. The LAST
+            // publish wins, which is the fresh one when there is a network
+            // and the cached one when there is not.
+            if let value = state.value { resolution.user = value }
+            if case .loaded(let value, .fresh) = state { resolution.freshFlags = .some(value.featureFlags) }
+        }
+        return resolution
+    }
+
     init(
+        fetchCacheFirst: @escaping @MainActor () async -> Resolution = {
+            await CurrentUserStore.resolveCacheFirst()
+        },
         fetchFresh: @escaping @MainActor () async -> LoadState<CurrentUser> = {
             await CachedResource.load(MeAPI.path) { data in try await MeAPI.decode(from: data) }
         },
@@ -205,6 +250,7 @@ final class CurrentUserStore {
             BottomTabsStore.shared.adopt($0.bottomTabOrder, isOperator: $0.isOperator)
         }
     ) {
+        self.fetchCacheFirst = fetchCacheFirst
         self.fetchFresh = fetchFresh
         self.identity = identity
         self.flags = flags ?? FeatureFlags.shared
@@ -241,23 +287,8 @@ final class CurrentUserStore {
         // here and the result is dropped if it has moved.
         let epoch = SessionEpoch.current
         let task = Task<CurrentUser?, Never> {
-            var resolved: CurrentUser?
-            // The flags from a NETWORK answer only. `.loaded(_, .fresh)` is
-            // what `CachedResource.load` returns for a 200 (the app sends no
-            // `If-None-Match`, so a 304 does not arise); the cache-first
-            // publish and the offline fallback are both `.stale`. Stale
-            // flags are a kill switch that did not reach this phone, so they
-            // are never adopted — see `FeatureFlags`.
-            var freshFlags: [String: Bool]??
-            await CachedResource.loadShowingCacheFirst(MeAPI.path) { data in
-                try await MeAPI.decode(from: data)
-            } publish: { state in
-                // Cache first, then the network answer if it differs. The
-                // LAST publish wins, which is the fresh one when there is
-                // a network and the cached one when there is not.
-                if let value = state.value { resolved = value }
-                if case .loaded(let value, .fresh) = state { freshFlags = .some(value.featureFlags) }
-            }
+            let resolution = await fetchCacheFirst()
+            let resolved = resolution.user
             // `clear()` already let go of this task; touching `inFlight` now
             // could release a NEWER session's request instead.
             guard SessionEpoch.isCurrent(epoch) else { return nil }
@@ -265,7 +296,7 @@ final class CurrentUserStore {
             if resolved == nil {
                 Log.auth.error("could not resolve current user, cached or live")
             }
-            commit(resolved, freshFlags: freshFlags)
+            commit(resolved, freshFlags: resolution.freshFlags)
             return resolved
         }
         inFlight = task
@@ -322,6 +353,36 @@ final class CurrentUserStore {
         }
         inFlight = task
         return await task.value
+    }
+
+    /// Who is signed in, as far as a `/me` ALREADY ASKED will say — never a
+    /// request of its own. For `OfflinePrefetch`, and for nothing that needs
+    /// an answer when there is none.
+    ///
+    /// ── Why the prefetch must not ask ──
+    ///
+    /// It used to: `CachedResource.load(MeAPI.path)` straight, past this
+    /// store. It runs at the two moments this store is ALREADY asking — the
+    /// launch task's `load()` and the foreground handler's `refresh()`, in
+    /// the same handler — so every foreground sent `/me` twice, and every
+    /// cold launch too. Two answers, only one of which reached `user` and the
+    /// flags; the other wrote the cache and was thrown away.
+    ///
+    /// What the prefetch wanted from it was the CACHE ENTRY, so a cold launch
+    /// in a field has an identity. Both of this store's producers write
+    /// `ResponseCache` on a 200 (`CachedResource.load` does, under both), so
+    /// the entry is written by the request that is happening anyway.
+    ///
+    /// ── Why not `load()` ──
+    ///
+    /// `load()` starts a request when there is no user and none in flight —
+    /// which is exactly the offline launch, where it would send a second
+    /// `/me` into the same dead link. This one waits for a request in flight
+    /// (so the prefetch's own writes land under the identity that answer
+    /// adopts) and otherwise returns what is held, nil included.
+    func settled() async -> CurrentUser? {
+        if let inFlight { return await inFlight.value }
+        return user
     }
 
     /// The one place a resolved `/me` is adopted, by both paths, and only

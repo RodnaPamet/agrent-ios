@@ -59,6 +59,33 @@ enum BgDate {
         date.formatted(.dateTime.hour().minute().locale(locale))
     }
 
+    /// 14:32:05 — a clock time to the SECOND, for Админ → «Диагностика».
+    ///
+    /// The one place in the app where seconds are the point: the owner times
+    /// a flag flip on the server against the moment the phone adopted it, and
+    /// a foreground refresh lands within a second or two of the app opening —
+    /// at minute resolution every measurement reads "same minute".
+    ///
+    /// A FIXED `HH:mm:ss`, not `.dateTime.hour().minute().second()` like
+    /// `time` above: a measurement is set beside a server log line, so it must
+    /// be zero-padded and 24-hour on every phone — `time` gives "9:05", and
+    /// whether a 12-hour device setting overrides the locale is unchecked.
+    /// `en_US_POSIX` because a fixed format is held against a fixed locale
+    /// (see `parseISODay`); the device's zone because the owner reads it
+    /// against his own clock.
+    static func clockSeconds(_ date: Date) -> String {
+        clockSecondsWriter.string(from: date)
+    }
+
+    private static let clockSecondsWriter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
+
     /// A message's time, as a conversation shows it:
     ///
     ///     today                 14:32

@@ -73,8 +73,26 @@ final class FeatureFlags {
     static let shared = FeatureFlags()
 
     /// The resolved map as last adopted. Read through `isOn`, which is the
-    /// only correct reading of it.
+    /// only correct reading of it for a DECISION. Админ → «Диагностика» lists
+    /// its keys, because that readout's job is to show what the server sent,
+    /// and still says "вкл." only where `isOn` would.
     private(set) var resolved: [String: Bool] = [:]
+
+    /// When the map was last adopted — i.e. when the last FRESH `/me` was
+    /// committed, since nothing else reaches `adopt` (`CurrentUserStore.commit`
+    /// is the one call site, behind a `.fresh` check on both producers). nil:
+    /// no fresh answer this session, which is also why every flag is off.
+    ///
+    /// For Админ → «Диагностика» and nothing else. It exists so the owner can
+    /// time a flag flip on the server against its arrival on the phone — the
+    /// propagation the foreground refresh was built for — without a debugger,
+    /// in the Release build he actually runs. No decision may read it: "how
+    /// old are the flags" has no correct threshold here, and the policy is
+    /// already set (stale never adopted, a failed refresh keeps the last).
+    ///
+    /// Memory only, like `resolved`, and cleared with it: B's diagnostics must
+    /// not show A's last answer as if it were B's.
+    private(set) var lastFreshAt: Date?
 
     init() {}
 
@@ -83,8 +101,18 @@ final class FeatureFlags {
 
     /// Adopt the flags from a FRESH `/me`. `nil` is an older server with no
     /// `featureFlags` key, and means all off — not "keep what you had".
-    func adopt(_ flags: [String: Bool]?) { resolved = flags ?? [:] }
+    ///
+    /// The time is stamped HERE rather than by the caller, so the map and its
+    /// stamp cannot be set apart; `now` is a parameter only so a test can
+    /// hold the clock.
+    func adopt(_ flags: [String: Bool]?, at now: Date = Date()) {
+        resolved = flags ?? [:]
+        lastFreshAt = now
+    }
 
-    /// Back to a fresh launch's state: everything off.
-    func reset() { resolved = [:] }
+    /// Back to a fresh launch's state: everything off, no fresh answer yet.
+    func reset() {
+        resolved = [:]
+        lastFreshAt = nil
+    }
 }
