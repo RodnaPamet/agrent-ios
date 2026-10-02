@@ -84,7 +84,9 @@ struct MainTabView: View {
     @State private var tabs = BottomTabsStore.shared
     @State private var outbox = OutboxStore.shared
     @State private var unread = ExchangeUnreadStore.shared
+    @State private var foreground = ForegroundReturn()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(AuthClient.self) private var auth
 
     var body: some View {
         // Built from the saved order rather than written out, so the bar
@@ -125,6 +127,15 @@ struct MainTabView: View {
                 // exists to say so sooner.
                 Task { await unread.refresh() }
             }
+            // Who, and with which flags, on every RETURN (owner decision
+            // 2026-10-02): the only way a flag flip reaches an app that is
+            // already open, since nothing polls while it is. Not the first
+            // `.active` of a launch — `.task` below is already reading `/me`
+            // then — and not while signed out, where there is nobody to ask
+            // about. `foreground` decides which `.active` is a return.
+            if foreground.isReturn(to: phase), auth.state == .signedIn {
+                Task { await CurrentUserStore.shared.refresh() }
+            }
         }
         .task {
             // NOT AWAITED, and caching it was not enough.
@@ -147,9 +158,9 @@ struct MainTabView: View {
             // separately for its own gate. So it resolves alongside, not in
             // front.
             Task {
-                if let me = await CurrentUserStore.shared.load() {
-                    tabs.adopt(me.bottomTabOrder, isOperator: me.isOperator)
-                }
+                // The store adopts the bar itself now — see
+                // `CurrentUserStore.commit` — so a foreground refresh does too.
+                _ = await CurrentUserStore.shared.load()
                 // AFTER the user resolves, so a MECHANISATOR — who has no
                 // Борса — is not sent to collect a 403 for a badge.
                 await unread.refresh()
@@ -164,6 +175,33 @@ struct MainTabView: View {
             // wait on a prefetch, least of all the first screen a farmer
             // sees.
             Task.detached { await OfflinePrefetch.warm() }
+        }
+    }
+}
+
+/// Which `.active` is a RETURN to the app, as opposed to the launch's own.
+///
+/// Keyed on having been in `.background`, not on "any `.active` after the
+/// first": `.onChange` does fire for a launch's inactive → active on some
+/// paths and not others, so counting them would either read `/me` twice on
+/// a cold launch or skip the first real return. And `.inactive` alone —
+/// Control Centre pulled down, a call banner — is not leaving the app; a
+/// farmer who never left has nothing new to be told.
+///
+/// A value, not view logic, so `CurrentUserRefreshTests` can drive it.
+struct ForegroundReturn {
+    private(set) var hasLeft = false
+
+    mutating func isReturn(to phase: ScenePhase) -> Bool {
+        switch phase {
+        case .background:
+            hasLeft = true
+            return false
+        case .active:
+            defer { hasLeft = false }
+            return hasLeft
+        default:
+            return false
         }
     }
 }

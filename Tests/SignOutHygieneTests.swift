@@ -361,7 +361,10 @@ final class SignOutHygieneTests: XCTestCase {
         XCTAssertLessThan(capture.lowerBound, guardLine.lowerBound)
         XCTAssertLessThan(guardLine.lowerBound, assign.lowerBound,
                           "a /me resolved after Изход is written before the check")
-        XCTAssertTrue(me.contains("SessionIdentity.shared.adopt(resolved.id)"),
+        // `identity` is `SessionIdentity.shared` in the app (an init default);
+        // the refresh path's epoch guard is driven at runtime in
+        // `CurrentUserRefreshTests`.
+        XCTAssertTrue(me.contains("identity.adopt(resolved.id)"),
                       "the identity is not adopted from /me")
 
         let tabs = read("Agrent/Tabs/BottomTabsStore.swift")

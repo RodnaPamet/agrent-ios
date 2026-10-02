@@ -162,8 +162,9 @@ enum MeAPI {
     }
 }
 
-/// Cached for the session, because identity does not change under an
-/// operator mid-spray.
+/// Held for the session — identity does not change under an operator
+/// mid-spray — and re-read from the network every time the app returns to
+/// the foreground (`refresh()`, owner decision 2026-10-02).
 ///
 /// It IS through `ResponseCache` (see `load()` — the 15-second offline launch
 /// is why), scoped to the user by `CacheScope` and purged at Изход. That
@@ -176,7 +177,39 @@ final class CurrentUserStore {
     static let shared = CurrentUserStore()
 
     private(set) var user: CurrentUser?
-    private var inFlight: Task<CurrentUser?, Never>?
+    /// ONE slot for `load()` and `refresh()` alike: whichever started first is
+    /// the request, and the other awaits it. Two slots would mean two `/me`s
+    /// racing to write `user` and the flags, and the later ANSWER — not the
+    /// later request — would win.
+    @ObservationIgnored private var inFlight: Task<CurrentUser?, Never>?
+
+    /// Seams for `CurrentUserRefreshTests`: the network-only `/me`, and where
+    /// a resolved answer is adopted. The app uses the real four. Tabs is a
+    /// closure rather than a store because `BottomTabsStore` has a private
+    /// init and no second instance to hand in.
+    @ObservationIgnored private let fetchFresh: @MainActor () async -> LoadState<CurrentUser>
+    @ObservationIgnored private let identity: SessionIdentity
+    @ObservationIgnored private let flags: FeatureFlags
+    @ObservationIgnored private let adoptTabs: @MainActor (CurrentUser) -> Void
+
+    init(
+        fetchFresh: @escaping @MainActor () async -> LoadState<CurrentUser> = {
+            await CachedResource.load(MeAPI.path) { data in try await MeAPI.decode(from: data) }
+        },
+        identity: SessionIdentity = .shared,
+        // nil-then-`.shared` in the body rather than a `= .shared` default: a
+        // default argument is evaluated outside the main actor, and
+        // `FeatureFlags.shared` is main-actor state.
+        flags: FeatureFlags? = nil,
+        adoptTabs: @escaping @MainActor (CurrentUser) -> Void = {
+            BottomTabsStore.shared.adopt($0.bottomTabOrder, isOperator: $0.isOperator)
+        }
+    ) {
+        self.fetchFresh = fetchFresh
+        self.identity = identity
+        self.flags = flags ?? FeatureFlags.shared
+        self.adoptTabs = adoptTabs
+    }
 
     /// Who is signed in — from cache first, like every other read.
     ///
@@ -229,23 +262,88 @@ final class CurrentUserStore {
             // could release a NEWER session's request instead.
             guard SessionEpoch.isCurrent(epoch) else { return nil }
             inFlight = nil
-            if let resolved {
-                // The identity everything per-user is keyed on — the response
-                // cache and the outbox's owner. Adopted from the SERVER's
-                // answer, never from anything on disk that preceded it.
-                SessionIdentity.shared.adopt(resolved.id)
-            } else {
+            if resolved == nil {
                 Log.auth.error("could not resolve current user, cached or live")
             }
-            user = resolved
-            // Outer nil: no fresh answer, keep what the session has (all off
-            // at launch). Inner nil: a fresh answer from a server with no
-            // `featureFlags` key, which `adopt` reads as all off.
-            if let freshFlags { FeatureFlags.shared.adopt(freshFlags) }
+            commit(resolved, freshFlags: freshFlags)
             return resolved
         }
         inFlight = task
         return await task.value
+    }
+
+    /// Re-read `/me` from the NETWORK, past the session memo, every time the
+    /// app returns to the foreground (owner decision 2026-10-02) — so a flag
+    /// flip, a role change or a bar saved on the web reaches a running app
+    /// the next time it is opened, not at its next cold launch. Never on a
+    /// timer while open: the owner chose that over a request every 30 s from
+    /// a phone in a field.
+    ///
+    /// ── Coalesced with whatever `/me` is already in flight ──
+    ///
+    /// A `load()` in flight reads the network too (cache first, THEN the
+    /// network), so its answer is as fresh as this one would be and a second
+    /// request would only race it to `user`. Its result is returned as is.
+    ///
+    /// ── A failure changes NOTHING — unlike a cold offline launch ──
+    ///
+    /// A launch with no signal runs with every flag off: it has no fresh
+    /// answer at all, and the cached one may predate a kill switch. Here the
+    /// session already HOLDS a fresh answer (from launch or an earlier
+    /// foreground), and a refresh that cannot reach the server has learned
+    /// nothing that contradicts it — an already-fresh value beats an unknown.
+    /// Flipping flags off on failure would make a surface vanish whenever a
+    /// farmer opens the app at the edge of a field and come back when they
+    /// walk in. If the session never had a fresh answer its flags are still
+    /// all off, so keeping them keeps that too.
+    ///
+    /// The user is kept for the same reason, and because the spray sheet
+    /// needs an identity to record offline.
+    @discardableResult
+    func refresh() async -> CurrentUser? {
+        if let inFlight { return await inFlight.value }
+
+        // The same guard as `load()`: an answer for A that lands after Изход
+        // is dropped, flags and all — B must not open on A's cohort.
+        let epoch = SessionEpoch.current
+        let task = Task<CurrentUser?, Never> {
+            let answer = await fetchFresh()
+            guard SessionEpoch.isCurrent(epoch) else { return nil }
+            inFlight = nil
+            // `.fresh` only. `CachedResource.load` gives nothing else for a
+            // 200; a `.stale` here would be a disk copy, and flags are never
+            // adopted from one.
+            guard case .loaded(let fresh, .fresh) = answer else {
+                Log.auth.info("foreground /me refresh failed; keeping the session's user and flags")
+                return user
+            }
+            commit(fresh, freshFlags: .some(fresh.featureFlags))
+            return fresh
+        }
+        inFlight = task
+        return await task.value
+    }
+
+    /// The one place a resolved `/me` is adopted, by both paths, and only
+    /// AFTER each has checked the epoch.
+    ///
+    /// `freshFlags` — outer nil: no fresh answer, keep what the session has
+    /// (all off at launch). Inner nil: a fresh answer from a server with no
+    /// `featureFlags` key, which `adopt` reads as all off.
+    private func commit(_ resolved: CurrentUser?, freshFlags: [String: Bool]??) {
+        if let resolved {
+            // The identity everything per-user is keyed on — the response
+            // cache and the outbox's owner. Adopted from the SERVER's
+            // answer, never from anything on disk that preceded it.
+            identity.adopt(resolved.id)
+            // The bar, HERE rather than after `load()` in `MainTabView.task`
+            // where it used to be: a refresh needs it too, and so does a
+            // `load()` another screen started that the launch coalesced
+            // onto. Same answer, same moment, one place.
+            adoptTabs(resolved)
+        }
+        user = resolved
+        if let freshFlags { flags.adopt(freshFlags) }
     }
 
     /// Back to a fresh launch's state — part of `SessionReset`. The request

@@ -28,6 +28,7 @@ import Observation
 ///                                              predates the rail has enabled
 ///                                              nothing.
 ///   · no fresh `/me` this session (offline)   → all off. See below.
+///   · a foreground refresh that failed        → unchanged. See below.
 ///
 /// ── Session state, never persisted ──
 ///
@@ -47,10 +48,19 @@ import Observation
 /// a launch with signal — failing closed, which for a dark-launch rail is the
 /// only safe direction.
 ///
-/// `/me` is read once per session (launch, and sign-in), not on foreground:
-/// `CurrentUserStore.load` returns the held user once it has one. So a flip
-/// reaches a running app at its next launch. Re-reading on foreground would be
-/// a separate decision about `/me`, not about flags.
+/// ── When a flip reaches the phone: the next return to the foreground ──
+///
+/// `/me` is read at launch and sign-in (`CurrentUserStore.load`, memoised for
+/// the session) AND from the network on every return to the foreground
+/// (`CurrentUserStore.refresh`, from `MainTabView`'s scenePhase handler) —
+/// the owner's decision of 2026-10-02. Nothing polls while the app is open,
+/// so the server's ≤30s is how fast a flip is SERVED, not how fast it lands
+/// here: a running app picks it up the next time it comes to the foreground.
+///
+/// A refresh that FAILS (offline) keeps the map as it is rather than turning
+/// it off. That differs from an offline cold launch on purpose: there the
+/// session has no fresh answer, here it already holds one, and an
+/// already-fresh value beats an unknown. See `CurrentUserStore.refresh`.
 ///
 /// ── Reset on sign-out ──
 ///

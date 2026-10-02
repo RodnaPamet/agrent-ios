@@ -112,9 +112,16 @@ final class FeatureFlagsTests: XCTestCase {
         let code = SignOutHygieneTests.code(source)
         XCTAssertTrue(code.contains("if case .loaded(let value, .fresh) = state { freshFlags = .some(value.featureFlags) }"),
                       "flags are taken from a publish that is not known to be fresh")
-        XCTAssertEqual(code.components(separatedBy: "FeatureFlags.shared.adopt(").count - 1, 1,
+        // One adoption site, `commit`, behind both producers. The store's
+        // `flags` is `FeatureFlags.shared` in the app (the init's fallback).
+        XCTAssertEqual(code.components(separatedBy: "flags.adopt(").count - 1, 1,
                        "a second adoption site — check it is fresh-only too")
-        XCTAssertTrue(code.contains("FeatureFlags.shared.adopt(freshFlags)"))
+        XCTAssertTrue(code.contains("if let freshFlags { flags.adopt(freshFlags) }"))
+        XCTAssertTrue(code.contains("self.flags = flags ?? FeatureFlags.shared"))
+        // The second producer, the foreground refresh: fresh or nothing.
+        XCTAssertTrue(code.contains("guard case .loaded(let fresh, .fresh) = answer else {"),
+                      "refresh() adopts flags from an answer not known to be fresh")
+        XCTAssertTrue(code.contains("commit(fresh, freshFlags: .some(fresh.featureFlags))"))
         // Nothing writes flags to disk: no UserDefaults / AppStorage in the store.
         let store = try String(contentsOf: root.appendingPathComponent("Agrent/Core/FeatureFlags.swift"),
                                encoding: .utf8)
