@@ -8,6 +8,7 @@ import SwiftUI
 ///
 /// ── FOUR ROWS, IN THE OWNER'S ORDER (2026-10-01, 2026-10-02) ──
 ///
+///     (account card) → who is signed in, read-only (2026-10-04)
 ///     «Стопанство»   → the farm profile, which can now be edited
 ///     «Долна лента»  → the bottom-bar editor
 ///     «Потребители»  → the members, with their count
@@ -23,11 +24,21 @@ import SwiftUI
 /// this one is the index. The farm comes first because it is what the
 /// administration is OF; the members are the longest page and go last.
 ///
+/// ── The account card goes ABOVE «Стопанство» (owner, 2026-10-04) ──
+///
+/// It answers "as whom am I administering this farm" before anything below
+/// is changed under that name. It is not a row: nothing to tap, no chevron.
+/// Hidden on `.forbidden` with the rest — and hidden until `/me` has
+/// answered, rather than drawn as a blank circle with no name.
+///
 /// One store for all three. The rows show a member count and the producer's
 /// name, so they read the same data the pages do — and a deactivation on the
 /// members page is reflected in the count on the way back.
 struct AdminView: View {
     @State private var store = AdminStore()
+    /// The shared instance, held as `@State` the way `ConversationView` does,
+    /// so the card redraws when `/me` resolves while Админ is open.
+    @State private var me = CurrentUserStore.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -65,6 +76,9 @@ struct AdminView: View {
 
         case .allowed:
             List {
+                if let user = me.user {
+                    Section { AccountCard(user: user) }.pageRow()
+                }
                 Section { farmRow }.pageRow()
                 // The bottom-row editor, moved off every screen's toolbar
                 // and into the one place that holds settings.

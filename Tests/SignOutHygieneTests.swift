@@ -600,7 +600,7 @@ final class SignOutHygieneTests: XCTestCase {
             "CurrentUserStore.shared", "BottomTabsStore.shared", "ExchangeUnreadStore.shared",
             "OutboxStore.shared", "RateLimitPause.messages", "DashboardPreferences.shared",
             "APIClient.shared", "ResponseCache.shared", "PendingOperations.shared",
-            "SessionIdentity.shared", "FeatureFlags.shared",
+            "SessionIdentity.shared", "FeatureFlags.shared", "AccountAvatarStore.shared",
         ]
         XCTAssertTrue(known.isSubset(of: found), "the scan misses: \(known.subtracting(found).sorted())")
 

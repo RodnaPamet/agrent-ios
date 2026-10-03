@@ -537,7 +537,9 @@ final class A11yShotsTests: XCTestCase {
     ///
     /// ── Since 2026-10-01 these are three screens, not one ──
     ///
-    /// Админ is an index now: «Стопанство», «Долна лента», «Потребители».
+    /// Админ is an index now: «Стопанство», «Долна лента», «Потребители» —
+    /// under the read-only account card, which this asserts before the
+    /// capture and never taps (there is nothing on it to tap).
     /// The profile and the members each push their own page, so this walks
     /// into each and back rather than photographing one long list.
     ///
@@ -576,6 +578,19 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20),
                       "Админ did not present a sheet")
         Thread.sleep(forTimeInterval: 4)
+
+        // ── The account card, above «Стопанство» (2026-10-04) ──
+        //
+        // ONE element whose label is the whole sentence — asserted by its
+        // exact text, so a card that split back into three VoiceOver stops
+        // (picture, name, address) fails here rather than in a person's ear.
+        // The fixture account is `auth-me.json`'s; its picture request has no
+        // fixture on purpose, so the capture below shows the INITIALS circle.
+        let card = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@",
+                                  "Вписан като Иван Фикстуров, owner@example.invalid"))
+            .firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Админ")
         capture("10-admin", app: app)
 
         // ── «Стопанство», the first row ──
@@ -621,6 +636,17 @@ final class A11yShotsTests: XCTestCase {
         let membersRow = app.buttons
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Потребители"))
             .firstMatch
+        // SCROLLED TO, since the account card went on top (2026-10-04). At
+        // AX5 the card stacks — circle, name, a character-wrapped email — and
+        // takes most of a screen, so «Потребители» is below the fold and a
+        // lazy List has not built its cell: `waitForExistence` alone failed
+        // there and only there. Vertical swipes on the list, never on a row
+        // (a horizontal swipe on a row is what opens its actions), bounded so
+        // a row that is really gone still fails below rather than looping.
+        let list = app.collectionViews.firstMatch
+        for _ in 0..<4 where !membersRow.waitForExistence(timeout: 2) {
+            list.swipeUp()
+        }
         XCTAssertTrue(membersRow.waitForExistence(timeout: 10), "no «Потребители» row on Админ")
         membersRow.tap()
         XCTAssertTrue(app.navigationBars["Потребители"].waitForExistence(timeout: 10),
