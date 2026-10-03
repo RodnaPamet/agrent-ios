@@ -51,6 +51,9 @@ import Foundation
 ///                                      the owner's rule; the cost is that two
 ///                                      people sharing a phone each re-arrange
 ///                                      after the other.
+///     · `AccountAvatarStore.shared` — A's picture on the Админ account card.
+///                                      In memory only (#136), so the reset is
+///                                      the whole of it; B's Админ asks for B's.
 ///
 ///   PURGED, then made unreachable by key:
 ///     · `ResponseCache.shared`      — `removeAll()` here, and every entry is
@@ -139,6 +142,7 @@ enum SessionReset {
         RateLimitPause.messages.reset()
         DashboardPreferences.shared.reset()
         FeatureFlags.shared.reset()
+        AccountAvatarStore.shared.reset()
     }
 }
 

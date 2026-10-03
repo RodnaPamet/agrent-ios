@@ -227,6 +227,43 @@ enum Palette {
         static let neutralFill = Color(.secondarySystemFill)
     }
 
+    /// The account card's initials circle on Админ — a FILL and the INK on
+    /// it, defined together for the reason `onAccent` gives.
+    ///
+    /// The brand pair, not a new colour: the circle is the accent and the
+    /// letters are `onAccent`'s values. Measured (WCAG 2.x relative
+    /// luminance, the same formula as every ratio in this file):
+    ///
+    ///     #FFFFFF on #A04E1B (light)                5.83:1
+    ///     #0A1712 on #D4AF37 (dark)                 8.73:1
+    ///
+    /// INCREASE CONTRAST deepens the light fill to `accentDeep`'s value:
+    ///
+    ///     #FFFFFF on #7A3A12 (light, increased)     8.60:1
+    ///     #0A1712 on #D4AF37 (dark, increased)      8.73:1   unchanged
+    ///
+    /// Dark stays gold because gold is already the strongest of the pair —
+    /// `accentDeep`'s dark #B8860B would DROP it to 5.64:1. Both normal
+    /// pairs pass 4.5:1 even though the letters are large semibold text (3:1
+    /// would do); the setting is honoured where it buys something.
+    ///
+    /// The hex values are exposed so `AccountCardTests` recomputes these
+    /// ratios from the very numbers the circle is drawn with — a comment can
+    /// go stale, a test of the constants cannot.
+    enum Avatar {
+        static let fillLight: UInt32 = 0xA04E1B
+        static let fillLightIncreased: UInt32 = 0x7A3A12
+        static let fillDark: UInt32 = 0xD4AF37
+        static let inkLight: UInt32 = 0xFFFFFF
+        static let inkDark: UInt32 = 0x0A1712
+
+        static func fill(_ contrast: ColorSchemeContrast) -> Color {
+            Color(light: contrast == .increased ? fillLightIncreased : fillLight, dark: fillDark)
+        }
+
+        static let ink = Color(light: inkLight, dark: inkDark)
+    }
+
     /// The schematic map. Verified against the canvas value by value.
     enum Map {
         static let ground = Color(hex: 0x6E6A52)

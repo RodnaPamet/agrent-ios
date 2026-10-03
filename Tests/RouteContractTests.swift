@@ -114,6 +114,9 @@ final class RouteContractTests: XCTestCase {
             ("CurrentUser.swift", [MeAPI.path]),
             ("SessionReset.swift", [SessionRevocation.path]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
+            // The Админ account card's picture: live, UNDOCUMENTED on the
+            // server (not in openapi.json), streams image/webp, 404 = none.
+            ("AccountAvatar.swift", [AccountAvatarAPI.path(userID: "{userId}")]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
             ("ExchangeAPI.swift", [
                 ExchangeAPI.listingsPath,

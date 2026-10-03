@@ -4,6 +4,7 @@
 # exact lines. Read by .github/workflows/agri-saas-routes.yml, which runs on
 # Linux and cannot run the suite, to say which removed server paths the app
 # still calls.
+/api/account/avatar/{userId}
 /api/account/bottom-tabs
 /api/auth/me
 /api/auth/native/exchange
