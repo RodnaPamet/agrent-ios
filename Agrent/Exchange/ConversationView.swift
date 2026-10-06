@@ -287,8 +287,8 @@ struct ConversationView: View {
 
     // MARK: - Footer: the composer
 
-    /// Pinned under the messages, on the bar material, the house's place for
-    /// a bottom-anchored action. It rises with the keyboard.
+    /// Pinned under the messages, on a solid bar (`solidBar`), the house's
+    /// place for a bottom-anchored action. It rises with the keyboard.
     ///
     /// Only what answers a tap stays here: a failed action or send is the
     /// reply to something the farmer just did, and is short. The closed and
@@ -305,7 +305,7 @@ struct ConversationView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.bar)
+        .solidBar(hairline: .top)
     }
 
     @ViewBuilder

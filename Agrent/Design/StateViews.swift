@@ -64,7 +64,7 @@ struct ErrorState: View {
                 Text(message).font(.body)
             } actions: {
                 Button("Опитай пак") { Task { await retry() } }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButton()
                     .controlSize(.large)
             }
         }

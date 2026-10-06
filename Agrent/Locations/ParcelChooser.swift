@@ -57,7 +57,9 @@ struct ParcelChooser: View {
                     CommodityName.freeText(parcel.cropType),
                     parcel.areaHa.map { Area(hectares: $0).spoken },
                 ]))
+                .listRowBackground(Palette.Surface.card)
             }
+            .pageBackground()
             .inlineTitle("Кой парцел?")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -69,5 +71,9 @@ struct ParcelChooser: View {
             // is asking about — the farmer may want to look again.
             .presentationDetents([.height(260), .medium])
         }
+        // The one partial-height sheet in the app, and the one place the
+        // system draws a translucent sheet — over the parcel map, which is
+        // exactly what it is asking about. Solid instead (iOS 16.4 API).
+        .presentationBackground(Palette.Surface.page)
     }
 }

@@ -53,7 +53,7 @@ struct FarmRiskView: View {
                     VStack(spacing: 0) {
                         locationPicker
                     }
-                    .background(.bar)
+                    .solidBar(hairline: .bottom)
                 }
                 // THE ACTION BUTTON, bottom-leading, as asked for — and
                 // the same control other screens will grow for their own

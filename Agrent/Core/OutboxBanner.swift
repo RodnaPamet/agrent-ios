@@ -53,7 +53,7 @@ struct OutboxBanner: View {
             }
             .font(.footnote)
             .foregroundStyle(outbox.refused.isEmpty ? Color.primary : Palette.warning)
-            .background(.bar)
+            .solidBar(hairline: .bottom)
             // COMBINE THE TEXT, LEAVE THE BUTTON ALONE.
             //
             // `children: .combine` on the whole row folded «Изпрати» into one

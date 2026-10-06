@@ -49,12 +49,12 @@ struct JournalListView: View {
             } label: {
                 Text("Нов запис").frame(maxWidth: .infinity, minHeight: 30)
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButton()
             .controlSize(.large)
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 12)
-            .background(.bar)
+            .solidBar(hairline: .top)
         }
     }
 

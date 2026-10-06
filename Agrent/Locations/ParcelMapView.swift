@@ -62,7 +62,21 @@ struct ParcelMapView: View {
         VStack(spacing: 0) {
             content
         }
+        // The loading and failure states have no list to carry the page
+        // colour, and would otherwise show the system background.
+        .background(Palette.Surface.page)
         .inlineTitle(location.name)
+        // OPAQUE EVEN AT THE SCROLL EDGE, here and only here. `SolidChrome`
+        // leaves the bar clear at the scroll edge because elsewhere the page
+        // is all that is beneath it — but the schematic ground runs up under
+        // this bar by design, so the location name sat on #6E6A52 olive —
+        // black on it is 3.85:1, in light and «Слънце». The page behind the title
+        // instead; the map keeps its clearance (`SchematicParcelMap`
+        // measures the safe area, which the bar still occupies). iOS 16 API,
+        // and an inline title, which the iOS 26 large-title defect does not
+        // touch.
+        .toolbarBackground(Palette.Surface.page, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         // IN THE MENU — and the menu button IS the second trailing glyph this
         // file warns about. Owner accepted it staying (2026-09-26).
         //
@@ -176,7 +190,7 @@ struct ParcelMapView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
-        .background(Color(.secondarySystemBackground))
+        .solidBar(hairline: .bottom)
         // The swatches ARE the content here; spoken, they are two unlabelled
         // rectangles followed by two words. Said once, as what the key means.
         .accessibilityElement(children: .ignore)
@@ -358,7 +372,13 @@ struct ParcelMapView: View {
                 .font(.title3)
                 .padding(11)
                 .frame(minWidth: 44, minHeight: 44)
-                .background(.thinMaterial, in: Circle())
+                // SOLID, not `.thinMaterial`: over a satellite tile a
+                // material is whatever colour the field beneath it is, so the
+                // glyph's contrast changed with every pan. The ring is what
+                // separates the disc from a pale field in «Слънце», where
+                // `Surface.bar` is white.
+                .background(Palette.Surface.bar, in: Circle())
+                .overlay { Circle().strokeBorder(Palette.Surface.edge, lineWidth: 1) }
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -429,7 +449,7 @@ struct ParcelMapView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.bar)
+            .solidBar(hairline: .bottom)
         }
     }
 
@@ -466,8 +486,12 @@ struct ParcelMapView: View {
                 .padding(.vertical, 7)
                 // `Palette.accent` rather than `Color.accentColor`, which is
                 // the same colour — `AgrentApp` sets `.tint(Palette.accent)` —
-                // but says so, and pairs with the foreground below.
-                .background(isSelected ? Palette.accent : Color(.secondarySystemFill),
+                // but says so, and pairs with the foreground below. The
+                // unselected fill is the web's neutral badge ground rather
+                // than `secondarySystemFill`: it sits on `Surface.bar`, which
+                // is solid now, so the composite is one measured colour
+                // (`PaletteTokenTests`) instead of a system grey at 16%.
+                .background(isSelected ? Palette.accent : Palette.Chip.neutralFill,
                             in: Capsule())
                 // White on the DARK accent is 2.10:1. A selected index chip
                 // in dark mode was the least readable text on a screen used
@@ -713,19 +737,31 @@ struct ParcelMapView: View {
 
     @ViewBuilder
     private func parcelList(_ response: ParcelsResponse, drawable: [Parcel]) -> some View {
+        // TOKEN SURFACES, not the grouped-list defaults: the system drew this
+        // list on `systemGroupedBackground` — black in dark mode, under a
+        // green page everywhere else in the app — with grey cards. Page
+        // behind, `Surface.card` rows, and the header in `secondaryText`,
+        // because the system's header grey is not a token and was never
+        // measured against a page that is not the system's.
         List {
-            Section(header: Text(Plural.bg(response.parcels.count, "парцел", "парцела"))) {
+            Section {
                 ForEach(response.parcels) { parcel in
                     parcelRow(parcel)
+                        .listRowBackground(Palette.Surface.card)
                 }
+            } header: {
+                Text(Plural.bg(response.parcels.count, "парцел", "парцела"))
+                    .foregroundStyle(Palette.secondaryText)
             }
             if drawable.count != response.parcels.count {
                 RefusalNote(
                     text: "\(response.parcels.count - drawable.count) парцела без очертания не се показват на картата.",
                     icon: "map"
                 )
+                .listRowBackground(Palette.Surface.card)
             }
         }
+        .pageBackground()
         // THE WINDOW SCALES WITH THE TEXT IN IT. 260 points was measured
         // against rows at the default size — about four parcels — and it was
         // a constant, so at accessibility5 the same window showed ONE row of

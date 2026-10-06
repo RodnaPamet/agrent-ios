@@ -46,7 +46,7 @@ struct ExchangeInboxView: View {
                     + "натиснете «Съобщение до продавача»."
             ) {
                 Button("Към обявите") { showListings() }
-                    .buttonStyle(.borderedProminent)
+                    .prominentButton()
                     .accessibilityInputLabels(A11y.spokenNames("Към обявите", "Listings"))
             }
 

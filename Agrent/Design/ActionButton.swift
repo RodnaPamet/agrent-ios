@@ -79,3 +79,18 @@ extension View {
         }
     }
 }
+
+extension View {
+    /// `.borderedProminent` with the ink the accent is defined with.
+    ///
+    /// The system writes WHITE on a prominent button's tint, and the dark
+    /// accent is gold: 2.10:1, the pair `Palette.onAccent` exists to stop.
+    /// It was on «Нов запис» and «Нов разход» — the two actions a farmer
+    /// performs standing in a field, on the bars P2.8 made solid — plus
+    /// «Вход», «Опитай пак» and «Към обявите». `onAccent` on `accent` is
+    /// 8.45 / 5.21 / 5.21, measured in `PaletteTokenTests`.
+    func prominentButton() -> some View {
+        buttonStyle(.borderedProminent)
+            .foregroundStyle(Palette.onAccent)
+    }
+}
