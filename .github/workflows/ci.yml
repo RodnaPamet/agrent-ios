@@ -354,6 +354,15 @@ jobs:
           fi
           echo "Semantic colours all come from Palette."
 
+      # Palette's VALUES come from agri-saas design/tokens.json, through the
+      # generated Tokens.swift vendored by scripts/sync-design-tokens.sh. A
+      # hand edit to the vendored copy would fork the app's colours from the
+      # web's while both still claimed tokens.json as their source, so its
+      # body is hashed against what the script recorded. (VendoredTokensTests
+      # checks the same in the test run, with a one-byte-edit control.)
+      - name: Vendored design tokens are unmodified
+        run: scripts/sync-design-tokens.sh --check
+
       # A SHEET THAT CANNOT BE NAMED ALOUD IS A SHEET A VOICE USER CANNOT LEAVE.
       #
       # Voice Control's recogniser follows the DEVICE language. This phone

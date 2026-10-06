@@ -103,8 +103,6 @@ struct AccountAvatarCircle: View {
     let initials: String?
     let diameter: CGFloat
 
-    @Environment(\.colorSchemeContrast) private var contrast
-
     var body: some View {
         ZStack {
             if let image {
@@ -112,7 +110,7 @@ struct AccountAvatarCircle: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Circle().fill(Palette.Avatar.fill(contrast))
+                Circle().fill(Palette.Avatar.fill)
                 Group {
                     if let initials {
                         // Sized from the circle, not from Dynamic Type: the

@@ -1,267 +1,224 @@
 import SwiftUI
 
-/// The app's colour, taken from the design canvas "Agrent iOS Design
-/// Direction" rather than invented here.
+/// The app's colour, by ROLE — and since P2.8 (agri-saas#1193) every role's
+/// value comes from the design tokens rather than from a literal here.
 ///
-/// WHY THE ACCENT IS OCHRE AND NOT GREEN, which is the load-bearing decision:
-/// green on the parcel map is DATA — it encodes whether a parcel is sown. An
-/// app accent in the same family would read as one more state, so the accent
-/// is deliberately a colour the map never uses.
+/// WHERE THE VALUES LIVE. agri-saas `design/tokens.json` generates both the
+/// web CSS and `Tokens.swift`; `scripts/sync-design-tokens.sh` vendors the
+/// latter into `Design/Generated/` and a hash check fails on any hand edit.
+/// So a colour change is made ONCE, in tokens.json, and reaches both
+/// platforms — the web and this app had been choosing their palettes
+/// separately, and the ochre, the green-black page and the systemGreen below
+/// were three places where they had drifted apart. This file chooses WHICH
+/// token answers each role; it never chooses a hex value.
 ///
-/// WHAT IS *NOT* DEFINED HERE, on purpose. The canvas's neutrals — #F2F2F7
-/// grouped background, #E5E5EA separator, #5A5A5F secondary text, #8A8A8E
-/// tertiary — are the iOS light system palette. Reproducing them as literals
-/// would pin the app to light mode for no gain, so those stay as SwiftUI's
-/// semantic colours: identical in light, and dark mode keeps working. Only
-/// genuinely brand-specific values are literals below.
+/// WHICH THEME. The tokens have three arms: dark, light and highContrast,
+/// the web's «Слънце». On the web «Слънце» is an explicit theme the user
+/// picks, and it is the LIGHT palette plus a contrast overlay (agri-saas
+/// `attributesFor('sunlight')` sets `data-theme="light"` AND
+/// `data-contrast="high"`; the generator resolves highContrast through light
+/// for that reason). iOS has no theme picker, so the system settings choose:
 ///
-/// The canvas specifies no dark appearance. Where a brand colour needs one it
-/// is derived here and marked as derived, not taken from the canvas.
+///     Dark appearance                      -> dark
+///     Light appearance                     -> light
+///     Light appearance + Increase Contrast -> highContrast («Слънце»)
+///     Dark appearance + Increase Contrast  -> dark
+///
+/// The last row is the decision. «Слънце» is a white page with black ink, so
+/// handing it to someone in dark mode would flip a whole dark interface —
+/// system bars, sheets, keyboards — to a white app inside it. There is no
+/// dark high-contrast arm to give them instead, and the dark arm already
+/// passes 4.5:1 for every text role below, most of them above 7:1 (the
+/// lowest is `accentDeep` at 5.11). Increase Contrast in
+/// dark mode still does what it did before this change: the parcel map's
+/// near-solid fills (`Map.fillOpacity(_:)`) and the per-view strokes that
+/// read `colorSchemeContrast` themselves.
+///
+/// WHY THE ACCENT IS GOLD AND NOT GREEN, which is the load-bearing decision
+/// and survives the move to tokens: green on the parcel map is DATA — it
+/// encodes whether a parcel is sown. An app accent in the same family would
+/// read as one more state, so the accent is the brand gold, a colour the map
+/// never uses. Before the tokens the LIGHT accent was a canvas ochre
+/// (#A04E1B); the web's light rebrand (P2.4) made it a deep goldenrod and
+/// this app now follows it.
+///
+/// EVERY RATIO BELOW is WCAG 2.x, measured on the token values with
+/// translucent fills composited over `Surface.page`, and `PaletteTokenTests`
+/// recomputes each from the colours as the app resolves them — a comment can
+/// go stale, a test of the resolved colour cannot. Columns are
+/// dark / light / «Слънце».
+///
+/// Map colours are NOT tokens: they are data encodings tuned for sunlight
+/// over a schematic ground, and the web has no parcel map to share them with.
 enum Palette {
-    /// Ochre in light, GOLD in dark. Tabs, buttons, links.
+    /// Tabs, buttons, links, and the fill of the floating action button.
+    /// `--brand-default`.
     ///
-    /// The gold is the web's `--brand-default #D4AF37`, and it is ALL that
-    /// survived a dark theme that also took the web's green surfaces. That
-    /// theme shipped half-finished — three screens had green rows and four
-    /// still drew black ones — and the owner's call was to put the system's
-    /// dark appearance back and keep only the gold. A half-themed app is
-    /// worse than an unthemed one.
+    ///     on Surface.page    7.91   4.90   5.49
     ///
-    /// It keeps the rule that made the light accent ochre in the first
-    /// place: the accent must not be a colour the parcel map uses for DATA.
-    /// Green on that map means "this field is sown", and gold is not green.
-    static let accent = Color(light: 0xA04E1B, dark: 0xD4AF37)
+    /// Light is the tightest pair in this file that still passes; it is the
+    /// web's own measured link colour on the same cream page.
+    static let accent = Color(token: AgrentColor.brandDefault)
 
-    /// Pressed, and text on the accent chip. `--brand-emphasis` in dark.
-    static let accentDeep = Color(light: 0x7A3A12, dark: 0xB8860B)
+    /// Pressed, and the stronger brand ink. `--brand-emphasis`.
+    ///
+    ///     on Surface.page    5.11   5.82   6.51
+    static let accentDeep = Color(token: AgrentColor.brandEmphasis)
 
     /// WHAT TO WRITE ON TOP OF `accent`. Never `.white` directly.
+    /// `--content-inverted`, which is what the web's primary button writes
+    /// on its brand fill.
     ///
-    /// Measured, because the dark accent is gold and gold is bright:
+    /// The reason this exists is unchanged: the dark accent is gold and gold
+    /// is bright, so white on it measured 2.10:1. Three sites once wrote
+    /// `.foregroundStyle(.white)` over an accent fill — the floating action
+    /// button, the map's index chips and the exchange map's region fills —
+    /// and a farmer was reading white on gold outdoors. A pair defined
+    /// together cannot drift apart, and the next accent-filled control gets
+    /// it for free.
     ///
-    ///     white on #D4AF37 (dark)    2.10:1   fails 4.5:1, and 3:1 for large
-    ///     near-black on #D4AF37      8.73:1
-    ///     white on #A04E1B (light)   5.83:1   passes
-    ///
-    /// So the light accent takes white and the dark one cannot. Three sites
-    /// wrote `.foregroundStyle(.white)` over an accent fill — the floating
-    /// action button, the map's index chips and the exchange map's region
-    /// fills — and in dark mode a farmer was reading white on gold at 2.10:1,
-    /// outdoors, which is where this app is used.
-    ///
-    /// Fixed HERE rather than at the three call sites, on the skill's
-    /// design-system rule: a pair defined together cannot drift apart, and
-    /// the next accent-filled control gets it for free. The dark value is the
-    /// page colour rather than pure black, so the text reads as ink on the
-    /// surface rather than as a hole in it.
-    static let onAccent = Color(light: 0xFFFFFF, dark: 0x0A1712)
+    ///     on accent          8.45   5.21   5.21
+    ///     on accentDeep      5.46   6.19   6.19
+    static let onAccent = Color(token: AgrentColor.contentInverted)
 
-    /// The page, in dark only: a very dark green instead of pure black.
+    /// The page: every scrolling screen, and every List row through
+    /// `pageRow()`. `--bg-page`.
     ///
-    /// ONE COLOUR, not a page/card pair. The first attempt at a dark theme
-    /// had a #05231B page under #0A3327 cards, and getting that right meant
-    /// touching every list in the app — I reached three of seven, so three
-    /// screens had green rows and four still had black ones. A half-themed
-    /// app is worse than an unthemed one, and the owner said so.
+    /// ONE COLOUR, not a page/card pair, and that part is deliberate history.
+    /// The first dark theme had a page under lighter cards, and getting that
+    /// right meant touching every list in the app — three of seven were
+    /// reached, so three screens had green rows and four still had black
+    /// ones. A single value is much harder to get half-right: every surface
+    /// takes the same colour, and a screen that is missed is obviously wrong
+    /// rather than subtly inconsistent. The tokens' card tiers (`--bg-default`,
+    /// `--bg-elevated`) are left for the "solid surfaces" half of P2.8.
     ///
-    /// A single value is much harder to get half-right: every surface that
-    /// was black becomes the same green, and a screen I miss is obviously
-    /// wrong rather than subtly inconsistent.
-    ///
-    /// LIGHT IS UNTOUCHED — this resolves to `systemBackground` there, so
-    /// the shipped light appearance is byte-for-byte what it was.
-    ///
-    /// Dark enough to read as "not quite black": at #0A1712 the hue is
-    /// visible against true black but it never competes with the map's
-    /// sown-green, which is the one green in this app that carries meaning.
+    /// LIGHT CHANGES with this: it was `systemBackground` (white) and is now
+    /// the web's warm off-white, #F4F2ED; «Слънце» is pure white.
     enum Surface {
-        static let page = Color(UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(Color(hex: 0x0A1712))
-                : .systemBackground
-        })
+        static let page = Color(token: AgrentColor.bgPage)
     }
 
     /// The ONLY colour that means "something is broken". Reserved: staleness,
     /// refusals and withheld data are not errors and must not borrow it.
+    /// `--content-error`.
     ///
-    /// A PAIR NOW, and it was one literal. #B4472A is 5.42:1 on white and
-    /// passes — but `pageBackground()` puts `Surface.page` (#0A1712) behind it
-    /// in dark mode, where the same red measures 3.39:1 and fails 4.5:1 for
-    /// body text. That is the colour every failure message in the app is
-    /// written in: a failed cost save, a refused operation, a listing that
-    /// would not post. The message a farmer most needs to read was the least
-    /// readable one on the screen.
+    /// It is the colour every failure message in the app is written in — a
+    /// failed cost save, a refused operation, a listing that would not post —
+    /// so it is the message a farmer most needs to read. The pre-token dark
+    /// value had to be lightened for exactly that reason (#B4472A measured
+    /// 3.39:1 on the dark page); the token is already light in dark.
     ///
-    ///     #B4472A on #0A1712   3.39:1   fails
-    ///     #E8705A on #0A1712   6.03:1
-    ///
-    /// Light keeps #B4472A, which is measured and passing; only the dark side
-    /// changes, so nothing moves on a screen that was already correct.
-    static let error = Color(light: 0xB4472A, dark: 0xE8705A)
+    ///     on Surface.page    7.26   7.57   7.75
+    static let error = Color(token: AgrentColor.contentError)
 
     /// WHAT TO WRITE ON TOP OF `error` when it is the FILL rather than the
-    /// ink — the same pairing `onAccent` makes, for the same reason.
+    /// ink — the same pairing `onAccent` makes, for the same reason: the dark
+    /// error is light precisely so it can be READ on a dark page, which
+    /// makes it a poor thing to put white on. `--content-inverted`.
     ///
-    ///     white on #B4472A (light)     5.42:1
-    ///     white on #E8705A (dark)      3.05:1   fails
-    ///     #0A1712 on #E8705A           6.03:1
-    ///
-    /// The dark error is light precisely so it can be READ as text on a dark
-    /// page, which makes it a poor thing to put white on. Defined here beside
-    /// the colour it sits on so the two cannot be changed apart.
-    static let onError = Color(light: 0xFFFFFF, dark: 0x0A1712)
+    ///     on error           7.76   8.05   7.37
+    static let onError = Color(token: AgrentColor.contentInverted)
 
     /// The counterpart: something WORKED. Reserved the same way `error` is.
+    /// `--content-success`.
     ///
-    /// `Color.green` was standing in for this at three sites, and it is the
-    /// worst-measuring colour Apple ships:
-    ///
-    ///     systemGreen #34C759 on white           2.22:1
-    ///     systemGreen #30D158 on Surface.page    9.08:1
-    ///
-    /// Light mode is where it fails, by a long way, and light mode is what
-    /// this app shipped with. «Запитването е изпратено.» — the one sentence
-    /// confirming an inquiry reached a buyer — was printed at 2.22:1.
-    ///
-    /// The light value is `RiskLevel.good`'s foreground, already chosen and
-    /// already measured in this app rather than invented here; the dark one
-    /// is systemGreen's dark variant, which passes comfortably.
-    ///
-    ///     #1F6B3A on white             6.52:1
-    ///     #30D158 on Surface.page      9.08:1
+    /// `Color.green` once stood in for this at three sites, and systemGreen
+    /// on white is 2.22:1 — «Запитването е изпратено.», the one sentence
+    /// confirming an inquiry reached a buyer, was printed at that.
     ///
     /// This does not contradict the header's rule about green. That rule is
-    /// about the ACCENT — green on the parcel map means "this field is sown",
-    /// so the app's accent must not be green. A success tick is not on the
-    /// map and is not the accent.
-    static let success = Color(light: 0x1F6B3A, dark: 0x30D158)
+    /// about the ACCENT; a success tick is not on the map and is not the
+    /// accent.
+    ///
+    ///     on Surface.page   10.25   6.59   8.08
+    static let success = Color(token: AgrentColor.contentSuccess)
 
     /// NOT BROKEN, BUT NOT RIGHT EITHER — the caveat colour.
-    ///
-    /// Fourteen sites reached for `Color.orange`, which makes this the most
-    /// widespread contrast failure in the app:
-    ///
-    ///     systemOrange #FF9500 on white          2.20:1
-    ///     systemOrange #FF9F0A on Surface.page   8.93:1
-    ///     #8A5B00 on white                       5.87:1
-    ///
-    /// Light again, and badly. The irony is on the record in `FarmRiskView`,
-    /// where the comment above one of these reads "NEVER `.secondary`, which
-    /// is what this was … it must not read as a footnote" — and the colour
-    /// chosen to stop it reading as a footnote measures 2.20:1 against
-    /// `.secondary`'s 3.44:1. It was fainter than the thing it replaced.
+    /// `--content-warning`.
     ///
     /// What it marks, everywhere: a satellite reading older than a pass, an
     /// outbox entry the server refused, a break-even that is not covered, a
     /// product with no ЗЗР number, a file that will duplicate every parcel if
     /// it has already been imported. None of those is an error and none is
-    /// decoration — they are the sentence a farmer must read before acting.
+    /// decoration — they are the sentence a farmer must read before acting,
+    /// which is why fourteen sites of `Color.orange` (2.20:1 on white) were
+    /// replaced by this.
     ///
-    /// Light takes `RiskLevel.watch`'s foreground, already chosen and already
-    /// measured in this app. Dark keeps systemOrange, which passes.
-    static let warning = Color(light: 0x8A5B00, dark: 0xFF9F0A)
+    ///     on Surface.page    9.96   6.24   7.13
+    static let warning = Color(token: AgrentColor.contentWarning)
 
-    /// SECONDARY TEXT, and this one replaces a system colour at 109 sites.
+    /// SECONDARY TEXT, at 109 sites. `--content-muted`.
     ///
     /// `Color.secondary` is `secondaryLabel`, #3C3C43 at 60%, and over a
-    /// white row it composites to 3.44:1 — under the 4.5:1 that body text
-    /// needs. That is Apple's own value behaving as documented; it is not a
-    /// bug in the app. It is simply below the bar, everywhere, in the
-    /// appearance this app shipped with.
+    /// white row it composites to 3.44:1 — Apple's own value behaving as
+    /// documented, and below the 4.5:1 body text needs. A literal (now a
+    /// token) also fixes what opacity could not: a translucent grey takes its
+    /// final colour from whatever is behind it, which is how a chip's label
+    /// once ended up at 3.19:1 over a fill nobody had measured it against.
     ///
-    ///     Color.secondary on white              3.44:1
-    ///     Color.secondary on Surface.page       6.16:1
-    ///     #5A5A5F on white                      6.86:1
-    ///     #A0A0A6 on Surface.page               7.06:1
+    /// Secondary text has a job — being visibly subordinate to primary — and
+    /// the tokens keep that separation: primary (`--content-emphasis`) is
+    /// 16.63 / 15.56 / 21.00 on the page.
     ///
-    /// The light value is NOT invented here: #5A5A5F is the design canvas's
-    /// own secondary text, named in this file's header as one of the
-    /// neutrals deliberately left to the system. The reasoning there was
-    /// that reproducing them as literals would pin the app to light mode for
-    /// no gain. `Color(light:dark:)` removes the pinning, and the gain
-    /// turned out to be three and a half stops of contrast.
-    ///
-    /// The dark value is chosen to MATCH the light one's ratio rather than
-    /// to be as bright as possible. Secondary text has a job — being
-    /// visibly subordinate to primary — and primary is 21:1 in light and
-    /// 18.35:1 in dark, so roughly 7:1 keeps the same three-to-one
-    /// separation in both appearances.
-    ///
-    /// A literal also fixes something opacity could not. A translucent grey
-    /// takes its final colour from whatever is behind it, which is exactly
-    /// how `Chip.neutralText` ended up at 3.19:1 over a chip fill nobody had
-    /// measured it against. #5A5A5F is #5A5A5F on every surface in the app.
-    static let secondaryText = Color(light: 0x5A5A5F, dark: 0xA0A0A6)
+    ///     on Surface.page    9.17   6.98  11.37
+    static let secondaryText = Color(token: AgrentColor.contentMuted)
 
     /// Entry-type chips. Two families so a glance separates an input
-    /// application from an observation without reading.
+    /// application from an observation without reading, plus a neutral one.
+    /// The pairs follow the web's `Badge` variants (agri-saas
+    /// `src/components/ui/badge.tsx`), with one exception that is the
+    /// input text.
+    ///
+    /// Ratios are text on its own fill, the fill composited over the page —
+    /// a chip's text is `.caption`, normal-size text, so 4.5:1 applies:
+    ///
+    ///     input              7.33   5.29   5.83
+    ///     activity           6.53   6.79   7.43
+    ///     neutral            7.48   6.51  10.43
+    ///
+    /// THE INPUT TEXT IS TWO TOKENS. The web's `brand` badge writes
+    /// `--brand-muted` on `--brand-subtle`, which passes in dark (7.33) and
+    /// measures 1.71 in light and 1.88 in «Слънце». The tokens' own note
+    /// names `--brand-emphasis` as the text for brand-subtle tiles, which
+    /// passes in light and «Слънце» but measures 3.80 in dark. No single
+    /// brand token passes on that fill in all three arms, so dark takes the
+    /// badge's token and light/«Слънце» take the note's — both are pairings
+    /// the web itself declares, and no value is invented. Filed as
+    /// agri-saas#1331; when tokens.json gains one token that passes on the
+    /// tint everywhere, this becomes a plain `Color(token:)`.
     enum Chip {
-        static let inputText = Color(hex: 0x7A3A12)
-        static let inputFill = Color(hex: 0xF6EBE2)
-        static let activityText = Color(hex: 0x274A6D)
-        static let activityFill = Color(hex: 0xE7EFF7)
-        /// EXPLICIT, because two semantic colours drift against each other.
-        ///
-        /// This was `Color.secondary` — `secondaryLabel`, #3C3C43 at 60% —
-        /// over `secondarySystemFill`, #787880 at 16%. Both system-resolved,
-        /// neither chosen with the other in mind:
-        ///
-        ///     secondaryLabel on secondarySystemFill, light   3.19:1   fails
-        ///     secondaryLabel on secondarySystemFill, dark    4.88:1
-        ///     #4A4A4F on the light fill                      7.29:1
-        ///     #D8D8DC on the dark fill                       8.73:1
-        ///
-        /// A chip's text is `.caption` at 11pt, which is normal-size text and
-        /// needs 4.5:1, so LIGHT MODE IS THE ONE THAT FAILS here — the
-        /// opposite of `onAccent` and `error`, which both fail only in dark.
-        /// A grey label at 60% opacity over a grey fill at 16% is two washes
-        /// of the same thing, and that is exactly as legible as it sounds.
-        ///
-        /// The other two chip families were picked as pairs and measure
-        /// 7.33:1 and 7.91:1. This one inherited its halves from different
-        /// places, so nobody ever put the two numbers next to each other.
-        /// The values here land in the same band, which is the point: the
-        /// three chip families should not differ in how readable they are.
-        static let neutralText = Color(light: 0x4A4A4F, dark: 0xD8D8DC)
-        static let neutralFill = Color(.secondarySystemFill)
+        static let inputText = Color(token: { theme in
+            theme == .dark ? AgrentColor.brandMuted(theme) : AgrentColor.brandEmphasis(theme)
+        })
+        static let inputFill = Color(token: AgrentColor.brandSubtle)
+        static let activityText = Color(token: AgrentColor.contentInfo)
+        static let activityFill = Color(token: AgrentColor.bgInfo)
+        /// Two tokens chosen as a pair. Before the tokens this was
+        /// `secondaryLabel` over `secondarySystemFill`, two system colours
+        /// that drifted against each other to 3.19:1 in light — a grey at 60%
+        /// over a grey at 16%. The web's neutral badge is exactly this pair.
+        static let neutralText = Color(token: AgrentColor.contentMuted)
+        static let neutralFill = Color(token: AgrentColor.bgSubtle)
     }
 
-    /// The account card's initials circle on Админ — a FILL and the INK on
-    /// it, defined together for the reason `onAccent` gives.
+    /// The account card's initials circle — a FILL and the INK on it,
+    /// defined together for the reason `onAccent` gives: the circle is the
+    /// accent and the letters are `onAccent`.
     ///
-    /// The brand pair, not a new colour: the circle is the accent and the
-    /// letters are `onAccent`'s values. Measured (WCAG 2.x relative
-    /// luminance, the same formula as every ratio in this file):
+    ///     ink on fill        8.45   5.21   6.19
     ///
-    ///     #FFFFFF on #A04E1B (light)                5.83:1
-    ///     #0A1712 on #D4AF37 (dark)                 8.73:1
-    ///
-    /// INCREASE CONTRAST deepens the light fill to `accentDeep`'s value:
-    ///
-    ///     #FFFFFF on #7A3A12 (light, increased)     8.60:1
-    ///     #0A1712 on #D4AF37 (dark, increased)      8.73:1   unchanged
-    ///
-    /// Dark stays gold because gold is already the strongest of the pair —
-    /// `accentDeep`'s dark #B8860B would DROP it to 5.64:1. Both normal
-    /// pairs pass 4.5:1 even though the letters are large semibold text (3:1
-    /// would do); the setting is honoured where it buys something.
-    ///
-    /// The hex values are exposed so `AccountCardTests` recomputes these
-    /// ratios from the very numbers the circle is drawn with — a comment can
-    /// go stale, a test of the constants cannot.
+    /// «Слънце» deepens the fill to `--brand-emphasis`, because Increase
+    /// Contrast should raise this ratio and the highContrast arm's
+    /// `--brand-default` is the same as light's. Dark keeps gold because gold
+    /// is already the strongest of the pair; `--brand-emphasis` would drop
+    /// it to 5.46.
     enum Avatar {
-        static let fillLight: UInt32 = 0xA04E1B
-        static let fillLightIncreased: UInt32 = 0x7A3A12
-        static let fillDark: UInt32 = 0xD4AF37
-        static let inkLight: UInt32 = 0xFFFFFF
-        static let inkDark: UInt32 = 0x0A1712
+        static let fill = Color(token: { theme in
+            theme == .highContrast ? AgrentColor.brandEmphasis(theme) : AgrentColor.brandDefault(theme)
+        })
 
-        static func fill(_ contrast: ColorSchemeContrast) -> Color {
-            Color(light: contrast == .increased ? fillLightIncreased : fillLight, dark: fillDark)
-        }
-
-        static let ink = Color(light: inkLight, dark: inkDark)
+        static let ink = onAccent
     }
 
     /// The schematic map. Verified against the canvas value by value.
@@ -331,17 +288,37 @@ enum Palette {
     }
 }
 
-extension Color {
-    /// One colour, two appearances — resolved by the system rather than by
-    /// anything reading `@Environment(\.colorScheme)`.
+extension AgrentTheme {
+    /// The token arm a trait collection gets — the table in `Palette`'s
+    /// header, and the one place that decides it.
     ///
-    /// A literal cannot answer "which appearance is this?", and a value read
-    /// from the environment cannot reach a `UIColor` inside a MapKit
-    /// renderer or a UIKit appearance proxy. A dynamic `UIColor` answers in
-    /// both places.
-    init(light: UInt32, dark: UInt32) {
+    /// Read from TRAITS rather than from `@Environment(\.colorScheme)`
+    /// because a dynamic `UIColor` is what reaches a MapKit renderer or a
+    /// UIKit appearance proxy, and the system asks it again whenever
+    /// appearance or contrast changes, with no view having to re-render.
+    static func current(_ traits: UITraitCollection) -> AgrentTheme {
+        if traits.userInterfaceStyle == .dark { return .dark }
+        return traits.accessibilityContrast == .high ? .highContrast : .light
+    }
+}
+
+extension Color {
+    /// One role, three token arms — resolved by the system per
+    /// `AgrentTheme.current(_:)`.
+    ///
+    /// Pass a generated accessor directly (`Color(token:
+    /// AgrentColor.bgPage)`). The three arms are converted once, here, so
+    /// the provider the system calls on every trait change only picks one.
+    init(token: (AgrentTheme) -> Color) {
+        let dark = UIColor(token(.dark))
+        let light = UIColor(token(.light))
+        let high = UIColor(token(.highContrast))
         self.init(UIColor { traits in
-            UIColor(Color(hex: traits.userInterfaceStyle == .dark ? dark : light))
+            switch AgrentTheme.current(traits) {
+            case .dark: return dark
+            case .light: return light
+            case .highContrast: return high
+            }
         })
     }
 

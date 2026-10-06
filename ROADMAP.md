@@ -281,6 +281,22 @@ Shipped and proven end to end on a device simulator (2026-09-21):
    so the shape is proven; it just needs generalising. Waiting on the server's
    code list, which lands in batches.
 
+5. **Colours come from agri-saas `design/tokens.json` (P2.8, 2026-10-06).**
+   `Agrent/Design/Generated/Tokens.swift` is vendored by
+   `scripts/sync-design-tokens.sh <agri-saas clone> [ref]`, which records the
+   source commit and a body hash; a Guards step and `VendoredTokensTests` fail
+   on any hand edit. `Palette` keeps its role API and only chooses WHICH token
+   answers each role. Settings → arm: dark → dark, light → light, light +
+   Increase Contrast → highContrast («Слънце»), dark + Increase Contrast →
+   dark. That last row is deliberate: «Слънце» is the light palette plus a
+   contrast overlay on the web, and there is no dark high-contrast arm.
+   **Typography is NOT adopted:** tokens.json defines only font FAMILIES
+   (`--font-display` Bricolage Grotesque, `--font-heading` Onest), with no
+   sizes to map onto Dynamic Type, and bundling web fonts is not a token
+   change. **Open, server-side:** agri-saas#1331 (brand text on
+   `--brand-subtle`), agri-saas#1318 (focus ring). Map colours stay local,
+   because they are data encodings and the web has no parcel map.
+
 ## Phase 0 — Foundations — DONE (2a8f6f1..d6d8798)
 
 Shipped and proven on the simulator: five-tab shell, `os_log` diagnostics with
