@@ -61,13 +61,106 @@ final class AccountCardTests: XCTestCase {
                        "Вписан като Иван")
     }
 
-    // MARK: - The picture's route and bytes
+    // MARK: - avatarUrl, decoded from /me
 
-    func testThePathIsTheServeRouteWithTheIdAsOneSegment() {
-        XCTAssertEqual(AccountAvatarAPI.path(userID: "usr_1"), "/api/account/avatar/usr_1")
-        // An id cannot add a segment or start a query.
-        XCTAssertEqual(AccountAvatarAPI.path(userID: "a/b?c"), "/api/account/avatar/a%2Fb%3Fc")
+    private func me(_ avatarJSON: String?) throws -> CurrentUser {
+        let field = avatarJSON.map { #","avatarUrl":\#($0)"# } ?? ""
+        let json = #"{"user":{"id":"usr_a","name":"А","email":null,"role":"OWNER","bottomTabOrder":null\#(field)},"tenant":null,"featureFlags":{}}"#
+        return try JSONDecoder().decode(CurrentUser.self, from: Data(json.utf8))
     }
+
+    func testAvatarUrlDecodesNullRelativeAndAbsolute() throws {
+        XCTAssertNil(try me("null").avatarUrl)
+        XCTAssertEqual(try me(#""/api/account/avatar/usr_a""#).avatarUrl, "/api/account/avatar/usr_a")
+        XCTAssertEqual(try me(#""https://photos.example.invalid/a.jpg""#).avatarUrl,
+                       "https://photos.example.invalid/a.jpg")
+    }
+
+    /// The spec: "may be ABSENT from a server older than this field — treat
+    /// absent as null". And a value of the wrong type costs the picture,
+    /// never the identity (`DecoderToleranceTests`' rule, one level down).
+    func testAnAbsentOrUnreadableAvatarUrlIsNilAndTheUserSurvives() throws {
+        let absent = try me(nil)
+        XCTAssertNil(absent.avatarUrl)
+        XCTAssertEqual(absent.id, "usr_a")
+        let wrongType = try me("42")
+        XCTAssertNil(wrongType.avatarUrl)
+        XCTAssertEqual(wrongType.id, "usr_a", "an unreadable avatarUrl must not fail /me")
+    }
+
+    // MARK: - Which shape goes where
+
+    func testTheTwoShapesAreToldApart() throws {
+        XCTAssertNil(AccountAvatarAPI.source(nil))
+        XCTAssertNil(AccountAvatarAPI.source(""))
+        XCTAssertEqual(AccountAvatarAPI.source("/api/account/avatar/usr_a"),
+                       .api(path: "/api/account/avatar/usr_a"))
+        let photo = try XCTUnwrap(URL(string: "https://photos.example.invalid/a/b=s96-c"))
+        XCTAssertEqual(AccountAvatarAPI.source(photo.absoluteString), .external(photo))
+    }
+
+    /// Everything that is neither a clean root-relative path nor an https
+    /// URL falls back to initials, and asks nothing.
+    func testAnythingButHTTPSOrARootRelativePathIsRefused() {
+        for value in [
+            "http://photos.example.invalid/a.jpg",       // in clear
+            "HTTP://photos.example.invalid/a.jpg",
+            "ftp://photos.example.invalid/a.jpg",
+            "data:image/png;base64,AAAA",
+            "file:///etc/hosts",
+            "javascript:alert(1)",
+            "//photos.example.invalid/a.jpg",            // protocol-relative: ANOTHER host
+            "/\\photos.example.invalid/a.jpg",
+            "https://user:pw@photos.example.invalid/a",  // credentials in the URL
+            "https:///no-host",
+            "/api/account/avatar/has a space",           // not a path APIClient builds
+            "api/account/avatar/usr_a",                  // neither shape
+        ] {
+            XCTAssertNil(AccountAvatarAPI.source(value), "\(value) must be refused")
+        }
+    }
+
+    /// THE SECURITY PROPERTY: the bearer goes to the API host for a relative
+    /// value and NOWHERE for an absolute one. Both are the builders the live
+    /// fetches use (`APIClient.perform`, `AccountAvatarAPI.fetchExternal`).
+    func testOnlyTheRelativeShapeCarriesTheBearer() throws {
+        let relative = try XCTUnwrap(AccountAvatarAPI.source("/api/account/avatar/usr_a"))
+        guard case .api(let path) = relative else { return XCTFail("relative read as \(relative)") }
+        let api = try APIClient.request(for: path, method: "GET", accessToken: "test-access")
+        XCTAssertEqual(api.value(forHTTPHeaderField: "Authorization"), "Bearer test-access",
+                       "positive control: the relative shape is authorised")
+        XCTAssertEqual(api.url?.host, Config.baseURL.host, "a relative value resolves on the API host")
+        XCTAssertEqual(api.url?.path, "/api/account/avatar/usr_a")
+        XCTAssertEqual(api.value(forHTTPHeaderField: ClientHeader.name), ClientHeader.value)
+
+        let absolute = try XCTUnwrap(AccountAvatarAPI.source("https://photos.example.invalid/a.jpg"))
+        guard case .external(let url) = absolute else { return XCTFail("absolute read as \(absolute)") }
+        let external = AccountAvatarAPI.externalRequest(for: url)
+        XCTAssertNil(external.value(forHTTPHeaderField: "Authorization"),
+                     "the bearer must never reach a third-party host")
+        XCTAssertNil(external.allHTTPHeaderFields?["Cookie"])
+        XCTAssertFalse(external.httpShouldHandleCookies)
+        XCTAssertEqual(external.url, url, "an absolute value is fetched exactly as given")
+        XCTAssertEqual(external.httpMethod, "GET")
+        XCTAssertEqual(external.value(forHTTPHeaderField: ClientHeader.name), ClientHeader.value,
+                       "every request is stamped, a third-party one included")
+    }
+
+    /// The session for the third-party fetch keeps nothing and sends nothing
+    /// of this app's: no URL cache, no cookies, no credential store.
+    func testTheThirdPartySessionHoldsNoCredentials() {
+        let configuration = NoURLCache.thirdPartyConfiguration()
+        XCTAssertNil(configuration.urlCache)
+        XCTAssertEqual(configuration.requestCachePolicy, .reloadIgnoringLocalCacheData)
+        XCTAssertNil(configuration.httpCookieStorage)
+        XCTAssertFalse(configuration.httpShouldSetCookies)
+        XCTAssertNil(configuration.urlCredentialStorage)
+        XCTAssertNil(configuration.httpAdditionalHeaders?["Authorization"])
+        XCTAssertNil(NoURLCache.thirdPartySession.configuration.urlCache)
+        XCTAssertNil(NoURLCache.thirdPartySession.configuration.httpCookieStorage)
+    }
+
+    // MARK: - The bytes
 
     func testImageBytesDecodeAndAnythingElseDoesNot() throws {
         let png = try XCTUnwrap(Self.onePixel().pngData())
@@ -77,19 +170,92 @@ final class AccountCardTests: XCTestCase {
         XCTAssertNil(AccountAvatarAPI.image(from: Data(#"{"error":"nope"}"#.utf8)))
     }
 
+    func testMoreThanTheCapIsRefusedUnread() {
+        XCTAssertEqual(AccountAvatarAPI.maxBytes, 5 * 1024 * 1024)
+        XCTAssertNil(AccountAvatarAPI.image(from: Data(count: AccountAvatarAPI.maxBytes + 1)))
+    }
+
+    /// A large picture is decoded DOWN to what the circle can show.
+    func testALargePictureIsDownsampled() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let big = UIGraphicsImageRenderer(size: CGSize(width: 2000, height: 1000), format: format)
+            .image { ctx in
+                UIColor.blue.setFill()
+                ctx.fill(CGRect(x: 0, y: 0, width: 2000, height: 1000))
+            }
+        let image = try XCTUnwrap(AccountAvatarAPI.image(from: try XCTUnwrap(big.jpegData(compressionQuality: 0.5))))
+        let cg = try XCTUnwrap(image.cgImage)
+        XCTAssertEqual(max(cg.width, cg.height), AccountAvatarAPI.maxPixelSize)
+    }
+
     // MARK: - The store
 
-    func testAPictureIsHeldForItsOwnerOnly() async throws {
+    private static let relative = "/api/account/avatar/usr_a"
+    private static let absolute = "https://photos.example.invalid/a.jpg"
+
+    func testNullAsksNothingAndDrawsInitials() async {
+        var asked: [AccountAvatarAPI.Source] = []
+        let store = AccountAvatarStore { asked.append($0); return Data() }
+        await store.load(for: "usr_a", avatarURL: nil)
+        XCTAssertEqual(asked, [], "no picture means no request — not a speculative one by user id")
+        XCTAssertNil(store.key)
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: nil))
+    }
+
+    func testANonHTTPSValueAsksNothing() async {
+        var asked: [AccountAvatarAPI.Source] = []
+        let store = AccountAvatarStore { asked.append($0); return Data() }
+        await store.load(for: "usr_a", avatarURL: "http://photos.example.invalid/a.jpg")
+        XCTAssertEqual(asked, [])
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: "http://photos.example.invalid/a.jpg"))
+    }
+
+    func testEachShapeIsFetchedThroughItsOwnRoute() async throws {
         let png = try XCTUnwrap(Self.onePixel().pngData())
-        var asked: [String] = []
-        let store = AccountAvatarStore { id in asked.append(id); return png }
+        var asked: [AccountAvatarAPI.Source] = []
+        let store = AccountAvatarStore { asked.append($0); return png }
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        await store.load(for: "usr_b", avatarURL: Self.absolute)
+        XCTAssertEqual(asked, [
+            .api(path: Self.relative),
+            .external(try XCTUnwrap(URL(string: Self.absolute))),
+        ])
+        XCTAssertNotNil(store.image(for: "usr_b", avatarURL: Self.absolute))
+    }
 
-        await store.load(for: "usr_a")
-        XCTAssertNotNil(store.image(for: "usr_a"))
-        XCTAssertNil(store.image(for: "usr_b"), "A's picture must never answer for B")
+    func testAPictureIsHeldForItsOwnerAndValueOnly() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var asked = 0
+        let store = AccountAvatarStore { _ in asked += 1; return png }
 
-        await store.load(for: "usr_a")
-        XCTAssertEqual(asked, ["usr_a"], "a held picture is not asked for again")
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertNotNil(store.image(for: "usr_a", avatarURL: Self.relative))
+        XCTAssertNil(store.image(for: "usr_b", avatarURL: Self.relative), "A's picture must never answer for B")
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.absolute), "nor for a value it was not fetched from")
+
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(asked, 1, "a held picture is not asked for again")
+    }
+
+    /// #147's foreground refresh: a CHANGED `avatarUrl` fetches again; a
+    /// removed one turns back into initials with no request.
+    func testAChangedValueIsFetchedAndARemovedOneForgotten() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var asked: [AccountAvatarAPI.Source] = []
+        let store = AccountAvatarStore { asked.append($0); return png }
+
+        await store.load(for: "usr_a", avatarURL: Self.absolute)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(asked.count, 2)
+        XCTAssertEqual(asked.last, .api(path: Self.relative))
+        XCTAssertNotNil(store.image(for: "usr_a", avatarURL: Self.relative))
+
+        await store.load(for: "usr_a", avatarURL: nil)
+        XCTAssertEqual(asked.count, 2, "removal asks nothing")
+        XCTAssertNil(store.key)
+        XCTAssertEqual(store.avatar, .unknown)
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.relative))
     }
 
     func testA404MeansInitialsAndIsNotAskedAgain() async {
@@ -99,11 +265,24 @@ final class AccountCardTests: XCTestCase {
             throw APIClient.APIError.http(status: 404, code: nil, message: nil,
                                           params: nil, retryAfterSeconds: nil)
         }
-        await store.load(for: "usr_a")
+        await store.load(for: "usr_a", avatarURL: Self.relative)
         XCTAssertEqual(store.avatar, AccountAvatarStore.Avatar.none)
-        XCTAssertNil(store.image(for: "usr_a"))
-        await store.load(for: "usr_a")
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.relative))
+        await store.load(for: "usr_a", avatarURL: Self.relative)
         XCTAssertEqual(calls, 1)
+    }
+
+    /// A third-party host's final answers — gone, or too big — are initials
+    /// for this value, not a retry every time Админ opens.
+    func testAThirdPartyRefusalOrOversizeIsFinal() async {
+        for failure in [AccountAvatarAPI.Unavailable.gone(status: 404), .tooLarge] {
+            var calls = 0
+            let store = AccountAvatarStore { _ in calls += 1; throw failure }
+            await store.load(for: "usr_a", avatarURL: Self.absolute)
+            await store.load(for: "usr_a", avatarURL: Self.absolute)
+            XCTAssertEqual(store.avatar, AccountAvatarStore.Avatar.none, "\(failure)")
+            XCTAssertEqual(calls, 1, "\(failure)")
+        }
     }
 
     /// Offline, a 5xx, or the fixture seam's 501: initials now, ask again
@@ -111,9 +290,9 @@ final class AccountCardTests: XCTestCase {
     func testATransientFailureIsAskedAgain() async {
         var calls = 0
         let store = AccountAvatarStore { _ in calls += 1; throw URLError(.notConnectedToInternet) }
-        await store.load(for: "usr_a")
+        await store.load(for: "usr_a", avatarURL: Self.relative)
         XCTAssertEqual(store.avatar, .unknown)
-        await store.load(for: "usr_a")
+        await store.load(for: "usr_a", avatarURL: Self.relative)
         XCTAssertEqual(calls, 2)
     }
 
@@ -121,23 +300,25 @@ final class AccountCardTests: XCTestCase {
     func testSignOutForgetsThePicture() async throws {
         let png = try XCTUnwrap(Self.onePixel().pngData())
         let store = AccountAvatarStore { _ in png }
-        await store.load(for: "usr_a")
-        XCTAssertNotNil(store.image(for: "usr_a"))
+        await store.load(for: "usr_a", avatarURL: Self.absolute)
+        XCTAssertNotNil(store.image(for: "usr_a", avatarURL: Self.absolute))
         store.reset()
-        XCTAssertNil(store.userID)
+        XCTAssertNil(store.key)
         XCTAssertEqual(store.avatar, .unknown)
-        XCTAssertNil(store.image(for: "usr_a"))
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.absolute))
     }
 
     /// And the shared one is actually on the sign-out path, not just
     /// resettable: `resetUserState()` must empty it.
     func testResetUserStateEmptiesTheSharedStore() {
-        AccountAvatarStore.shared.adoptForTesting(userID: "usr_a", image: Self.onePixel())
-        XCTAssertNotNil(AccountAvatarStore.shared.image(for: "usr_a"), "positive control")
+        AccountAvatarStore.shared.adoptForTesting(userID: "usr_a", avatarURL: Self.relative,
+                                                  image: Self.onePixel())
+        XCTAssertNotNil(AccountAvatarStore.shared.image(for: "usr_a", avatarURL: Self.relative),
+                        "positive control")
         SessionReset.resetUserState()
-        XCTAssertNil(AccountAvatarStore.shared.userID)
+        XCTAssertNil(AccountAvatarStore.shared.key)
         XCTAssertEqual(AccountAvatarStore.shared.avatar, .unknown)
-        XCTAssertNil(AccountAvatarStore.shared.image(for: "usr_a"))
+        XCTAssertNil(AccountAvatarStore.shared.image(for: "usr_a", avatarURL: Self.relative))
     }
 
     /// A picture for A that answers after Изход is dropped.
@@ -148,14 +329,32 @@ final class AccountCardTests: XCTestCase {
             await withCheckedContinuation { release = $0 }
             return png
         }
-        let load = Task { await store.load(for: "usr_a") }
+        let load = Task { await store.load(for: "usr_a", avatarURL: Self.relative) }
         while release == nil { await Task.yield() }
         SessionEpoch.advance()
         store.reset()
         release?.resume()
         await load.value
-        XCTAssertNil(store.image(for: "usr_a"))
-        XCTAssertNil(store.userID)
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.relative))
+        XCTAssertNil(store.key)
+    }
+
+    /// An answer for the value the refresh has since REPLACED is not this
+    /// picture either — same session, different `avatarUrl`.
+    func testAnAnswerForAReplacedValueIsDropped() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var release: CheckedContinuation<Void, Never>?
+        let store = AccountAvatarStore { source in
+            if source == .api(path: Self.relative) { await withCheckedContinuation { release = $0 } }
+            return png
+        }
+        let old = Task { await store.load(for: "usr_a", avatarURL: Self.relative) }
+        while release == nil { await Task.yield() }
+        await store.load(for: "usr_a", avatarURL: nil)
+        release?.resume()
+        await old.value
+        XCTAssertNil(store.key, "the removed avatar came back from a late answer")
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.relative))
     }
 
     // MARK: - The circle's contrast, from the constants it is drawn with

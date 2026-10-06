@@ -293,7 +293,7 @@ final class DecoderToleranceTests: XCTestCase {
         // survivable, because an older server omits it.
         Probe("CurrentUser", #"""
         {"user":{"id":"u","name":"А","email":"a@example.invalid","role":"OWNER",
-          "bottomTabOrder":["/tasks"]},
+          "bottomTabOrder":["/tasks"],"avatarUrl":"/api/account/avatar/u"},
          "tenant":{"id":"t","name":"Ферма","slug":"agrent"},
          "featureFlags":{"social.dm":true}}
         """#) { _ = try await MeAPI.decode(from: $0) },

@@ -4,6 +4,7 @@
     "name": "Иван Фикстуров",
     "email": "owner@example.invalid",
     "role": "OWNER",
-    "bottomTabOrder": null
+    "bottomTabOrder": null,
+    "avatarUrl": null
   }
 }

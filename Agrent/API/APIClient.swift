@@ -765,14 +765,24 @@ actor APIClient {
         return url
     }
 
+    /// The request every `APIClient` call starts from: the API host, the
+    /// client header and THIS APP'S BEARER. Pure, so a test can see which
+    /// requests carry the token — the account card's picture sends it for a
+    /// root-relative `avatarUrl` (this path) and never for an absolute one
+    /// (`AccountAvatarAPI.externalRequest`, a different host).
+    static func request(for path: String, method: String, accessToken: String) throws -> URLRequest {
+        var req = URLRequest(url: try url(for: path))
+        ClientHeader.stamp(&req)
+        req.httpMethod = method
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        return req
+    }
+
     private func perform(
         _ path: String, _ method: String, _ body: Data?, _ key: String?,
         _ ifMatch: String?, _ tokens: Tokens, _ contentType: String? = nil
     ) async throws -> (Data, HTTPURLResponse) {
-        var req = URLRequest(url: try Self.url(for: path))
-        ClientHeader.stamp(&req)
-        req.httpMethod = method
-        req.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
+        var req = try Self.request(for: path, method: method, accessToken: tokens.accessToken)
         if let body {
             req.httpBody = body
             req.setValue(contentType ?? "application/json",

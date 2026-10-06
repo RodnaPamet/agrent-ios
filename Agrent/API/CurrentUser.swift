@@ -58,6 +58,18 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// location known, the second read is noise.
     let bottomTabOrder: [String]?
 
+    /// The account's picture, AS STORED on the server (agri-saas#1299/#1316),
+    /// or nil for none — the account card then draws initials and asks
+    /// nothing. A straight projection of `User.image`, in one of two shapes
+    /// that are fetched differently; `AccountAvatarAPI.source` tells them
+    /// apart and says why it matters (whose credentials go where).
+    ///
+    /// Optional AND decoded with `try?`: the spec does not require it, a
+    /// server older than the field omits it (absent = null, never a third
+    /// state), and a value this build cannot read must cost the picture,
+    /// never the identity the spray sheet needs.
+    let avatarUrl: String?
+
     /// Runtime feature flags as the server resolved them for this caller
     /// (agri-saas#1209) — at the ENVELOPE root, beside `user`, not inside it.
     ///
@@ -74,7 +86,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     let featureFlags: [String: Bool]?
 
     private enum Outer: String, CodingKey { case user, featureFlags }
-    private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder }
+    private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder, avatarUrl }
 
     init(from decoder: Decoder) throws {
         let outer = try decoder.container(keyedBy: Outer.self)
@@ -84,6 +96,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.email = try user.decodeIfPresent(String.self, forKey: .email)
         self.role = try user.decodeIfPresent(String.self, forKey: .role)
         self.bottomTabOrder = try user.decodeIfPresent([String].self, forKey: .bottomTabOrder)
+        self.avatarUrl = (try? user.decodeIfPresent(String.self, forKey: .avatarUrl)) ?? nil
         self.featureFlags = (try? outer.decodeIfPresent([String: Bool].self, forKey: .featureFlags)) ?? nil
     }
 
@@ -143,13 +156,15 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     }
 
     init(id: String, name: String?, email: String?, role: String?,
-         bottomTabOrder: [String]? = nil, featureFlags: [String: Bool]? = nil) {
+         bottomTabOrder: [String]? = nil, featureFlags: [String: Bool]? = nil,
+         avatarUrl: String? = nil) {
         self.id = id
         self.name = name
         self.email = email
         self.role = role
         self.bottomTabOrder = bottomTabOrder
         self.featureFlags = featureFlags
+        self.avatarUrl = avatarUrl
     }
 }
 
