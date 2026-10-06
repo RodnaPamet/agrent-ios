@@ -480,6 +480,23 @@ Owner's request: Админ is now an index of three rows — «Стопанст
 profile), «Долна лента», «Потребители» (with a count). The member list moved
 unchanged to its own pushed page.
 
+### Профил — every role, since 2026-10-06 (agri-saas#1193 P2.8)
+
+Web `/account` (P2.7: «Вашият акаунт», sections «Профил» and «Сигурност»,
+works with zero farms) · iOS `ProfileView`, from the menu for every role,
+and from the Админ account card, which now links to it (one `AccountCard`).
+
+- Shown: the picture or initials, the name, the email — what `/api/auth/me`
+  sends — and «Изход», behind a confirmation.
+- Изход stays in the menu too, as on the web's user menu, behind the SAME
+  confirmation (`SignOutConfirmation`); `UserMessage`'s session-expired text
+  sends people to the menu for it.
+- Not ported, and why: name editing (`PATCH /api/account/profile`) and the
+  picture upload/removal (`POST`/`DELETE /api/account/avatar`) are route code
+  absent from openapi.json — follow-ups once documented. «Сигурност»
+  (password change) is for credential accounts; this app signs in through the
+  browser. The web's sound/haptics preferences are device-local web settings.
+
 ---
 
 ## Design status — the AX3 failures are FIXED

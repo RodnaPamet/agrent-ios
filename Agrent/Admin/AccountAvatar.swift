@@ -172,7 +172,7 @@ enum AccountAvatarAPI {
     }
 }
 
-/// The picture for the card on Админ, held IN MEMORY ONLY.
+/// The picture for the account card (Админ and Профил), held IN MEMORY ONLY.
 ///
 /// ── No disk, deliberately (#136) ──
 ///
