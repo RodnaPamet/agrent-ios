@@ -18,7 +18,8 @@ import Observation
 // ── Every write here is BUILT AND UNFIRED ──
 //
 // Open, send, close, block, unblock and retract are each seen by another
-// farm; `read` moves every colleague's pointer. None has been called against
+// farm; `read` moves the person's own pointer (per person since agri-saas
+// #1323 — it used to move every colleague's). None has been called against
 // production from development, CI or A11yShots. Under the UI test seam each
 // is answered 501, which is why a failed mark-read is swallowed.
 
@@ -132,18 +133,38 @@ enum MessagingPolicy {
     ///
     /// SIDE-NEUTRAL, where the web says «купувач» and «продавач»: the payload
     /// carries no listing side, and on a BUY listing the owner is the one
-    /// buying. The owner's wording says what a block covers — every listing
-    /// between the two farms — because nothing else on this screen does.
+    /// buying.
+    ///
+    /// ── What a block IS today, said without "you blocked this farm" ──
+    ///
+    /// Conversations became private to people in #1323, but the block did not
+    /// move with them: it is still stored once per pair of FARMS (the
+    /// person-level block is agri-saas #1314, not done). So the listing
+    /// farm's block refuses every person at the other farm, on every listing
+    /// the listing farm has — including listings a colleague created, and
+    /// whoever at the listing farm pressed it. The owner's side is told that
+    /// scope, because nothing else on this screen says it, and it is said as
+    /// what happens rather than as «блокирахте това стопанство»: in a
+    /// conversation between people, "this farm" reads as "this person", and
+    /// the sentence would turn false the day #1314 lands. The other side's
+    /// wording is true under either rule.
     static func blockedNotice(role: ExchangeThreadRole) -> String {
         switch role {
         case .seller:
-            "Блокирали сте това стопанство. То не може да Ви пише по нито една от Вашите обяви."
+            "Съобщенията от другата страна са спрени — от всички хора в нейното стопанство, "
+                + "по всички обяви на Вашето стопанство."
         case .inquirer:
-            "Собственикът на обявата не приема съобщения от Вашето стопанство."
+            "Собственикът на обявата не приема съобщения от Вас."
         case .unknown:
-            "Съобщенията между двете стопанства са блокирани."
+            "Съобщенията в този разговор са спрени."
         }
     }
+
+    /// The block confirmation's body. The SCOPE is the point of confirming —
+    /// see `blockedNotice` for why it is said this way and not as a farm.
+    static let blockConfirmation = "Блокирането спира съобщенията от всички хора в другото "
+        + "стопанство, по всички обяви на Вашето стопанство — не само в този разговор. "
+        + "Може да го отмените по всяко време."
 
     /// Whether a failed send may in fact have been delivered.
     ///
@@ -194,6 +215,15 @@ enum MessagingPolicy {
 /// Held as the SET of thread ids, not a number, so that marking one read
 /// removes exactly that one — twice is harmless — and so that `hasUnread`,
 /// not `unreadCount`, is what counts (see `ExchangeInbox.unreadCount`).
+///
+/// ── The PERSON's badge since #1323 ──
+///
+/// The logic is unchanged and still right; what it counts changed meaning.
+/// `hasUnread` and the read pointer are per person, so: a colleague reading
+/// a thread no longer clears this badge; a colleague's reply now RAISES it
+/// (it used to arrive as "ours"); and the set is of the person's own inbox,
+/// which `SessionReset` already empties on sign-out. A thread that turns out
+/// to be unavailable (404) is dropped from it at once.
 @Observable
 @MainActor
 final class ExchangeUnreadStore {
@@ -240,8 +270,8 @@ final class ExchangeUnreadStore {
         unreadThreadIDs.remove(threadID)
     }
 
-    /// No badge — part of `SessionReset`. The farm whose threads these were
-    /// may not be the next account's.
+    /// No badge — part of `SessionReset`. The person whose threads these were
+    /// may not be the next account.
     func reset() {
         unreadThreadIDs = []
     }
@@ -249,7 +279,8 @@ final class ExchangeUnreadStore {
 
 // MARK: - The inbox
 
-/// «Съобщения»: every conversation this farm is in, from both sides.
+/// «Съобщения»: the person's OWN conversations, from both sides — since
+/// #1323 not the farm's shared inbox, so two colleagues see different lists.
 ///
 /// ONE PAGE — the server's default hundred — as on the web, which ignores
 /// `nextCursor` too. A farm with more than a hundred live conversations is
@@ -317,6 +348,16 @@ final class ConversationStore {
     /// reading, which is what the web does.
     private(set) var loadFailure: String?
 
+    /// The server answered 404: this conversation is not available to this
+    /// PERSON (`ConversationAvailability`). Final for this screen — the
+    /// messages already shown are cleared, polling stops, and the screen says
+    /// so instead of offering a retry.
+    ///
+    /// Cleared rather than kept on screen: a 404 mid-conversation means the
+    /// person has left its audience (a role changed at the farm), and the
+    /// server has just said they may not read it.
+    private(set) var unavailable = false
+
     /// Local copies of the header's two states, so a close or a block shows
     /// the moment its 200 arrives rather than after the refetch.
     private(set) var closed = false
@@ -375,8 +416,10 @@ final class ConversationStore {
     func run() async {
         runningLoops += 1
         defer { runningLoops -= 1 }
-        while !Task.isCancelled {
+        while !Task.isCancelled, !unavailable {
             let error = await refresh()
+            // Nothing to poll for: a 404 is not one a retry changes.
+            if unavailable { return }
             let wait = MessagingPolicy.nextPoll(
                 after: error, interval: MessagingPolicy.conversationInterval
             )
@@ -394,7 +437,11 @@ final class ConversationStore {
             page = try await ExchangeAPI.decodeThread(from: data)
         } catch {
             if Task.isCancelled { return nil }
-            if conversation == nil { loadFailure = UserMessage.text(for: error) }
+            if ConversationAvailability.isUnavailable(error) {
+                becomeUnavailable()
+            } else if conversation == nil {
+                loadFailure = UserMessage.text(for: error)
+            }
             return error
         }
 
@@ -414,6 +461,29 @@ final class ConversationStore {
         }
         if shouldMark { await markRead() }
         return nil
+    }
+
+    /// See `unavailable`. The thread leaves the badge too: it is not in this
+    /// person's inbox, and the next inbox load would drop it anyway.
+    private func becomeUnavailable() {
+        unavailable = true
+        conversation = nil
+        header = nil
+        loadFailure = nil
+        sendFailure = nil
+        actionFailure = nil
+        olderFailure = nil
+        ExchangeUnreadStore.shared.markedRead(threadID)
+    }
+
+    /// A WRITE answered 404 — the send's or an action's `THREAD_NOT_FOUND`.
+    /// The newest page is the authority on whether the conversation is still
+    /// there, so it is asked; true when it is not, and the screen has already
+    /// changed to say so.
+    private func confirmedUnavailable(after error: Error) async -> Bool {
+        guard ConversationAvailability.isUnavailable(error) else { return false }
+        await refresh()
+        return unavailable
     }
 
     /// `POST …/read`, and the interim race rule after it.
@@ -455,6 +525,10 @@ final class ConversationStore {
             conversation?.mergeOlder(page)
         } catch {
             if Task.isCancelled { return }
+            if ConversationAvailability.isUnavailable(error) {
+                becomeUnavailable()
+                return
+            }
             olderFailure = MessagingPolicy.failure("По-старите съобщения не могат да бъдат заредени.", error)
         }
     }
@@ -499,6 +573,7 @@ final class ConversationStore {
             // composer now says when it can.
             sendFeedback.refused()
             if RateLimitPause.messages.absorb(error) { return }
+            if await confirmedUnavailable(after: error) { return }
             sendFailure = MessagingPolicy.sendFailure(for: error)
         }
     }
@@ -545,6 +620,7 @@ final class ConversationStore {
         do {
             try await write()
         } catch {
+            if await confirmedUnavailable(after: error) { return }
             actionFailure = MessagingPolicy.failure(what, error)
             return
         }
@@ -570,8 +646,10 @@ final class ListingThreadOpener {
     /// The thread's id, or nil with `failure` set.
     ///
     /// One retry on a 409: two first opens racing — a double tap on two
-    /// devices — can collide on the unique (listing, farm) row, and the
-    /// second attempt finds the thread the first one made.
+    /// devices — can collide on the unique (listing, inquirer PERSON) row
+    /// (per farm until #1323), and the second attempt finds the thread the
+    /// first one made. A colleague's thread on the same listing is not that
+    /// row: since #1323 each person who writes gets their own conversation.
     func open(listingID: String) async -> String? {
         guard !opening else { return nil }
         opening = true

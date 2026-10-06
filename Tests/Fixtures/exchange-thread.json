@@ -6,13 +6,15 @@
   "lastMessageAt": "2026-09-28T09:15:00.000Z",
   "closed": false,
   "blocked": true,
-  "unreadCount": 1,
+  "unreadCount": 2,
   "olderCursor": null,
   "messages": [
     {
       "id": "msg_synthetic_1",
       "senderTenantId": "tnt_synthetic_buyer",
+      "senderUserId": "usr_synthetic_buyer",
       "mine": false,
+      "fromMyFarm": false,
       "body": "Здравейте, пшеницата още ли е налична?",
       "deleted": false,
       "createdAt": "2026-09-27T08:00:00.000Z"
@@ -20,15 +22,29 @@
     {
       "id": "msg_synthetic_2",
       "senderTenantId": "tnt_synthetic_owner",
+      "senderUserId": "usr_synthetic_creator",
       "mine": true,
+      "fromMyFarm": false,
       "body": "Да, 250 т.\nМоже оглед в четвъртък.",
       "deleted": false,
       "createdAt": "2026-09-27T08:30:00.000Z"
     },
     {
+      "id": "msg_synthetic_5",
+      "senderTenantId": "tnt_synthetic_owner",
+      "senderUserId": "usr_synthetic_admin",
+      "mine": false,
+      "fromMyFarm": true,
+      "body": "Може и в петък, ако е по-удобно.",
+      "deleted": false,
+      "createdAt": "2026-09-27T08:45:00.000Z"
+    },
+    {
       "id": "msg_synthetic_3",
       "senderTenantId": "tnt_synthetic_buyer",
+      "senderUserId": "usr_synthetic_buyer",
       "mine": false,
+      "fromMyFarm": false,
       "body": null,
       "deleted": true,
       "createdAt": "2026-09-27T09:00:00.000Z"
@@ -36,7 +52,9 @@
     {
       "id": "msg_synthetic_4",
       "senderTenantId": "tnt_synthetic_buyer",
+      "senderUserId": "usr_synthetic_buyer",
       "mine": false,
+      "fromMyFarm": false,
       "body": "Цена <300 € на тон?",
       "deleted": false,
       "createdAt": "2026-09-28T09:15:00.000Z"

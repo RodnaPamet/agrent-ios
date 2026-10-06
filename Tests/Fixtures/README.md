@@ -133,15 +133,24 @@ The hard cases, each on purpose:
 | case | where |
 |---|---|
 | tombstone — `deleted: true`, `body: null` | `exchange-thread.json`, `msg_synthetic_3` |
-| a role this build does not know (`broker`) → `.unknown` | `exchange-threads.json`, row 3 |
-| `sellerDisplayName: null` | `exchange-threads.json`, rows 2 and 3 |
+| all THREE speakers (agri-saas #1323): me (`mine`), a colleague (`fromMyFarm`, not `mine`), the other side (neither) | `msg_synthetic_2` / `msg_synthetic_5` / `msg_synthetic_1` |
+| two rows on ONE listing — two people, as from one buyer farm (#1323: a thread is per inquirer person) | `thr_synthetic_1` and `thr_synthetic_4`, both `lst_synthetic_1` |
+| a role this build does not know (`broker`) → `.unknown` | `exchange-threads.json`, `thr_synthetic_3` |
+| `sellerDisplayName: null` | `thr_synthetic_2` and `thr_synthetic_3` |
 | `olderCursor: null` (the start is on this page) | `exchange-thread.json` |
-| `hasUnread: true` and `false` | rows 1 and 3 / row 2 |
-| `closed: true` | `exchange-threads.json`, row 2 |
+| `hasUnread: true` and `false` | `thr_synthetic_1`, `_3` / `thr_synthetic_2`, `_4` |
+| `closed: true` | `thr_synthetic_2` |
 | `blocked: true` | `exchange-thread.json` |
 | a multi-line body, and one with `<` that must render verbatim | `msg_synthetic_2`, `msg_synthetic_4` |
-| a decimal-string quantity with a fraction (`"12.5"`) | row 2 |
-| `lastMessageAt` with and without non-zero milliseconds | rows 1 and 2 |
+| a decimal-string quantity with a fraction (`"12.5"`) | `thr_synthetic_2` |
+| `lastMessageAt` with and without non-zero milliseconds | `thr_synthetic_1` and `thr_synthetic_2` |
+
+The summary carries nothing about the inquirer, so the fixture cannot — and
+does not — say that `thr_synthetic_1` and `thr_synthetic_4` come from the same
+buyer farm; that is the story the synthetic ids (`usr_synthetic_buyer`, a
+second buyer) tell, not a field. The sender ids are opaque strings like the
+server's, and the colleague is `usr_synthetic_admin`: the seller farm's admin
+answering for the listing's creator, who is the reader (`usr_synthetic_creator`).
 
 `olderCursor` is null because the UI test seam matches on the PATH alone: a
 `before=` request would be answered with this same page, and a cursor here

@@ -113,7 +113,7 @@ final class MessagingLayoutSourceTests: XCTestCase {
     }
 
     /// Scrolling to "the newest" goes past the notices, so a reply never
-    /// parks «Блокирали сте…» just under the composer; and every animated
+    /// parks the blocked notice just under the composer; and every animated
     /// scroll asks Reduce Motion first.
     func testTheConversationScrollsToItsEndPastTheNotices() throws {
         let text = try source("Agrent/Exchange/ConversationView.swift")

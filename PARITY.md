@@ -191,13 +191,16 @@ OTHER farm sees:
 
 - **open a thread** — a row in the listing owner's inbox at once, unread
   and empty, before a word is written; there is no way to delete it;
-- **send** — a message, plus a bell row and an email to their owners and
-  admins;
+- **send** — a message, plus a bell row and an email to exactly the people
+  who can open the conversation (agri-saas #1323; it was every owner and
+  admin of the other farm);
 - **close** — either party; **block** and **unblock** — the listing owner
-  only, and a block covers every listing between the two farms;
+  only, and a block covers every listing between the two farms (still
+  farm-to-farm after #1323; person-level is agri-saas #1314);
 - **retract** — a tombstone the other side sees where the message was;
 - **read** — fired by OPENING a conversation, not by a button, and it
-  moves the pointer for every member of the farm to the server's now. So
+  moves the reader's OWN pointer to the server's now (per person since
+  #1323; it used to move every member's). So
   even viewing a real conversation from development is a production write,
   and none has been opened. Under the UI test seam every one of these is
   answered 501, which is the backstop, not the rule.
@@ -227,6 +230,70 @@ The web keeps both; this app does not.
 Read out of agri-saas at 11b00118 — the spec, `exchange-messaging.ts`,
 `ThreadsClient.tsx`, `ThreadClient.tsx` — not observed running. No real
 conversation has been opened (see the note above).
+
+**Conversations are private to PEOPLE, not the farm — adopted 2026-10-06
+(agri-saas #1323, the owner's rulings on #1298).** Read out of agri-saas
+at 7af43f9: `ExchangeMessage`, `ExchangeThread`, `ExchangeThreadSummary`
+and the nine paths in `openapi.json`, cross-checked in
+`exchange-messaging.ts`. What changed for this app:
+
+- **Three speakers.** `ExchangeMessage` gained `senderUserId` and
+  `fromMyFarm`. `mine` is me, the PERSON (it meant "my farm");
+  `fromMyFarm` and not `mine` is a colleague — e.g. the seller admin
+  answering for the listing's creator; neither is the other side
+  (`MessageSpeaker`). A colleague's bubble has its own caption, «Колега от
+  стопанството», and its own style: mine is solid gold, a colleague's a gold
+  tint with a gold edge — both trailing, my farm's side — and the other
+  side's a neutral tint, leading. All three pairs measured in
+  `PaletteTokenTests`. VoiceOver says the speaker first. Both new fields
+  are decoded tolerantly: absent means a server from before #1323, where a
+  colleague's message already arrived as `mine`.
+- **«Вие» is the person.** Every messaging string was re-read. Where the
+  server checks the person — the audience, retract
+  (`MESSAGE_NOT_SENDER`), the read pointer — the text says «Вас». Where it
+  still checks the farm — your own listing (`THREAD_OWN_LISTING`), the
+  block — it says the farm. The inbox's role chips became «Наша обява» /
+  «Наше запитване» (were «Вашата обява» / «Вие питате»): an admin on a
+  colleague's listing does not own it, and a buyer-side admin on a
+  colleague's thread is not the one asking.
+- **The block is unchanged on the server** (farm-to-farm, every listing of
+  the blocking farm, every person at the blocked one) until #1314. The app
+  says that scope as what happens and never as «блокирахте това
+  стопанство», which would read as "this person" and turn false when #1314
+  lands.
+- **Unread is per person.** `mine`, `unreadCount` and `hasUnread` moved
+  without changing type. The badge logic holds unchanged; what it means
+  changed: a colleague reading a thread no longer clears my badge, and a
+  colleague's reply now raises it — so a reply from a colleague arriving
+  on screen marks read like the other side's (`Arrival.fromSomeoneElse`).
+- **Several threads per buyer farm.** A thread is per (listing, inquirer
+  PERSON), so a listing owner may see several rows on one listing, and a
+  buyer-side admin a colleague's beside their own. The summary carries the
+  listing and nothing about the other person — deliberately on the seller
+  side (the inquiry contact-reveal gate) — so the app cannot say WHO. It
+  says what is true: «Един от N разговора по тази обява» on each such row.
+  Never merged.
+- **404, not 403,** for anyone outside the audience, a colleague
+  included. A 404 on a conversation is its own state, «Разговорът не е
+  достъпен», with both possibilities («между други хора от стопанството или
+  вече да не съществува») — not the error state and its retry. It clears
+  what was shown, stops polling, drops the thread from the badge and is
+  announced to VoiceOver; a write's 404 asks the conversation once to
+  confirm.
+
+**Server follow-ups (none invented client-side):**
+
+- **A sender name on `ExchangeMessage`.** Only the opaque `senderUserId`
+  ships, so a colleague is «Колега от стопанството», never by name, and two
+  colleagues read alike. A display name for same-farm senders (no
+  contact-reveal concern inside one farm) would let the caption name them.
+- **Something to tell sibling inbox rows apart.** `ExchangeThreadSummary`
+  has nothing per inquirer. An opaque, stable per-listing ordinal (or the
+  thread's `createdAt`, so a client can number «разговор 1, 2» stably)
+  would separate them without revealing the buyer; the last message's
+  preview would also do it.
+- **The person-level block, #1314** — the block strings will need
+  re-reading when it lands.
 
 **Owner decisions (2026-09-29, asked directly):**
 
@@ -263,8 +330,8 @@ conversation has been opened (see the note above).
   `Retry-After` instead of the interval, never less than the interval.
 - **Wording is side-neutral wherever the side is unknown.** The payloads
   carry no listing side, and «Вие продавате» / «Блокирай купувача» are
-  false on every BUY listing. So the inbox says «Вашата обява» / «Вие
-  питате», the action is «Блокирай» / «Отблокирай», and the blocked notices
+  false on every BUY listing. So the inbox says «Наша обява» / «Наше
+  запитване» (farm-level since #1323, see above), the action is «Блокирай» / «Отблокирай», and the blocked notices
   name neither buyer nor seller. On the listing the side IS known:
   «Съобщение до продавача» on a SELL listing, «Съобщение до купувача» on a
   BUY one. The button is not tied to the listing being active — it is the

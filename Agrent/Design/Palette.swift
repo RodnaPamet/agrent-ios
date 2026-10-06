@@ -244,6 +244,43 @@ enum Palette {
         static let neutralFill = Color(token: AgrentColor.bgSubtle)
     }
 
+    /// The three speakers of an exchange conversation (agri-saas #1323): me,
+    /// a colleague at my farm, and the other side. Each is a FILL and the INK
+    /// written on it, chosen as pairs so that the three are told apart by
+    /// more than hue:
+    ///
+    ///     me           solid gold     `accent` under `onAccent`
+    ///     colleague    gold TINT      `--brand-subtle` under the input-chip
+    ///                                 ink, plus a gold EDGE always
+    ///     other side   neutral tint   `Chip.neutralFill` under primary
+    ///
+    /// Gold is my farm's side, and solid against tinted is me against a
+    /// colleague — the same family, plainly not the same object. The edge is
+    /// what keeps a colleague's bubble from reading as the other side's in
+    /// «Слънце», where both tints are faint; the caption over every bubble
+    /// says who in words, so colour is never the only channel.
+    ///
+    /// No new token pairing is invented: the colleague's pair IS the input
+    /// chip's (agri-saas#1331 explains its two-token ink), and the other
+    /// side's was the bubble's before #1323. Bubble text is body size, so
+    /// 4.5:1 applies; `PaletteTokenTests` measures each:
+    ///
+    ///     me                 8.45   5.21   5.21
+    ///     colleague          7.33   5.29   5.83
+    ///     other side        13.57  17.50  19.26
+    ///
+    /// The colleague's EDGE is `accentDeep`, a non-text boundary (3:1 against
+    /// the page: 5.11 / 5.82 / 6.51, measured under `accentDeep on page`).
+    enum Bubble {
+        static let mineFill = accent
+        static let mineInk = onAccent
+        static let colleagueFill = Chip.inputFill
+        static let colleagueInk = Chip.inputText
+        static let colleagueEdge = accentDeep
+        static let theirsFill = Chip.neutralFill
+        static let theirsInk = Color.primary
+    }
+
     /// The account card's initials circle — a FILL and the INK on it,
     /// defined together for the reason `onAccent` gives: the circle is the
     /// accent and the letters are `onAccent`.

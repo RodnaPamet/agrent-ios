@@ -251,12 +251,12 @@ final class DecoderToleranceTests: XCTestCase {
         {"id":"t","listingId":"l","listingCommodity":"wheat","role":"seller",
          "lastMessageAt":"2026-09-28T09:15:00.000Z","closed":false,"blocked":false,
          "unreadCount":1,"olderCursor":"b3BhcXVl",
-         "messages":[{"id":"m","senderTenantId":"x","mine":false,"body":"Здравейте",
+         "messages":[{"id":"m","senderTenantId":"x","senderUserId":"u","mine":false,"fromMyFarm":true,"body":"Здравейте",
            "deleted":false,"createdAt":"2026-09-28T09:15:00.000Z"}]}
         """#) { _ = try await ExchangeAPI.decodeThread(from: $0) },
 
         Probe("ExchangeMessage", #"""
-        {"id":"m","senderTenantId":"x","mine":true,"body":"Да",
+        {"id":"m","senderTenantId":"x","senderUserId":"u","mine":true,"fromMyFarm":false,"body":"Да",
          "deleted":false,"createdAt":"2026-09-28T09:15:00.000Z"}
         """#) { _ = try await APIClient.shared.decode($0, as: ExchangeMessage.self) },
 
@@ -472,6 +472,13 @@ final class DecoderToleranceTests: XCTestCase {
         //     a commodity and a time is still worth showing.
         //   - `unreadCount` and `senderTenantId`: nothing reads them.
         //     `hasUnread` is the unread signal and `mine` decides the side.
+        //   - `senderUserId` and `fromMyFarm` (agri-saas #1323, re-checked
+        //     against 7af43f9): required by the spec, not here. A server from
+        //     before #1323 sends neither, and there a colleague's message
+        //     already arrived as `mine` — so absent `fromMyFarm` defaults to
+        //     false, which is what that server meant, and `senderUserId` is an
+        //     id nothing on screen reads. Requiring either would cost the
+        //     whole conversation on that server.
         //   - WRITE responses require only what a caller cannot do without;
         //     the 2xx is the success, and a missing flag must not turn a
         //     delivered message into an error a farmer retries.

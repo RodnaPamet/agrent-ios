@@ -144,7 +144,7 @@ enum A11y {
         static let closeConversation = spokenNames("Затвори разговора", "Close conversation")
         static let block = spokenNames("Блокирай", "Block")
         static let unblock = spokenNames("Отблокирай", "Unblock")
-        /// Retract one of this farm's messages.
+        /// Retract one of the person's OWN messages (per person since agri-saas #1323).
         static let retract = spokenNames("Премахни", "Remove")
 
         // ── The account (agri-saas#1193 P2.8) ──

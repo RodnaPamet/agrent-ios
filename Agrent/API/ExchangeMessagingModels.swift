@@ -52,17 +52,25 @@ enum ExchangeThreadRole: String, CaseIterable, LenientDecodable, Sendable {
     case inquirer
     case unknown
 
-    /// The inbox's role marker. «Вашата обява», not «Вие продавате»: on a BUY
+    /// The inbox's role marker. Side-neutral — not «Вие продавате»: on a BUY
     /// listing the owner is buying, and the row cannot tell which.
+    ///
+    /// And FARM-level, «Наша», not «Вашата» / «Вие питате» as before #1323.
+    /// The role is which side my FARM is on, while «Вие» now means the person:
+    /// an admin answering on a colleague's listing does not own it, and a
+    /// buyer-side admin reading a colleague's thread is not the one asking.
+    /// «Ние» is the farm in Bulgarian farm talk, and true for every reader.
     var label: String {
         switch self {
-        case .seller: "Вашата обява"
-        case .inquirer: "Вие питате"
+        case .seller: "Наша обява"
+        case .inquirer: "Наше запитване"
         case .unknown: "—"
         }
     }
 
-    /// Block and unblock are the listing owner's alone (`BLOCK_SELLER_ONLY`).
+    /// Block and unblock are the listing owner's alone (`BLOCK_SELLER_ONLY`) —
+    /// the owning FARM's: anyone in the seller-side audience, the creator or
+    /// an admin.
     /// An unrecognised role is NOT the owner: offering a control the server
     /// then refuses is worse than not offering it.
     var ownsListing: Bool { self == .seller }
@@ -80,8 +88,20 @@ struct ExchangeThreadPage: Decodable, Equatable, Sendable {
     let nextCursor: String?
 }
 
-/// One inbox row. Rows come from BOTH sides: threads this farm opened as an
-/// inquirer and threads opened against its own listings.
+/// One inbox row — of the CALLER's own inbox since #1323, not the farm's
+/// shared one: threads they opened, threads on listings they created, and
+/// threads on either where they are an OWNER/ADMIN of a party farm. Two
+/// colleagues see different lists.
+///
+/// ── Several rows on one listing are several PEOPLE ──
+///
+/// A thread is per (listing, inquirer PERSON), so a listing owner can hold
+/// several rows on one listing from one buyer farm, and a buyer-side admin
+/// can see a colleague's thread beside their own. They are different
+/// conversations and are never merged. Nothing in the row says who the
+/// other person is — deliberately, on the seller's side, because the buyer's
+/// identity sits behind the inquiry contact-reveal gate — so the inbox can
+/// only say that a row is one of several (`ExchangeInbox.siblings`).
 struct ExchangeThreadSummary: Decodable, Equatable, Sendable, Identifiable {
     let id: String
     let listingId: String
@@ -116,6 +136,9 @@ struct ExchangeThreadSummary: Decodable, Equatable, Sendable, Identifiable {
     /// thread and one whose last message was retracted have `unreadCount` 0
     /// and `hasUnread` true, and gating on the count would leave «Ново» on
     /// the row for good.
+    ///
+    /// PER PERSON since #1323: a colleague reading the thread no longer
+    /// clears it for me, and a colleague's reply now sets it for me.
     let hasUnread: Bool
 
     var quantity: Decimal? { WireDecimal.parse(listingQuantityTonnes) }
@@ -147,13 +170,16 @@ struct ExchangeThread: Decodable, Equatable, Sendable, Identifiable {
     /// Closed refuses nothing: the next message from either party reopens it.
     let closed: Bool
 
-    /// The tenant-pair block, reported to BOTH parties. It covers every
-    /// listing between the two farms, not only this thread.
+    /// The tenant-pair block, reported to BOTH parties. Still FARM-level after
+    /// #1323 (the person-level block is agri-saas #1314, not done): the
+    /// listing farm refuses every person at the other farm, on every listing
+    /// of its own, not only in this thread.
     let blocked: Bool
 
-    /// The caller's exact unread count. Decoded but NOT the unread signal —
-    /// see `ExchangeThreadSummary.hasUnread` — and optional because nothing
-    /// here depends on it.
+    /// The caller's exact unread count — the CALLER's, per person since
+    /// #1323. Decoded but NOT the unread signal — see
+    /// `ExchangeThreadSummary.hasUnread` — and optional because nothing here
+    /// depends on it.
     let unreadCount: Int?
 
     /// Null once the start of the conversation is on this page.
@@ -174,16 +200,43 @@ struct ExchangeThread: Decodable, Equatable, Sendable, Identifiable {
 /// rendered as «Съобщението е премахнато», never dropped — dropping it would
 /// open a hole in the other party's scrollback where something they read
 /// used to be.
+///
+/// ── Three speakers, since agri-saas #1323 (#1298) ──
+///
+/// A conversation is private to PEOPLE now, not shared by the farm: its
+/// audience is the person who opened it, the listing's creator, and the
+/// OWNER/ADMIN members of either farm. So a message is one of three, and
+/// `speaker` says which:
+///
+///     mine                  -> me, the person holding this phone
+///     fromMyFarm, not mine  -> a COLLEAGUE at my own farm — e.g. the seller
+///                              admin answering for the listing's creator
+///     neither               -> the other side
+///
+/// The server computes both flags for the caller; nothing here compares ids.
 struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
     let id: String
 
-    /// A TENANT id, never a user. Optional because nothing reads it: which
-    /// side a bubble goes on is `mine`, which the server computes for the
-    /// caller. Comparing tenant ids here would be re-deriving that, worse.
+    /// A TENANT id, never a user. Optional because nothing reads it: who said
+    /// it is `speaker`, which the server computes for the caller. Comparing
+    /// tenant ids here would be re-deriving that, worse.
     let senderTenantId: String?
 
-    /// True for anything THIS FARM sent — a colleague's message is `mine` too.
+    /// The sending PERSON's opaque id (#1323). Required by the spec, optional
+    /// here because nothing on screen depends on it: it is an id, not a name,
+    /// and the payload carries no name — a server follow-up, PARITY Gap 7.
+    let senderUserId: String?
+
+    /// SENT BY ME, the person (#1323). It used to mean "sent by my farm", so a
+    /// colleague's message was `mine` too; it no longer is.
     let mine: Bool
+
+    /// Sent by someone ELSE at my own farm (#1323). Required by the spec, but
+    /// DEFAULTED to false when absent: absent means a server from before
+    /// #1323, and there a colleague's message already arrived as `mine`, so
+    /// false is exactly what that server meant. Requiring it would cost the
+    /// whole conversation on that server over a flag it could never send.
+    let fromMyFarm: Bool
 
     /// Plain text after the server's sanitiser. Render it VERBATIM
     /// (`Text(verbatim:)`): never markdown, never HTML, never a
@@ -193,15 +246,93 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
     let deleted: Bool
     let createdAt: Date
 
+    init(id: String, senderTenantId: String?, senderUserId: String? = nil,
+         mine: Bool, fromMyFarm: Bool = false,
+         body: String?, deleted: Bool, createdAt: Date) {
+        self.id = id
+        self.senderTenantId = senderTenantId
+        self.senderUserId = senderUserId
+        self.mine = mine
+        self.fromMyFarm = fromMyFarm
+        self.body = body
+        self.deleted = deleted
+        self.createdAt = createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, senderTenantId, senderUserId, mine, fromMyFarm, body, deleted, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        senderTenantId = try c.decodeIfPresent(String.self, forKey: .senderTenantId)
+        senderUserId = try c.decodeIfPresent(String.self, forKey: .senderUserId)
+        mine = try c.decode(Bool.self, forKey: .mine)
+        fromMyFarm = try c.decodeIfPresent(Bool.self, forKey: .fromMyFarm) ?? false
+        body = try c.decodeIfPresent(String.self, forKey: .body)
+        deleted = try c.decode(Bool.self, forKey: .deleted)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+    }
+
+    var speaker: MessageSpeaker { MessageSpeaker(mine: mine, fromMyFarm: fromMyFarm) }
+
     /// Removed, whichever of the two fields says so. A body that is null on a
     /// message not marked deleted is a contract break, and showing an empty
     /// bubble would be worse than showing it as removed.
     var isTombstone: Bool { deleted || body == nil }
 
-    /// «Премахни» is offered only on this farm's own, still-present messages.
-    /// The server checks the sending TENANT, so a colleague's message
-    /// qualifies too — which is what `mine` already says.
+    /// «Премахни» is offered only on MY OWN still-present messages. Since
+    /// #1323 the server checks the sending PERSON and answers anyone else
+    /// `MESSAGE_NOT_SENDER` — it used to compare the farm, so an admin could
+    /// retract the creator's words. A colleague's message is not offered.
     var mayRetract: Bool { mine && !isTombstone }
+}
+
+/// Who said it, seen from the person holding the phone.
+///
+/// A pure mapping of the server's two flags, so the bubble's style, its
+/// caption and its VoiceOver sentence all read one value, and a test can
+/// hold every combination.
+enum MessageSpeaker: Equatable, Sendable, CaseIterable {
+    /// The person holding the phone.
+    case me
+    /// Someone else at the same farm who is in this conversation's audience.
+    case colleague
+    /// The other side of the listing — whoever there is writing.
+    case counterparty
+
+    /// `mine` wins. The server computes `fromMyFarm` as "my farm and not me",
+    /// so it never sends both; if it ever did, a message the server says I
+    /// sent is mine, retract included.
+    init(mine: Bool, fromMyFarm: Bool) {
+        if mine {
+            self = .me
+        } else if fromMyFarm {
+            self = .colleague
+        } else {
+            self = .counterparty
+        }
+    }
+
+    /// The caption over a bubble, and the first thing VoiceOver says.
+    ///
+    /// «Вие» is the PERSON since #1323, never the farm. The colleague has no
+    /// name because the payload carries none — only an opaque id — so the
+    /// caption says what is known. A sender name is a server follow-up
+    /// (PARITY Gap 7).
+    var label: String {
+        switch self {
+        case .me: "Вие"
+        case .colleague: "Колега от стопанството"
+        case .counterparty: "Отсрещната страна"
+        }
+    }
+
+    /// My farm's side — me and a colleague — sits on the trailing edge, the
+    /// other side on the leading one. A colleague DID write for my farm, so
+    /// they are told apart from me by caption and bubble style, not by side.
+    var isOurSide: Bool { self != .counterparty }
 }
 
 // MARK: - Write bodies and responses

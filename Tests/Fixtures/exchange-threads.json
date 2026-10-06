@@ -13,6 +13,18 @@
       "hasUnread": true
     },
     {
+      "id": "thr_synthetic_4",
+      "listingId": "lst_synthetic_1",
+      "listingCommodity": "wheat",
+      "listingRegionName": "Pleven",
+      "listingQuantityTonnes": "250",
+      "sellerDisplayName": "Синтетично стопанство",
+      "role": "seller",
+      "lastMessageAt": "2026-09-28T07:30:00.000Z",
+      "closed": false,
+      "hasUnread": false
+    },
+    {
       "id": "thr_synthetic_2",
       "listingId": "lst_synthetic_2",
       "listingCommodity": "sunflower",
