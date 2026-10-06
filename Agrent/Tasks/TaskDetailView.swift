@@ -51,6 +51,7 @@ struct TaskDetailView: View {
                 resolving = nil
             }
         }
+        .writeFeedback(store.writeFeedback)
         .task { if store.state.value == nil { await store.load() } }
     }
 

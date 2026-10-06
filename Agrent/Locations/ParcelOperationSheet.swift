@@ -77,6 +77,11 @@ struct ParcelOperationSheet: View {
     /// queued for later closes the outbox's pause — see `queueForLater`.
     @State private var failureError: Error?
 
+    /// A refused save, played here because a refused sheet stays open. The
+    /// success is played by the presenter, from `onSaved` — see
+    /// `WriteFeedback`.
+    @State private var feedback = WriteFeedback()
+
     /// Minted ONCE per logical operation and reused across retries. A new
     /// key per attempt defeats the dedupe entirely.
     @State private var idempotencyKey = UUID().uuidString
@@ -309,6 +314,7 @@ struct ParcelOperationSheet: View {
                 }
             }
             .interactiveDismissDisabled(saving)
+            .writeFeedback(feedback)
             .sheet(isPresented: $creatingProduct) {
             NewProductView(
                 onCreated: { created in
@@ -360,6 +366,7 @@ struct ParcelOperationSheet: View {
             failure = UserMessage.text(for: error)
             failureIsRetriable = PendingOperations.isWorthRetrying(error)
             failureError = error
+            feedback.refused()
         }
     }
 
@@ -385,6 +392,7 @@ struct ParcelOperationSheet: View {
     private func queueForLater() async {
         guard let body = try? await APIClient.shared.encodeBody(draft) else {
             failure = "Операцията не можа да бъде запазена на устройството."
+            feedback.refused()
             return
         }
         if let failureError { OutboxStore.shared.pause.absorb(failureError) }

@@ -53,6 +53,7 @@ struct FarmProfileView: View {
                         reload: { try await store.reloadProfile() })
                 }
             }
+            .writeFeedback(store.profileSaveFeedback)
             .privacyCover()
             // The «записан» note describes ONE save. Leaving and coming back is
             // a fresh look at the profile, and a note still sitting there would
@@ -299,6 +300,12 @@ struct FarmProfileEditView: View {
     @State private var failure: String?
     @State private var confirmingDiscard = false
 
+    /// A refused save — the 409 included — played here because a refused
+    /// editor stays open. The success is played by the page underneath,
+    /// from `AdminStore.profileSaveFeedback`. A form problem caught before
+    /// sending is not a write and plays nothing. See `WriteFeedback`.
+    @State private var feedback = WriteFeedback()
+
     /// The profile the draft is an edit OF — and so the version the save
     /// sends. State, not a `let`: a reload after a 409 moves it to what is
     /// stored now, and every "untouched" judgement moves with it.
@@ -413,6 +420,7 @@ struct FarmProfileEditView: View {
             } message: {
                 Text("Направените промени няма да бъдат записани.")
             }
+            .writeFeedback(feedback)
             .privacyCover()
         }
     }
@@ -658,6 +666,7 @@ struct FarmProfileEditView: View {
                 // Nothing was written; everything typed stays; NO retry.
                 reloadNotes = nil
                 conflicted = true
+                feedback.refused()
                 AccessibilityNotification.Announcement(FarmProfileConflict.message).post()
             } catch {
                 // Stays open with everything typed. A refused write whose
@@ -665,6 +674,7 @@ struct FarmProfileEditView: View {
                 // different form. A 403 lands here as «Нямате права за това
                 // действие.» through `UserMessage`.
                 failure = UserMessage.text(for: error)
+                feedback.refused()
             }
         }
     }

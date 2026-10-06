@@ -60,6 +60,7 @@ struct ConversationView: View {
                 ToolbarItem(placement: .primaryAction) { actionsMenu }
             }
         }
+        .writeFeedback(store.sendFeedback)
         // Keyed on whether the app is ACTIVE: the loop starts when the screen
         // appears or the app returns, and is cancelled when either stops. A
         // conversation behind the lock screen is neither polled nor marked.
