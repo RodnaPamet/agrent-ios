@@ -125,6 +125,7 @@ final class A11yShotsTests: XCTestCase {
         captureFromMenu("06-news", label: "Новини", app: app)
         captureFromMenu("07-dashboard", label: "Табло", app: app)
         captureAdmin(app)
+        captureProfile(app)
 
         // Задачи and Борса ARE in the default bar — but the bar is whatever the
         // server sent, so this asks the tab bar first and falls back to the
@@ -255,9 +256,10 @@ final class A11yShotsTests: XCTestCase {
 
     /// THE MENU HOLDS «ИЗХОД», so nothing here may tap by index.
     ///
-    /// `AppMenuButton` lists the overflow surfaces, then Админ, then a
-    /// destructive «Изход» that calls `auth.signOut()` — which clears the
-    /// Keychain. Under the seam `AuthClient.signOut` does less (see the note
+    /// `AppMenuButton` lists the overflow surfaces, then Админ, then Профил
+    /// and a destructive «Изход» that asks once and then calls
+    /// `auth.signOut()` — which clears the Keychain. The question is a second
+    /// tap, not a guard to lean on. Under the seam `AuthClient.signOut` does less (see the note
     /// on `AgrentApp.openingState`), but the simulator this runs on may well
     /// be the owner's, holding a real Google session in that Keychain, and a
     /// guard that relies on the seam being on is a guard that fails exactly
@@ -538,8 +540,9 @@ final class A11yShotsTests: XCTestCase {
     /// ── Since 2026-10-01 these are three screens, not one ──
     ///
     /// Админ is an index now: «Стопанство», «Долна лента», «Потребители» —
-    /// under the read-only account card, which this asserts before the
-    /// capture and never taps (there is nothing on it to tap).
+    /// under the account card, which this asserts before the capture and does
+    /// not tap here: since P2.8 it opens Профил, and `captureProfile` reaches
+    /// that page from the menu, which is the route every role has.
     /// The profile and the members each push their own page, so this walks
     /// into each and back rather than photographing one long list.
     ///
@@ -784,6 +787,35 @@ final class A11yShotsTests: XCTestCase {
 
         goBack(app, to: "Админ")
         dismissSheet(app, named: "Админ")
+    }
+
+    /// Профил from the menu (agri-saas#1193 P2.8): the shared account card and
+    /// the «Изход» row.
+    ///
+    /// ── «Изход» is FOUND, never tapped ──
+    ///
+    /// Its existence is asserted so the capture is known to show it; the tap
+    /// would ask the confirmation, and the confirmation's answer clears the
+    /// Keychain on a simulator that may be the owner's. `tapMenuRow` refuses
+    /// the label outright, and nothing here calls `.tap()` on the row.
+    ///
+    /// The card is the same `AccountCard` Админ draws, so the same sentence is
+    /// asserted: one VoiceOver stop, on the fixture account.
+    private func captureProfile(_ app: XCUIApplication) {
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Профил")
+        XCTAssertTrue(tapMenuRow("Профил", in: app), "«Профил» is not in the menu")
+        XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 20),
+                      "Профил did not present a sheet")
+
+        let card = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@",
+                                  "Вписан като Иван Фикстуров, owner@example.invalid"))
+            .firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Профил")
+        XCTAssertTrue(app.buttons["Изход"].waitForExistence(timeout: 5), "no «Изход» on Профил")
+        Thread.sleep(forTimeInterval: 2)
+        capture("16-profile", app: app)
+        dismissSheet(app, named: "Профил")
     }
 
     // MARK: - helpers

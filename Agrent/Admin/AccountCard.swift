@@ -1,13 +1,16 @@
 import SwiftUI
 
-/// Who is signed in, at the top of Админ (owner, 2026-10-04): the picture or
-/// the initials, the name, the email.
+/// Who is signed in (owner, 2026-10-04): the picture or the initials, the
+/// name, the email.
 ///
-/// ── Read-only, and only here ──
+/// ── One card, two places (P2.8, 2026-10-06) ──
 ///
-/// No editing and no Изход on it — the owner asked for neither, and Изход
-/// already lives in the menu. Админ is admin-only today, so a non-admin does
-/// not see this card at all; that is the owner's call, not an oversight.
+/// At the top of Админ, as a link to Профил, and on Профил itself, which
+/// every role reaches from the menu. The SAME view in both, so the initials
+/// rule, the layout and the spoken sentence cannot drift between them.
+///
+/// Read-only, and with no Изход on it: the card is identity, and Изход is a
+/// row of its own on Профил (and in the menu), behind a confirmation.
 ///
 /// ── From `CurrentUserStore`, never a request of its own for the text ──
 ///

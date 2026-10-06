@@ -146,6 +146,17 @@ enum A11y {
         static let unblock = spokenNames("Отблокирай", "Unblock")
         /// Retract one of this farm's messages.
         static let retract = spokenNames("Премахни", "Remove")
+
+        // ── The account (agri-saas#1193 P2.8) ──
+        //
+        // «Профил» is the menu row and the Админ card's link; «Изход» is the
+        // menu row, the Профил page's row and the confirmation's answer. One
+        // word, because it is one act, and the dialog is modal, so two of them
+        // are never live at once. Neither collides: no other control in the
+        // app is «Профил» (the farm's page is reached through «Стопанство»),
+        // and nothing else answers to "Profile" or "Sign out".
+        static let profile = spokenNames("Профил", "Profile")
+        static let signOut = spokenNames("Изход", "Sign out")
     }
 
     /// Join facts as speech: nils and blanks dropped, comma-separated, one

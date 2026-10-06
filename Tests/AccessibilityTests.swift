@@ -235,8 +235,9 @@ final class SpokenVocabularyTests: XCTestCase {
             ("closeConversation", A11y.Spoken.closeConversation),
             ("block", A11y.Spoken.block), ("unblock", A11y.Spoken.unblock),
             ("retract", A11y.Spoken.retract),
+            ("profile", A11y.Spoken.profile), ("signOut", A11y.Spoken.signOut),
         ]
-        XCTAssertEqual(vocabulary.count, 14)
+        XCTAssertEqual(vocabulary.count, 16)
         for (name, names) in vocabulary {
             XCTAssertEqual(names.count, 2, "\(name) should offer exactly two names")
             XCTAssertTrue(names[0].unicodeScalars.contains { $0.properties.isAlphabetic
@@ -250,6 +251,26 @@ final class SpokenVocabularyTests: XCTestCase {
     /// «Запази» and «Запиши» are both "Save" — two Bulgarian verbs, one
     /// English one. Deliberate, and recorded so nobody "fixes" it by
     /// inventing a second English word for a control that has no second name.
+    /// NO TWO WORDS FOR ONE NAME. Two controls answering to one phrase make
+    /// Voice Control number them, and the person who said it has to read
+    /// which is which. Every entry, `edit` and `discard` included; the one
+    /// shared English word is the deliberate "Save" below.
+    func testNoTwoVerbsCollide() {
+        let all: [[String]] = [
+            A11y.Spoken.cancel, A11y.Spoken.close, A11y.Spoken.save, A11y.Spoken.record,
+            A11y.Spoken.create, A11y.Spoken.publish, A11y.Spoken.send, A11y.Spoken.done,
+            A11y.Spoken.importing, A11y.Spoken.edit, A11y.Spoken.discard,
+            A11y.Spoken.sendMessage, A11y.Spoken.closeConversation, A11y.Spoken.block,
+            A11y.Spoken.unblock, A11y.Spoken.retract, A11y.Spoken.profile, A11y.Spoken.signOut,
+        ]
+        let bulgarian = all.map { $0[0].lowercased() }
+        XCTAssertEqual(Set(bulgarian).count, bulgarian.count, "a Bulgarian name is used twice: \(bulgarian)")
+        let english = all.map { $0[1].lowercased() }.filter { $0 != "save" }
+        XCTAssertEqual(Set(english).count, english.count, "an English name is used twice: \(english)")
+        // Positive control: the check does see the deliberate pair.
+        XCTAssertEqual(all.filter { $0[1] == "Save" }.count, 2)
+    }
+
     func testTwoVerbsDeliberatelyShareOneEnglishWord() {
         XCTAssertEqual(A11y.Spoken.save[1], "Save")
         XCTAssertEqual(A11y.Spoken.record[1], "Save")

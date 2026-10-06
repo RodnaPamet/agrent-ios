@@ -27,7 +27,8 @@ import SwiftUI
 /// ── The account card goes ABOVE «Стопанство» (owner, 2026-10-04) ──
 ///
 /// It answers "as whom am I administering this farm" before anything below
-/// is changed under that name. It is not a row: nothing to tap, no chevron.
+/// is changed under that name. Since P2.8 (2026-10-06) it is a row that opens
+/// Профил — the page every role reaches from the menu.
 /// Hidden on `.forbidden` with the rest — and hidden until `/me` has
 /// answered, rather than drawn as a blank circle with no name.
 ///
@@ -77,7 +78,26 @@ struct AdminView: View {
         case .allowed:
             List {
                 if let user = me.user {
-                    Section { AccountCard(user: user) }.pageRow()
+                    // A LINK to Профил (owner, 2026-10-06), and the same
+                    // component that page draws — one card, not two copies
+                    // that drift. Pushed, not a second sheet: Админ already
+                    // is one, and its stack gives the back button.
+                    Section {
+                        NavigationLink {
+                            ProfileView()
+                        } label: {
+                            AccountCard(user: user)
+                        }
+                        // The label is a sentence about WHO, so the hint says
+                        // WHERE the row goes — nothing else on it does.
+                        .accessibilityHint("Отваря профила")
+                        // «Профил», which is where it leads and what the menu
+                        // row says, and the name, which is what is printed
+                        // on it and what a Voice Control user reads off it.
+                        .accessibilityInputLabels(A11y.Spoken.profile
+                                                  + A11y.spokenNames(user.name))
+                    }
+                    .pageRow()
                 }
                 Section { farmRow }.pageRow()
                 // The bottom-row editor, moved off every screen's toolbar
