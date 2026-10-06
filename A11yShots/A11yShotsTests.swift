@@ -106,6 +106,7 @@ final class A11yShotsTests: XCTestCase {
         // shape PR #93 changed.
         capture("01-journal", app: app)
         assertFixtureWorld(app)
+        captureNewEntryForm(app)
 
         // ── The screens reached from the menu, done BEFORE Локации ──
         //
@@ -383,6 +384,7 @@ final class A11yShotsTests: XCTestCase {
                       "Борса showed nothing")
         Thread.sleep(forTimeInterval: 3)
         capture("09-exchange", app: app)
+        captureExchangeMap(app)
 
         captureListingWithMessageParty(app)
         captureInboxAndConversation(app)
@@ -402,6 +404,44 @@ final class A11yShotsTests: XCTestCase {
             goBack(app, to: "Борса")
             dismissSheet(app, named: "Борса")
         }
+    }
+
+    /// Борса's map (`ExchangeMapView`), for its oblast fills (#156). The
+    /// toggle is `@AppStorage("exchange.showMap")`, which outlives the run,
+    /// so it is flipped back at once: the steps after this find listing ROWS,
+    /// and the owner's next launch should open on the list it opened on.
+    private func captureExchangeMap(_ app: XCUIApplication) {
+        let toMap = app.buttons["Покажи карта"]
+        guard toMap.waitForExistence(timeout: 5) else {
+            XCTFail("no «Покажи карта» on Борса")
+            return
+        }
+        toMap.tap()
+        Thread.sleep(forTimeInterval: 2)
+        capture("09b-exchange-map", app: app)
+        let toList = app.buttons["Покажи списък"]
+        XCTAssertTrue(toList.waitForExistence(timeout: 5), "no «Покажи списък» to put Борса back")
+        toList.tap()
+        Thread.sleep(forTimeInterval: 1)
+    }
+
+    /// «Нов запис», the most-used of the app's ten `Form`s (#156), opened
+    /// and CANCELLED — «Създай» stays untouched, and is disabled on an empty
+    /// title anyway.
+    private func captureNewEntryForm(_ app: XCUIApplication) {
+        let open = app.buttons["Нов запис"]
+        guard open.waitForExistence(timeout: 5) else {
+            XCTFail("no «Нов запис» on Дневник")
+            return
+        }
+        open.tap()
+        let cancel = app.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), "«Нов запис» did not present its form")
+        Thread.sleep(forTimeInterval: 1)
+        capture("17-new-entry", app: app)
+        cancel.tap()
+        XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 10),
+                      "«Отказ» did not close «Нов запис»")
     }
 
     /// The listing detail with «Съобщение до продавача» on it — photographed,
@@ -595,6 +635,18 @@ final class A11yShotsTests: XCTestCase {
             .firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Админ")
         capture("10-admin", app: app)
+
+        // ── «Стопанство» at the accessibility sizes (#150) ──
+        //
+        // At AX5 the card fills the first screen and the farm row's value —
+        // the producer's name, which must WRAP rather than end «Синтети…» —
+        // starts below the fold. One swipe brings it up; the list has no
+        // swipe actions on these rows, so a swipe can only scroll.
+        if UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1)
+            capture("10b-admin-farm-row", app: app)
+        }
 
         // ── «Стопанство», the first row ──
         //

@@ -80,6 +80,23 @@ final class PaletteTokenTests: XCTestCase {
         ("primary on page (navigation titles)", Color.primary, Palette.Surface.page, [16.63, 18.77, 21.00]),
         ("secondaryText on card", Palette.secondaryText, Palette.Surface.card, [7.64, 7.24, 11.37]),
         ("primary on card", Color.primary, Palette.Surface.card, [13.85, 19.47, 21.00]),
+        // #156: the ten forms' rows are `Surface.card` (`PageForm`). Their
+        // labels and fields are `primary`, their hints `secondaryText` (both
+        // above); these are the rest a form row writes — a button or a
+        // picker's value in the accent, a failure, a caveat.
+        ("accent on card (form buttons)", Palette.accent, Palette.Surface.card, [6.59, 5.09, 5.49]),
+        ("error on card (form failures)", Palette.error, Palette.Surface.card, [6.05, 7.85, 7.75]),
+        ("warning on card (form caveats)", Palette.warning, Palette.Surface.card, [8.30, 6.48, 7.13]),
+        // #156: a form's footers and headers sit on `formPage`, which is the
+        // page in dark and light and `--bg-muted` in «Слънце».
+        ("secondaryText on formPage (footers)", Palette.secondaryText, Palette.Surface.formPage, [9.17, 6.98, 9.28]),
+        ("warning on formPage", Palette.warning, Palette.Surface.formPage, [9.96, 6.24, 5.82]),
+        ("error on formPage", Palette.error, Palette.Surface.formPage, [7.26, 7.57, 6.33]),
+        // #156: the composer, a token-drawn field on the bar.
+        ("field text", Palette.Field.text, Palette.Field.fill, [13.85, 19.47, 21.00]),
+        ("field placeholder", Palette.Field.placeholder, Palette.Field.fill, [5.81, 5.32, 7.46]),
+        // #150: Админ's row values, on page rows.
+        ("Админ row value", Palette.secondaryText, Palette.Surface.page, [9.17, 6.98, 11.37]),
     ]
 
     /// The one role that does NOT pass on a bar, written down so nobody
@@ -91,6 +108,48 @@ final class PaletteTokenTests: XCTestCase {
         let ratio = Self.contrast(Palette.accentDeep, on: Palette.Surface.bar, Self.dark)
         XCTAssertEqual(ratio, 4.26, accuracy: 0.02)
         XCTAssertLessThan(ratio, 4.5)
+    }
+
+    /// The composer's EDGE is the field's whole boundary (its fill is the
+    /// bar it sits on), so it is a non-text pair held to 3:1 against the
+    /// bar — in «Слънце» too, where bar and page are both white. The web's
+    /// `--ctrl-edge-rest`, which `Palette.Field` declines, is the positive
+    /// control: it measures the 1.5 that comment cites, and fails.
+    func testTheComposerEdgeIsVisibleInEveryArm() {
+        for (traits, expected) in zip([Self.dark, Self.light, Self.sunlight], [5.81, 5.32, 7.46]) {
+            let ratio = Self.contrast(Palette.Field.edge, on: Palette.Surface.bar, traits)
+            XCTAssertGreaterThanOrEqual(ratio, 3)
+            XCTAssertEqual(ratio, expected, accuracy: 0.02)
+        }
+        let web = Self.contrast(Color(token: AgrentColor.ctrlEdgeRest), on: Palette.Surface.bar, Self.light)
+        XCTAssertEqual(web, 1.50, accuracy: 0.02)
+        XCTAssertLessThan(web, 3)
+    }
+
+    /// A form's card rows differ from the ground under them in EVERY arm —
+    /// the point of `formPage`. The plain page is the positive control: in
+    /// «Слънце» it equals the card, which is the white-on-white form the
+    /// first #156 capture showed.
+    func testFormCardsStandOffTheirGroundInEveryArm() {
+        for (traits, arm) in zip([Self.dark, Self.light, Self.sunlight], ["dark", "light", "«Слънце»"]) {
+            XCTAssertNotEqual(Self.rgba(Palette.Surface.card, traits), Self.rgba(Palette.Surface.formPage, traits), arm)
+        }
+        XCTAssertEqual(Self.rgba(Palette.Surface.card, Self.sunlight), Self.rgba(Palette.Surface.page, Self.sunlight))
+        XCTAssertEqual(Self.rgba(Palette.Surface.formPage, Self.dark), Self.rgba(Palette.Surface.page, Self.dark))
+        XCTAssertEqual(Self.rgba(Palette.Surface.formPage, Self.light), Self.rgba(Palette.Surface.page, Self.light))
+    }
+
+    /// The exchange map's oblast boundary against the idle oblast fill, the
+    /// fill composited over the page. BELOW 3:1 by documented choice (see
+    /// `Palette.RegionMap`); pinned so the numbers in that comment stay true
+    /// and a token change that moves them is seen.
+    func testTheRegionMapBoundaryIsTheDocumentedShortfall() {
+        for (traits, expected) in zip([Self.dark, Self.light, Self.sunlight], [2.6, 2.1, 2.3]) {
+            let page = Self.rgba(Palette.Surface.page, traits)
+            let idle = Self.over(Self.rgba(Palette.RegionMap.idleFill, traits), page)
+            let line = Self.over(Self.rgba(Palette.RegionMap.boundary, traits), idle)
+            XCTAssertEqual(Self.ratio(line, idle), expected, accuracy: 0.1)
+        }
     }
 
     /// The map's index chips: `Chip.neutralFill` is translucent, and it sits

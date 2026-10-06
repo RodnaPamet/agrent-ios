@@ -17,7 +17,7 @@ struct NewEntryView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 Section {
                     Picker("Тип", selection: $type) {
                         // `selectable`, never `allCases` — the latter now carries

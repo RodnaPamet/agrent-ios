@@ -82,7 +82,7 @@ struct NewProductView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 Section("Наименование") {
                     TextField("Търговско наименование", text: $name)
                         .textInputAutocapitalization(.words)

@@ -45,6 +45,11 @@ struct ExchangeMapView: View {
             } footer: {
                 Text("Маркерите показват област, не точно местоположение.")
             }
+            // Every section on the page colour, as Борса's list view draws
+            // its rows (`pageRow`). Without it the region sections under the
+            // map were the system's grouped grey — black in dark mode, under
+            // a green page (#156).
+            .pageRow()
 
             if regions.isEmpty {
                 Section {
@@ -52,6 +57,7 @@ struct ExchangeMapView: View {
                         .font(.footnote)
                         .foregroundStyle(Palette.secondaryText)
                 }
+                .pageRow()
             } else {
                 // ── ONE SECTION PER OBLAST, AND THE OFFERS ARE IN IT ──
                 //
@@ -69,6 +75,7 @@ struct ExchangeMapView: View {
                         RegionRow(region: region)
                         offerLinks(region.listings)
                     }
+                    .pageRow()
                 }
             }
 
@@ -86,6 +93,7 @@ struct ExchangeMapView: View {
                     // openable.
                     offerLinks(unplaceable)
                 }
+                .pageRow()
             }
         }
     }
@@ -137,11 +145,11 @@ struct ExchangeMapView: View {
                     path,
                     with: .color(active
                         ? Palette.accent.opacity(contrast == .increased ? 0.45 : 0.28)
-                        : Color(.secondarySystemFill))
+                        : Palette.RegionMap.idleFill)
                 )
                 context.stroke(
                     path,
-                    with: .color(Color(.separator)),
+                    with: .color(Palette.RegionMap.boundary),
                     lineWidth: contrast == .increased ? 1.2 : 0.7
                 )
             }

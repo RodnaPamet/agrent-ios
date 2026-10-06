@@ -225,7 +225,7 @@ struct InsuranceRequestForm: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 if available.isEmpty {
                     RefusalNote(
                         text: "Тази локация няма парцели.",

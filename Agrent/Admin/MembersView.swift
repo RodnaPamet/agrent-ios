@@ -307,7 +307,7 @@ private struct InviteMemberView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 Section("Имейл") {
                     TextField("name@example.com", text: $email)
                         .keyboardType(.emailAddress)

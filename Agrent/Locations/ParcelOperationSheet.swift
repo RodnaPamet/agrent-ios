@@ -148,7 +148,7 @@ struct ParcelOperationSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 Section {
                     Picker("Операция", selection: $kind) {
                         ForEach(Kind.allCases) { Text($0.label).tag($0) }
