@@ -177,11 +177,13 @@ final class FixtureSeamTests: XCTestCase {
             InsuranceCatalogueAPI.path,
             "/api/auth/token/refresh",
             // The Админ account card's picture. NO fixture, on purpose: the
-            // fixture account has no picture, so the seam's 501 leaves the
-            // card on its initials — which is the state A11yShots should
-            // photograph, since it is what most real accounts show (an
-            // upload is optional) and the one whose contrast was measured.
-            AccountAvatarAPI.path(userID: "usr_fixture_owner"),
+            // fixture `/me` says `avatarUrl: null`, so the card asks nothing
+            // and draws initials — the state A11yShots should photograph,
+            // since it is what most real accounts show (an upload is
+            // optional) and the one whose contrast was measured. Were a
+            // fixture ever to name this path, the seam's 501 would still
+            // leave it on initials.
+            "/api/account/avatar/usr_fixture_owner",
             // THE QUERY DECIDES on these two (#115): the wheat fixture must
             // not answer a maize chart, and «Всички» must not answer a
             // category filter. Each is a different request and has no payload.

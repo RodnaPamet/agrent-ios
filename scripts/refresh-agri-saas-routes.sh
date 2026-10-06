@@ -42,10 +42,10 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 GITHUB_REPO="RodnaPamet/agri-saas"
 FILE="src/generated/route-inventory.json"
-# >>> SWITCH TO `main` ONCE agri-saas#1175 MERGES. Until then the inventory
-# exists only on its PR branch. Change it here and in nowhere else: the
-# scheduled diff (.github/workflows/agri-saas-routes.yml) calls this script.
-REF="${AGRI_SAAS_REF:-feat/route-inventory}"
+# `main`: agri-saas#1175 merged, so the inventory lives there (the snapshot
+# was first taken from its PR branch). Change it here and in nowhere else:
+# the scheduled diff (.github/workflows/agri-saas-routes.yml) calls this script.
+REF="${AGRI_SAAS_REF:-main}"
 OUT="${OUT:-Tests/Contract/agri-saas-routes.txt}"
 
 WORK=$(mktemp -d)

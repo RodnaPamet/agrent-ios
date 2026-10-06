@@ -216,11 +216,11 @@ enum SessionEpoch {
 ///
 /// ── Until agri-saas#1206 deploys ──
 ///
-/// The route is on an open PR. Until it ships, the request falls through to
+/// The route is merged (in the route snapshot from agri-saas main a3df5f0,
+/// documented). On a server that predates it, the request falls through to
 /// NextAuth's `/api/auth/[...nextauth]` catch-all and is refused, and that
-/// answer is ignored like any other: the outcome is today's (the token dies
-/// with the Keychain item). `RouteContractTests.pendingServerRoutes` carries
-/// the path until the vendored route snapshot has it.
+/// answer is ignored like any other: the outcome is the old one (the token
+/// dies with the Keychain item).
 enum SessionRevocation {
     /// `POST`, body `{ "refreshToken": "…" }` — the field name in both the
     /// route (`'refreshToken' in body`) and its `NativeRevokeRequest` schema.

@@ -61,6 +61,33 @@ enum NoURLCache {
     /// seam: the token exchange and the index tiles.
     static let session = URLSession(configuration: configuration())
 
+    /// For a THIRD-PARTY host: the account card's provider photo (an
+    /// absolute `avatarUrl`, e.g. a Google profile picture). Nothing else.
+    ///
+    /// Not `session` above, and not `APIClient`'s: those carry this app's
+    /// credentials one way or another — `APIClient` attaches the bearer to
+    /// every request, and `session` shares the process's cookie and
+    /// credential stores with the token exchange. A request to someone
+    /// else's CDN must carry none of it, so this configuration has NO cookie
+    /// store, sets no cookies and has no credential store, on top of having
+    /// no URL cache. The caller still stamps `ClientHeader` (the house rule
+    /// is every request) and never sets `Authorization`.
+    ///
+    /// Fifteen seconds and no waiting for connectivity, for `APIClient`'s
+    /// reasons: a picture that cannot load should fall back to initials, not
+    /// hold a request open for a minute.
+    static func thirdPartyConfiguration() -> URLSessionConfiguration {
+        let configuration = configuration()
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCredentialStorage = nil
+        configuration.timeoutIntervalForRequest = 15
+        configuration.waitsForConnectivity = false
+        return configuration
+    }
+
+    static let thirdPartySession = URLSession(configuration: thirdPartyConfiguration())
+
     /// Purge, then disable, the shared cache. Call once, before any request.
     ///
     /// PURGE FIRST: a build from before #134 has already written whatever it

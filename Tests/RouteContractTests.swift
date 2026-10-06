@@ -80,13 +80,10 @@ final class RouteContractTests: XCTestCase {
     /// SELF-EXPIRING: `testPendingRoutesAreStillPending` fails once the
     /// snapshot serves the route, so the refresh that brings it in must also
     /// take it off this list. An entry cannot outlive its reason.
-    private static let pendingServerRoutes: [String: String] = [
-        // TODO(agri-saas#1206): drop once #1206 merges and the snapshot is
-        // refreshed. Best-effort and fire-and-forget after the local clear
-        // (`SessionRevocation`); until the route ships the request is refused
-        // and ignored, which leaves today's behaviour.
-        "/api/auth/native/revoke": "agri-saas#1206 (open): POST /api/auth/native/revoke",
-    ]
+    ///
+    /// Empty since the snapshot from agri-saas main a3df5f0, which serves
+    /// `/api/auth/native/revoke` (agri-saas#1206) — its entry expired.
+    private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -112,11 +109,14 @@ final class RouteContractTests: XCTestCase {
         let loc = "{locationId}", parcel = "{parcelId}", id = "{id}"
         var all: [(String, [String])] = [
             ("CurrentUser.swift", [MeAPI.path]),
+            // The Админ account card's picture. The app no longer BUILDS this
+            // path — it follows a root-relative `avatarUrl` from `/me` — but
+            // it still CALLS it, so the route is held here in the shape the
+            // spec documents for that value (`getUserAvatar`). A server that
+            // retired it would leave every uploaded avatar on initials.
+            ("AccountAvatar.swift", ["/api/account/avatar/{userId}"]),
             ("SessionReset.swift", [SessionRevocation.path]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
-            // The Админ account card's picture: live, UNDOCUMENTED on the
-            // server (not in openapi.json), streams image/webp, 404 = none.
-            ("AccountAvatar.swift", [AccountAvatarAPI.path(userID: "{userId}")]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
             ("ExchangeAPI.swift", [
                 ExchangeAPI.listingsPath,
@@ -209,7 +209,10 @@ final class RouteContractTests: XCTestCase {
     }
 
     /// The four outcomes, and the failure text each one prints.
-    private static func classify(_ template: String, in inventory: Inventory) -> (String, String?) {
+    private static func classify(
+        _ template: String, in inventory: Inventory,
+        pending pendingServerRoutes: [String: String] = RouteContractTests.pendingServerRoutes
+    ) -> (String, String?) {
         if nextAuthAllowlist.contains(template) { return ("nextauth (allowlisted)", nil) }
         guard let route = inventory.route(matching: template) else {
             // Absent AND pending is the one tolerated absence. A pending route
@@ -263,17 +266,19 @@ final class RouteContractTests: XCTestCase {
                          "\(template) is now in the snapshot (\(inventory.sha.prefix(12))); "
                          + "remove it from pendingServerRoutes (\(why))")
         }
-        // The classification itself, on a known inventory: pending tolerates
-        // ABSENT only; a retired route of the same shape still fails.
+        // The classification itself, on a known inventory and a known pending
+        // list (the real one may be empty): pending tolerates ABSENT only; a
+        // retired route of the same shape still fails.
+        let pending = ["/api/auth/native/later": "a synthetic pending route"]
         let inv = try Inventory.parse("""
         # sha 0123
-        retired documented   /api/auth/native/revoke withdrawn
+        retired documented   /api/auth/native/later withdrawn
         """)
-        XCTAssertEqual(Self.classify("/api/auth/native/revoke", in: inv).0, "RETIRED")
-        XCTAssertEqual(Self.classify("/api/auth/native/revoke",
-                                     in: Inventory(sha: "x", routes: [])).0, "pending (allowlisted)")
-        XCTAssertEqual(Self.classify("/api/auth/native/nope",
-                                     in: Inventory(sha: "x", routes: [])).0, "ABSENT")
+        XCTAssertEqual(Self.classify("/api/auth/native/later", in: inv, pending: pending).0, "RETIRED")
+        XCTAssertEqual(Self.classify("/api/auth/native/later", in: Inventory(sha: "x", routes: []),
+                                     pending: pending).0, "pending (allowlisted)")
+        XCTAssertEqual(Self.classify("/api/auth/native/nope", in: Inventory(sha: "x", routes: []),
+                                     pending: pending).0, "ABSENT")
     }
 
     /// The #130 path itself, pinned. If this ever matches, the matcher has

@@ -12,8 +12,8 @@ import SwiftUI
 /// ── From `CurrentUserStore`, never a request of its own for the text ──
 ///
 /// The name and email are `/me`'s, which the launch already asked for. Only
-/// the PICTURE is fetched here (`AccountAvatarStore`), and only when the card
-/// is on screen.
+/// the PICTURE is fetched here (`AccountAvatarStore`), only when the card is
+/// on screen, and only when `/me` named one (`avatarUrl`) — nil asks nothing.
 ///
 /// ── The email is personal data ──
 ///
@@ -38,7 +38,7 @@ struct AccountCard: View {
 
         layout {
             AccountAvatarCircle(
-                image: avatars.image(for: user.id),
+                image: avatars.image(for: user.id, avatarURL: user.avatarUrl),
                 initials: AccountInitials.of(name: user.name, email: user.email),
                 diameter: diameter
             )
@@ -65,7 +65,17 @@ struct AccountCard: View {
         // as three stops, and the picture has nothing to say.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Self.spokenLabel(name: user.name, email: user.email))
-        .task(id: user.id) { await avatars.load(for: user.id) }
+        // Keyed on the VALUE as well as the user: the foreground `/me`
+        // refresh can change `avatarUrl`, and that change is the one that
+        // must fetch again (the store asks nothing for a value it holds).
+        .task(id: AvatarTaskID(userID: user.id, avatarURL: user.avatarUrl)) {
+            await avatars.load(for: user.id, avatarURL: user.avatarUrl)
+        }
+    }
+
+    private struct AvatarTaskID: Equatable {
+        let userID: String
+        let avatarURL: String?
     }
 
     /// «Вписан като <name>, <email>», or as much of it as exists.
