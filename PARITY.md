@@ -514,9 +514,28 @@ What the client must get right, read from the route and usecase:
 
 - **Merge semantics since agri-saas#1181** (fixing #1176): an ABSENT field
   is left alone and an explicit null (or blank) clears. Before that an absent
-  field was nulled. The app still reads, merges the edits and PUTs all
-  thirteen keys with explicit nulls — correct under both. The request is
+  field was nulled. The app still reads, merges the edits and PUTs every
+  writable key with explicit nulls — correct under both. The request is
   documented now (`UpdateFarmProfileRequest`, #1178).
+- **ЕИК is read-only and never sent** (agri-saas#1352, enforced by P3.9,
+  client since 2026-10-07). The PUT refuses any body that CONTAINS `eik` —
+  unchanged value and null included — with 400
+  `FARM_PROFILE_EIK_NOT_EDITABLE`; the ЕИК is written only by Agrent staff
+  verifying the farm's identity claim (P3.4/P3.9). So the body carries
+  exactly TWELVE keys (`FarmProfileText.writable` + `sizeHa` +
+  `grainProduced`), and absent leaves the stored ЕИК alone under #1181
+  (`Object.hasOwn` in `upsertFarmProfile`, read on agri-saas main). The
+  editor shows the ЕИК read-only with «ЕИК се променя само след проверка от
+  екипа на Agrent.» — iOS wording: agri-saas `messages/bg.json` on main has
+  none for P3.4/P3.9. The code maps to a Bulgarian `UserMessage` in case an
+  older payload trips it. The 409 reload (`FarmProfileRebase`) takes the
+  stored ЕИК and never carries a draft one into the body.
+  **Unverified:** the P3.9 branch (`feat/p3-9-staff-verification-console`)
+  was not on the agri-saas remote when this landed, so the rejection is
+  taken from #1352's plan, not from its code. **No verification state** is
+  shown: neither the `FarmProfile` response nor any documented route on main
+  exposes PENDING / VERIFIED (`FarmIdentityClaim` has no route); if P3.9
+  adds one, show it beside the read-only ЕИК.
 - **`admin.manage` on GET and PUT** — OWNER and ADMIN. The edit action shows
   only over a profile the GET returned.
 - **The response can differ from the request** (trim, `sanitizePlainText`,

@@ -398,6 +398,16 @@ enum UserMessage {
         // have drifted, and the farmer still needs a sentence they can read.
         "VALIDATION_ERROR": "Сървърът не прие данните. Проверете полетата и опитайте отново.",
 
+        // The farm-profile PUT refuses ANY body that carries `eik`, even
+        // unchanged or null (agri-saas#1352, P3.9): the ЕИК is written only by
+        // Agrent staff verifying the farm's identity. This client never sends
+        // the key (`FarmProfileText.writable`), so reaching this means an older
+        // build or payload did — and the farmer needs to know the rest was not
+        // saved either, and where the ЕИК is changed instead.
+        "FARM_PROFILE_EIK_NOT_EDITABLE":
+            "ЕИК не може да се променя оттук и профилът не е записан. "
+            + "ЕИК се променя само след проверка от екипа на Agrent.",
+
         // ── Exchange messaging (agrent-ios#114) ──
         //
         // The server's sentences are English and the web has no Bulgarian

@@ -10,11 +10,14 @@ import XCTest
 final class FarmProfileEditTests: XCTestCase {
 
     /// The properties of `UpdateFarmProfileRequest` as agri-saas#1178
-    /// documents them (13, none required; absent is left alone since #1181), which
-    /// are the route's zod keys. Hard-coded rather than read from the spec at
-    /// test time: the suite must not depend on another repository's branch.
-    private let thirteen: Set<String> = [
-        "producerName", "egn", "eik", "urn", "address", "municipality", "settlement",
+    /// documents them (13, none required; absent is left alone since #1181),
+    /// MINUS `eik`: agri-saas#1352 (P3.9) makes the PUT refuse any body that
+    /// CONTAINS that key — unchanged and null included — with 400
+    /// FARM_PROFILE_EIK_NOT_EDITABLE. Hard-coded rather than read from the
+    /// spec at test time: the suite must not depend on another repository's
+    /// branch.
+    private let twelve: Set<String> = [
+        "producerName", "egn", "urn", "address", "municipality", "settlement",
         "agricultureDirectorateCity", "registrationPlace", "registrationEkatte",
         "odbhCity", "sizeHa", "grainProduced",
     ]
@@ -64,13 +67,14 @@ final class FarmProfileEditTests: XCTestCase {
     // MARK: - The body: whole object, always
 
     /// agri-saas#1176. An absent key WAS nulled by the usecase until #1181
-    /// made it "left alone"; all thirteen, every time, is correct under both
-    /// and does not depend on which server build answers — including when
-    /// every value is null, which is exactly when the synthesised `Encodable`
-    /// would have dropped them all.
-    func testTheBodyAlwaysCarriesAllThirteenKeys() throws {
+    /// made it "left alone"; all twelve writable keys, every time, is correct
+    /// under both and does not depend on which server build answers —
+    /// including when every value is null, which is exactly when the
+    /// synthesised `Encodable` would have dropped them all.
+    func testTheBodyAlwaysCarriesAllTwelveWritableKeys() throws {
         let full = try json(body(profile()))
-        XCTAssertEqual(Set(full.keys), thirteen)
+        XCTAssertEqual(Set(full.keys), twelve)
+        XCTAssertEqual(full.count, 12)
 
         let empty = FarmProfile(producerName: nil, eik: nil, egn: nil, address: nil,
                                 settlement: nil, municipality: nil, registrationPlace: nil,
@@ -78,42 +82,77 @@ final class FarmProfileEditTests: XCTestCase {
                                 agricultureDirectorateCity: nil, urn: nil, sizeHa: nil,
                                 grainProduced: [])
         let blank = try json(body(empty) { $0[.producerName] = "Ново стопанство" })
-        XCTAssertEqual(Set(blank.keys), thirteen, "nil fields were omitted — and omitted is erased")
+        XCTAssertEqual(Set(blank.keys), twelve, "nil fields were omitted — and omitted is erased")
+        XCTAssertNil(blank["eik"], "a null eik is still the key, and the key alone is a 400")
         XCTAssertTrue(blank["egn"] is NSNull)
         XCTAssertTrue(blank["sizeHa"] is NSNull)
         XCTAssertEqual(blank["grainProduced"] as? [String], [])
     }
 
-    /// Exactly the thirteen: unknown keys are stripped server-side, so an
+    /// Exactly the twelve: unknown keys are stripped server-side, so an
     /// extra one would be a value the farmer believes saved and is not.
     func testTheBodyCarriesNothingElse() throws {
-        XCTAssertEqual(Set(try json(body(profile())).keys).subtracting(thirteen), [])
+        XCTAssertEqual(Set(try json(body(profile())).keys).subtracting(twelve), [])
     }
 
-    /// Read-modify-write: editing ONE field sends the other twelve exactly as
+    /// agri-saas#1352: the PUT refuses a body that CONTAINS `eik` — with the
+    /// stored value, with null, with anything — as 400
+    /// FARM_PROFILE_EIK_NOT_EDITABLE. Absent, under #1181, leaves the stored
+    /// ЕИК alone. So it is absent from every body: untouched, with a stored
+    /// value, with none, and even if a caller writes into the draft's ЕИК,
+    /// which the editor never offers.
+    func testTheBodyNeverCarriesTheEIK() throws {
+        XCTAssertNil(try json(body(profile()))["eik"])
+        XCTAssertNil(try json(body(profile(eik: nil)) { $0[.urn] = "1" })["eik"])
+
+        let pushed = try body(profile()) { $0[.eik] = "999999999" }
+        XCTAssertNil(pushed.text[.eik] ?? nil, "an ЕИК edit was built into the body")
+        let text = String(decoding: try JSONEncoder().encode(pushed), as: UTF8.self)
+        XCTAssertFalse(text.contains("\"eik\""), text)
+        XCTAssertFalse(text.contains("999999999"), text)
+
+        // Even a hand-built body with the ЕИК set does not encode it.
+        var forced = pushed
+        forced.text[.eik] = "203912345"
+        XCTAssertNil(try json(forced)["eik"])
+        // Positive control: the same path DOES encode a writable field.
+        forced.text[.urn] = "42"
+        XCTAssertEqual(try json(forced)["urn"] as? String, "42")
+    }
+
+    /// Only the ЕИК is held back, and it is the only field shown read-only.
+    func testTheEIKIsTheOnlyFieldNotWritable() {
+        XCTAssertEqual(FarmProfileText.allCases.filter { !$0.isWritable }, [.eik])
+        XCTAssertEqual(FarmProfileText.writable.count, 10)
+        XCTAssertEqual(FarmProfileText.writable,
+                       FarmProfileText.allCases.filter { $0 != .eik }, "the web's order moved")
+    }
+
+    /// Read-modify-write: editing ONE field sends the other eleven exactly as
     /// loaded — the case the wipe in #1176 was reproduced with.
     func testEditingOneFieldKeepsTheOtherTwelve() throws {
         let original = profile(grain: ["Пшеница", "царевица"])
         let sent = try body(original) { $0[.producerName] = "Мария Петрова" }
 
         XCTAssertEqual(sent.text[.producerName] ?? nil, "Мария Петрова")
-        for field in FarmProfileText.allCases where field != .producerName {
+        for field in FarmProfileText.writable where field != .producerName {
             XCTAssertEqual(sent.text[field] ?? nil, original[keyPath: field.wire], "\(field)")
         }
         XCTAssertEqual(sent.sizeHa, 39.758, "an untouched size is resent as stored, not re-parsed")
         XCTAssertEqual(sent.grainProduced, ["Пшеница", "царевица"])
     }
 
-    /// The ONE way to clear: the farmer emptied the field. Sent as null.
+    /// The ONE way to clear: the farmer emptied the field. Sent as null —
+    /// still the explicit-null clear of #1181 for every writable field.
     func testAFieldIsClearedOnlyWhenTheFarmerClearedIt() throws {
-        let sent = try body(profile()) { $0[.eik] = "" }
-        XCTAssertNil(sent.text[.eik] ?? nil)
-        XCTAssertTrue(try json(sent)["eik"] is NSNull)
-        XCTAssertEqual(sent.text[.urn] ?? nil, "1234567", "a neighbour was cleared too")
+        let sent = try body(profile()) { $0[.urn] = "" }
+        XCTAssertNil(sent.text[.urn] ?? nil)
+        XCTAssertTrue(try json(sent)["urn"] is NSNull)
+        XCTAssertEqual(sent.text[.egn] ?? nil, "7501011234", "a neighbour was cleared too")
 
         // Whitespace-only is empty to the server (trim → blank → null), so it
         // is a clear here as well rather than a value that silently becomes one.
-        XCTAssertNil(try body(profile()) { $0[.eik] = "   " }.text[.eik] ?? nil)
+        XCTAssertNil(try body(profile()) { $0[.urn] = "   " }.text[.urn] ?? nil)
     }
 
     func testAnEditedFieldIsTrimmed() throws {
@@ -125,7 +164,7 @@ final class FarmProfileEditTests: XCTestCase {
     func testAnUntouchedDraftRebuildsTheLoadedProfile() throws {
         let original = profile()
         let sent = try body(original)
-        for field in FarmProfileText.allCases {
+        for field in FarmProfileText.writable {
             XCTAssertEqual(sent.text[field] ?? nil, original[keyPath: field.wire])
         }
         XCTAssertEqual(sent.sizeHa, original.sizeHa)
@@ -212,7 +251,7 @@ final class FarmProfileEditTests: XCTestCase {
     func testTheEGNIsNotValidatedHarderThanTheServer() {
         XCTAssertTrue(problems(profile()) { $0[.egn] = "12" }.isEmpty)
         XCTAssertTrue(problems(profile()) { $0[.egn] = "ЛНЧ 1234567890" }.isEmpty)
-        XCTAssertTrue(problems(profile()) { $0[.eik] = "BG203912345" }.isEmpty)
+        XCTAssertTrue(problems(profile()) { $0[.urn] = "BG203912345" }.isEmpty)
     }
 
     // MARK: - Crops
@@ -310,6 +349,17 @@ final class FarmProfileEditTests: XCTestCase {
                                         message: "Invalid request payload")
         XCTAssertEqual(text, UserMessage.bulgarian["VALIDATION_ERROR"])
         XCTAssertFalse(text.contains("Invalid"))
+    }
+
+    /// agri-saas#1352's refusal, in case an older payload ever trips it: in
+    /// Bulgarian, saying the profile was NOT saved and where ЕИК is changed.
+    func testTheEIKRefusalIsBulgarian() {
+        let text = UserMessage.httpText(status: 400, code: "FARM_PROFILE_EIK_NOT_EDITABLE",
+                                        message: "The EIK cannot be edited here.")
+        XCTAssertEqual(text, UserMessage.bulgarian["FARM_PROFILE_EIK_NOT_EDITABLE"])
+        XCTAssertTrue(text.contains("не е записан"), text)
+        XCTAssertTrue(text.hasSuffix(FarmProfileText.eikReadOnlyNote), text)
+        XCTAssertFalse(text.contains("EIK"))
     }
 
     /// A 403 on the save is the category sentence, not a retry prompt.
