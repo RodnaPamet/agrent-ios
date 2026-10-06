@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// «Съобщения», Борса's fourth section: every conversation this farm is in,
-/// newest first, as the server orders them (PARITY GAP 7).
+/// «Съобщения», Борса's fourth section: the person's OWN conversations —
+/// since agri-saas #1323 not the farm's shared inbox — newest first, as the
+/// server orders them (PARITY GAP 7).
 ///
 /// Network-only — see `ExchangeInboxStore` — and polled every 30 s while on
 /// screen with the app active, as the web polls. Pull to refresh as well,
@@ -51,13 +52,16 @@ struct ExchangeInboxView: View {
             }
 
         case .loaded(let rows, _):
+            // Computed once per page, not per row: several rows on one
+            // listing are several people since #1323 (`ExchangeInbox.siblings`).
+            let siblings = ExchangeInbox.siblings(rows)
             List {
                 Section {
                     ForEach(rows) { thread in
                         NavigationLink {
                             ConversationView(threadID: thread.id, commodity: thread.commodity)
                         } label: {
-                            InboxRow(thread: thread)
+                            InboxRow(thread: thread, siblings: siblings[thread.id])
                         }
                     }
                 }
@@ -75,16 +79,25 @@ struct ExchangeInboxView: View {
 /// through `CommodityName` (the web prints the slug), the region in
 /// Bulgarian (the web prints the stored English), «т» (the web a Latin «t»),
 /// and the time through `BgDate` in the phone's zone (the web: en-GB, UTC).
-/// The role marker is side-neutral — «Вашата обява», not «Вие продавате»,
-/// which is false on every BUY listing.
+/// The role marker is side-neutral — «Наша обява», not «Вие продавате»,
+/// which is false on every BUY listing — and farm-level, because «Вие» is
+/// the person since #1323 (`ExchangeThreadRole.label`).
+///
+/// A row that shares its listing with others says so (`siblings`): since
+/// #1323 those are separate conversations with different people, and the
+/// row carries nothing else that tells them apart.
 struct InboxRow: View {
     let thread: ExchangeThreadSummary
+    /// How many rows in the inbox are on this listing, this one included;
+    /// nil when it is the only one.
+    var siblings: Int? = nil
 
     private var name: String { CommodityName.canonical(thread.commodity) ?? thread.commodity }
     private var region: String? { BulgarianRegion.name(english: thread.listingRegionName) }
     private var tonnes: String? { Exchange.tonnes(thread.listingQuantityTonnes) }
     private var seller: String? { thread.sellerDisplayName?.recorded }
     private var time: String { BgDate.messageTime(thread.lastMessageAt) }
+    private var siblingNote: String? { siblings.map(ExchangeInbox.siblingNote) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -127,6 +140,14 @@ struct InboxRow: View {
             }
             .font(.footnote)
             .foregroundStyle(Palette.secondaryText)
+            // Its own line, not one more fact in the meta row: it is the one
+            // thing that says two otherwise identical rows are two people.
+            if let siblingNote {
+                Label(siblingNote, systemImage: "person.2")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text(time)
                 .font(.footnote)
                 .foregroundStyle(Palette.secondaryText)
@@ -144,6 +165,7 @@ struct InboxRow: View {
                 region,
                 tonnes.map { "\($0) \(thread.quantity == 1 ? "тон" : "тона")" },
                 seller,
+                siblingNote,
                 time,
             ]),
             saying: A11y.spokenNames(CommodityName.canonical(thread.commodity), thread.commodity)

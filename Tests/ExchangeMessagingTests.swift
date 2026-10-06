@@ -112,7 +112,8 @@ final class ExchangeMessagingModelTests: XCTestCase {
     func testTheInboxDecodesEveryHardCase() async throws {
         let page = try await ExchangeAPI.decodeThreads(from: try fixture("exchange-threads"))
         XCTAssertNil(page.nextCursor)
-        XCTAssertEqual(page.threads.map(\.id), ["thr_synthetic_1", "thr_synthetic_2", "thr_synthetic_3"])
+        XCTAssertEqual(page.threads.map(\.id),
+                       ["thr_synthetic_1", "thr_synthetic_4", "thr_synthetic_2", "thr_synthetic_3"])
 
         let first = page.threads[0]
         XCTAssertEqual(first.commodity, "wheat", "listingCommodity decodes into `commodity`")
@@ -122,14 +123,20 @@ final class ExchangeMessagingModelTests: XCTestCase {
         XCTAssertFalse(first.closed)
         XCTAssertEqual(first.quantity, Decimal(string: "250"))
 
-        let second = page.threads[1]
+        // #1323: a second person's thread on the SAME listing is its own row.
+        let sameListing = page.threads[1]
+        XCTAssertEqual(sameListing.listingId, first.listingId)
+        XCTAssertNotEqual(sameListing.id, first.id)
+        XCTAssertFalse(sameListing.hasUnread)
+
+        let second = page.threads[2]
         XCTAssertNil(second.sellerDisplayName, "present-and-null is a value, not a failure")
         XCTAssertEqual(second.role, .inquirer)
         XCTAssertTrue(second.closed)
         XCTAssertEqual(second.listingQuantityTonnes, "12.5")
         XCTAssertEqual(second.quantity, Decimal(string: "12.5"))
 
-        XCTAssertEqual(page.threads[2].role, .unknown,
+        XCTAssertEqual(page.threads[3].role, .unknown,
                        "a role this build does not know degrades; it does not fail the inbox")
     }
 
@@ -139,11 +146,12 @@ final class ExchangeMessagingModelTests: XCTestCase {
         XCTAssertTrue(thread.blocked)
         XCTAssertFalse(thread.closed)
         XCTAssertNil(thread.olderCursor)
-        XCTAssertEqual(thread.unreadCount, 1)
+        XCTAssertEqual(thread.unreadCount, 2)
         XCTAssertEqual(thread.messages.map(\.id),
-                       ["msg_synthetic_1", "msg_synthetic_2", "msg_synthetic_3", "msg_synthetic_4"])
+                       ["msg_synthetic_1", "msg_synthetic_2", "msg_synthetic_5",
+                        "msg_synthetic_3", "msg_synthetic_4"])
 
-        let tombstone = thread.messages[2]
+        let tombstone = thread.messages[3]
         XCTAssertTrue(tombstone.deleted)
         XCTAssertNil(tombstone.body)
         XCTAssertTrue(tombstone.isTombstone)
@@ -155,6 +163,62 @@ final class ExchangeMessagingModelTests: XCTestCase {
         XCTAssertEqual(mine.body, "Да, 250 т.\nМоже оглед в четвъртък.", "newlines survive")
 
         XCTAssertFalse(thread.messages[0].mayRetract, "never on the other farm's message")
+    }
+
+    /// agri-saas #1323: the fixture holds all three speakers, and the two new
+    /// fields decode from it.
+    func testTheConversationHasAllThreeSpeakers() async throws {
+        let thread = try await ExchangeAPI.decodeThread(from: try fixture("exchange-thread"))
+        let byID = Dictionary(uniqueKeysWithValues: thread.messages.map { ($0.id, $0) })
+
+        let me = try XCTUnwrap(byID["msg_synthetic_2"])
+        XCTAssertEqual(me.speaker, .me)
+        XCTAssertEqual(me.senderUserId, "usr_synthetic_creator")
+
+        let colleague = try XCTUnwrap(byID["msg_synthetic_5"])
+        XCTAssertTrue(colleague.fromMyFarm)
+        XCTAssertFalse(colleague.mine)
+        XCTAssertEqual(colleague.speaker, .colleague)
+        XCTAssertEqual(colleague.senderUserId, "usr_synthetic_admin")
+        XCTAssertFalse(colleague.mayRetract, "a colleague's words are not mine to retract")
+
+        let other = try XCTUnwrap(byID["msg_synthetic_1"])
+        XCTAssertEqual(other.speaker, .counterparty)
+        XCTAssertEqual(Set(thread.messages.map(\.speaker)), Set(MessageSpeaker.allCases))
+    }
+
+    /// A server from before #1323 sends neither field. The message still
+    /// decodes, and reads as that server meant it: no colleague (a colleague's
+    /// message arrived as `mine` there).
+    func testAMessageFromBeforeTheChangeStillDecodes() async throws {
+        let json = #"{"id":"m","senderTenantId":"x","mine":false,"body":"Да","deleted":false,"createdAt":"2026-09-28T09:15:00Z"}"#
+        let message = try await APIClient.shared.decode(Data(json.utf8), as: ExchangeMessage.self)
+        XCTAssertNil(message.senderUserId)
+        XCTAssertFalse(message.fromMyFarm)
+        XCTAssertEqual(message.speaker, .counterparty)
+    }
+
+    /// The two fields, present: decoded as sent.
+    func testTheNewFieldsDecode() async throws {
+        let json = #"{"id":"m","senderTenantId":"x","senderUserId":"u9","mine":false,"fromMyFarm":true,"body":"Да","deleted":false,"createdAt":"2026-09-28T09:15:00Z"}"#
+        let message = try await APIClient.shared.decode(Data(json.utf8), as: ExchangeMessage.self)
+        XCTAssertEqual(message.senderUserId, "u9")
+        XCTAssertTrue(message.fromMyFarm)
+        XCTAssertEqual(message.speaker, .colleague)
+    }
+
+    /// A retract keeps who said it: a tombstone of a colleague's message is
+    /// still the colleague's.
+    func testATombstoneKeepsItsSpeaker() {
+        let t0 = Date(timeIntervalSince1970: 1_790_000_000)
+        var conversation = Conversation(ExchangeThread(
+            id: "t1", listingId: "l1", commodity: "wheat", role: .seller,
+            lastMessageAt: t0, closed: false, blocked: false, unreadCount: nil, olderCursor: nil,
+            messages: [ExchangeMessage(id: "a", senderTenantId: nil, senderUserId: "u2", mine: false,
+                                       fromMyFarm: true, body: "х", deleted: false, createdAt: t0)]))
+        conversation.tombstone("a")
+        XCTAssertEqual(conversation.messages[0].speaker, .colleague)
+        XCTAssertEqual(conversation.messages[0].senderUserId, "u2")
     }
 
     /// A body null on a message NOT marked deleted is a contract break; it
@@ -177,12 +241,16 @@ final class ExchangeMessagingModelTests: XCTestCase {
     }
 
     /// Side-neutral: the payloads carry no listing side, and on a BUY listing
-    /// the `seller` role is the one buying.
+    /// the `seller` role is the one buying. And farm-level since #1323: the
+    /// role is my FARM's side, and «Вие» / «Ваш» is the person now — an admin
+    /// on a colleague's listing does not own it, and a buyer-side admin on a
+    /// colleague's thread is not the one asking.
     func testRoleLabelsAreSideNeutral() {
-        XCTAssertEqual(ExchangeThreadRole.seller.label, "Вашата обява")
-        XCTAssertEqual(ExchangeThreadRole.inquirer.label, "Вие питате")
+        XCTAssertEqual(ExchangeThreadRole.seller.label, "Наша обява")
+        XCTAssertEqual(ExchangeThreadRole.inquirer.label, "Наше запитване")
         for role in ExchangeThreadRole.allCases {
             XCTAssertFalse(role.label.contains("продава"), role.label)
+            XCTAssertFalse(role.label.contains("Вие") || role.label.contains("Ваш"), role.label)
         }
         XCTAssertTrue(ExchangeThreadRole.seller.ownsListing)
         XCTAssertFalse(ExchangeThreadRole.inquirer.ownsListing)
@@ -384,7 +452,7 @@ final class ConversationMergeTests: XCTestCase {
         XCTAssertEqual(conversation.messages.map(\.id), ["a", "b", "c"])
         XCTAssertEqual(arrival.new.map(\.id), ["c"])
         XCTAssertFalse(arrival.discontinuous)
-        XCTAssertTrue(arrival.fromOtherParty)
+        XCTAssertTrue(arrival.fromSomeoneElse)
     }
 
     /// THE WEB'S BUG, NOT COPIED: once older pages are loaded, a poll's newest
@@ -490,12 +558,18 @@ final class ConversationMergeTests: XCTestCase {
         XCTAssertEqual(conversation.messages.map(\.id), ["a", "b"])
     }
 
-    /// Only the OTHER farm's arrivals are what marking read is for; a
-    /// tombstone from them counts, because it still moved `lastMessageAt`.
+    /// Anyone's arrivals but mine are what marking read is for — a
+    /// colleague's included since #1323, because the pointer is the person's
+    /// and `hasUnread` does not look at who wrote. A tombstone counts, because
+    /// it still moved `lastMessageAt`.
     func testWhoseArrivalItIs() {
-        XCTAssertFalse(Conversation.Arrival(new: [message("m", at: 0, mine: true)]).fromOtherParty)
-        XCTAssertTrue(Conversation.Arrival(new: [message("m", at: 0, deleted: true)]).fromOtherParty)
-        XCTAssertFalse(Conversation.Arrival(new: []).fromOtherParty)
+        XCTAssertFalse(Conversation.Arrival(new: [message("m", at: 0, mine: true)]).fromSomeoneElse)
+        XCTAssertTrue(Conversation.Arrival(new: [message("m", at: 0, deleted: true)]).fromSomeoneElse)
+        XCTAssertFalse(Conversation.Arrival(new: []).fromSomeoneElse)
+        let colleague = ExchangeMessage(id: "c", senderTenantId: nil, mine: false, fromMyFarm: true,
+                                        body: "х", deleted: false, createdAt: t0)
+        XCTAssertTrue(Conversation.Arrival(new: [colleague]).fromSomeoneElse,
+                      "a colleague's reply would otherwise leave «Ново» on my row")
     }
 }
 

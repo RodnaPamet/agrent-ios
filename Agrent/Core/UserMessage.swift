@@ -409,25 +409,38 @@ enum UserMessage {
         // messaging payload says which. So «собственикът на обявата», never
         // «продавачът», in a refusal that can meet either.
         //
-        // FARM, not person, where the server checks the farm. Retract and the
-        // read pointer are per tenant: a colleague's message is "yours" to
-        // remove.
+        // PERSON or FARM, whichever the server checks — and since agri-saas
+        // #1323 (#1298) that differs by rule, so each sentence names the one
+        // its code means. «Вие» is the PERSON: the conversation's audience,
+        // retract (`MESSAGE_NOT_SENDER` compares the sender) and the read
+        // pointer are per person. The FARM stays where the check is still a
+        // farm's: your own listing (`THREAD_OWN_LISTING` compares tenants, so
+        // a colleague's listing counts) and the block, which is farm-to-farm
+        // until #1314. No sentence says «блокирахте това стопанство»; see
+        // `MessagingPolicy.blockedNotice`.
         //
         // NOTHING SAYS «В ТОЗИ РАЗГОВОР» about a limit. The send budget is
         // the whole farm's, sixty a minute across every thread and device,
         // and a 429 is said by status anyway — see `httpText`.
         //
         // Not the found-or-not-visible distinction: `THREAD_NOT_FOUND` is
-        // also what a farm that is not a party gets (row-level security hides
-        // the row), so it does not claim the conversation was deleted.
-        "THREAD_NOT_FOUND": "Разговорът не е намерен или не е достъпен за Вашето стопанство.",
+        // what anyone outside the conversation's audience gets, a colleague
+        // at a party farm included (a 404, not a 403, so it cannot leak that
+        // a colleague is talking to someone). So it neither claims the
+        // conversation was deleted nor names a colleague. The conversation
+        // screen does not show this sentence — a 404 there is its own state,
+        // `ConversationAvailability` — but the listing's «Съобщение до …»
+        // can still meet it.
+        "THREAD_NOT_FOUND": "Разговорът не е намерен или не е достъпен за Вас.",
         // Defensive server-side and unreachable while its row-level security
         // holds; worded so that it is true if it ever fires.
         "THREAD_NOT_A_PARTY": "Вашето стопанство не е участник в разговора.",
         "BLOCK_SELLER_ONLY": "Само собственикът на обявата може да блокира или отблокира.",
         "LISTING_NOT_FOUND": "Обявата не беше намерена.",
-        "THREAD_OWN_LISTING": "Не можете да започнете разговор по собствената си обява.",
-        "THREAD_BLOCKED": "Собственикът на обявата не приема съобщения от Вашето стопанство.",
+        "THREAD_OWN_LISTING": "Не можете да започнете разговор по обява на Вашето стопанство.",
+        // True under the farm-level block of today and the person-level one
+        // of #1314 alike: you are refused either way.
+        "THREAD_BLOCKED": "Собственикът на обявата не приема съобщения от Вас.",
         // Reached only when the server's sanitiser strips a draft the app
         // thought had text — `<ivan@abv.bg>` is a tag to it — because the
         // composer does not send a blank one.
@@ -437,7 +450,7 @@ enum UserMessage {
         // its own counter near it.
         "MESSAGE_TOO_LONG": "Съобщението е твърде дълго. Съкратете го и опитайте отново.",
         "MESSAGE_NOT_FOUND": "Съобщението не беше намерено.",
-        "MESSAGE_NOT_SENDER": "Можете да премахвате само съобщения, изпратени от Вашето стопанство.",
+        "MESSAGE_NOT_SENDER": "Можете да премахвате само съобщения, които сте изпратили Вие.",
 
         // Batch 1.
         "CROP_PLAN_NOT_READY": "Планът за културите не е готов.",

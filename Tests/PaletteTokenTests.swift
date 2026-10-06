@@ -61,6 +61,12 @@ final class PaletteTokenTests: XCTestCase {
         ("activity chip", Palette.Chip.activityText, Palette.Chip.activityFill, [6.53, 6.79, 7.43]),
         ("neutral chip", Palette.Chip.neutralText, Palette.Chip.neutralFill, [7.48, 6.51, 10.43]),
         ("avatar", Palette.Avatar.ink, Palette.Avatar.fill, [8.45, 5.21, 6.19]),
+        // The three speakers of a conversation (agri-saas #1323). Bubble text
+        // is body size, so 4.5:1. The other side's pair was "measured by
+        // nobody" before this (ROADMAP's device checks); it is measured here.
+        ("my bubble", Palette.Bubble.mineInk, Palette.Bubble.mineFill, [8.45, 5.21, 5.21]),
+        ("colleague's bubble", Palette.Bubble.colleagueInk, Palette.Bubble.colleagueFill, [7.33, 5.29, 5.83]),
+        ("other side's bubble", Palette.Bubble.theirsInk, Palette.Bubble.theirsFill, [13.57, 17.50, 19.26]),
         // P2.8 solid surfaces: everything written on a bar. `Color.primary`
         // is what the composer, the outbox banner, the map's target glyph
         // and the index chips write in; `secondaryText` is the unselected
@@ -134,6 +140,20 @@ final class PaletteTokenTests: XCTestCase {
         let rejected = Self.contrast(Color(token: AgrentColor.brandMuted), on: Palette.Chip.inputFill, Self.light)
         XCTAssertEqual(rejected, 1.71, accuracy: 0.02)
         XCTAssertLessThan(rejected, 4.5)
+    }
+
+    /// The three bubbles are three OBJECTS, not one colour three times: in
+    /// every arm each pair of fills differs, and the colleague's edge is a
+    /// non-text boundary at 3:1 or more against the page it sits on.
+    func testTheThreeBubblesAreTellableApart() {
+        for (traits, arm) in zip([Self.dark, Self.light, Self.sunlight], ["dark", "light", "«Слънце»"]) {
+            let page = Self.rgba(Palette.Surface.page, traits)
+            let fills = [Palette.Bubble.mineFill, Palette.Bubble.colleagueFill, Palette.Bubble.theirsFill]
+                .map { Self.over(Self.rgba($0, traits), page) }
+            XCTAssertEqual(Set(fills).count, 3, "\(arm): two bubbles share a fill")
+            let edge = Self.contrast(Palette.Bubble.colleagueEdge, on: Palette.Surface.page, traits)
+            XCTAssertGreaterThanOrEqual(edge, 3, "\(arm): the colleague's edge \(edge)")
+        }
     }
 
     /// Increase Contrast must RAISE the avatar's ratio in light, not just

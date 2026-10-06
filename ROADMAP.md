@@ -163,14 +163,27 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   - **device-only checks, none done:** Борса's four sections as a row of
     chips on a phone (measured in the simulator only: four segments ask for
     464pt, a phone has 370, so the chips take over) and at the
-    accessibility sizes; the bubble colours — «Вие» is `Palette.onAccent` on
-    `Palette.accent`, a measured pair, but the other party's is the primary
-    label colour on `Palette.Chip.neutralFill`, measured by nobody, in light,
-    dark and Increase Contrast; the scroll to the newest message, with and
+    accessibility sizes; the three bubbles (#1323) side by side on a real
+    screen in sunlight — all three pairs are now MEASURED
+    (`Palette.Bubble`, `PaletteTokenTests`), but whether a colleague's gold
+    tint reads apart from the other side's neutral tint at arm's length is a
+    device question; the scroll to the newest message, with and
     without Reduce Motion; the tab badge and the app menu row's «Борса (N)»;
     Voice Control telling «Изпрати съобщението» / "Send message" apart from
     the outbox banner's «Изпрати» / "Send"; the composer above the keyboard
     and the tab bar at the accessibility sizes.
+- **Private conversations (agri-saas #1323, #1298) — adopted from the spec,
+  never seen on the wire.** `senderUserId` / `fromMyFarm`, the per-person
+  `mine`, `unreadCount` and `hasUnread`, several threads per buyer farm and
+  the audience's 404 are read out of `openapi.json` and
+  `exchange-messaging.ts` at 7af43f9 and exercised only on synthetic
+  fixtures. Unverified: a real colleague's message carrying `fromMyFarm`;
+  the 404 state reached from a stale inbox (the seam answers unknown
+  threads 501, not 404, so A11yShots cannot photograph it — it is held by
+  unit tests); the sibling note on a real inbox. **Server follow-ups**,
+  recorded in PARITY Gap 7: a sender name for same-farm senders; something
+  per thread to tell sibling inbox rows apart; the person-level block
+  (#1314), after which the block strings need re-reading.
 
 ## Decisions locked
 

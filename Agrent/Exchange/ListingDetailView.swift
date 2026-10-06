@@ -52,7 +52,7 @@ struct ListingDetailView: View {
 
             if listing.isOwn {
                 Section {
-                    Text("Това е ваша обява.")
+                    Text("Това е обява на Вашето стопанство.")
                         .font(.footnote)
                         .foregroundStyle(Palette.secondaryText)
                 }

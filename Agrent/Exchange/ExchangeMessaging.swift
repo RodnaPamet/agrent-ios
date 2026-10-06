@@ -5,19 +5,22 @@ import Foundation
 // URLProtocol seam and cannot observe an outgoing header, so a rule that
 // lived inside a store would be a rule nothing checks.
 //
-// Five of them: the send key's lifecycle, what a sendable body is, how pages
-// of a conversation merge, when to mark a conversation read, and what the
-// unread badge counts.
+// Six of them: the send key's lifecycle, what a sendable body is, how pages
+// of a conversation merge, when to mark a conversation read, what the unread
+// badge counts (and which inbox rows share a listing), and when a
+// conversation is not available to the person at all (#1323).
 
 // MARK: - The send key
 
 /// An `Idempotency-Key` for ONE logical send.
 ///
 /// A type rather than a `String` so the only way to get one is to mint it.
-/// The server matches a replay on (sending farm, key) alone — not the thread,
-/// not the text — so a key derived from the text would make the same «Да» in
-/// two threads one message, and an empty key probably answers 409 on the
-/// farm's next empty-key send. Neither can be built from this.
+/// The server matches a replay on (sending PERSON, key) alone — the farm
+/// until #1323, when two colleagues' per-device keys could collide and one
+/// send silently dedupe into the other's — not the thread, not the text. So
+/// a key derived from the text would make the same «Да» in two threads one
+/// message, and an empty key probably answers 409 on the next empty-key
+/// send. Neither can be built from this.
 struct MessageSendKey: Equatable, Sendable {
     let value: String
 
@@ -210,11 +213,19 @@ struct Conversation: Equatable, Sendable {
         /// Scrollback is lost and walkable again through `olderCursor`.
         var discontinuous: Bool = false
 
-        /// New messages from the OTHER farm — the ones marking read is for.
+        /// New messages from ANYONE BUT ME — the ones marking read is for.
+        ///
+        /// Since #1323 that includes a colleague. The read pointer is the
+        /// person's, and the inbox computes `hasUnread` as `lastMessageAt >
+        /// my pointer` whoever wrote, so a colleague's reply arriving on
+        /// screen leaves «Ново» behind unless it is marked like the other
+        /// side's. (Before #1323 a colleague's message was `mine`, and the
+        /// farm's shared pointer moved with their send.)
+        ///
         /// A tombstone counts: a message sent and retracted between two polls
         /// still moved `lastMessageAt`, so the inbox marks the thread unread
         /// until the pointer passes it.
-        var fromOtherParty: Bool { new.contains { !$0.mine } }
+        var fromSomeoneElse: Bool { new.contains { !$0.mine } }
     }
 
     /// Merge a NEWEST page — a poll, or the refetch after a send or a mark.
@@ -274,8 +285,9 @@ struct Conversation: Equatable, Sendable {
             guard message.id == messageID else { return message }
             return ExchangeMessage(
                 id: message.id, senderTenantId: message.senderTenantId,
-                mine: message.mine, body: nil, deleted: true,
-                createdAt: message.createdAt
+                senderUserId: message.senderUserId,
+                mine: message.mine, fromMyFarm: message.fromMyFarm,
+                body: nil, deleted: true, createdAt: message.createdAt
             )
         }
     }
@@ -302,9 +314,13 @@ struct Conversation: Equatable, Sendable {
 ///
 /// The web marks once per page mount. Here (owner decision, 2026-09-29) it
 /// marks after the FIRST successful load, and AGAIN whenever a poll brings a
-/// message from the other farm while the conversation is on screen — a farmer
-/// looking at the message has read it, and «Ново» on the inbox row afterwards
-/// would be wrong.
+/// message from anyone but me — the other side or, since #1323, a colleague —
+/// while the conversation is on screen. A farmer looking at the message has
+/// read it, and «Ново» on the inbox row afterwards would be wrong.
+///
+/// The pointer is MINE since #1323. Marking used to move it for every member
+/// of the farm; now it moves only the caller's, so opening a conversation no
+/// longer clears a colleague's «Ново».
 ///
 /// ── Not gated on `unreadCount` ──
 ///
@@ -329,7 +345,7 @@ struct ReadMarking: Equatable, Sendable {
             markedOnce = true
             return true
         }
-        return arrival.fromOtherParty
+        return arrival.fromSomeoneElse
     }
 
     /// The first load, which has no `Arrival` of its own.
@@ -364,7 +380,84 @@ enum ExchangeInbox {
     /// inbox rows do not carry.
     ///
     /// `hasUnread`, not `unreadCount`, for the reason `ReadMarking` gives.
+    ///
+    /// MY count since #1323: `hasUnread` is per person, so a colleague
+    /// reading a thread no longer lowers my badge, and two colleagues' badges
+    /// can differ — they hold different inboxes.
     static func unreadCount(_ threads: [ExchangeThreadSummary]) -> Int {
         threads.reduce(0) { $0 + ($1.hasUnread ? 1 : 0) }
     }
+
+    /// For each row, how many rows in this inbox are on the SAME LISTING —
+    /// only where that is more than one.
+    ///
+    /// ── Why, and why only this ──
+    ///
+    /// A thread is per (listing, inquirer PERSON) since #1323, so a listing's
+    /// owner may hold several rows on one listing — from different people,
+    /// possibly at one buyer farm — and a buyer-side admin may see a
+    /// colleague's thread beside their own. The rows carry the LISTING
+    /// (commodity, region, tonnes, the owner's public name) and nothing about
+    /// the other person: on the seller side that is deliberate, because the
+    /// buyer's identity sits behind the inquiry contact-reveal gate. So two
+    /// such rows are identical but for their time and «Ново».
+    ///
+    /// What the app CAN say truthfully is that a row is one of several on
+    /// that listing — separate conversations, never to be merged — and that
+    /// is all this computes. Numbering them («разговор 1», «разговор 2») is
+    /// not possible honestly: the rows move with every message, and there is
+    /// no stable order to number by. A per-thread label from the server is a
+    /// follow-up (PARITY Gap 7).
+    ///
+    /// Within the loaded page only — the server's first hundred, which is
+    /// all the inbox shows.
+    static func siblings(_ threads: [ExchangeThreadSummary]) -> [String: Int] {
+        let perListing = Dictionary(grouping: threads, by: \.listingId)
+        var counts: [String: Int] = [:]
+        for rows in perListing.values where rows.count > 1 {
+            for row in rows { counts[row.id] = rows.count }
+        }
+        return counts
+    }
+
+    /// The line a row with siblings carries, and VoiceOver says.
+    static func siblingNote(_ count: Int) -> String {
+        "Един от \(count) разговора по тази обява"
+    }
+}
+
+// MARK: - A conversation that is not there
+
+/// Whether a failure means "this conversation is not available to you".
+///
+/// ── 404, and only 404 ──
+///
+/// Since #1323 a conversation is private to its people. Anyone outside its
+/// audience — a colleague at a party farm included — gets 404
+/// `THREAD_NOT_FOUND`, not 403: the row is invisible to them at the database
+/// level, so the server cannot tell "not yours" from "does not exist", and
+/// must not, or it would leak that a colleague is talking to someone.
+///
+/// The app meets it when a conversation is opened from a stale inbox, from a
+/// link, or after the person's role at the farm changed under an open
+/// screen. That is not an error a retry fixes, so it gets its own state
+/// rather than the server-error one and its «Опитай отново».
+///
+/// The status alone decides, not the code: every 404 the thread routes can
+/// give means the same thing to the person, and a renamed code must not
+/// turn this back into a generic failure.
+enum ConversationAvailability {
+    static func isUnavailable(_ error: Error) -> Bool {
+        if case APIClient.APIError.http(let status, _, _, _, _) = error {
+            return status == 404
+        }
+        return false
+    }
+
+    static let title = "Разговорът не е достъпен"
+
+    /// Both possibilities, because the server cannot say which — and neither
+    /// names a colleague or claims the conversation was deleted.
+    static let message = "Този разговор не е достъпен за Вас. Възможно е да е между други хора "
+        + "от стопанството или вече да не съществува."
 }

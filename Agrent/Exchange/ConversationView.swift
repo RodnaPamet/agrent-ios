@@ -7,8 +7,9 @@ import SwiftUI
 ///
 /// Built, wired, and never sent. Writing to another farm is the owner's act,
 /// the same standing decision as `createListing` — and merely OPENING this
-/// screen marks the conversation read for every member of the farm. So no
-/// real conversation has been opened from development. The screenshot harness
+/// screen marks the conversation read (the person's own pointer since
+/// agri-saas #1323, still a production write). So no real conversation has
+/// been opened from development. The screenshot harness
 /// photographs this screen only because it runs on the fixture seam (#115):
 /// it opens `thr_synthetic_1`, the mark-read POST is answered `501
 /// WRITE_REFUSED` before a socket opens, and nothing is tapped after that.
@@ -68,16 +69,24 @@ struct ConversationView: View {
             guard scenePhase == .active else { return }
             await store.run()
         }
-        .alert("Да блокирате ли това стопанство?", isPresented: $confirmingBlock) {
+        // A 404 can arrive on a POLL, under a conversation someone is
+        // reading: the list vanishes and VoiceOver's focus goes with it, so
+        // the reason is said rather than left to be found.
+        .onChange(of: store.unavailable) { _, unavailable in
+            guard unavailable else { return }
+            AccessibilityNotification.Announcement(ConversationAvailability.title).post()
+        }
+        .alert("Да блокирате ли другата страна?", isPresented: $confirmingBlock) {
             Button("Блокирай", role: .destructive) { Task { await store.setBlocked(true) } }
             Button("Отказ", role: .cancel) {}
         } message: {
-            // THE CONFIRMATION IS FOR THIS SENTENCE. A block is stored once
-            // per pair of farms, so pressing it here silences that farm on
-            // every listing of yours — the web does it in one tap and never
-            // says so.
-            Text("Блокирането важи за всички Ваши обяви, не само за този разговор. "
-                 + "Стопанството няма да може да Ви пише, докато не го отблокирате.")
+            // THE CONFIRMATION IS FOR THIS SENTENCE. A block is still stored
+            // once per pair of farms (#1323 did not move it; #1314 will), so
+            // pressing it here silences every person at the other farm on
+            // every listing of this farm — the web does it in one tap and
+            // never says so. Worded as what happens, not as "this farm":
+            // see `MessagingPolicy.blockedNotice`.
+            Text(MessagingPolicy.blockConfirmation)
         }
         .alert("Да премахнете ли съобщението?", isPresented: $confirmingRetract,
                presenting: retracting) { message in
@@ -92,7 +101,16 @@ struct ConversationView: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.conversation != nil {
+        if store.unavailable {
+            // NOT the error state: a 404 is the server saying this person
+            // may not read it (#1323), and «Опитай пак» would only ask again.
+            // A lock, not a warning triangle — a state, never red.
+            EmptyState(
+                ConversationAvailability.title,
+                icon: "lock",
+                message: ConversationAvailability.message
+            )
+        } else if store.conversation != nil {
             messageList
                 .safeAreaInset(edge: .bottom, spacing: 0) { footer }
         } else if let failure = store.loadFailure {
@@ -150,7 +168,7 @@ struct ConversationView: View {
             //
             // To `end`, not to the message itself: the notices sit after the
             // newest message, and anchoring the message to the bottom edge
-            // would leave «блокирахте…» just out of sight under the composer.
+            // would leave the blocked notice just out of sight under the composer.
             .onChange(of: store.messages.last?.id) { old, new in
                 guard new != nil else { return }
                 scrollToEnd(proxy, animated: old != nil)
@@ -380,12 +398,16 @@ struct ConversationView: View {
 
 /// One message, or its tombstone.
 ///
-/// ── Colours, from `Palette` only ──
+/// ── Three speakers since agri-saas #1323 ──
 ///
-/// Mine: `accent` under `onAccent`, a pair measured in `Palette` (5.83:1
-/// light, 8.73:1 dark). Theirs: the neutral chip fill under the primary label
-/// colour — not measured as a pair here; see ROADMAP.md's device checks.
-/// Under Increase Contrast each bubble gets an edge, as `CategoryChip` does,
+/// Me, a colleague at my farm, and the other side — `MessageSpeaker`. Each
+/// has its own caption and its own bubble (`Palette.Bubble`, where the three
+/// pairs are measured): me solid gold, a colleague a gold tint with a gold
+/// edge, both on the trailing side because both wrote for my farm; the other
+/// side a neutral tint on the leading side. The caption says who in words,
+/// so neither side nor colour is the only channel.
+///
+/// Under Increase Contrast every bubble gets an edge, as `CategoryChip` does,
 /// so a pale fill on a pale page is still an object.
 struct MessageBubble: View {
     let message: ExchangeMessage
@@ -394,32 +416,34 @@ struct MessageBubble: View {
 
     @Environment(\.colorSchemeContrast) private var contrast
 
-    private var sender: String { message.mine ? "Вие" : "Отсрещната страна" }
+    private var speaker: MessageSpeaker { message.speaker }
     private var time: String { BgDate.messageTime(message.createdAt) }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 0) {
-            if message.mine { Spacer(minLength: 48) }
-            VStack(alignment: message.mine ? .trailing : .leading, spacing: 4) {
-                // No names: the author is a FARM, and a colleague's message
-                // is `mine` too.
-                Text("\(sender), \(time)")
+            if speaker.isOurSide { Spacer(minLength: 48) }
+            VStack(alignment: speaker.isOurSide ? .trailing : .leading, spacing: 4) {
+                // No personal names: the payload carries none, only an
+                // opaque sender id (a server follow-up, PARITY Gap 7).
+                Text("\(speaker.label), \(time)")
                     .font(.caption)
                     .foregroundStyle(Palette.secondaryText)
                 bubble
             }
-            if !message.mine { Spacer(minLength: 48) }
+            if !speaker.isOurSide { Spacer(minLength: 48) }
         }
-        // ONE element, spoken from the values — who, what, when.
+        // ONE element, spoken from the values — who, what, when. The speaker
+        // first, so a colleague's words are never heard as the reader's own.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(A11y.sentence([sender, bodyText, time]))
+        .accessibilityLabel(MessageBubble.spoken(speaker: speaker, body: bodyText, time: time))
         .accessibilityActions {
             if mayRetract {
                 Button("Премахни", action: onRetract)
             }
         }
-        // Long-press on the bubble. Only on this farm's own, still-present
-        // messages; an empty menu is no menu.
+        // Long-press on the bubble. Only on MY OWN still-present messages
+        // (never a colleague's: the server checks the person since #1323);
+        // an empty menu is no menu.
         .contextMenu {
             if mayRetract {
                 Button(role: .destructive, action: onRetract) {
@@ -432,6 +456,39 @@ struct MessageBubble: View {
 
     private var bodyText: String {
         message.isTombstone ? "Съобщението е премахнато" : (message.body ?? "")
+    }
+
+    /// The VoiceOver sentence: «Колега от стопанството, Може и в петък., 09:00».
+    /// A static function so a test can hold it per speaker without a view.
+    static func spoken(speaker: MessageSpeaker, body: String, time: String) -> String {
+        A11y.sentence([speaker.label, body, time])
+    }
+
+    private var fill: Color {
+        switch speaker {
+        case .me: Palette.Bubble.mineFill
+        case .colleague: Palette.Bubble.colleagueFill
+        case .counterparty: Palette.Bubble.theirsFill
+        }
+    }
+
+    private var ink: Color {
+        switch speaker {
+        case .me: Palette.Bubble.mineInk
+        case .colleague: Palette.Bubble.colleagueInk
+        case .counterparty: Palette.Bubble.theirsInk
+        }
+    }
+
+    /// The colleague's edge is drawn ALWAYS — it is what separates a tinted
+    /// gold bubble from the other side's tint at a glance. The other two get
+    /// one under Increase Contrast only.
+    private var edge: Color? {
+        switch speaker {
+        case .colleague: Palette.Bubble.colleagueEdge
+        case .me: contrast == .increased ? Palette.accentDeep : nil
+        case .counterparty: contrast == .increased ? Palette.secondaryText : nil
+        }
     }
 
     @ViewBuilder
@@ -451,17 +508,14 @@ struct MessageBubble: View {
             // markdown, never a `LocalizedStringKey`: `**` in a message is two
             // asterisks somebody typed.
             Text(verbatim: message.body ?? "")
-                .foregroundStyle(message.mine ? Palette.onAccent : Color.primary)
+                .foregroundStyle(ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(message.mine ? Palette.accent : Palette.Chip.neutralFill, in: shape)
+                .background(fill, in: shape)
                 .overlay {
-                    if contrast == .increased {
-                        shape.strokeBorder(
-                            message.mine ? Palette.accentDeep : Palette.secondaryText,
-                            lineWidth: 1
-                        )
+                    if let edge {
+                        shape.strokeBorder(edge, lineWidth: speaker == .colleague ? 1.5 : 1)
                     }
                 }
         }
