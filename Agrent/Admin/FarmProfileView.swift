@@ -372,6 +372,8 @@ struct FarmProfileEditView: View {
                     ForEach(FarmProfileText.allCases, id: \.self) { field in
                         if field == .egn {
                             egnEditor
+                        } else if !field.isWritable {
+                            readOnlyField(field)
                         } else {
                             textEditor(field)
                         }
@@ -437,7 +439,43 @@ struct FarmProfileEditView: View {
     /// LEARNS what is typed into a field that allows it, and offers it back
     /// as a suggestion elsewhere — a state identifier has no business in the
     /// predictive dictionary.
-    private static let identifiers: Set<FarmProfileText> = [.egn, .eik, .urn, .registrationEkatte]
+    /// (The ЕИК is an identifier too, but it is never typed into here.)
+    private static let identifiers: Set<FarmProfileText> = [.egn, .urn, .registrationEkatte]
+
+    /// The ЕИК: SHOWN, in its place in the web's order, and NOT EDITABLE
+    /// (agri-saas#1352). The server refuses any body carrying it; only
+    /// Agrent staff write it, by verifying the farm's identity claim.
+    ///
+    /// Read from `original`, not the draft, so a reload after a 409 shows
+    /// the ЕИК stored NOW — a verification may have landed meanwhile. No
+    /// verification state (PENDING / VERIFIED) is shown because no response
+    /// exposes one; inventing it from the presence of a value would be a
+    /// claim the server never made.
+    @ViewBuilder
+    private func readOnlyField(_ field: FarmProfileText) -> some View {
+        let value = original[keyPath: field.wire] ?? ""
+        VStack(alignment: .leading, spacing: 4) {
+            Text(field.label)
+                .font(.footnote).foregroundStyle(Palette.secondaryText)
+            Text(value.isEmpty ? "—" : value)
+                .font(.body.monospacedDigit())
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            if let hint = field.hint {
+                Text(hint).font(.caption).foregroundStyle(Palette.secondaryText)
+            }
+            Text(FarmProfileText.eikReadOnlyNote)
+                .font(.caption).foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        // One element, read as label, value and why it cannot be changed —
+        // and with no editing trait, so VoiceOver does not offer a field
+        // that is not one. An empty ЕИК is said as such, not as «тире».
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(field.label)
+        .accessibilityValue(value.isEmpty ? "не е попълнено" : value)
+        .accessibilityHint(FarmProfileText.eikReadOnlyNote)
+    }
 
     @ViewBuilder
     private func textEditor(_ field: FarmProfileText) -> some View {

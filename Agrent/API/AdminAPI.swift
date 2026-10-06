@@ -123,9 +123,12 @@ enum AdminAPI {
     /// with the NEW `version`, so the next save needs no re-GET.
     ///
     /// MERGE SEMANTICS since agri-saas#1176/#1181: an absent key is left
-    /// alone and an explicit null clears. `FarmProfileUpdate` still encodes
-    /// all thirteen — correct either way, and it does not depend on which
-    /// server build answers. Build it with `FarmProfileUpdate.build`.
+    /// alone and an explicit null clears. `FarmProfileUpdate` encodes every
+    /// writable key — twelve, correct either way, and it does not depend on
+    /// which server build answers. NEVER `eik`: the route refuses any body
+    /// carrying it with FARM_PROFILE_EIK_NOT_EDITABLE (agri-saas#1352), and
+    /// absent leaves the stored ЕИК alone. Build it with
+    /// `FarmProfileUpdate.build`.
     ///
     /// `If-Match: <body.expectedVersion>` (agri-saas#1184) — the version the
     /// draft was built from, carried ON the body so it cannot be mixed up

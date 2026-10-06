@@ -19,17 +19,29 @@ import Foundation
 //   ABSENT IS LEFT ALONE NOW (agri-saas#1176, fixed by #1181). It used to
 //   clear: the usecase mapped every field through `norm(input[k])` and
 //   `norm(undefined)` was null, so a body that left out `egn` erased the
-//   farm's ЕГН. The body below STILL carries all thirteen keys with explicit
-//   nulls — correct under both semantics, so it does not matter which server
-//   build answers, and it is the read-modify-write the web page does too.
-//   Swift's synthesised `Encodable` omits nil optionals, which under the old
-//   semantics would have been the same erase by another route; it stays
-//   replaced. An explicit null still clears, and that is the one way to.
+//   farm's ЕГН. The body below STILL carries every key it may send (twelve,
+//   see the next paragraph) with explicit nulls — correct under both
+//   semantics, so it does not matter which server build answers, and it is
+//   the read-modify-write the web page does too. Swift's synthesised
+//   `Encodable` omits nil optionals, which under the old semantics would have
+//   been the same erase by another route; it stays replaced. An explicit null
+//   still clears, and that is the one way to.
 //
-//   THE REQUEST IS DOCUMENTED NOW (#1178): `UpdateFarmProfileRequest` has
-//   the thirteen properties, none required, and the limits below match its
-//   `maxLength`s — exactly `FarmProfileText`'s eleven plus `sizeHa` and
-//   `grainProduced`.
+//   ЕИК IS NEVER SENT (agri-saas#1352, enforced by P3.9). The PUT REJECTS any
+//   body that so much as CONTAINS the key `eik` — unchanged value and null
+//   included — with 400 FARM_PROFILE_EIK_NOT_EDITABLE. ЕИК is written only
+//   by Agrent staff verifying the farm's identity claim (P3.4/P3.9), because
+//   it reaches the ДНЕВНИК PDF and the БАБХ register export and a free-edit
+//   field let any ADMIN put an unchecked number there. So the body carries
+//   exactly TWELVE keys, `eik` absent. Absent is "left alone" under #1181's
+//   merge semantics, verified in `upsertFarmProfile` (`Object.hasOwn`), so
+//   leaving it out preserves the stored ЕИК rather than clearing it. The
+//   field stays READABLE: it is in the GET response and shown read-only.
+//
+//   THE REQUEST IS DOCUMENTED (#1178): `UpdateFarmProfileRequest` lists
+//   thirteen properties, none required, and the limits below match its
+//   `maxLength`s. The twelve sent are `FarmProfileText.writable` plus
+//   `sizeHa` and `grainProduced`.
 //
 //   A NEGATIVE SIZE IS A 400, not a stored null. The usecase does refuse a
 //   negative as null, but zod's `.nonnegative()` in the route rejects it
@@ -112,6 +124,24 @@ enum FarmProfileText: String, CaseIterable, Sendable {
              .registrationPlace, .odbhCity: 200
         }
     }
+
+    /// May the farm's own admin write this field through the PUT?
+    ///
+    /// Every field but ЕИК (agri-saas#1352): the server refuses a body that
+    /// carries `eik` at all, so it is shown in the editor but never typed
+    /// into and never sent. See the file header.
+    var isWritable: Bool { self != .eik }
+
+    /// The text fields the PUT body carries, in the web's order. Every loop
+    /// that BUILDS, ENCODES, REBASES or REPORTS on a save walks this, not
+    /// `allCases` — one list, so the ЕИК cannot leak back in through any one
+    /// of them.
+    static let writable: [FarmProfileText] = allCases.filter(\.isWritable)
+
+    /// Under the read-only ЕИК in the editor. No web wording exists for it
+    /// (agri-saas `messages/bg.json` on main has none for P3.4/P3.9, and the
+    /// P3.9 branch is not pushed), so it is written here.
+    static let eikReadOnlyNote = "ЕИК се променя само след проверка от екипа на Agrent."
 
     var wire: KeyPath<FarmProfile, String?> {
         switch self {
@@ -243,11 +273,13 @@ struct FarmProfileDraft: Equatable, Sendable {
     }
 }
 
-/// The PUT body: all thirteen keys, ALWAYS, nulls explicit.
+/// The PUT body: all TWELVE writable keys, ALWAYS, nulls explicit — and
+/// never `eik` (agri-saas#1352).
 ///
 /// See the file header — an omitted key used to be erased server-side, so
 /// the synthesised `Encodable` (which omits nils) is replaced rather than
-/// trusted.
+/// trusted. The ЕИК is the one deliberate omission: the server refuses a body
+/// that carries it, and absent leaves the stored one alone.
 struct FarmProfileUpdate: Encodable, Equatable, Sendable {
     var text: [FarmProfileText: String?]
     var sizeHa: Double?
@@ -273,7 +305,9 @@ struct FarmProfileUpdate: Encodable, Equatable, Sendable {
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: Key.self)
-        for field in FarmProfileText.allCases {
+        // `writable`, NOT `allCases`: even a `text[.eik]` some caller set is
+        // never encoded, because the key alone is a 400 (agri-saas#1352).
+        for field in FarmProfileText.writable {
             // `?? nil` flattens the dictionary's own optional: a missing key
             // is sent as null rather than skipped. The table is total today;
             // this keeps the body total if that ever stops being true.
@@ -322,7 +356,8 @@ struct FarmProfileUpdate: Encodable, Equatable, Sendable {
         var problems: [Problem] = []
         var text: [FarmProfileText: String?] = [:]
 
-        for field in FarmProfileText.allCases {
+        // The ЕИК is not built at all: it is not the farmer's to send.
+        for field in FarmProfileText.writable {
             if draft[field] == before[field] {
                 text[field] = original[keyPath: field.wire]
                 continue
@@ -406,7 +441,10 @@ struct FarmProfileRebase: Equatable {
             mine != was && theirs != was && theirs != mine
         }
 
-        for field in FarmProfileText.allCases where draft[field] != before[field] {
+        // `writable`: the ЕИК always takes the FRESH stored value (it is in
+        // `now`), never a carried-over edit — staff verification may be the
+        // very write that caused the 409, and it must not be written back.
+        for field in FarmProfileText.writable where draft[field] != before[field] {
             out[field] = draft[field]
             guard collided(draft[field], before[field], now[field]) else { continue }
             if field == .egn {
@@ -470,7 +508,9 @@ enum FarmProfileSaveReport {
     static func notes(draft: FarmProfileDraft, saved profile: FarmProfile) -> [String] {
         var notes: [String] = []
 
-        for field in FarmProfileText.allCases {
+        // Not the ЕИК: it was not sent, so whatever the server holds is not
+        // something it "changed" from what the farmer typed.
+        for field in FarmProfileText.writable {
             let typed = draft[field].trimmingCharacters(in: .whitespacesAndNewlines)
             let stored = profile[keyPath: field.wire] ?? ""
             guard typed != stored else { continue }

@@ -99,14 +99,16 @@ final class FarmProfileLockTests: XCTestCase {
     }
 
     /// The version rides on the body's builder, NOT in the JSON: the body
-    /// schema has no `version`, and the thirteen keys stay thirteen.
+    /// schema has no `version`, and the twelve keys stay twelve (`eik` is
+    /// never sent — agri-saas#1352).
     func testTheBuiltBodyCarriesTheLoadedVersionButDoesNotEncodeIt() throws {
         let body = try build(profile(version: 3)) { $0[.municipality] = "Ловеч" }
         XCTAssertEqual(body.expectedVersion, 3)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(
             with: JSONEncoder().encode(body)) as? [String: Any])
         XCTAssertNil(json["version"])
-        XCTAssertEqual(json.count, 13)
+        XCTAssertNil(json["eik"])
+        XCTAssertEqual(json.count, 12)
     }
 
     /// THE LOST UPDATE THIS PREVENTS. The store's copy moves under an open
@@ -285,5 +287,48 @@ final class FarmProfileLockTests: XCTestCase {
         XCTAssertEqual(r.draft.crops, ["ечемик"])
         XCTAssertEqual(r.collisions, ["Размер: друг потребител е записал 41 ха.",
                                       "Култури: друг потребител е записал царевица."])
+    }
+    // MARK: - The ЕИК through a reload (agri-saas#1352)
+
+    private func withEIK(_ eik: String?, version: Int) -> FarmProfile {
+        FarmProfile(producerName: "Иван Петров", eik: eik, egn: "7501011234",
+                    address: nil, settlement: "Плевен", municipality: "Плевен",
+                    registrationPlace: nil, registrationEkatte: "56722",
+                    odbhCity: nil, agricultureDirectorateCity: nil,
+                    urn: "1234567", sizeHa: 39.758, grainProduced: ["пшеница"],
+                    version: version)
+    }
+
+    /// The 409 may BE staff verification writing the ЕИК. The reload takes
+    /// the stored ЕИК, never carries a draft one across, names no collision
+    /// for it — and the rebuilt body still has no `eik` key at all.
+    func testTheReloadMergeNeverPutsTheEIKIntoTheBody() throws {
+        let old = withEIK(nil, version: 3)
+        var draft = FarmProfileDraft(old)
+        draft[.municipality] = "Ловеч"
+        draft[.eik] = "111111111"          // not offered by the editor; forced here
+        let fresh = withEIK("203912345", version: 4)
+
+        let r = FarmProfileRebase.rebase(draft, from: old, onto: fresh)
+        XCTAssertEqual(r.draft[.eik], "203912345", "a draft ЕИК was carried over the stored one")
+        XCTAssertEqual(r.draft[.municipality], "Ловеч")
+        XCTAssertEqual(r.collisions, [])
+
+        let body = try FarmProfileUpdate.build(original: fresh, draft: r.draft).get()
+        XCTAssertEqual(body.expectedVersion, 4)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(body)) as? [String: Any])
+        XCTAssertNil(json["eik"])
+        XCTAssertEqual(json.count, 12)
+        XCTAssertEqual(json["municipality"] as? String, "Ловеч", "positive control")
+    }
+
+    /// The ЕИК was not sent, so a different stored one after the save is not
+    /// something the server "changed" from what the farmer typed.
+    func testTheSaveReportSaysNothingAboutTheEIK() {
+        let draft = FarmProfileDraft(withEIK(nil, version: 3))
+        let notes = FarmProfileSaveReport.notes(draft: draft,
+                                                saved: withEIK("203912345", version: 4))
+        XCTAssertEqual(notes, [])
     }
 }

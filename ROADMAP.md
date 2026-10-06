@@ -746,7 +746,11 @@ and "invite" is the whole "someone needs access and I'm not at my desk" case.
   from the agreed web/server plan (agri-saas#1141, #1145; the full-replace
   trap was agri-saas#1176, fixed by #1181). Saves are guarded by the
   optimistic lock (`If-Match`, agri-saas#1184): a concurrent edit is a
-  conflict with a reload, no longer last-write-wins. See PARITY.md,
+  conflict with a reload, no longer last-write-wins. ЕИК is read-only and
+  never in the PUT body since 2026-10-07 (agri-saas#1352, P3.9: the key alone
+  is a 400 `FARM_PROFILE_EIK_NOT_EDITABLE`; staff verification writes it).
+  Open: show a verification state (PENDING / VERIFIED) beside it once a
+  response exposes one — none does on agri-saas main. See PARITY.md,
   "Farm profile".
 
 **Membership has THREE statuses, not two:** `ACTIVE`, `INVITED`,
