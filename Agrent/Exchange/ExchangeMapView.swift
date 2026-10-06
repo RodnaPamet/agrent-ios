@@ -165,7 +165,7 @@ struct ExchangeMapView: View {
                     lineWidth: 1.5)
             }
         }
-        .background(Color(.systemBackground))
+        .background(Palette.Surface.page)
         // A Canvas is one opaque rectangle to VoiceOver, and this one's
         // whole content is positional. Each region becomes its own element
         // so the map is navigable rather than merely announced.

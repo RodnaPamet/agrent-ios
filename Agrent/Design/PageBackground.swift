@@ -23,3 +23,32 @@ extension View {
         listRowBackground(Palette.Surface.page)
     }
 }
+
+extension View {
+    /// A solid band pinned to one edge of a screen — what `.background(.bar)`
+    /// used to be, without the material. `Surface.bar` behind it, and an
+    /// `edge` hairline on the side that faces the content, so the band reads
+    /// as separate from what scrolls past it in every arm, «Слънце»
+    /// included, where `--bg-default` and the page are both white.
+    ///
+    /// `hairline` is the side the line goes on: `.top` for a bar at the
+    /// bottom of the screen, `.bottom` for one at the top.
+    func solidBar(hairline: VerticalEdge) -> some View {
+        modifier(SolidBar(hairline: hairline))
+    }
+}
+
+private struct SolidBar: ViewModifier {
+    let hairline: VerticalEdge
+    @Environment(\.displayScale) private var displayScale
+
+    func body(content: Content) -> some View {
+        content
+            .background(Palette.Surface.bar)
+            .overlay(alignment: hairline == .top ? .top : .bottom) {
+                Palette.Surface.edge
+                    .frame(height: 1 / displayScale)
+                    .accessibilityHidden(true)
+            }
+    }
+}

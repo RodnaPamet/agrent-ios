@@ -90,13 +90,55 @@ enum Palette {
     /// reached, so three screens had green rows and four still had black
     /// ones. A single value is much harder to get half-right: every surface
     /// takes the same colour, and a screen that is missed is obviously wrong
-    /// rather than subtly inconsistent. The tokens' card tiers (`--bg-default`,
-    /// `--bg-elevated`) are left for the "solid surfaces" half of P2.8.
+    /// rather than subtly inconsistent.
     ///
     /// LIGHT CHANGES with this: it was `systemBackground` (white) and is now
     /// the web's warm off-white, #F4F2ED; «Слънце» is pure white.
+    ///
+    /// SOLID, ALL OF IT (P2.8 "solid surfaces"). DESIGN.md's first exception
+    /// to Apple's defaults: translucency spends a contrast budget a farmer in
+    /// direct sun does not have, and a material takes its colour from
+    /// whatever scrolls under it — over the satellite map, that is a
+    /// different colour for every field. So every surface that carries text
+    /// is one of the opaque tokens below. The navigation bar is `page` (see
+    /// `SolidChrome`), so a large title sits on the same colour as the list
+    /// it heads.
+    ///
+    /// Every ratio on `bar` / `card` is in `PaletteTokenTests`, all three
+    /// arms. «Слънце» has `--bg-default` equal to the page (both white), so
+    /// there the separation is carried by `edge` alone — which is #8A8A8A in
+    /// that arm, the strongest of the three, as it should be.
     enum Surface {
         static let page = Color(token: AgrentColor.bgPage)
+
+        /// A band pinned to an edge of the screen: the tab bar, the bottom
+        /// action bars («Нов запис», «Нов разход»), the composer, the outbox
+        /// banner, the map's index controls and its target button.
+        /// `--bg-default`, which is exactly what the web's bottom tab bar
+        /// (`BottomTabBar.tsx`) is painted with.
+        ///
+        ///     accent             6.59   5.09   5.49
+        ///     secondaryText      7.64   7.24  11.37
+        ///     warning            8.30   6.48   7.13
+        ///     error              6.05   7.85   7.75
+        ///     success            8.54   6.83   8.08
+        ///     primary           13.85  19.47  21.00
+        ///
+        /// NOT `accentDeep`: 4.26 in dark, below 4.5. Nothing writes it on a
+        /// bar today, and a test pins the shortfall so it stays visible.
+        static let bar = Color(token: AgrentColor.bgDefault)
+
+        /// A grouped block on the page — the parcel list under the map, a
+        /// Тенденции chart card. The web's card is the same token as its
+        /// bar, so this is a second NAME for one value: a role that may
+        /// diverge later, not a second colour today.
+        static let card = Color(token: AgrentColor.bgDefault)
+
+        /// The hairline between a bar and what scrolls past it.
+        /// `--border-subtle`, the web bottom bar's `border-t`. Decorative —
+        /// it is not the only thing separating the two, so it carries no
+        /// 3:1 obligation.
+        static let edge = Color(token: AgrentColor.borderSubtle)
     }
 
     /// The ONLY colour that means "something is broken". Reserved: staleness,

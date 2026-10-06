@@ -297,6 +297,18 @@ Shipped and proven end to end on a device simulator (2026-09-21):
    `--brand-subtle`), agri-saas#1318 (focus ring). Map colours stay local,
    because they are data encodings and the web has no parcel map.
 
+6. **Solid surfaces (P2.8, 2026-10-06).** No material carries text. The
+   navigation bar is `--bg-page`, opaque once content scrolls under it and
+   transparent over the page at the scroll edge (an opaque scroll edge hid
+   large titles on iOS 26). The tab bar and every pinned band (`solidBar`)
+   are `--bg-default` with a `--border-subtle` hairline, as the web's bottom
+   bar is. Set through the UIKit appearance proxy (`SolidChrome`), one place
+   for twenty `NavigationStack`s. **Not reachable on iOS 17 API:** the glass
+   capsules iOS 26 draws behind bar buttons and around the floating tab bar.
+   **Open:** `--brand-emphasis` (`accentDeep`) on `--bg-default` is 4.26 in
+   dark, so it must not go on a bar; `Form`s in sheets still use the
+   system's grouped greys (opaque, not token).
+
 ## Phase 0 — Foundations — DONE (2a8f6f1..d6d8798)
 
 Shipped and proven on the simulator: five-tab shell, `os_log` diagnostics with

@@ -83,6 +83,13 @@ struct ExchangeView: View {
             case .messages: ExchangeInboxView(store: inbox, showListings: { tab = .browse })
             }
         }
+        // THE STRIP AROUND THE SECTION PICKER. Each list below paints the
+        // page through `pageBackground()`, but the picker sits OUTSIDE them,
+        // so in dark mode the band between the search field and the first
+        // row was the system's black (#154 noted it). The navigation bar
+        // above is the page colour too (`SolidChrome`), so the header now
+        // reads as one surface from the title down.
+        .background(Palette.Surface.page)
 
         if tab == .browse {
             content.searchable(

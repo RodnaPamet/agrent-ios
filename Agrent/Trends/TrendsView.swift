@@ -33,6 +33,9 @@ struct TrendsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        // The page under the chart cards (`Surface.card`); without it they
+        // sat on the system background, black in dark mode.
+        .background(Palette.Surface.page)
         .inlineTitle("Тенденции")
         // «Затвори» only when the app menu presented this — see
         // `closeWhenPresentedFromMenu`. As a tab root it had one that did nothing.
@@ -230,7 +233,7 @@ struct TrendsView: View {
             }
         }
         .padding(14)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .background(Palette.Surface.card, in: RoundedRectangle(cornerRadius: 12))
     }
 
     /// The visible data's range with a margin, so no line is drawn on the

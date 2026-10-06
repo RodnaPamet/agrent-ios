@@ -61,7 +61,56 @@ final class PaletteTokenTests: XCTestCase {
         ("activity chip", Palette.Chip.activityText, Palette.Chip.activityFill, [6.53, 6.79, 7.43]),
         ("neutral chip", Palette.Chip.neutralText, Palette.Chip.neutralFill, [7.48, 6.51, 10.43]),
         ("avatar", Palette.Avatar.ink, Palette.Avatar.fill, [8.45, 5.21, 6.19]),
+        // P2.8 solid surfaces: everything written on a bar. `Color.primary`
+        // is what the composer, the outbox banner, the map's target glyph
+        // and the index chips write in; `secondaryText` is the unselected
+        // tab and the map's failure line; `accent` the selected tab.
+        ("accent on bar", Palette.accent, Palette.Surface.bar, [6.59, 5.09, 5.49]),
+        ("secondaryText on bar", Palette.secondaryText, Palette.Surface.bar, [7.64, 7.24, 11.37]),
+        ("warning on bar", Palette.warning, Palette.Surface.bar, [8.30, 6.48, 7.13]),
+        ("error on bar", Palette.error, Palette.Surface.bar, [6.05, 7.85, 7.75]),
+        ("success on bar", Palette.success, Palette.Surface.bar, [8.54, 6.83, 8.08]),
+        ("primary on bar", Color.primary, Palette.Surface.bar, [13.85, 19.47, 21.00]),
+        ("primary on page (navigation titles)", Color.primary, Palette.Surface.page, [16.63, 18.77, 21.00]),
+        ("secondaryText on card", Palette.secondaryText, Palette.Surface.card, [7.64, 7.24, 11.37]),
+        ("primary on card", Color.primary, Palette.Surface.card, [13.85, 19.47, 21.00]),
     ]
+
+    /// The one role that does NOT pass on a bar, written down so nobody
+    /// puts it there: `accentDeep` on `Surface.bar` in dark is 4.26. Today
+    /// it is used only on the page (a sent message's timestamp, two chart
+    /// series), where it is 5.11. If this ever starts passing, the token
+    /// moved and `Palette.Surface.bar`'s note can drop the warning.
+    func testAccentDeepOnTheDarkBarIsTheKnownShortfall() {
+        let ratio = Self.contrast(Palette.accentDeep, on: Palette.Surface.bar, Self.dark)
+        XCTAssertEqual(ratio, 4.26, accuracy: 0.02)
+        XCTAssertLessThan(ratio, 4.5)
+    }
+
+    /// The map's index chips: `Chip.neutralFill` is translucent, and it sits
+    /// on the BAR, not the page — so it is composited over the bar here,
+    /// which the generic helper (fill over page) would get wrong.
+    func testIndexChipOnTheBar() {
+        for (traits, expected) in zip([Self.dark, Self.light, Self.sunlight], [11.71, 18.12, 19.26]) {
+            let bar = Self.over(Self.rgba(Palette.Surface.bar, traits), Self.rgba(Palette.Surface.page, traits))
+            let chip = Self.over(Self.rgba(Palette.Chip.neutralFill, traits), bar)
+            let ratio = Self.ratio(Self.over(Self.rgba(Color.primary, traits), chip), chip)
+            XCTAssertGreaterThanOrEqual(ratio, 4.5)
+            XCTAssertEqual(ratio, expected, accuracy: 0.02)
+        }
+    }
+
+    /// Every surface P2.8 introduced is OPAQUE, in every arm — the point of
+    /// the change. The hairline is the one translucent token, and it is
+    /// decoration.
+    func testTheSolidSurfacesAreOpaque() {
+        for traits in [Self.dark, Self.light, Self.sunlight, Self.darkIncreased] {
+            for (name, colour) in [("page", Palette.Surface.page), ("bar", Palette.Surface.bar),
+                                   ("card", Palette.Surface.card)] {
+                XCTAssertEqual(Self.rgba(colour, traits)[3], 1, "\(name) must be opaque")
+            }
+        }
+    }
 
     func testEveryDocumentedPairMeasuresWhatItSaysAndPassesAA() {
         for (name, ink, fill, documented) in Self.pairs {
@@ -112,6 +161,11 @@ final class PaletteTokenTests: XCTestCase {
     private static func contrast(_ ink: Color, on fill: Color, _ traits: UITraitCollection) -> Double {
         let background = over(rgba(fill, traits), rgba(Palette.Surface.page, traits))
         let foreground = over(rgba(ink, traits), background)
+        return ratio(foreground, background)
+    }
+
+    /// WCAG 2.x contrast of two opaque colours.
+    private static func ratio(_ foreground: [Double], _ background: [Double]) -> Double {
         func linear(_ c: Double) -> Double { c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
         func luminance(_ c: [Double]) -> Double {
             0.2126 * linear(c[0]) + 0.7152 * linear(c[1]) + 0.0722 * linear(c[2])

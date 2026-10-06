@@ -10,6 +10,9 @@ struct AgrentApp: App {
     /// `BulgarianLayout`.
     init() {
         BulgarianLayout.install()
+        // Before any scene too: the appearance proxy styles only the bars
+        // created after it is set. See `SolidChrome`.
+        SolidChrome.install()
         // Before any scene, for a different reason: before the first request.
         // Purges what older builds left in Cache.db and replaces
         // `URLCache.shared` with a zero-capacity one. See `NoURLCache` (#134).
@@ -243,7 +246,7 @@ struct SignInView: View {
                     Text("Вход").frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .prominentButton()
             .controlSize(.large)
             .disabled(auth.state == .signingIn)
             .padding(.horizontal, 40)
