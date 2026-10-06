@@ -31,6 +31,12 @@ final class AdminStore {
     /// it does not outlive the screen it describes.
     private(set) var lastSaveNotes: [String]?
 
+    /// A profile save that landed, for the profile page to play: the editor
+    /// closes on success, so the page under it is what is on screen. Only
+    /// `saveProfile` changes it — never a load or the reload after a 409.
+    /// The editor plays its own refusals. See `WriteFeedback`.
+    private(set) var profileSaveFeedback = WriteFeedback()
+
     /// The farm-profile network, as two closures so the lock is a unit test.
     ///
     /// There is no URLProtocol seam in `Tests/`, and the things worth pinning
@@ -137,6 +143,7 @@ final class AdminStore {
         let saved = try await sendProfile(body)
         profile = .loaded(saved, .fresh)
         lastSaveNotes = FarmProfileSaveReport.notes(draft: draft, saved: saved)
+        profileSaveFeedback.saved()
     }
 
     /// Re-read the profile after a 409, for the editor to rebase onto.

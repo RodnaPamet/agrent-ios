@@ -26,6 +26,10 @@ struct ParcelMapView: View {
     /// The parcel whose operation sheet is open.
     @State private var operating: Parcel?
 
+    /// An operation saved (or kept for later) from that sheet. Played HERE
+    /// because the sheet closes on success — see `WriteFeedback`.
+    @State private var operationFeedback = WriteFeedback()
+
     /// The parcels under an ambiguous tap, offered for the farmer to
     /// choose between.
     @State private var choosing: ParcelChoice?
@@ -125,9 +129,11 @@ struct ParcelMapView: View {
             ParcelOperationSheet(
                 locationID: location.id, parcel: parcel
             ) {
+                operationFeedback.saved()
                 Task { await store.load() }
             }
         }
+        .writeFeedback(operationFeedback)
         .task {
             if store.state.value == nil { await store.load() }
             me = await CurrentUserStore.shared.load()

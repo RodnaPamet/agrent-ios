@@ -497,6 +497,32 @@ and from the Админ account card, which now links to it (one `AccountCard`).
   (password change) is for credential accounts; this app signs in through the
   browser. The web's sound/haptics preferences are device-local web settings.
 
+### Haptics — since 2026-10-06 (agri-saas#1193 P2.8)
+
+Web `src/lib/haptics.ts` (Vibration API; Android browsers only — iOS Safari
+has none) · iOS `WriteFeedback` in `Agrent/Design/Haptics.swift`, the one
+caller of `.sensoryFeedback`.
+
+- The web fires on ACTION COMPLETION: a field-operation parcel line marked
+  (DONE `success`, skip/reopen `tap`, failure `error`), a journal photo
+  uploaded (`success` / `error`, `tap` on the shutter), a write queued
+  offline (`tap`), and `tap` when a pull-to-refresh triggers. No picker or
+  segment ticks, nothing on navigation.
+- iOS keeps two words: `.success` for the person's write landing (or, for a
+  field operation, kept on the device to send), `.warning` for it refused
+  with the screen saying what to do. Four sites: a field operation saved or
+  kept, a task status changed, a message sent, the farm profile saved. The
+  other writes close onto a list showing the new row; each is a one-line
+  addition if wanted. `HapticSiteTests` lists the sites exactly.
+- Never from the app's own work: polls, refreshes, cache revalidation and
+  the outbox drain record nothing. The pull-to-refresh tick comes from the
+  system's refresh control, not from this.
+- Not ported: the web's «Звук и вибрация» card (`FeedbackPrefsCard`:
+  «Звук при успех», «Тактилна обратна връзка») is browser localStorage with
+  no API, and the web also gates haptics on
+  reduced motion. iOS's System Haptics setting governs instead; an in-app
+  switch is a follow-up only if the preference ever reaches the server.
+
 ---
 
 ## Design status — the AX3 failures are FIXED

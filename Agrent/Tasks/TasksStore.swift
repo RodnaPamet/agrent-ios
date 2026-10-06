@@ -25,6 +25,11 @@ final class TaskDetailStore {
     private(set) var saving = false
     private(set) var writeError: String?
 
+    /// The outcome of the person's own status change, for the screen to
+    /// play. `load()` never touches it — a refresh is not something the
+    /// person did. See `WriteFeedback`.
+    private(set) var writeFeedback = WriteFeedback()
+
     func load() async {
         if state.value == nil { state = .loading }
         await CachedResource.loadShowingCacheFirst(WorkItemAPI.detailPath(id)) { data in
@@ -57,12 +62,14 @@ final class TaskDetailStore {
             try await WorkItemAPI.setStatus(
                 id, to: status, resolution: body, idempotencyKey: key
             )
+            writeFeedback.saved()
             await load()
         } catch {
             // Stay on the screen with the error visible. Closing a form
             // after a refused write is the defect filed against the web app
             // as #921 — it reads as success and the operator's work is gone.
             writeError = UserMessage.text(for: error)
+            writeFeedback.refused()
         }
     }
 }

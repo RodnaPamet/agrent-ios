@@ -326,6 +326,11 @@ final class ConversationStore {
     private(set) var sending = false
     private(set) var sendFailure: String?
 
+    /// The outcome of the person's own send, for the screen to play. Only
+    /// `send()` changes it: a poll, the refetch after a write, mark-read and
+    /// the other writes never do. See `WriteFeedback`.
+    private(set) var sendFeedback = WriteFeedback()
+
     /// Close, block, unblock, retract — one at a time.
     private(set) var acting = false
     private(set) var actionFailure: String?
@@ -487,8 +492,12 @@ final class ConversationStore {
             sendKeys.delivered()
             draft = MessagingPolicy.draftAfterDelivery(draft, sent: text)
             if sent.reopened { closed = false }
+            sendFeedback.saved()
             await refresh()
         } catch {
+            // A 429 is a refusal too: the message did not go, and the
+            // composer now says when it can.
+            sendFeedback.refused()
             if RateLimitPause.messages.absorb(error) { return }
             sendFailure = MessagingPolicy.sendFailure(for: error)
         }
