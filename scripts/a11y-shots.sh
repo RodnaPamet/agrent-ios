@@ -111,17 +111,23 @@ trap restore EXIT
 
 # name | content_size | increase_contrast | appearance
 #
-# Four runs, each a fresh install and launch, because
+# Five runs, each a fresh install and launch, because
 # and there is no way to change these settings from inside the test process.
 # The pairs are the ones #97 asks to COMPARE:
 #   default vs ax5             — does a row stack, does the `·` go
 #   default vs contrast-high   — the parcel map, "the one that matters most"
-#   default vs light           — 113 sites of secondary text at #5A5A5F
+#   default vs light           — 113 sites of secondary text, now a token
+#   light vs sunlight          — the tokens' highContrast arm, «Слънце»
+#
+# `sunlight` is the only run that shows the highContrast arm: Palette maps
+# Increase Contrast to it in LIGHT appearance only (see Palette.swift's
+# header), so `contrast-high`, which is dark, stays on the dark arm.
 VARIANTS=(
   "default|large|disabled|dark"
   "ax5|accessibility-extra-extra-extra-large|disabled|dark"
   "contrast-high|large|enabled|dark"
   "light|large|disabled|light"
+  "sunlight|large|enabled|light"
 )
 
 mkdir -p "$OUT_DIR"

@@ -357,25 +357,8 @@ final class AccountCardTests: XCTestCase {
         XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.relative))
     }
 
-    // MARK: - The circle's contrast, from the constants it is drawn with
-
-    func testTheInitialsOnTheCircleMeetAA() {
-        typealias A = Palette.Avatar
-        let pairs: [(String, UInt32, UInt32, Double)] = [
-            ("light", A.inkLight, A.fillLight, 5.83),
-            ("light, Increase Contrast", A.inkLight, A.fillLightIncreased, 8.60),
-            ("dark", A.inkDark, A.fillDark, 8.73),
-        ]
-        for (name, ink, fill, documented) in pairs {
-            let ratio = Self.contrast(ink, fill)
-            XCTAssertGreaterThanOrEqual(ratio, 4.5, "\(name): \(ratio)")
-            XCTAssertEqual(ratio, documented, accuracy: 0.01,
-                           "\(name): Palette.Avatar's comment says \(documented), measured \(ratio)")
-        }
-        XCTAssertGreaterThan(Self.contrast(A.inkLight, A.fillLightIncreased),
-                             Self.contrast(A.inkLight, A.fillLight),
-                             "Increase Contrast must raise the ratio, not just change the colour")
-    }
+    // The circle's contrast is measured in `PaletteTokenTests`, from the
+    // token colours as the app resolves them in each arm.
 
     // MARK: - helpers
 
@@ -384,21 +367,5 @@ final class AccountCardTests: XCTestCase {
             UIColor.red.setFill()
             ctx.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
         }
-    }
-
-    /// WCAG 2.x contrast ratio of two sRGB hex colours.
-    private static func contrast(_ a: UInt32, _ b: UInt32) -> Double {
-        func linear(_ hex: UInt32, shift: UInt32) -> Double {
-            let value = Double((hex >> shift) & 0xFF) / 255
-            return value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
-        }
-        func luminance(_ hex: UInt32) -> Double {
-            let r: Double = 0.2126 * linear(hex, shift: 16)
-            let g: Double = 0.7152 * linear(hex, shift: 8)
-            let b: Double = 0.0722 * linear(hex, shift: 0)
-            return r + g + b
-        }
-        let (hi, lo) = (max(luminance(a), luminance(b)), min(luminance(a), luminance(b)))
-        return (hi + 0.05) / (lo + 0.05)
     }
 }
