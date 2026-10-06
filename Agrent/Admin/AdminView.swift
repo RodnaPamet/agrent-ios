@@ -125,11 +125,12 @@ struct AdminView: View {
                     ProgressView()
                 case .failed:
                     Text("Неуспешно зареждане")
+                        .rowValue()
                 case .loaded(let profile, _):
                     Text(profile.isEmpty
                          ? "Непопълнено"
                          : (profile.producerName ?? ""))
-                        .lineLimit(1)
+                        .rowValue()
                 }
             } label: {
                 Label("Стопанство", systemImage: "building.2")
@@ -146,7 +147,7 @@ struct AdminView: View {
         } label: {
             LabeledContent {
                 if let all = store.members.value {
-                    Text("\(all.count)").monospacedDigit()
+                    Text("\(all.count)").monospacedDigit().rowValue()
                 } else if case .loading = store.members {
                     ProgressView()
                 }
@@ -167,5 +168,22 @@ struct AdminView: View {
         }
         .accessibilityHint("Показва флаговете на функциите, получени от сървъра")
         .accessibilityInputLabels(A11y.spokenNames("Диагностика", "Diagnostics"))
+    }
+}
+
+private extension Text {
+    /// A row's VALUE — the producer's name on «Стопанство», the count on
+    /// «Потребители».
+    ///
+    /// WRAPS, never truncates (#150). The name was `lineLimit(1)`, and at
+    /// the accessibility sizes `LabeledContent` stacks the value under its
+    /// label, where one line of AX5 text held «Синтети…» of the farm's name.
+    /// The row's whole job is to say WHICH farm, and a cut name does not.
+    ///
+    /// `Palette.secondaryText`, not `LabeledContent`'s default value grey,
+    /// which is the system's `secondaryLabel` — 3.29:1 on the light page.
+    func rowValue() -> some View {
+        foregroundStyle(Palette.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

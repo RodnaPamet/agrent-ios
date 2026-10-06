@@ -288,7 +288,7 @@ private struct ResolutionSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 Section("Решение") {
                     TextEditor(text: $text).frame(minHeight: 140)
                 }

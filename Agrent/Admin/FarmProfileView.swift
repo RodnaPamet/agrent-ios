@@ -336,7 +336,7 @@ struct FarmProfileEditView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 if conflicted {
                     conflictSection
                 } else if let reloadNotes {

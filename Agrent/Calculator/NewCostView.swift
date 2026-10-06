@@ -119,7 +119,7 @@ struct NewCostView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 Section {
                     Picker("Категория", selection: $category) {
                         ForEach(CostCategory.selectable, id: \.self) {

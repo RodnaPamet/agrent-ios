@@ -64,7 +64,7 @@ struct SpatialImportView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 switch phase {
                 case .choosing: chooser
                 case .uploading, .working, .done, .failed: progress

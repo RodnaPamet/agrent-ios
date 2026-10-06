@@ -32,6 +32,9 @@ struct ConversationView: View {
     @State private var confirmingBlock = false
     @State private var confirmingRetract = false
     @State private var retracting: ExchangeMessage?
+    /// So a tap on the composer's padding — inside its drawn edge, outside
+    /// the text — focuses the field, as `.roundedBorder`'s whole box did.
+    @FocusState private var composing: Bool
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -342,9 +345,30 @@ struct ConversationView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         HStack(alignment: .bottom, spacing: 8) {
-            TextField("Напишете съобщение…", text: $store.draft, axis: .vertical)
+            // Token-drawn rather than `.roundedBorder`, whose fill is system
+            // black in dark mode and whose hairline nobody measured
+            // (#156). `Palette.Field` has the pairs; the prompt is styled
+            // so the hint is a token too, not UIKit's placeholder grey.
+            TextField("Съобщение", text: $store.draft,
+                      prompt: Text("Напишете съобщение…").foregroundStyle(Palette.Field.placeholder),
+                      axis: .vertical)
                 .lineLimit(1...6)
-                .textFieldStyle(.roundedBorder)
+                .foregroundStyle(Palette.Field.text)
+                .focused($composing)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                // The tap is on the BACKGROUND, which only the padding
+                // exposes: taps on the text still place the cursor.
+                .background {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Palette.Field.fill)
+                        .onTapGesture { composing = true }
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Palette.Field.edge, lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
                 .accessibilityLabel("Съобщение")
             sendButton
         }

@@ -101,7 +101,7 @@ struct NewListingView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            PageForm {
                 Section {
                     Picker("Страна", selection: $side) {
                         ForEach(ExchangeSide.allCases.filter { $0 != .unknown }, id: \.self) {

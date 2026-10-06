@@ -139,6 +139,26 @@ enum Palette {
         /// it is not the only thing separating the two, so it carries no
         /// 3:1 obligation.
         static let edge = Color(token: AgrentColor.borderSubtle)
+
+        /// What a `PageForm` sits on: `page`, except in «Слънце», where it
+        /// is `--bg-muted`.
+        ///
+        /// A form's rows are FIELDS on `card`, and a text field or a text
+        /// editor has no border of its own — the card is its shape. In
+        /// «Слънце» `card` and `page` are both white, and the first capture
+        /// of the token forms (#156) showed what that means: «Бележки» was a
+        /// blank stretch of white with nothing to say where to type. So in
+        /// that arm alone the form's ground steps down to the tokens' muted
+        /// surface and the cards stay white — the arrangement the system's
+        /// grouped form had, with token values. Dark and light keep the page,
+        /// where `card` already differs from it.
+        ///
+        /// Only footers and section headers sit on it; `PaletteTokenTests`
+        /// measures what the app writes there (`secondaryText`, `warning`,
+        /// `error`) in all three arms.
+        static let formPage = Color(token: { theme in
+            theme == .highContrast ? AgrentColor.bgMuted(theme) : AgrentColor.bgPage(theme)
+        })
     }
 
     /// The ONLY colour that means "something is broken". Reserved: staleness,
@@ -279,6 +299,58 @@ enum Palette {
         static let colleagueEdge = accentDeep
         static let theirsFill = Chip.neutralFill
         static let theirsInk = Color.primary
+    }
+
+    /// A text field drawn by the app rather than by `Form` — the
+    /// conversation composer (agrent-ios#156), which sits on a `solidBar`.
+    /// It was `.roundedBorder`: a system black box in dark mode on a green
+    /// bar, and a hairline the tokens never measured.
+    ///
+    /// The fill and the placeholder are the web's `Input` (`bg-bg-default`,
+    /// `placeholder-content-subtle`); the text is `Color.primary`, as on
+    /// every bar. The fill IS the bar, so the edge is the whole boundary, in
+    /// every arm — which is what «Слънце» needs anyway, where the bar and the
+    /// page are both white.
+    ///
+    /// THE EDGE IS NOT THE WEB'S. `--ctrl-edge-rest` measures 1.54 / 1.50 /
+    /// 1.51 on the bar and every `--border-*` token is under 3:1 in light
+    /// (`--border-emphasis` 2.83 / 1.59 / 21.00) — a boundary a farmer in
+    /// sun cannot find. The edge is the placeholder's own token,
+    /// `--content-subtle`, so the field's outline and its hint are one
+    /// colour and both clear 3:1 (non-text) with room to spare:
+    ///
+    ///     text on fill          13.85  19.47  21.00
+    ///     placeholder on fill    5.81   5.32   7.46
+    ///     edge against bar       5.81   5.32   7.46
+    enum Field {
+        static let fill = Surface.bar
+        static let text = Color.primary
+        static let placeholder = Color(token: AgrentColor.contentSubtle)
+        static let edge = Color(token: AgrentColor.contentSubtle)
+    }
+
+    /// Борса's map of Bulgaria (`ExchangeMapView`): the oblasti with no
+    /// offer, and the line between oblasti. They were `secondarySystemFill`
+    /// and `separator`, two system greys (#156).
+    ///
+    /// The DATA on this map is the accent tint of an oblast that has offers,
+    /// the markers and their VoiceOver proxies; the idle fill and the
+    /// boundary are the ground they sit on. So they are the web's diagram
+    /// tokens — `--bg-subtle` for the idle oblast (the neutral chip's fill)
+    /// and `--canvas-edge`, the token tokens.json defines for edges drawn on
+    /// a canvas. Measured against the idle fill over the page:
+    ///
+    ///     boundary           2.6    2.1    2.3
+    ///
+    /// Below 3:1, and stated rather than fixed with a colour of this
+    /// file's own: the boundary is orientation, not information — every
+    /// oblast that carries something says so with a fill, a marker and a
+    /// spoken name. It is still stronger than the `separator` it replaces,
+    /// which measured about 1.3 in dark and 1.6 in light over its own grey,
+    /// and Increase Contrast thickens it (`ExchangeMapView`).
+    enum RegionMap {
+        static let idleFill = Color(token: AgrentColor.bgSubtle)
+        static let boundary = Color(token: AgrentColor.canvasEdge)
     }
 
     /// The account card's initials circle — a FILL and the INK on it,
