@@ -72,7 +72,7 @@ struct AdminView: View {
                 // The farm profile row is hidden with the rest, not shown and
                 // then refused: its GET needs `admin.manage`, which is the same
                 // OWNER/ADMIN pair, so a reader who gets here cannot open it.
-                Section { forbiddenNotice }.pageRow()
+                forbiddenNotice.pageRow()
 
             case .allowed:
                 Section { farmRow }.pageRow()
@@ -119,16 +119,16 @@ struct AdminView: View {
         .accessibilityInputLabels(A11y.Spoken.profile + A11y.spokenNames(me.user?.name))
     }
 
-    /// What a reader sees under the account row: the screen-filling
-    /// `EmptyState` this used to be, as a row now that something sits above
-    /// it. `ContentUnavailableView` is what `EmptyState` draws; the scrolling
-    /// `EmptyState` adds for large text is the `List`'s job here.
+    /// What a reader sees under the account row. A screen-filling
+    /// `EmptyState` while it was the only thing on the page; under a row, it
+    /// is a row and a footer, which wrap at every text size. A
+    /// `ContentUnavailableView` row was tried and kept its title to one line:
+    /// «Нямате достъп до то…» at the DEFAULT size (A11yShots, 2026-10-07).
     private var forbiddenNotice: some View {
-        ContentUnavailableView {
+        Section {
             Label("Нямате достъп до този раздел", systemImage: "lock")
-        } description: {
-            Text("Управлението на достъпа е достъпно само за администратори на стопанството.")
-                .font(.body)
+        } footer: {
+            SectionFooter("Управлението на достъпа е достъпно само за администратори на стопанството.")
         }
     }
 
