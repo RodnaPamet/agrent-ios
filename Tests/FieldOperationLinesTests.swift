@@ -233,6 +233,8 @@ final class LineMarkWireTests: XCTestCase {
             APIClient.APIError.http(status: 503, code: nil, message: nil)), .keep)
         XCTAssertEqual(FieldOperationRules.failure(
             APIClient.APIError.http(status: 429, code: "RATE_LIMITED", message: nil)), .keep)
+        // #168: not a refusal, which would supersede the line's unsent marks.
+        XCTAssertEqual(FieldOperationRules.failure(APIClient.APIError.clientTooOld), .clientTooOld)
         guard case .refused(let text) = FieldOperationRules.failure(
             APIClient.APIError.http(status: 403, code: "OPERATION_NOT_ASSIGNED_TO_YOU",
                                     message: "You can only update field operations assigned to you."))
@@ -696,6 +698,52 @@ final class FieldOperationStoreTests: XCTestCase {
         XCTAssertEqual(store.feedback.feedback, .warning)
         let queued = await queue.all()
         XCTAssertTrue(queued.isEmpty)
+    }
+
+    // MARK: 426
+
+    /// A 426 on the tap (#168) is about the BUILD: said, and played as a
+    /// warning — and nothing on the phone is touched. The line's unsent mark
+    /// is not superseded (the server has not seen it either), the tap is not
+    /// queued, and the job is not re-read into the same 426. The outbox is
+    /// told, so its banner stops offering «Изпрати».
+    ///
+    /// The line: the server holds DONE at 4 and a reopen waits on the phone,
+    /// so the line shows PENDING and offers «Пропусни» — the one live send a
+    /// line with a waiting mark can make.
+    func testA426OnTheTapTouchesNothingAndTellsTheOutbox() async {
+        let network = Network()
+        let (outbox, queue) = makeOutbox()
+        let store = makeStore(network, outbox: outbox)
+        let held = line(status: .done, version: 4)
+        await loaded(store, network, [held])
+        let waiting = PendingOperation.mark(
+            .init(taskID: "tsk_1", lineID: "opl_1", status: "PENDING", seenVersion: 4),
+            ownerUserID: owner, summary: "x", payload: Data(), reason: nil)
+        await queue.enqueue(waiting)
+        let readsBefore = network.reads.count
+        network.answer = { _ in throw APIClient.APIError.clientTooOld }
+
+        await store.mark(held, as: .skipped, by: me)
+
+        XCTAssertEqual(network.marks.map(\.seenVersion), [4], "positive control: the tap went out")
+        let stored = await queue.all()
+        XCTAssertEqual(stored, [waiting], "a 426 superseded the line's unsent mark, or queued the tap")
+        XCTAssertEqual(network.reads.count, readsBefore, "the job was re-read into the same 426")
+        XCTAssertEqual(store.notice?.kind, .refused)
+        XCTAssertEqual(store.notice?.text, UserMessage.text(for: APIClient.APIError.clientTooOld))
+        XCTAssertEqual(store.feedback.feedback, .warning)
+        XCTAssertTrue(outbox.isClientTooOld, "the banner would go on offering «Изпрати»")
+        XCTAssertNil(store.busyLineID)
+
+        // Positive control: the same tap REFUSED does supersede the waiting
+        // mark — so it stood above because of the 426, not the setup.
+        network.answer = { _ in
+            throw APIClient.APIError.http(status: 403, code: "OPERATION_NOT_ASSIGNED_TO_YOU", message: nil)
+        }
+        await store.mark(held, as: .skipped, by: me)
+        let afterRefusal = await queue.all()
+        XCTAssertTrue(afterRefusal.isEmpty, "positive control: a refusal supersedes the line's unsent mark")
     }
 
     // MARK: nothing sent

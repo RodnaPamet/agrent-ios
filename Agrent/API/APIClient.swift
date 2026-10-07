@@ -130,8 +130,17 @@ actor APIClient {
         /// resolve it (#921/#922).
         case conflict(currentVersion: Int?, expectedVersion: Int?)
         /// 426 from middleware means THIS CLIENT IS TOO OLD, not that the
-        /// write was refused. Both web drains currently mistake it for a
-        /// terminal payload rejection and park the whole queue (#938, open).
+        /// write was refused. Both web drains used to mistake it for a
+        /// terminal payload rejection and park the whole queue; they now keep
+        /// every item untouched and stop (agri-saas#938). So does this app's
+        /// outbox, which also stops asking for the rest of the process
+        /// (`OutboxStore.isClientTooOld`, agrent-ios#168).
+        ///
+        /// The gate reads `x-agrent-client-version`, which this app does not
+        /// send (`ClientHeader` sends `X-Agrent-Client`, a counter), and an
+        /// absent header is served as compatible. So today's server never
+        /// answers this app with a 426: the handling is ready for the day a
+        /// version is declared, or anything else answers 426.
         case clientTooOld
         /// 304 Not Modified — the server confirms the cached copy is current.
         ///

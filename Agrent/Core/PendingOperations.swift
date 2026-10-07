@@ -279,6 +279,14 @@ actor PendingOperations {
     /// when it meets one live, and the drain parks for the operator when a
     /// replay meets one (`PendingOperation.Conflict`, #138).
     ///
+    /// A 426 (`APIError.clientTooOld`) is not queued either, and it is not a
+    /// refusal of anything: the server's version gate turned the BUILD away
+    /// before any route ran. `false` here means only that a live save offers
+    /// no «Запази за по-късно» on one — the web's live path queues none
+    /// either. Whatever must not read it as final checks for it FIRST: the
+    /// drain stops on it and touches nothing (`OutboxStore`, #168), and a
+    /// parcel line's tap leaves the queue alone (`FieldOperationRules.failure`).
+    ///
     /// A DecodingError is NOT queued, and that is the subtle one: if the
     /// response failed to decode, the write very likely SUCCEEDED and only
     /// the reply was unreadable. Queueing it would be safe (the key

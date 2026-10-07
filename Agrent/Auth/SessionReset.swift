@@ -32,6 +32,9 @@ import Foundation
 ///     · `ExchangeUnreadStore.shared`— which of A's farm's threads are unread.
 ///     · `OutboxStore.shared`        — its in-memory list and its pause. The
 ///                                      QUEUE ON DISK IS NOT TOUCHED; see below.
+///                                      Nor is `isClientTooOld` (#168): it is
+///                                      the server's word on this BUILD, which
+///                                      the next person runs too.
 ///     · `RateLimitPause.messages`   — A's farm's message budget. B may be on
 ///                                      another farm, and a pause that is wrong
 ///                                      for B blocks B's sends for up to a
