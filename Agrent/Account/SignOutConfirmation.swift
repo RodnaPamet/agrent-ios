@@ -8,14 +8,13 @@ import SwiftUI
 /// the browser and Google, which in a field may not be possible, and the
 /// session's cached data is purged with it (`SessionReset`).
 ///
-/// ── Why the menu asks too ──
+/// ── A modifier, with one Изход left ──
 ///
-/// Изход stays in the menu, where it has been since the menu was built and
-/// where the web keeps it (`user-menu.tsx`: «Профил», then «Изход» last), and
-/// where `UserMessage`'s session-expired text tells a farmer to find it. A
-/// menu row is the EASIER one to hit by mistake, so one place asking and the
-/// other not would protect the harder tap. Both use this modifier, so the
-/// question cannot drift between them.
+/// Изход was also a menu row until 2026-10-07, where the web keeps it
+/// (`user-menu.tsx`: «Профил», then «Изход» last); the owner moved it to
+/// Профил alone, under Админ. This stays the one caller of
+/// `AuthClient.signOut` (`ProfileTests`), so an Изход added anywhere later
+/// asks the same question rather than skipping it.
 ///
 /// ── Named aloud ──
 ///

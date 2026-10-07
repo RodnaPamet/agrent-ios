@@ -327,11 +327,12 @@ enum UserMessage {
         // server-side by pinning the upstream to one container
         // (agri-saas#1143); 40 probes from here now answer identically.
         //
-        // Names the fix, because there IS one and it is two taps: «Изход» in
-        // the menu, then sign in again.
+        // Names the fix, because there IS one: «Изход», then sign in again.
+        // Says where it is, since the owner moved it out of the menu
+        // (2026-10-07): Админ's top row — the account card — opens Профил.
         "TOKEN_REFRESH_FAILED":
-            "Сесията не можа да бъде подновена. Излезте от менюто и влезте "
-            + "отново.",
+            "Сесията не можа да бъде подновена. В «Админ» отворете профила си, "
+            + "изберете «Изход» и влезте отново.",
 
         // ── The insurance quote's own refusals ──
         //

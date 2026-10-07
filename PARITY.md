@@ -676,14 +676,17 @@ unchanged to its own pushed page.
 ### Профил — every role, since 2026-10-06 (agri-saas#1193 P2.8)
 
 Web `/account` (P2.7: «Вашият акаунт», sections «Профил» and «Сигурност»,
-works with zero farms) · iOS `ProfileView`, from the menu for every role,
-and from the Админ account card, which now links to it (one `AccountCard`).
+works with zero farms) · iOS `ProfileView`, pushed from the Админ account
+card (one `AccountCard`), for every role.
 
 - Shown: the picture or initials, the name, the email — what `/api/auth/me`
-  sends — and «Изход», behind a confirmation.
-- Изход stays in the menu too, as on the web's user menu, behind the SAME
-  confirmation (`SignOutConfirmation`); `UserMessage`'s session-expired text
-  sends people to the menu for it.
+  sends — and «Изход», behind a confirmation (`SignOutConfirmation`).
+- **Differs from the web on purpose (owner, 2026-10-07):** the app menu has
+  no «Профил» or «Изход» rows; the web's user menu keeps both. On iOS the
+  menu's «Админ» is the way to both. Админ draws the account row for every
+  role and in every state: above «Нямате достъп» for a reader, and as a plain
+  «Профил» row before `/me` answers. `UserMessage`'s session-expired text
+  says where Изход is now.
 - Not ported, and why: name editing (`PATCH /api/account/profile`) and the
   picture upload/removal (`POST`/`DELETE /api/account/avatar`) are route code
   absent from openapi.json — follow-ups once documented. «Сигурност»

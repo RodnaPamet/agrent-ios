@@ -149,8 +149,9 @@ enum A11y {
 
         // ── The account (agri-saas#1193 P2.8) ──
         //
-        // «Профил» is the menu row and the Админ card's link; «Изход» is the
-        // menu row, the Профил page's row and the confirmation's answer. One
+        // «Профил» is Админ's account row — the card, or the plain row before
+        // `/me` answers; «Изход» is the Профил page's row and the
+        // confirmation's answer (neither is a menu row since 2026-10-07). One
         // word, because it is one act, and the dialog is modal, so two of them
         // are never live at once. Neither collides: no other control in the
         // app is «Профил» (the farm's page is reached through «Стопанство»),

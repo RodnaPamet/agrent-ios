@@ -1,8 +1,9 @@
 import XCTest
 @testable import Agrent
 
-/// Профил for every role (agri-saas#1193 P2.8): the menu row, the Админ card
-/// as a link to it, the shared card, and Изход behind one confirmation.
+/// Профил for every role (agri-saas#1193 P2.8), reached from Админ's top row
+/// and nowhere else since the owner took «Профил» and «Изход» out of the menu
+/// (2026-10-07); the shared card; and Изход behind one confirmation.
 ///
 /// The wiring is read from the source, as `MenuSheetCloseTests` reads it:
 /// hosting the menu, a sheet and `AuthClient` to look for a row would test the
@@ -33,38 +34,50 @@ final class ProfileTests: XCTestCase {
 
     // MARK: - The menu
 
-    /// «Профил» is in the menu for everyone: in its own section, NOT under an
-    /// `if` on the role — the owner's "every role" is the whole point.
-    func testTheMenuOffersProfileToEveryRole() throws {
+    /// The menu keeps «Админ» and holds neither «Профил» nor «Изход» (owner,
+    /// 2026-10-07): both are reached through Админ now.
+    func testTheMenuLeavesProfileAndIzhodToAdmin() throws {
         let menu = try source("Agrent/Design/AppMenu.swift")
         XCTAssertTrue(menu.contains("struct AppMenuButton"), "positive control: the menu moved")
-        guard let row = menu.range(of: #"Label("Профил", systemImage: "person.crop.circle")"#) else {
-            return XCTFail("no «Профил» row in the menu")
+        // Админ stays — and without it nothing reaches Профил or Изход.
+        XCTAssertTrue(menu.contains(#"Label("Админ", systemImage: "person.2")"#),
+                      "«Админ» left the menu, and with it the only way to Профил and Изход")
+        XCTAssertTrue(menu.contains(".sheet(isPresented: $showingAdmin) { AdminView() }"))
+        for row in [#"Label("Профил""#, #"Label("Изход""#, "ProfileView()", ".signOutConfirmation("] {
+            XCTAssertFalse(menu.contains(row), "the menu has \(row) again")
         }
-        // The stretch of the menu body before the row holds no role check.
-        let before = String(menu[..<row.lowerBound])
-        guard let body = before.range(of: "var body: some View", options: .backwards) else {
-            return XCTFail("positive control: the menu has no body before the row")
-        }
-        let lead = String(before[body.upperBound...])
-        for gate in ["isOperator", "mayWrite", ".role", "isAdmin"] {
-            XCTAssertFalse(lead.contains(gate), "the «Профил» row sits behind \(gate)")
-        }
-        XCTAssertTrue(menu.contains(".accessibilityInputLabels(A11y.Spoken.profile)"))
-        // Presented as the menu's own sheet, flagged so the page draws «Затвори».
-        XCTAssertTrue(menu.contains("NavigationStack { ProfileView() }"))
-        XCTAssertTrue(menu.contains(".environment(\\.presentedFromMenu, true)"))
     }
 
-    /// The menu's Изход ASKS: it sets the flag, and the one confirmation does
-    /// the signing out.
-    func testTheMenuIzhodAsksFirst() throws {
-        let menu = try source("Agrent/Design/AppMenu.swift")
-        XCTAssertTrue(menu.contains(#"Label("Изход", systemImage: "rectangle.portrait.and.arrow.right")"#),
-                      "positive control: the menu's Изход row moved")
-        XCTAssertTrue(menu.contains("confirmingSignOut = true"))
-        XCTAssertTrue(menu.contains(".signOutConfirmation(isPresented: $confirmingSignOut)"))
-        XCTAssertTrue(menu.contains(".accessibilityInputLabels(A11y.Spoken.signOut)"))
+    // MARK: - Админ, the one way in
+
+    /// Профил is opened from ONE place, Админ's account row — and that row is
+    /// drawn OUTSIDE the access switch, so a reader whom Админ refuses still
+    /// has it, and with it the app's only Изход.
+    func testAdminOpensProfileInEveryState() throws {
+        let openers = try appSources().filter { $0.1.contains("ProfileView()") }
+        XCTAssertEqual(openers.map(\.0), ["Agrent/Admin/AdminView.swift"],
+                       "Профил is opened from somewhere other than Админ")
+
+        let admin = try source("Agrent/Admin/AdminView.swift")
+        let row = try XCTUnwrap(admin.range(of: "Section { accountRow }"),
+                                "positive control: Админ draws no account row")
+        let gate = try XCTUnwrap(admin.range(of: "switch store.access"),
+                                 "positive control: Админ no longer switches on access")
+        XCTAssertLessThan(row.lowerBound, gate.lowerBound,
+                          "the account row is inside the access switch — a reader loses Изход")
+
+        // Not waiting for `/me` either: no name yet still means a row.
+        let decl = try XCTUnwrap(admin.range(of: "private var accountRow: some View {"))
+        let end = try XCTUnwrap(admin.range(of: "private var forbiddenNotice", range: decl.upperBound..<admin.endIndex),
+                                "positive control: the notice no longer follows the row")
+        let body = String(admin[decl.upperBound..<end.lowerBound])
+        XCTAssertTrue(body.contains("ProfileView()"), "the account row opens something else")
+        XCTAssertTrue(body.contains("AccountCard(user: user)"), "the row's label is not the card")
+        XCTAssertTrue(body.contains(#"Label("Профил", systemImage: "person.crop.circle")"#),
+                      "no row until /me answers — an offline launch has no Изход")
+        XCTAssertFalse(body.contains("if let user = me.user {\n            NavigationLink"),
+                       "the whole row waits for /me again")
+        XCTAssertTrue(body.contains(".accessibilityInputLabels(A11y.Spoken.profile"))
     }
 
     /// THE INVARIANT: `AuthClient.signOut()` is called from exactly one view,
@@ -88,20 +101,14 @@ final class ProfileTests: XCTestCase {
 
     // MARK: - The page and the card
 
-    /// One card: Админ links its card to Профил, and Профил draws the same
-    /// `AccountCard` rather than a copy of it.
-    func testAdminAndProfileShareOneCard() throws {
-        let admin = try source("Agrent/Admin/AdminView.swift")
-        XCTAssertTrue(admin.contains("struct AdminView"), "positive control: AdminView moved")
-        let link = try XCTUnwrap(admin.range(of: "NavigationLink {\n                            ProfileView()"),
-                                 "Админ's card does not link to Профил")
-        let tail = String(admin[link.upperBound...].prefix(200))
-        XCTAssertTrue(tail.contains("AccountCard(user: user)"), "the link's label is not the card")
-
+    /// One card: Профил draws the same `AccountCard` Админ's row does (held by
+    /// the test above), not a copy — and it holds the app's only Изход, which
+    /// asks first and can be said aloud.
+    func testProfileSharesTheCardAndHoldsIzhod() throws {
         let profile = try source("Agrent/Account/ProfileView.swift")
+        XCTAssertTrue(profile.contains("struct ProfileView"), "positive control: ProfileView moved")
         XCTAssertTrue(profile.contains("AccountCard(user: user)"))
-        XCTAssertTrue(profile.contains(".closeWhenPresentedFromMenu()"),
-                      "Профил from the menu would have no «Затвори»")
+        XCTAssertTrue(profile.contains(#"Label("Изход", systemImage: "rectangle.portrait.and.arrow.right")"#))
         XCTAssertTrue(profile.contains(".signOutConfirmation(isPresented: $confirmingSignOut)"))
         XCTAssertTrue(profile.contains(".accessibilityInputLabels(A11y.Spoken.signOut)"))
     }

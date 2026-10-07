@@ -240,7 +240,7 @@ final class RetryAfterCarryingTests: XCTestCase {
     ///
     /// The refresh arm names an uncoded failure `TOKEN_REFRESH_FAILED`, and a
     /// code is looked up BEFORE the 429 rule — so a proxy's bodyless 429 there
-    /// would have said «Излезте от менюто и влезте отново», and sign-in spends
+    /// would have said to choose «Изход» and sign in again, and sign-in spends
     /// the same auth limiter. A source check for the throw, which lives inside
     /// the refresh closure; the rest is what each code would have said.
     func testABodylessRefresh429IsNotToldToSignOut() {

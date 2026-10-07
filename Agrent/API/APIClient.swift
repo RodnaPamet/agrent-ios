@@ -1048,7 +1048,7 @@ actor APIClient {
                     //
                     // AND A 429 IS NOT GIVEN THE INVENTED CODE. A code is
                     // looked up before `UserMessage`'s 429 rule, and this one
-                    // says «Излезте от менюто и влезте отново» — advice that
+                    // says to choose «Изход» and sign in again — advice that
                     // signs a farmer out, and signing back in goes through the
                     // same auth limiter that just refused. The limiter's own
                     // body carries `RATE_LIMITED`; only a 429 with no code — a
