@@ -405,6 +405,32 @@ rectangles have no web counterpart either. Traffic runs the other way
 too — the target button that walks the parcels is the web's «Намери моето
 поле», adopted here.
 
+### Divergence — a spray refused with a 426 is kept for the updated app (#169, owner 2026-10-07)
+
+**The web.** `ParcelDetailSheet` saves through `useOfflineSync.submit`,
+which throws on every 4xx except 408 and 429 (`isTerminalClientError`). On a
+426 the sheet shows the error and keeps nothing. In practice the web never
+meets one: it ships with the server and sends no `x-agrent-client-version`,
+and the gate serves an absent header as compatible.
+
+**iOS, deliberately different.** The app declares its contract on every
+request (`x-agrent-client-version: 1`; ROADMAP, «Decisions locked» 7). So
+once the server's floor passes that number, the spray sheet's save meets a
+426. The sheet then offers «Запази за по-късно», as it does with no signal,
+under the line «Записът остава на устройството и се изпраща след обновяване
+на приложението.» The record is queued under the same `Idempotency-Key` and
+the same owner (parked while anyone else is signed in, #142). It waits while
+`OutboxStore.isClientTooOld` holds, which is the rest of this process: no
+request goes out, and the banner shows its «…остаряла…» line in place of
+«Изпрати» (#168). The updated app's first flush sends it. A farmer who
+recorded a spray in a field does not have to retype it after updating.
+
+Unchanged: a parcel line's tap on a 426 still queues nothing, as on the web
+(#168); the 429 pause and the key behave as before.
+
+**Unverified**: no 426 has been met, because the server's floor is 1 too,
+and the sheet's 426 line has never rendered (ROADMAP, the #112 entry).
+
 ---
 
 ## Journal

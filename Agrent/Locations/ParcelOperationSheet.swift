@@ -64,13 +64,14 @@ struct ParcelOperationSheet: View {
     @State private var saving = false
     @State private var failure: String?
 
-    /// Can this failure be fixed by trying later?
+    /// Can this failure be fixed later — and by what?
     ///
     /// The distinction the outbox turns on. A 400 is the server
     /// disagreeing and will disagree tomorrow; no signal is a condition
-    /// that passes. Only the second may be queued — see
-    /// `PendingOperations.isWorthRetrying`.
-    @State private var failureIsRetriable = false
+    /// that passes, and so, once the operator updates, is a build the
+    /// server has retired (#169). Only those may be queued — see
+    /// `QueueOffer.after(_:)`.
+    @State private var queueOffer: QueueOffer = .notOffered
     @State private var queued = false
 
     /// The error behind `failure`, kept for ONE reason: a 429 that is then
@@ -91,6 +92,48 @@ struct ParcelOperationSheet: View {
         case fertilize = "FERTILIZE"
         var id: String { rawValue }
         var label: String { self == .spray ? "Пръскане" : "Торене" }
+    }
+
+    /// «Запази за по-късно» after a failed save: offered or not, and what
+    /// the line under it promises. Decided from the error alone, and PURE,
+    /// so a test can read the decision — nothing in the unit suite renders
+    /// this sheet.
+    enum QueueOffer: Equatable {
+        /// A refusal. It will be a refusal tomorrow, and a queued one would
+        /// sit in the outbox forever under a label promising it is on its way.
+        case notOffered
+        /// No signal, a 5xx, a 408 or a 429: a later attempt can land, and
+        /// the outbox makes it (`PendingOperations.isWorthRetrying`).
+        case retry
+        /// A 426: the server's version gate turned THIS BUILD away before
+        /// the route ran (#169). Nothing about the record was looked at, so a
+        /// build the server still serves will send it as it stands — kept on
+        /// the phone for the updated app, where the web keeps nothing.
+        case afterUpdate
+
+        static func after(_ error: Error) -> QueueOffer {
+            // The 426 FIRST. The retry policy calls it final, which is right
+            // for the drain and for a parcel line's tap, and is exactly what
+            // this case overrides for a record typed in a field.
+            if case APIClient.APIError.clientTooOld = error { return .afterUpdate }
+            return PendingOperations.isWorthRetrying(error) ? .retry : .notOffered
+        }
+
+        /// The line under the button — what happens to the record next — or
+        /// nil when there is no button. The 426's names the update, not a
+        /// connection: signal will not send it, and «автоматично» would
+        /// promise something only the operator can start, as the outbox
+        /// banner's own too-old line takes care not to.
+        var caption: String? {
+            switch self {
+            case .notOffered:
+                nil
+            case .retry:
+                "Записът остава на устройството и се изпраща автоматично, когато има връзка."
+            case .afterUpdate:
+                "Записът остава на устройството и се изпраща след обновяване на приложението."
+            }
+        }
     }
 
     /// The split is a NEGATION. 24 items on this tenant: 13 PESTICIDE, 8
@@ -284,18 +327,17 @@ struct ParcelOperationSheet: View {
                         Text("Може да опитате отново — повторното изпращане не създава втора операция.")
                             .font(.footnote).foregroundStyle(Palette.secondaryText)
 
-                        // Offered only when a later attempt could work. A
-                        // refusal must not be queueable: it would sit in
-                        // the outbox forever under a label promising it is
-                        // on its way.
-                        if failureIsRetriable {
+                        // Offered only when a later attempt could work, or
+                        // a later build (#169). A refusal must not be
+                        // queueable: it would sit in the outbox forever
+                        // under a label promising it is on its way.
+                        if let promise = queueOffer.caption {
                             Button {
                                 Task { await queueForLater() }
                             } label: {
                                 Label("Запази за по-късно", systemImage: "tray.and.arrow.down")
                             }
-                            Text("Записът остава на устройството и се изпраща "
-                               + "автоматично, когато има връзка.")
+                            Text(promise)
                                 .font(.footnote).foregroundStyle(Palette.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -369,13 +411,14 @@ struct ParcelOperationSheet: View {
             dismiss()
         } catch {
             failure = UserMessage.text(for: error)
-            failureIsRetriable = PendingOperations.isWorthRetrying(error)
+            queueOffer = QueueOffer.after(error)
             failureError = error
             feedback.refused()
             // A 426 is about this BUILD, so it is the outbox's answer too:
             // told now, its banner says why nothing is being sent instead of
-            // offering «Изпрати» for the same 426 (#168). Nothing is queued —
-            // the sheet stays open with the form intact, as on the web.
+            // offering «Изпрати» for the same 426 (#168). Told HERE, before
+            // «Запази за по-късно» can be tapped, so a record kept on a 426
+            // joins a queue that already waits for the update (#169).
             OutboxStore.shared.absorbClientTooOld(error)
         }
     }
@@ -399,6 +442,23 @@ struct ParcelOperationSheet: View {
     /// nothing. «Запиши» stays enabled: a live retry is the operator's call,
     /// and «повторното изпращане не създава втора операция» is still true of
     /// one.
+    ///
+    /// ── A 426 is kept too, for the updated app (#169) ──
+    ///
+    /// The server's version gate turned the BUILD away before the route ran,
+    /// so nothing about the record was refused, and a build the server still
+    /// serves will send it as it stands. The owner chose (2026-10-07) to keep
+    /// it rather than have a farmer retype a spray after updating. The web
+    /// shows its error and keeps nothing; this is a deliberate divergence
+    /// (PARITY.md, Locations).
+    ///
+    /// Nothing goes out from THIS build: `save()` has already told the
+    /// outbox, so every trigger is a no-op for the rest of the process
+    /// (`OutboxStore.isClientTooOld`) and its banner says the records wait
+    /// for the update. The updated app is a new process, which asks again
+    /// and sends it — under the same key, as the person who recorded it,
+    /// exactly as after no signal. The pause line below is a no-op for it:
+    /// a 426 is not a 429.
     private func queueForLater() async {
         guard let body = try? await APIClient.shared.encodeBody(draft) else {
             failure = "Операцията не можа да бъде запазена на устройството."

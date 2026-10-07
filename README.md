@@ -189,7 +189,10 @@ The wire contract is **settled**; what is still moving is client-side only.
   `currentVersion`. The web client read it one level too shallow for months
   and its keep-mine retry silently sent no If-Match at all.
 - **426 means the client is too old**, not that the write was refused. Show an
-  upgrade prompt; do not park the queue.
+  upgrade prompt; do not park the queue. The server can say so only because
+  this app declares the contract it was built against —
+  `x-agrent-client-version` on every request (#169). A client that sends none
+  is never refused.
 
 Four behaviours in the web client are defects, not the contract, and are
 deliberately not mirrored here: a 409 closing a form like a success, 426 as a

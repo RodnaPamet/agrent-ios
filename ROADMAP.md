@@ -105,9 +105,10 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   every queued spray REFUSED — permanently, for records the server never
   saw. A drain now stops on `notSignedIn` and touches nothing, which also
   covers the older case of a session that dies mid-drain. A 426 gets the same
-  stop since #168, and nothing asks again until a relaunch; never met — the
-  version gate reads `x-agrent-client-version`, which this app does not send —
-  and the banner's «…остаряла…» line never rendered. No seam answers a
+  stop since #168, and nothing asks again until a relaunch; never met — this
+  app has declared `x-agrent-client-version: 1` since #169, and the server's
+  floor is 1 — so the banner's «…остаряла…» line, and the spray sheet's
+  «Запази за по-късно» on a 426 (#169), have never rendered. No seam answers a
   429 or carries `Retry-After` — the unit suite runs with no seam at all,
   and the UI-test fixture protocol serves recorded GETs with 200 and refuses
   everything else with 501 — so the chain is proven in pieces: the parser
@@ -365,6 +366,33 @@ Shipped and proven end to end on a device simulator (2026-09-21):
    **Open:** `--brand-emphasis` (`accentDeep`) on `--bg-default` is 4.26 in
    dark, so it must not go on a bar; `Form`s in sheets still use the
    system's grouped greys (opaque, not token).
+
+7. **The app declares the contract it was built against (#169, owner
+   2026-10-07).** Every request carries `x-agrent-client-version:
+   <ClientHeader.contractVersion>`, beside `X-Agrent-Client` and from the
+   same `ClientHeader.stamp`. Today it is **1**, agri-saas's `x-api-version`
+   (main 261463d). The server's gate (`src/middleware.ts`) reads it as an
+   integer and answers 426 `client_version_unsupported` below
+   `x-minimum-client-version`. An absent or unparseable header is served as
+   compatible, so until #169 no floor could retire an iOS build.
+
+   **The rule: raise it ONLY in a release that understands the newer
+   contract — never on its own.** It is the app half of the app-first
+   sequence in agri-saas `docs/api-compatibility.md`: the release that
+   decodes the new shapes (and still the old ones, which it meets until the
+   server moves) raises the number in the same change, ships, and is
+   adopted; only then does the server bump its contract, and its floor
+   rises after the support window as a change of its own. Raised early, the
+   number claims an understanding the code lacks, and a build the server
+   has moved past stays served and breaks on the new shapes. Never raised,
+   a build that does understand is turned away once the floor passes 1.
+   `ClientHeaderTests` pins the value so that neither happens by accident.
+   It is not derived from `MARKETING_VERSION`: the app's version moves every
+   release, the contract only on a break.
+
+   What a refusal does here: the outbox stops and its banner asks for an
+   update (#168), and the spray sheet keeps a record typed in the field for
+   the updated app (#169; PARITY.md, Locations).
 
 ## Phase 0 — Foundations — DONE (2a8f6f1..d6d8798)
 
