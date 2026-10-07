@@ -237,8 +237,11 @@ What is NOT invented is the SHAPE. `field-operation-detail.json` follows the
 spec's `FieldOperationDetail` and `OperationParcel` and, where the spec is
 thin, the route itself (`getFieldOperation`): the raw Prisma row of each line
 with its five includes, Decimal columns as STRINGS (`doseValue`,
-`parcel.areaHa`), the location's parcels as numbers with no geometry, and the
-line's `version` — which the route sends and the spec's schema does not list.
+`parcel.areaHa`), the location's parcels with the geometry
+`locations-parcels.json` gives the same three ids (copied, not invented again —
+the task map draws them since agrent-ios#177; before that they carried
+`geometry: null`, since nothing drew them), and the line's `version` — which
+the route sends and the spec's schema does not list.
 `task-detail-fieldop.json` follows `WorkItem`, like the task it shadows.
 
 | case | where |
@@ -247,6 +250,7 @@ line's `version` — which the route sends and the spec's schema does not list.
 | a target note on a skipped line, a null water rate, a null `completedBy` | lines 2, 2, 0 |
 | an `areaHa` of `"5"` with no fractional part | line 2 |
 | the assignee is the operator, the viewer (`auth-me.json`) the owner — so the buttons show because the OWNER may write, not because they are assigned | `task.assigneeUserId` |
+| a task map with a parcel to do (four holes), a done one, and a skipped one with no outline — two drawn, one noted under the map | `parcels`, against lines 0–2 |
 
 The parcels are the three `locations-parcels.json` holds, by id and name; the
 product is the dashboard's «Примерен хербицид». The line ids (`opl_synthetic_*`)

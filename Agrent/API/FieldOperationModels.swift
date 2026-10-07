@@ -9,17 +9,64 @@ import Foundation
 /// The route sends the whole job in one read: the Task row, every line, the
 /// linked location with ALL of its parcels and their geometry (the web's map
 /// backdrop), and a derived `progress`. This models the task's three fields
-/// the lines section needs and the lines themselves. The map is not ported
-/// (PARITY.md), so `location` and `parcels` stay on the wire — geometry is
-/// the heaviest part of the payload and nothing here would draw it.
+/// the lines section needs, the lines, and — since the task map
+/// (agrent-ios#177) — the location and its parcels.
 ///
-/// `progress` is not decoded either. The spec says it is derived from
-/// `lines` (DONE or SKIPPED over all), and the screen derives its own from
-/// the lines PLUS the marks still on the phone, as the web's offline panel
-/// does — so a server count would be a second number for one fact.
+/// `progress` is not decoded. The spec says it is derived from `lines` (DONE
+/// or SKIPPED over all), and the screen derives its own from the lines PLUS
+/// the marks still on the phone, as the web's offline panel does — so a
+/// server count would be a second number for one fact.
 struct FieldOperationDetail: Decodable, Equatable, Sendable {
     let task: Job
     let lines: [OperationLine]
+
+    /// The job's location: «Resolved through the Task↔Location TaskLink» and
+    /// NULL when the job has none, which the spec calls «a signal, not just an
+    /// absence» — a partially committed create leaves exactly that.
+    let location: Place?
+
+    /// EVERY parcel of that location, with geometry — the map's context, not
+    /// the job's parcels (those are the lines'). Empty when `location` is null.
+    ///
+    /// The spec types the items as an open object; they come from
+    /// `ParcelRepository.listForLocation`, the call behind
+    /// `GET /locations/{id}/parcels`, so they decode as that route's `Parcel`
+    /// (documenting them is asked of agri-saas, agrent-ios#177).
+    ///
+    /// LOSSY, PER PARCEL, AND NEVER AT THE LINES' EXPENSE. The lines are the
+    /// work; the map is context. A parcel that will not decode is dropped on
+    /// its own, and a `parcels` or `location` that will not decode at all
+    /// leaves the job with no map — not with no lines.
+    let parcels: [Parcel]
+
+    struct Place: Decodable, Equatable, Sendable {
+        let id: String
+        let name: String
+    }
+
+    init(task: Job, lines: [OperationLine], location: Place? = nil, parcels: [Parcel] = []) {
+        self.task = task
+        self.lines = lines
+        self.location = location
+        self.parcels = parcels
+    }
+
+    private enum CodingKeys: String, CodingKey { case task, lines, location, parcels }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        task = try container.decode(Job.self, forKey: .task)
+        lines = try container.decode([OperationLine].self, forKey: .lines)
+        location = (try? container.decodeIfPresent(Place.self, forKey: .location)) ?? nil
+        parcels = ((try? container.decodeIfPresent([Lossy<Parcel>].self, forKey: .parcels)) ?? nil)?
+            .compactMap(\.value) ?? []
+    }
+
+    /// One array element that may not decode, without failing the array.
+    private struct Lossy<Value: Decodable>: Decodable {
+        let value: Value?
+        init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
+    }
 
     /// The job's own row, cut to what decides who may mark it.
     ///
@@ -50,7 +97,9 @@ struct FieldOperationDetail: Decodable, Equatable, Sendable {
         guard let version else { return self }
         return FieldOperationDetail(
             task: task,
-            lines: lines.map { $0.id == lineID ? $0.with(status: status, version: version) : $0 }
+            lines: lines.map { $0.id == lineID ? $0.with(status: status, version: version) : $0 },
+            location: location,
+            parcels: parcels
         )
     }
 }

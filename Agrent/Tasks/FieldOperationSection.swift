@@ -6,9 +6,11 @@ import SwiftUI
 /// ── Where, and what is not here ──
 ///
 /// On the task detail, as on the web (`FarmTaskDetailClient` renders
-/// `FieldOperationPanel` for a FIELD_OPERATION task). The panel's map and its
-/// «Необходимо: …» amounts are NOT ported — PARITY.md says why — so a line is
-/// its parcel, its product and dose, its area, its status and its buttons.
+/// `FieldOperationPanel` for a FIELD_OPERATION task). The panel's map is
+/// here since agrent-ios#177 — `TaskParcelMap`, under the progress line as the
+/// web puts it — and marks the job's parcels, which the web's does not; its
+/// «Необходимо: …» amounts are still not ported (PARITY.md says why). A line
+/// is its parcel, its product and dose, its area, its status and its buttons.
 ///
 /// ── What it shows that the server does not ──
 ///
@@ -88,6 +90,12 @@ struct FieldOperationSection: View {
         Text(FieldOperationText.progress(done: progress.done, total: progress.total))
             .font(.subheadline)
             .fixedSize(horizontal: false, vertical: true)
+        // From the same rows as the list below, so a mark waiting on the
+        // phone colours its parcel exactly as it changes its line. No map at
+        // all when none of the job's parcels has an outline.
+        if let map = TaskParcelMapContent.fieldOperation(parcels: detail.parcels, rows: rows) {
+            TaskParcelMap(content: map)
+        }
         if me == nil {
             RefusalNote(text: FieldOperationText.waitingForUser, icon: "person.crop.circle")
         } else if !mayMark {
