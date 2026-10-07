@@ -394,8 +394,16 @@ final class A11yShotsTests: XCTestCase {
         let row = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Пръскане срещу плевели"))
             .firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 20),
-                      "Задачи has no field-operation row — tasks-list.json's third row")
+        // At the accessibility sizes the third row starts below the fold, and
+        // a List builds rows lazily — it does not exist until scrolled to.
+        // Vertical swipes on a list can only scroll; bounded, so a row that
+        // is really missing still fails here rather than swiping forever.
+        var swipes = 0
+        while !row.waitForExistence(timeout: swipes == 0 ? 20 : 3), swipes < 4 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(row.exists, "Задачи has no field-operation row — tasks-list.json's third row")
         row.tap()
 
         // The progress line is the signal that field-operation-detail.json
@@ -404,6 +412,39 @@ final class A11yShotsTests: XCTestCase {
                       "the task opened without its parcel lines")
         Thread.sleep(forTimeInterval: 2)
         capture("08b-task-parcel-lines", app: app)
+
+        // ── The task map at the accessibility sizes (agrent-ios#177) ──
+        //
+        // Found by its spoken summary, which also proves the fixture's two
+        // outlined parcels made it onto the map. Below the fold at these
+        // sizes, so the page is scrolled until the WHOLE map clears the tab
+        // bar — `isHittable` is already true for a map whose top edge shows.
+        //
+        // Short drags, started where the map is: the map takes no gestures
+        // (`interactionModes: []`), so a finger on it must still scroll the
+        // page. If it ever swallows the drag, the map never rises and the
+        // assertion below says so — which is a bug a farmer would meet.
+        let map = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Карта на парцелите. Чакащо: SYNTH-1. Готово: SYNTH-2."))
+            .firstMatch
+        XCTAssertTrue(map.waitForExistence(timeout: 10), "the field operation has no task map")
+        if UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory {
+            let floor = app.tabBars.firstMatch.exists
+                ? app.tabBars.firstMatch.frame.minY
+                : app.windows.firstMatch.frame.maxY
+            var drags = 0
+            while map.frame.maxY > floor, drags < 8 {
+                let from = map.frame.minY < floor - 40
+                    ? map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+                    : app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+                from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -220)))
+                Thread.sleep(forTimeInterval: 0.5)
+                drags += 1
+            }
+            XCTAssertLessThanOrEqual(map.frame.maxY, floor, "the page would not scroll the task map into view")
+            Thread.sleep(forTimeInterval: 2)
+            capture("08c-task-map", app: app)
+        }
 
         goBack(app, to: "Задачи")
         if isTab {

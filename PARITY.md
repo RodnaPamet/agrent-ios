@@ -530,8 +530,19 @@ Where iOS goes further, deliberately:
   mid-pass is not sent from the pass's old list. The web's `flushOutbox`
   walks its snapshot.
 
-**Not ported:** the read-only parcel map with done parcels shaded; the
-«Необходимо: …» and «… вода» amounts (rate × area — the web's `totalLabel`,
+**The map — ported 2026-10-07 (#177), and it marks more than the web's.**
+The web draws every parcel of the job's location alike and shades the
+finished ones. iOS (`TaskParcelMap`, read-only, under the progress line as on
+the web) marks EVERY parcel of the job by its lines as shown — to do, done,
+skipped — so a mark waiting on the phone colours its parcel as it changes its
+line. The location's other parcels are thin outlines for context, and the
+camera frames the job's parcels, not the location. A job parcel with no
+outline is counted under the map, not silently missing from it.
+`FieldOperationDetail.parcels` is decoded as the parcel shape of
+`GET /locations/{id}/parcels`; agri-saas is documenting it as `ParcelGeo`
+(backend 1, 2026-10-07).
+
+**Not ported:** the «Необходимо: …» and «… вода» amounts (rate × area — the web's `totalLabel`,
 which also skips the ml→L promotion for Cyrillic unit symbols); the spray-job
 completion card; the reviewer's approve / request-changes on PENDING_REVIEW
 (`POST …/review`, admin-only). The job's move to PENDING_REVIEW after the

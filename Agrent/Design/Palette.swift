@@ -524,6 +524,35 @@ enum Palette {
         static func strokeWidth(_ contrast: ColorSchemeContrast) -> CGFloat {
             contrast == .increased ? 3.5 : strokeWidth
         }
+
+        /// A TASK'S parcels on the task map (agrent-ios#177), over Apple's
+        /// hybrid imagery.
+        ///
+        /// Fixed values, like the rest of this enum: the imagery under them is
+        /// the same in every theme, so a themed colour would only change how
+        /// well it reads against the same fields.
+        ///
+        /// Colour is never the only channel. A parcel still to do is an
+        /// outline over a light fill, a finished one is filled near-solid, a
+        /// skipped one is a DASHED outline with no fill, and the location's
+        /// other parcels are a thin outline. That is what separates them in a
+        /// monochrome screenshot, and for anyone who cannot tell a finished
+        /// parcel's green from a crop's.
+        enum TaskParcels {
+            /// Amber: a job's parcel still to do, or a parcel a task is about.
+            /// The web outlines parcels in amber too (#D97706); this one is
+            /// lighter, because it sits on dark imagery rather than a basemap.
+            static let marked = Color(hex: 0xFFC83D)
+            static let done = Color(hex: 0x4CD964)
+            static let skipped = Color(hex: 0xE5E5EA)
+            /// The location's other parcels: there to place the task's, not
+            /// to compete with them.
+            static let context = Color.white.opacity(0.7)
+            /// Under a legend swatch, so the swatch is seen against something
+            /// as dark as the imagery its colour was chosen for.
+            static let swatchGround = Color(hex: 0x24301F)
+            static let markedFillOpacity: Double = 0.25
+        }
     }
 }
 
