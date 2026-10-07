@@ -750,8 +750,7 @@ struct ParcelMapView: View {
                         .listRowBackground(Palette.Surface.card)
                 }
             } header: {
-                Text(Plural.bg(response.parcels.count, "парцел", "парцела"))
-                    .foregroundStyle(Palette.secondaryText)
+                SectionHeader(Plural.bg(response.parcels.count, "парцел", "парцела"))
             }
             if drawable.count != response.parcels.count {
                 RefusalNote(

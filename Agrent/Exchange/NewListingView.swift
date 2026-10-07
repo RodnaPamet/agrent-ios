@@ -103,12 +103,14 @@ struct NewListingView: View {
         NavigationStack {
             PageForm {
                 Section {
-                    Picker("Страна", selection: $side) {
+                    // `MenuPicker` for all three: the system menu picker cuts
+                    // a Bulgarian value short in the row (#160).
+                    MenuPicker("Страна", selection: $side, value: side.label) {
                         ForEach(ExchangeSide.allCases.filter { $0 != .unknown }, id: \.self) {
                             Text($0.label).tag($0)
                         }
                     }
-                    Picker("Вид", selection: $kind) {
+                    MenuPicker("Вид", selection: $kind, value: kind.label) {
                         ForEach(ExchangeKind.allCases.filter { $0 != .unknown }, id: \.self) {
                             Text($0.label).tag($0)
                         }
@@ -120,21 +122,22 @@ struct NewListingView: View {
                     // so driving both from one set is what makes them
                     // incapable of drifting. It also stops the phone
                     // posting a slug the board cannot filter on.
-                    Picker("Култура", selection: $commodity) {
+                    MenuPicker("Култура", selection: $commodity,
+                               value: CommodityName.canonical(commodity) ?? commodity) {
                         ForEach(Self.canonicalCommodities, id: \.self) { slug in
                             Text(CommodityName.canonical(slug) ?? slug).tag(slug)
                         }
                     }
                 }
 
-                Section("Количество и цена") {
-                    LabeledContent("Тонове") {
-                        TextField("0", text: $quantityText)
+                Section(titled: "Количество и цена") {
+                    FieldRow("Тонове") {
+                        TextField("0", text: $quantityText, prompt: .fieldPrompt("0"))
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    LabeledContent("Цена / т") {
-                        TextField("по избор", text: $priceText)
+                    FieldRow("Цена / т") {
+                        TextField("по избор", text: $priceText, prompt: .fieldPrompt("по избор"))
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
@@ -143,31 +146,33 @@ struct NewListingView: View {
                     // by design and used to accept BGN and USD before
                     // being deliberately narrowed. Offering a choice that
                     // does not exist would be a 400 dressed as a feature.
-                    LabeledContent("Валута") {
+                    ValueRow("Валута") {
                         Text("EUR").foregroundStyle(Palette.secondaryText)
                     }
                 }
 
-                Section("Регион") {
-                    TextField("напр. BG-PVN", text: $regionCode)
+                Section(titled: "Регион") {
+                    TextField("напр. BG-PVN", text: $regionCode, prompt: .fieldPrompt("напр. BG-PVN"))
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                 }
 
-                Section("Описание") {
+                Section(titled: "Описание") {
                     TextEditor(text: $descriptionText).frame(minHeight: 90)
                 }
 
                 Section {
-                    TextField("Име за показване", text: $sellerDisplayName)
-                    TextField("Контакт", text: $sellerContact)
+                    TextField("Име за показване", text: $sellerDisplayName, prompt: .fieldPrompt("Име за показване"))
+                    TextField("Контакт", text: $sellerContact, prompt: .fieldPrompt("Контакт"))
                 } header: {
-                    Text("Продавач")
+                    SectionHeader("Продавач")
                 } footer: {
-                    // Said on the screen, because the server keeping it
-                    // private does not stop an operator assuming it is
-                    // public and declining to fill it in.
-                    Text("Контактът НЕ се показва в обявата. Разкрива се само на купувач, чието запитване приемете.")
+                    SectionFooter {
+                        // Said on the screen, because the server keeping it
+                        // private does not stop an operator assuming it is
+                        // public and declining to fill it in.
+                        Text("Контактът НЕ се показва в обявата. Разкрива се само на купувач, чието запитване приемете.")
+                    }
                 }
 
                 Section {

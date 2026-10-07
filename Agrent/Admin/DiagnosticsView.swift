@@ -50,7 +50,7 @@ struct DiagnosticsView: View {
                     }
                 }
             } header: {
-                Text("Флагове")
+                SectionHeader("Флагове")
             }
             .pageRow()
 
@@ -59,11 +59,13 @@ struct DiagnosticsView: View {
                      value: flags.lastFreshAt.map(BgDate.clockSeconds) ?? "Няма в тази сесия")
                 fact("X-Agrent-Client", value: ClientHeader.value ?? "Не се изпраща")
             } header: {
-                Text("Сесия")
+                SectionHeader("Сесия")
             } footer: {
-                // What "fresh" means, once, because the measurement depends
-                // on it: a cached `/me` from disk never moves this time.
-                Text("Часът, в който приложението е приело флаговете от сървъра. Отговор от кеша не го променя.")
+                SectionFooter {
+                    // What "fresh" means, once, because the measurement depends
+                    // on it: a cached `/me` from disk never moves this time.
+                    Text("Часът, в който приложението е приело флаговете от сървъра. Отговор от кеша не го променя.")
+                }
             }
             .pageRow()
         }
@@ -75,7 +77,7 @@ struct DiagnosticsView: View {
     /// compares against the server's config letter by letter.
     private func flagRow(_ key: String) -> some View {
         let on = flags.isOn(key)
-        return LabeledContent {
+        return ValueRow {
             Text(on ? "вкл." : "изкл.")
                 // Off is the quiet state; on is the news. `Palette.secondaryText`
                 // is the measured 6.86:1, not `.secondary`.
@@ -90,7 +92,7 @@ struct DiagnosticsView: View {
     }
 
     private func fact(_ label: String, value: String) -> some View {
-        LabeledContent(label) {
+        ValueRow(label) {
             Text(value).monospacedDigit()
         }
         .accessibleRow(spoken: "\(label): \(value)", saying: [label])

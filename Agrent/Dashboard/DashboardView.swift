@@ -132,7 +132,7 @@ struct DashboardView: View {
         // data by definition, so every section below would render nothing and
         // the reason would never be seen.
         if let note = disabledNote(for: block) {
-            Section(block.label) {
+            Section(titled: block.label) {
                 Text(note)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
@@ -164,7 +164,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var briefingSection: some View {
         if let payload = store.briefing.value {
-            Section("Сателитно обобщение") {
+            Section(titled: "Сателитно обобщение") {
                 if let briefing = payload.briefing {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(briefing.headline).font(.headline)
@@ -192,7 +192,7 @@ struct DashboardView: View {
                 }
             }
         } else if store.briefing.isFailed {
-            Section("Сателитно обобщение") {
+            Section(titled: "Сателитно обобщение") {
                 Text(store.briefing.failureText ?? "Грешка.")
                     .font(.footnote)
                     .foregroundStyle(Palette.error)
@@ -245,7 +245,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var priceSection: some View {
         if let chosen = store.chosenPriceSeries, let latest = chosen.series.points.last {
-            Section(preferences.priceCommodity.label) {
+            Section(titled: preferences.priceCommodity.label) {
                 VStack(alignment: .leading, spacing: 4) {
                     // Тенденции's unit wording, not a `currency/unit` of our
                     // own: every input's unit already carries its currency,
@@ -284,7 +284,7 @@ struct DashboardView: View {
                 .pageRow()
             }
         } else if store.prices.isFailed {
-            Section(preferences.priceCommodity.label) {
+            Section(titled: preferences.priceCommodity.label) {
                 Text(store.prices.failureText ?? "Грешка.")
                     .font(.footnote).foregroundStyle(Palette.error).pageRow()
             }
@@ -296,7 +296,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var journalSection: some View {
         if let entries = store.ag.value?.recentJournal, !entries.isEmpty {
-            Section("Последни записи") {
+            Section(titled: "Последни записи") {
                 ForEach(entries) { entry in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(entry.title).font(.subheadline)
@@ -324,7 +324,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var taskTrendSection: some View {
         if let trend = store.taskTrend.value?.trend, !trend.isEmpty {
-            Section("Създадени и завършени задачи") {
+            Section(titled: "Създадени и завършени задачи") {
                 Chart {
                     ForEach(trend) { point in
                         if let day = point.date {
@@ -426,7 +426,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var tasksSection: some View {
         if let tasks = store.ag.value?.myTasks, !tasks.isEmpty {
-            Section("Моите задачи") {
+            Section(titled: "Моите задачи") {
                 ForEach(tasks) { task in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(task.title).font(.subheadline)
@@ -445,7 +445,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var lowStockSection: some View {
         if let stock = store.ag.value?.lowStock, !stock.isEmpty {
-            Section("Ниски наличности") {
+            Section(titled: "Ниски наличности") {
                 ForEach(stock) { item in
                     HStack {
                         Text(item.name).font(.subheadline)
@@ -465,7 +465,7 @@ struct DashboardView: View {
     @ViewBuilder
     private var achievementsSection: some View {
         if let achievements = store.ag.value?.achievements {
-            Section("Постижения") {
+            Section(titled: "Постижения") {
                 Text(A11y.sentence([
                     "Серия \(achievements.streak.current)",
                     "най-добра \(achievements.streak.best)",
@@ -506,9 +506,9 @@ struct DashboardBlockPicker: View {
                     }
                     .pickerStyle(.navigationLink)
                 } header: {
-                    Text("Цена")
+                    SectionHeader("Цена")
                 } footer: {
-                    Text("Показва се само ако блокът «\(DashboardBlock.grainPrice.label)» е включен.")
+                    SectionFooter("Показва се само ако блокът «\(DashboardBlock.grainPrice.label)» е включен.")
                 }
 
                 Section {
@@ -532,9 +532,9 @@ struct DashboardBlockPicker: View {
                         .pageRow()
                     }
                 } header: {
-                    Text("Блокове")
+                    SectionHeader("Блокове")
                 } footer: {
-                    Text("Блок без данни не се показва, дори когато е включен.")
+                    SectionFooter("Блок без данни не се показва, дори когато е включен.")
                 }
             }
             .listStyle(.insetGrouped)

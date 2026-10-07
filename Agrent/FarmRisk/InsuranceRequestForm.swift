@@ -259,33 +259,37 @@ struct InsuranceRequestForm: View {
 
                     Section {
                         HStack {
-                            TextField("0", text: $areaText)
+                            TextField("0", text: $areaText, prompt: .fieldPrompt("0"))
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                             Text("дка").foregroundStyle(Palette.secondaryText)
                         }
                         .accessibilityLabel("Площ за застраховане в декари")
                     } header: {
-                        Text("Площ за застраховане")
+                        SectionHeader("Площ за застраховане")
                     } footer: {
-                        if let recorded = selected?.areaHa.map(Area.init(hectares:)),
-                           let area, area.differs(from: recorded) {
-                            // Said out loud rather than silently corrected.
-                            // A deliberate difference is the reason this
-                            // field exists; a typo looks identical, and only
-                            // the farmer can tell them apart.
-                            Text("По регистър: \(recorded.text).")
-                                .foregroundStyle(Palette.warning)
-                        } else if let recorded = selected?.areaHa {
-                            Text("По регистър: \(Area(hectares: recorded).text).")
+                        SectionFooter {
+                            if let recorded = selected?.areaHa.map(Area.init(hectares:)),
+                               let area, area.differs(from: recorded) {
+                                // Said out loud rather than silently corrected.
+                                // A deliberate difference is the reason this
+                                // field exists; a typo looks identical, and only
+                                // the farmer can tell them apart.
+                                Text("По регистър: \(recorded.text).")
+                                    .foregroundStyle(Palette.warning)
+                            } else if let recorded = selected?.areaHa {
+                                Text("По регистър: \(Area(hectares: recorded).text).")
+                            }
                         }
                     }
 
                     Section {
                         Toggle("Изчисли премия", isOn: $wantsQuote)
                     } footer: {
-                        Text("Може да изпратите запитване и без изчисление — "
-                             + "тогава оферта дава застрахователят.")
+                        SectionFooter {
+                            Text("Може да изпратите запитване и без изчисление — "
+                                 + "тогава оферта дава застрахователят.")
+                        }
                     }
 
                     if wantsQuote, let refusal = previewRefusal {
@@ -298,12 +302,12 @@ struct InsuranceRequestForm: View {
                     } else if wantsQuote, let catalogue {
                         Section {
                             Picker("Покритие", selection: $productKey) {
-                                Section("Култури") {
+                                Section(titled: "Култури") {
                                     ForEach(catalogue.products.filter(\.isCrop)) {
                                         Text($0.name).tag(Optional($0.key))
                                     }
                                 }
-                                Section("Рискове") {
+                                Section(titled: "Рискове") {
                                     ForEach(catalogue.products.filter { !$0.isCrop }) {
                                         Text($0.name).tag(Optional($0.key))
                                     }
@@ -312,7 +316,7 @@ struct InsuranceRequestForm: View {
                             .pickerStyle(.navigationLink)
 
                             HStack {
-                                TextField("0", text: $sumInsuredText)
+                                TextField("0", text: $sumInsuredText, prompt: .fieldPrompt("0"))
                                     .keyboardType(.decimalPad)
                                     .multilineTextAlignment(.trailing)
                                 // The tenant's own symbol, so the app does not
@@ -328,31 +332,33 @@ struct InsuranceRequestForm: View {
                             .pickerStyle(.segmented)
                             .accessibilityLabel("Брой вноски")
                         } header: {
-                            Text("Изчисление")
+                            SectionHeader("Изчисление")
                         } footer: {
-                            // «100 000» is one hundred thousand and «12,345»
-                            // decares is twelve and a bit: the two fields read
-                            // the same characters differently, which is the
-                            // server's rule and has to be said rather than
-                            // discovered. The area field is above and already
-                            // labelled in decares.
-                            Text("Сумата се въвежда в евро: «100 000» е сто хиляди. "
-                                 + "«100,50» е сто евро и петдесет цента.")
+                            SectionFooter {
+                                // «100 000» is one hundred thousand and «12,345»
+                                // decares is twelve and a bit: the two fields read
+                                // the same characters differently, which is the
+                                // server's rule and has to be said rather than
+                                // discovered. The area field is above and already
+                                // labelled in decares.
+                                Text("Сумата се въвежда в евро: «100 000» е сто хиляди. "
+                                     + "«100,50» е сто евро и петдесет цента.")
+                            }
                         }
 
                         if let estimate {
                             Section {
-                                LabeledContent("Прогнозна премия") {
+                                ValueRow("Прогнозна премия") {
                                     Text(InsurancePremium.eur(estimate.premiumCents))
                                         .fontWeight(.semibold)
                                 }
                                 if let perDca = areaDecares.flatMap(estimate.perDecareCents) {
-                                    LabeledContent("На декар") {
+                                    ValueRow("На декар") {
                                         Text(InsurancePremium.eur(perDca))
                                     }
                                 }
                                 if estimate.instalmentsCents.count > 1 {
-                                    LabeledContent("Вноски") {
+                                    ValueRow("Вноски") {
                                         Text(estimate.instalmentsCents
                                             .map(InsurancePremium.eur)
                                             .joined(separator: " + "))
@@ -360,16 +366,18 @@ struct InsuranceRequestForm: View {
                                     }
                                 }
                             } footer: {
-                                // AN ESTIMATE, NOT A PRICE, and the distinction
-                                // is load-bearing rather than modest. The
-                                // request carries no price; the server
-                                // recomputes and its figure is what gets stored
-                                // and emailed. This phone also carries a
-                                // compiled-in tariff, so a rate change server
-                                // side makes this number stale with nothing
-                                // here able to know it.
-                                Text("Прогноза. Окончателната сума се изчислява "
-                                     + "от застрахователя при изпращане.")
+                                SectionFooter {
+                                    // AN ESTIMATE, NOT A PRICE, and the distinction
+                                    // is load-bearing rather than modest. The
+                                    // request carries no price; the server
+                                    // recomputes and its figure is what gets stored
+                                    // and emailed. This phone also carries a
+                                    // compiled-in tariff, so a rate change server
+                                    // side makes this number stale with nothing
+                                    // here able to know it.
+                                    Text("Прогноза. Окончателната сума се изчислява "
+                                         + "от застрахователя при изпращане.")
+                                }
                             }
                         } else if !sumInsuredText.isEmpty || !areaText.isEmpty {
                             Section {

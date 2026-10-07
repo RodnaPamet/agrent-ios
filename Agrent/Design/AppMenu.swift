@@ -59,7 +59,7 @@ struct AppMenuButton<Extra: View>: View {
                 Section { extra }
             }
 
-            Section(Config.tenantSlug) {
+            Section(titled: Config.tenantSlug) {
                 // EVERY surface not in the bottom row, always.
                 //
                 // This is what makes the tab customiser safe rather than a
@@ -247,7 +247,7 @@ struct TabCustomiserRow: View {
         Button {
             editing = true
         } label: {
-            LabeledContent {
+            ValueRow {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     // The ONLY mark that this row opens something, and at

@@ -41,12 +41,14 @@ struct TabCustomiserView: View {
                     }
                     .onMove { from, to in chosen.move(fromOffsets: from, toOffset: to) }
                 } header: {
-                    Text("В долната лента · \(chosen.count) от \(AppSurface.capacity)")
+                    SectionHeader("В долната лента · \(chosen.count) от \(AppSurface.capacity)")
                 } footer: {
-                    // Says the constraint rather than letting a farmer
-                    // discover it by having a tap do nothing.
-                    Text("iOS показва най-много \(AppSurface.capacity) раздела. "
-                       + "Всичко останало е в менюто горе вляво и остава достъпно.")
+                    SectionFooter {
+                        // Says the constraint rather than letting a farmer
+                        // discover it by having a tap do nothing.
+                        Text("iOS показва най-много \(AppSurface.capacity) раздела. "
+                           + "Всичко останало е в менюто горе вляво и остава достъпно.")
+                    }
                 }
 
                 // `permitted`, not `allCases` — the editor must not offer a
@@ -59,7 +61,7 @@ struct TabCustomiserView: View {
                         && !chosen.contains { $0.id == surface.id }
                 }
                 if !rest.isEmpty {
-                    Section("В менюто") {
+                    Section(titled: "В менюто") {
                         ForEach(rest) { surface in
                             row(surface, inBar: false)
                         }

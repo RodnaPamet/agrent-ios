@@ -175,7 +175,7 @@ struct ExchangeView: View {
                     }
                     loadMoreRow
                 } footer: {
-                    Text("Обявите са от всички стопанства в платформата.")
+                    SectionFooter("Обявите са от всички стопанства в платформата.")
                 }
                 // On the SECTION — it propagates to the rows inside, which
                 // is one modifier per section instead of one per row type.
@@ -232,6 +232,9 @@ struct ExchangeView: View {
             )) {
                 ForEach(TonnageBand.allCases) { Text($0.label).tag($0) }
             }
+            // Explicit, as every `Picker` in the app is (`ListChromeTests`):
+            // inside a `Menu` the options are the menu's own rows.
+            .pickerStyle(.inline)
             if listings.query.isFiltered {
                 Divider()
                 Button("Изчисти филтрите") { Task { await listings.clearFilters() } }

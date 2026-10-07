@@ -119,7 +119,7 @@ struct AdminView: View {
         NavigationLink {
             FarmProfileView(store: store)
         } label: {
-            LabeledContent {
+            ValueRow {
                 switch store.profile {
                 case .loading:
                     ProgressView()
@@ -145,7 +145,7 @@ struct AdminView: View {
         NavigationLink {
             MembersView(store: store)
         } label: {
-            LabeledContent {
+            ValueRow {
                 if let all = store.members.value {
                     Text("\(all.count)").monospacedDigit().rowValue()
                 } else if case .loading = store.members {
@@ -180,10 +180,10 @@ private extension Text {
     /// label, where one line of AX5 text held «Синтети…» of the farm's name.
     /// The row's whole job is to say WHICH farm, and a cut name does not.
     ///
-    /// `Palette.secondaryText`, not `LabeledContent`'s default value grey,
-    /// which is the system's `secondaryLabel` — 3.29:1 on the light page.
+    /// The colour is no longer set here: `ValueRow` gives every row value
+    /// `Palette.ListChrome.value` (#159), which is what this did for these
+    /// two rows alone.
     func rowValue() -> some View {
-        foregroundStyle(Palette.secondaryText)
-            .fixedSize(horizontal: false, vertical: true)
+        fixedSize(horizontal: false, vertical: true)
     }
 }

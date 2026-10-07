@@ -43,7 +43,7 @@ struct ExchangeMapView: View {
                         .foregroundStyle(Palette.secondaryText)
                 }
             } footer: {
-                Text("Маркерите показват област, не точно местоположение.")
+                SectionFooter("Маркерите показват област, не точно местоположение.")
             }
             // Every section on the page colour, as Борса's list view draws
             // its rows (`pageRow`). Without it the region sections under the

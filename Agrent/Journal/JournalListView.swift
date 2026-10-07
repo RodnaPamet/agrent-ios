@@ -86,7 +86,7 @@ struct JournalListView: View {
                 // claim about the tenant's whole history that one page
                 // cannot make. The old copy said exactly that and was wrong
                 // for any farm past fifty entries.
-                Section(store.hasMore
+                Section(titled: store.hasMore
                         ? "Показани " + Plural.bg(entries.count, "запис", "записа")
                         : Plural.bg(entries.count, "запис", "записа")) {
                 ForEach(entries) { entry in

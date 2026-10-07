@@ -19,20 +19,24 @@ struct NewEntryView: View {
         NavigationStack {
             PageForm {
                 Section {
-                    Picker("Тип", selection: $type) {
+                    // `MenuPicker`, not a bare `Picker`: the system's menu
+                    // picker drew «Дейност» as «Де…ст» here, at the default
+                    // text size (#160).
+                    MenuPicker("Тип", english: "Type", selection: $type, value: type.label) {
                         // `selectable`, never `allCases` — the latter now carries
                         // `.unknown`, whose raw value the server would reject.
                         ForEach(LogEntryType.selectable) { Text($0.label).tag($0) }
                     }
                     DatePicker("Дата", selection: $occurredAt, displayedComponents: .date)
                 }
-                Section("Заглавие") {
+                Section(titled: "Заглавие") {
                     // No font-size dance here. UIKit's text input does not
                     // focus-zoom, which is the entire class of bug that took
                     // five fixes on the web.
-                    TextField("напр. Третиране на южния блок", text: $title, axis: .vertical)
+                    TextField("Заглавие", text: $title,
+                              prompt: .fieldPrompt("напр. Третиране на южния блок"), axis: .vertical)
                 }
-                Section("Бележки") {
+                Section(titled: "Бележки") {
                     TextEditor(text: $notes).frame(minHeight: 140)
                 }
                 if let error {

@@ -289,7 +289,7 @@ private struct ResolutionSheet: View {
     var body: some View {
         NavigationStack {
             PageForm {
-                Section("Решение") {
+                Section(titled: "Решение") {
                     TextEditor(text: $text).frame(minHeight: 140)
                 }
                 Section {

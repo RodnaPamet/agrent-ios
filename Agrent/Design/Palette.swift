@@ -329,6 +329,45 @@ enum Palette {
         static let edge = Color(token: AgrentColor.contentSubtle)
     }
 
+    /// The text a `List` or `Form` draws AROUND its rows, which the system
+    /// otherwise draws in its own greys (agrent-ios#159). Every one of these
+    /// is a second name for a role above: no new value, only the decision
+    /// that the system's colour is not used here. `FormChrome.swift` is what
+    /// writes them; `ListChromeTests` fails on a site that bypasses it.
+    ///
+    /// What they replace, measured on the token surfaces in #156:
+    ///
+    ///     header / footer   secondaryLabel    5.82   3.29   4.25
+    ///     row value         secondaryLabel    5.18   3.34   4.25
+    ///     placeholder       placeholderText    —     ~1.9    —
+    ///
+    /// What they measure now (`PaletteTokenTests`, dark / light / «Слънце»):
+    ///
+    ///     header on formPage          9.17   6.98   9.28
+    ///     header on page              9.17   6.98  11.37
+    ///     value on card               7.64   7.24  11.37
+    ///     value on page               9.17   6.98  11.37
+    ///     placeholder on card         5.81   5.32   7.46
+    ///     menu value on card          6.59   5.09   5.49
+    ///
+    /// plus the same header and value on the system grouped surfaces, for
+    /// the lists that are not on tokens yet (see `PaletteTokenTests`).
+    enum ListChrome {
+        /// A section's header and footer — `SectionHeader`, `SectionFooter`,
+        /// `Section(titled:)`.
+        static let header = secondaryText
+        /// A row's value — `ValueRow`. What `LabeledContent` draws in
+        /// `secondaryLabel` by default.
+        static let value = secondaryText
+        /// A text field's prompt — `Text.fieldPrompt(_:)`. The composer's,
+        /// so a form field and the composer hint in one colour.
+        static let placeholder = Field.placeholder
+        /// A menu picker's collapsed value — `MenuPicker`. The accent,
+        /// because it is the control: the system's own menu picker draws its
+        /// value in the tint, and this keeps that.
+        static let menuValue = accent
+    }
+
     /// Борса's map of Bulgaria (`ExchangeMapView`): the oblasti with no
     /// offer, and the line between oblasti. They were `secondarySystemFill`
     /// and `separator`, two system greys (#156).
