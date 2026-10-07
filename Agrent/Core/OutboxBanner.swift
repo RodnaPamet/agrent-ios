@@ -21,7 +21,7 @@ struct OutboxBanner: View {
             // Read ONCE per render. It reads the clock, and three separate
             // reads could straddle the server's moment — a caption shown
             // beside the button it exists to replace.
-            let caption = pauseCaption
+            let caption = Self.caption(for: outbox)
             // ── NEVER TALLER THAN THE SPACE IT IS OFFERED ──
             //
             // Nothing bounded this banner's height, and it sits above EVERY
@@ -108,10 +108,10 @@ struct OutboxBanner: View {
             // One stop for the description, built from the values — the
             // button beside it stays a separate, nameable element.
             //
-            // The pause caption is IN the sentence. While it shows there
-            // is no «Изпрати», and a control that simply vanished says
-            // nothing to VoiceOver; the caption is the reason, so it is
-            // what gets read.
+            // The caption is IN the sentence, the pause's and the retired
+            // build's alike. While it shows there is no «Изпрати», and a
+            // control that simply vanished says nothing to VoiceOver; the
+            // caption is the reason, so it is what gets read.
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(A11y.sentence(
                 [headline, focus?.parcelSummary, caption, conflictHint]))
@@ -134,45 +134,61 @@ struct OutboxBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// «Изпрати», and — when the pass it starts meets a 429 — the reason,
-    /// said aloud.
+    /// «Изпрати», and — when the pass it starts meets a 429 or a 426 — the
+    /// reason, said aloud.
     ///
     /// ── The control a VoiceOver user pressed is gone ──
     ///
-    /// A 429 ends the pass with the caption where the button was, and the
-    /// caption's reason lives in the label of the description beside it —
-    /// which VoiceOver reads only if focus happens to land there. Nothing
-    /// else is spoken. So the reason is announced, on THIS path only: launch,
-    /// the return to the foreground and the alarm start passes nobody is
-    /// waiting on, and announcing those would talk over whatever the person
-    /// is doing. High priority, because the focus move that follows a
+    /// Either answer ends the pass with the caption where the button was,
+    /// and the caption's reason lives in the label of the description beside
+    /// it — which VoiceOver reads only if focus happens to land there.
+    /// Nothing else is spoken. So the reason is announced, on THIS path only:
+    /// launch, the return to the foreground and the alarm start passes nobody
+    /// is waiting on, and announcing those would talk over whatever the
+    /// person is doing. High priority, because the focus move that follows a
     /// vanished control is exactly what cuts a default one short. NOT heard
     /// on a device.
     private func send() async {
         await outbox.flush()
-        guard let caption = pauseCaption else { return }
+        guard let caption = Self.caption(for: outbox) else { return }
         var announcement = AttributedString(caption)
         announcement.accessibilitySpeechAnnouncementPriority = .high
         AccessibilityNotification.Announcement(announcement).post()
     }
 
-    /// Why nothing is being sent, while the server has asked the queue to
-    /// wait — and only when something is waiting to BE sent.
+    /// Why nothing is being sent — and only when something is waiting to BE
+    /// sent. Two reasons, both the server's answer about everything queued
+    /// rather than any one item:
+    ///
+    ///   - THIS BUILD IS TOO OLD (a 426, #168). Nothing is sent until a newer
+    ///     one is installed, and the line says so, and that nothing is lost.
+    ///   - THE SERVER HAS ASKED THE QUEUE TO WAIT (a 429). The queue resumes
+    ///     by itself, and the line says when.
+    ///
+    /// When both hold, the build's line wins: the pause reopening would send
+    /// nothing either, so its clock time would promise a resumption that is
+    /// not coming.
     ///
     /// ── It REPLACES «Изпрати», rather than sitting beside a disabled one ──
     ///
-    /// A tap during the pause could only buy a guaranteed 429, so there is
-    /// nothing for the button to do. A dimmed control with no reason is the
-    /// worse of the two for VoiceOver and Voice Control alike: it is found,
-    /// named, and does nothing. A sentence that says the queue resumes by
-    /// itself is the whole of what the farmer needs.
+    /// A tap could only buy the same answer, so there is nothing for the
+    /// button to do. A dimmed control with no reason is the worse of the two
+    /// for VoiceOver and Voice Control alike: it is found, named, and does
+    /// nothing. A sentence that says what happens next is the whole of what
+    /// the farmer needs.
     ///
     /// The headline stays as it is: «N операции чакат изпращане» is still
-    /// true. At reopen the observed gate changes and this line goes; the
-    /// alarm's own flush then shows the usual spinner, and «Изпрати» is back
-    /// for whatever that pass could not send.
-    private var pauseCaption: String? {
-        guard !outbox.sendable.isEmpty, let remaining = outbox.pause.remaining else { return nil }
+    /// true. At the pause's reopen the observed gate changes and its line
+    /// goes; the alarm's own flush then shows the usual spinner, and
+    /// «Изпрати» is back for whatever that pass could not send. The build's
+    /// line stays until the process ends.
+    ///
+    /// Static, and handed the store, so a test can read what the banner says
+    /// about a store in a given state without rendering it.
+    static func caption(for outbox: OutboxStore) -> String? {
+        guard !outbox.sendable.isEmpty else { return nil }
+        if outbox.isClientTooOld { return UserMessage.outboxClientTooOld }
+        guard let remaining = outbox.pause.remaining else { return nil }
         return UserMessage.outboxRateLimited(remaining: remaining)
     }
 
@@ -197,10 +213,14 @@ struct OutboxBanner: View {
         return "\(Plural.bg(waiting, "операция чака", "операции чакат")) изпращане."
     }
 
-    /// Something here waits for a PERSON — a refusal to read or a conflict
-    /// to decide — rather than for signal. Drawn as the caveat, never as an
+    /// Something here waits for a PERSON — a refusal to read, a conflict to
+    /// decide, or a newer build to install before anything waiting can be
+    /// sent (#168) — rather than for signal. Drawn as the caveat, never as an
     /// error: nothing is broken, and the work is still on the phone.
-    private var needsAPerson: Bool { !outbox.refused.isEmpty || !outbox.conflicts.isEmpty }
+    private var needsAPerson: Bool {
+        !outbox.refused.isEmpty || !outbox.conflicts.isEmpty
+            || (outbox.isClientTooOld && !outbox.sendable.isEmpty)
+    }
 
     /// The row the headline is about, so the line under it names that one:
     /// the first refusal, else the first conflict, else the first in line.

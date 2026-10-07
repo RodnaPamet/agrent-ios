@@ -133,6 +133,21 @@ enum UserMessage {
             + "\(whenRetry(remaining: remaining, now: now))."
     }
 
+    /// The outbox banner's line once the server has said this build is too
+    /// old to serve (a 426, agrent-ios#168), in place of «Изпрати».
+    ///
+    /// UNLIKE the pause's line, it does ask something of the farmer: only a
+    /// newer build sends the queue, and installing one is theirs to do. The
+    /// rest says what they most need to hear — nothing is lost. The work
+    /// stays on the phone exactly as it was, and the updated app sends it.
+    ///
+    /// «Записите», so it covers a queued spray and a parcel-line mark alike.
+    /// «Запазени на телефона» is the app's phrase for work kept to send
+    /// (`FieldOperationText.kept`); the web's `bg.json` has no sentence for a
+    /// retired build to borrow.
+    static let outboxClientTooOld = "Тази версия на приложението е остаряла. "
+        + "Записите са запазени на телефона и ще се изпратят след обновяване."
+
     /// «след малко», or «в 14:33».
     ///
     /// A CLOCK TIME, NOT A COUNT, because nothing re-renders this line every

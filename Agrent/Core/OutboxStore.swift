@@ -49,6 +49,41 @@ final class OutboxStore {
     /// never shown. Measured in scratch. Only an Optional field is safe.
     let pause = RateLimitPause()
 
+    /// The server has said this BUILD is too old to serve: a 426, which its
+    /// version gate answers before any route runs (agrent-ios#168).
+    ///
+    /// ── Remembered in memory, for the life of the process ──
+    ///
+    /// It describes the binary, not the work and not the person, so nothing a
+    /// pass, an Изход or a sign-in does can change it. Installing a newer
+    /// build can, and that ends this process. Once an answer has said it,
+    /// launch, the return to the foreground, «Изпрати» and the pause's alarm
+    /// stop asking: each would buy the same 426, and the queue on disk is
+    /// exactly what the updated app will send. (The web's drain keeps no such
+    /// memory, so it asks again on every trigger.)
+    ///
+    /// NOT persisted. A relaunch asks once more, which costs one request and
+    /// is the way back should the server's floor ever come down again.
+    ///
+    /// NOT cleared by `reset()`, unlike the pause. The next person to sign in
+    /// on this phone runs the same build, and the server would answer their
+    /// queue exactly as it answered this one.
+    private(set) var isClientTooOld = false
+
+    /// Remember a 426 if `error` is one, and say whether it was.
+    ///
+    /// The drain's stop, and also the way the live writes report one: the
+    /// spray sheet's save and a parcel line's tap are this same build asking
+    /// the same server, so what they learn is true of the queue too. Fed in
+    /// like the sheet's 429 (`pause.absorb`), so the banner can say why
+    /// nothing is being sent before a tap on «Изпрати» buys the same answer.
+    @discardableResult
+    func absorbClientTooOld(_ error: Error) -> Bool {
+        guard case APIClient.APIError.clientTooOld = error else { return false }
+        isClientTooOld = true
+        return true
+    }
+
     /// Seams for `SignOutHygieneTests`: the queue on disk, who is signed in,
     /// and how one item is sent. The app uses the real three.
     @ObservationIgnored private let queue: PendingOperations
@@ -140,6 +175,8 @@ final class OutboxStore {
     /// Back to a fresh launch — part of `SessionReset`. The in-memory list
     /// and the pause only: the QUEUE ON DISK is left exactly as it is, which
     /// is what parks the departing user's items rather than destroying them.
+    /// `isClientTooOld` stays as it is too: it belongs to the build, which
+    /// an Изход does not change.
     func reset() {
         pending = []
         needsAnotherPass = false
@@ -259,6 +296,13 @@ final class OutboxStore {
     /// thing five times. A refusal does not stop the drain, because it is
     /// specific to that one item.
     func flush() async {
+        // ── NOTHING GOES OUT FROM A BUILD THE SERVER HAS RETIRED (#168) ──
+        //
+        // Every request would meet the same 426, and only installing a newer
+        // build changes that — so every trigger is a no-op, with no spinner,
+        // until then. Checked before the pause: when the pause reopens there
+        // is still nothing to send, so there is no alarm worth arming.
+        guard !isClientTooOld else { return }
         // ── NOTHING GOES OUT WHILE THE SERVER HAS ASKED US TO WAIT ──
         //
         // A request sent before the server's moment cannot succeed; it buys a
@@ -288,8 +332,10 @@ final class OutboxStore {
             needsAnotherPass = false
             await drain()
             // A pause that closed during the pass ends the loop: work queued
-            // meanwhile waits for the alarm rather than walking into it.
-        } while needsAnotherPass && !pause.isPaused
+            // meanwhile waits for the alarm rather than walking into it. So
+            // does a 426 met during it: another turn would send the first
+            // item again, to be told the same thing.
+        } while needsAnotherPass && !pause.isPaused && !isClientTooOld
     }
 
     private func drain() async {
@@ -301,8 +347,9 @@ final class OutboxStore {
         for listed in pending where listed.awaitsSend {
             // The pause can close from OUTSIDE this pass — the operation
             // sheet feeds it, because its live save spends the same budget —
-            // and the next send would only confirm it.
-            if pause.isPaused { break }
+            // and the next send would only confirm it. A live write can learn
+            // of a 426 the same way, and the next send would confirm that too.
+            if pause.isPaused || isClientTooOld { break }
             // ── THE ROW AS IT IS NOW, NOT AS IT WAS LISTED (#138) ──
             //
             // A tap on a line during the pass REPLACES that line's unsent
@@ -358,6 +405,27 @@ final class OutboxStore {
                 // out inside a pause is drained with no token. Stop and touch
                 // nothing; the next sign-in's launch flush sends them.
                 if case APIClient.APIError.notSignedIn = error { break }
+
+                // ── A 426 IS ABOUT THE BUILD, NOT THIS ITEM (#168) ──
+                //
+                // The server's version gate answers before any route runs —
+                // "the request was not processed; it is NOT a payload
+                // rejection", in the spec's words — so it says nothing about
+                // this operation, and every item behind it would get the same
+                // answer. The retry policy calls it final, and before this stop
+                // that was the whole story: refused, the pass went on, and
+                // every queued spray and parcel-line mark was stamped REFUSED
+                // in one pass. Permanently — the updated app would never send
+                // them — under a banner saying the server had declined work it
+                // never looked at.
+                //
+                // So, as for no session, and BEFORE the bump: no attempt spent,
+                // `lastError` not rewritten, not refused, not parked as a
+                // conflict, nothing written to disk. The pass stops, and
+                // `isClientTooOld` keeps every later trigger from asking again
+                // until a newer build is installed, which sends the queue as it
+                // stands. The web does the same in `sync.ts` (agri-saas#938).
+                if absorbClientTooOld(error) { break }
 
                 item.attempts += 1
                 item.lastAttemptAt = Date()

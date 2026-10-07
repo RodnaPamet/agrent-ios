@@ -21,15 +21,18 @@ import Observation
 ///               conflict for the operator, never sent over it.
 ///   refused     a 403, 400, 404: said, and not queued — a refusal will be
 ///               a refusal tomorrow.
+///   426         this BUILD is too old for the server (#168). Said, and
+///               nothing on the phone touched: not queued, not re-read, and
+///               the line's unsent marks left to wait for the updated app.
 ///
 /// ── Haptics (#155's two words) ──
 ///
 /// `.success` when a «Готово» lands — or is kept on the phone to send, which
 /// #155 counts as landed for field work, as the web does. `.warning` on a
-/// refusal or a conflict. Skip and reopen play nothing: the web gives them a
-/// `tap`, and this app's vocabulary has no tap. Nothing the app does on its
-/// own — a reload, the drain sending a queued mark, a conflict the drain
-/// parks — plays anything (`HapticSiteTests`).
+/// refusal, a conflict or a 426. Skip and reopen play nothing: the web gives
+/// them a `tap`, and this app's vocabulary has no tap. Nothing the app does
+/// on its own — a reload, the drain sending a queued mark, a conflict the
+/// drain parks — plays anything (`HapticSiteTests`).
 @Observable
 @MainActor
 final class FieldOperationStore {
@@ -265,6 +268,26 @@ final class FieldOperationStore {
                 notice = Notice(lineID: line.id, kind: .kept, text: FieldOperationText.kept)
                 if target == .done { feedback.saved() }
 
+            case .clientTooOld:
+                // ── A 426 IS ABOUT THE BUILD, NOT THIS MARK (#168) ──
+                //
+                // The server's version gate answered before the route ran,
+                // so nothing about this line was looked at — and nothing
+                // about it changes here, which is where this parts from a
+                // refusal. The line's unsent marks are NOT superseded: the
+                // server has not seen them either, and they wait for the
+                // updated app like the rest of the queue, so what the line
+                // shows is still what will be sent. Nothing is queued: the
+                // tap is the operator's to make again once updated, as on
+                // the web, whose live mark queues nothing on a 426. Nothing
+                // is re-read: the read would meet the same 426.
+                //
+                // The outbox is told, so the banner says why nothing is being
+                // sent instead of offering «Изпрати» for the same answer.
+                outbox.absorbClientTooOld(error)
+                notice = Notice(lineID: line.id, kind: .refused, text: UserMessage.text(for: error))
+                feedback.refused()
+
             case .refused(let message):
                 disownReads()
                 notice = Notice(lineID: line.id, kind: .refused, text: message)
@@ -357,15 +380,22 @@ enum FieldOperationRules {
     enum Failure: Equatable {
         case conflict(currentVersion: Int?)
         case keep
+        /// A 426: this BUILD is too old for the server (#168). Neither kept
+        /// nor refused — see the branch in `FieldOperationStore.mark`.
+        case clientTooOld
         case refused(String)
     }
 
     /// What a failed live mark becomes. The 409 is checked FIRST: it is not
-    /// worth retrying, and it is not a refusal either.
+    /// worth retrying, and it is not a refusal either. The 426 next, for the
+    /// same two reasons — the retry policy calls it final, and it says
+    /// nothing about the mark — and because a refusal SUPERSEDES the line's
+    /// unsent marks, which a 426 must not (#168).
     static func failure(_ error: Error) -> Failure {
         if case APIClient.APIError.conflict(let current, _) = error {
             return .conflict(currentVersion: current)
         }
+        if case APIClient.APIError.clientTooOld = error { return .clientTooOld }
         if PendingOperations.isWorthRetrying(error) { return .keep }
         return .refused(UserMessage.text(for: error))
     }

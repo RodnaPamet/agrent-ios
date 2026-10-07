@@ -290,6 +290,42 @@ final class OutboxRateLimitTests: XCTestCase {
         XCTAssertFalse(PendingOperations.isWorthRetrying(APIClient.APIError.notSignedIn))
     }
 
+    /// A 426 REFUSES NOTHING (#168).
+    ///
+    /// The server's version gate answers before any route runs, so a 426 is
+    /// about the build and never about the item. The retry policy calls it
+    /// final all the same, and a refusal does not stop the pass — which is how
+    /// one 426 used to stamp every queued spray and parcel-line mark refused,
+    /// permanently, in one pass. The stop must come before the bump for the
+    /// reason the 429's and no-session's do. Held at runtime, for both kinds,
+    /// in `OutboxLineMarkTests` section 6.
+    func testA426SpendsNoAttemptAndRefusesNothing() {
+        let text = source
+        guard let tooOld = text.range(of: "if absorbClientTooOld(error) { break }"),
+              let bump = text.range(of: "item.attempts += 1") else {
+            return XCTFail("positive control: the 426 stop and the bump are both in the drain")
+        }
+        XCTAssertLessThan(tooOld.lowerBound, bump.lowerBound,
+                          "a 426 spends an attempt and refuses the item")
+        XCTAssertEqual(text.components(separatedBy: "absorbClientTooOld(error)").count - 1, 1,
+                       "a second place stops on a 426, so the one checked may not be the one that runs")
+
+        // And no trigger asks again: `flush` refuses to start a pass before it
+        // can show a spinner, and a coalesced turn is not taken after one.
+        guard let refused = text.range(of: "guard !isClientTooOld else { return }"),
+              let flushing = text.range(of: "isFlushing = true") else {
+            return XCTFail("positive control: flush's 426 guard and its spinner are where this expects them")
+        }
+        XCTAssertLessThan(refused.lowerBound, flushing.lowerBound,
+                          "a flush after a 426 shows a spinner for a pass it will not make")
+        XCTAssertTrue(text.contains("while needsAnotherPass && !pause.isPaused && !isClientTooOld"),
+                      "a coalesced pass sends the first item into the same 426 again")
+
+        // Why the drain has to stop on it ITSELF: the retry policy calls it
+        // final, and final is what marks an item refused.
+        XCTAssertFalse(PendingOperations.isWorthRetrying(APIClient.APIError.clientTooOld))
+    }
+
     /// NOTHING GOES OUT WHILE PAUSED. The pause is checked before anything
     /// else in `flush()`, and the disarm is reached only by a pass that is
     /// really starting — a flush that returns early must not cancel the alarm
@@ -362,6 +398,15 @@ final class OutboxRateLimitTests: XCTestCase {
         let spoken = text[sentence.upperBound...].prefix(120)
         XCTAssertTrue(spoken.contains("caption"),
                       "VoiceOver is not told why there is no «Изпрати»: \(spoken)")
+
+        // The caption shown, and the one announced after «Изпрати», is what
+        // `OutboxBanner.caption(for:)` returns — the function the runtime
+        // test of the banner reads (`OutboxLineMarkTests`, section 6). Twice:
+        // the render and the announcement.
+        XCTAssertTrue(text.contains("let caption = Self.caption(for: outbox)"),
+                      "the banner renders a caption no test reads")
+        XCTAssertEqual(text.components(separatedBy: "Self.caption(for: outbox)").count - 1, 2,
+                       "the banner shows or announces a caption no test reads")
     }
 }
 
@@ -378,7 +423,10 @@ final class OutboxRateLimitTests: XCTestCase {
 ///   3. a stale replay (409) is a CONFLICT — parked, never refused, never
 ///      resent by a pass, resolved only by the operator;
 ///   4. the queue keeps its other rules for marks: whose, 429, attempts;
-///   5. rows written before #138 still read, as creates.
+///   5. rows written before #138 still read, as creates;
+///   6. a 426 is about the BUILD (#168): it leaves every row of both kinds
+///      exactly as it was, stops the pass, and nothing asks again — and the
+///      banner says why.
 @MainActor
 final class OutboxLineMarkTests: XCTestCase {
 
@@ -832,5 +880,215 @@ final class OutboxLineMarkTests: XCTestCase {
         let rows = await queue.all()
         XCTAssertEqual(rows.map(\.id), [legacy.id])
         XCTAssertEqual(rows.first?.target, .create(locationID: "loc"))
+    }
+
+    // MARK: - 6. A 426 is about the build (#168)
+
+    /// THE BUG (#168). A 426 met mid-queue stamped its row REFUSED, and a
+    /// refusal does not stop the pass, so every row behind it — sprays and
+    /// marks alike — was refused in the same pass: permanently, never to be
+    /// sent even by the updated app. The server's version gate answers before
+    /// any route runs, so the answer is about the BUILD: every row stays
+    /// exactly as it was, and the pass stops at the first one to meet it.
+    ///
+    /// Run with a create and then a mark meeting the 426 first. Their
+    /// replays are different requests (a keyed POST, a guarded PATCH), and
+    /// only a mark's failure is ever read for a conflict.
+    func testA426MidQueueLeavesEveryRowOfBothKindsUntouchedAndStopsThePass() async {
+        for markFirst in [false, true] {
+            let kind = markFirst ? "a mark" : "a create"
+            let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+            let landed = create()
+            let rows = markFirst
+                ? [mark(line: "opl_1"), create(), mark(line: "opl_2"), create()]
+                : [create(), mark(line: "opl_1"), create(), mark(line: "opl_2")]
+            for item in [landed] + rows { await queue.enqueue(item) }
+            let before = await queue.all()
+            XCTAssertEqual(before.map(\.id), ([landed] + rows).map(\.id), "positive control: oldest first")
+            wire.answer = { item in
+                // The first lands; from the next on, the server turns the build away.
+                if item.id != landed.id { throw APIClient.APIError.clientTooOld }
+            }
+
+            await outbox.flush()
+
+            XCTAssertEqual(wire.sent.map(\.id), [landed.id, rows[0].id],
+                           "the pass went on past \(kind)'s 426")
+            let after = await queue.all()
+            XCTAssertEqual(after, Array(before.dropFirst()), "a 426 on \(kind) touched a row on disk")
+            for row in after {
+                XCTAssertEqual(row.attempts, 0, "an attempt was spent (\(kind))")
+                XCTAssertNil(row.lastError, "an error was written (\(kind))")
+                XCTAssertFalse(row.isRefused, "refused — never to be sent, even once updated (\(kind))")
+                XCTAssertNil(row.conflict, "parked for a decision nobody has to make (\(kind))")
+            }
+            XCTAssertTrue(outbox.refused.isEmpty, "the banner would say the server declined them")
+            XCTAssertEqual(outbox.sendable.map(\.id), rows.map(\.id))
+            XCTAssertTrue(outbox.isClientTooOld)
+            XCTAssertFalse(outbox.pause.isPaused, "a 426 closed the 429's pause")
+        }
+    }
+
+    /// Positive control for the test above: the same kinds meeting a REAL
+    /// refusal — a 400, about the payload — are refused row by row while the
+    /// pass goes on, so its assertions can see a refusal when there is one.
+    func testA400OnTheSameKindsIsRefusedRowByRow() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        let rows = [create(), mark(line: "opl_1")]
+        for item in rows { await queue.enqueue(item) }
+        wire.answer = { _ in throw APIClient.APIError.http(status: 400, code: nil, message: nil) }
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.map(\.id), rows.map(\.id), "a refusal stopped the pass")
+        XCTAssertEqual(outbox.refused.map(\.id), rows.map(\.id))
+        XCTAssertFalse(outbox.isClientTooOld, "a 400 was taken for a retired build")
+    }
+
+    /// REMEMBERED. Launch, the return to the foreground, «Изпрати» and the
+    /// pause's alarm all come through `flush()`, and after a 426 none of them
+    /// asks again — not with new work queued since, not after an Изход, not
+    /// even of a server that would now say yes. A new process — the updated
+    /// app — asks once more, and the queue goes out as it stood.
+    func testAfterA426NothingAsksAgainUntilARelaunch() async {
+        let queue = makeQueue(), wire = Wire(), identity = Identity(owner)
+        let outbox = makeOutbox(queue, wire, identity)
+        let spray = create()
+        await outbox.enqueue(spray)
+        wire.answer = { _ in throw APIClient.APIError.clientTooOld }
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.map(\.id), [spray.id], "positive control: the 426 was met")
+
+        wire.answer = { _ in }
+        let later = mark(line: "opl_5")
+        await outbox.enqueueMark(later)
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.count, 1, "a trigger asked the server again")
+        XCTAssertFalse(outbox.isFlushing)
+
+        // An Изход and the next sign-in run the same build.
+        outbox.reset()
+        XCTAssertTrue(outbox.isClientTooOld, "an Изход forgot what the server said about the build")
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.count, 1)
+
+        // Not even who is signed in. With nobody known a pass begins by
+        // asking `/me` — a request that would get the same 426.
+        var asked = 0
+        let nobodyKnown = OutboxStore(queue: makeQueue(), currentOwner: { nil },
+                                      identify: { asked += 1 }, send: { _ in })
+        await nobodyKnown.flush()
+        XCTAssertEqual(asked, 1, "positive control: a pass with nobody known asks who it is")
+        nobodyKnown.absorbClientTooOld(APIClient.APIError.clientTooOld)
+        await nobodyKnown.flush()
+        XCTAssertEqual(asked, 1, "a pass after a 426 asked the server who is signed in")
+
+        let relaunched = makeOutbox(queue, wire, identity)
+        XCTAssertFalse(relaunched.isClientTooOld)
+        await relaunched.flush()
+        XCTAssertEqual(wire.sent.dropFirst().map(\.id), [spray.id, later.id],
+                       "the queue did not go out from the updated app")
+        let left = await queue.all()
+        XCTAssertTrue(left.isEmpty)
+    }
+
+    /// «Запази моята» re-sends through the drain, so it can meet a 426 there.
+    /// The decision stands: re-queued at the server's version and waiting —
+    /// not refused, not parked again — for the updated app to send.
+    func testKeepMineThatMeetsA426WaitsForTheUpdate() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        var answers: [Error] = [stale, APIClient.APIError.clientTooOld]
+        wire.answer = { _ in if !answers.isEmpty { throw answers.removeFirst() } }
+        let item = mark(seen: 3)
+        await outbox.enqueueMark(item)
+        await outbox.flush()
+        XCTAssertEqual(outbox.conflicts.map(\.id), [item.id], "positive control: it is parked")
+
+        await outbox.keepMine(item.id)
+        XCTAssertEqual(wire.sent.map { $0.lineMark?.seenVersion }, [3, 5], "keep-mine was not re-sent")
+        let stored = await queue.all()
+        XCTAssertEqual(stored.map(\.id), [item.id], "the decision was lost")
+        XCTAssertNil(stored.first?.conflict, "a 426 parked the decision again")
+        XCTAssertEqual(stored.first?.lineMark?.seenVersion, 5, "the decision was undone")
+        XCTAssertEqual(stored.first?.isRefused, false)
+        XCTAssertEqual(stored.first?.attempts, 1, "the 426 spent an attempt; only the 409 may")
+        XCTAssertEqual(outbox.sendable.map(\.id), [item.id])
+        XCTAssertTrue(outbox.isClientTooOld)
+    }
+
+    /// Work queued DURING the pass that met the 426 gets no second turn: it
+    /// would be the same answer.
+    func testWorkQueuedDuringThePassThatMetA426IsNotSent() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        let first = create(), later = mark(line: "opl_3")
+        await queue.enqueue(first)
+        wire.answer = { _ in
+            // A tap queues a mark, and a trigger fires while this is in the air.
+            await outbox.enqueueMark(later)
+            await outbox.flush()
+            throw APIClient.APIError.clientTooOld
+        }
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.map(\.id), [first.id], "another turn sent into the same 426")
+        let stored = await queue.all()
+        XCTAssertEqual(stored.map(\.id), [first.id, later.id])
+        XCTAssertTrue(stored.allSatisfy { $0.attempts == 0 && !$0.isRefused })
+    }
+
+    /// A live write that meets a 426 while a pass runs — the spray sheet's
+    /// save, a line's tap — stops the pass before its next row.
+    func testA426LearnedByALiveWriteStopsAPassUnderWay() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        let first = create(), second = mark(line: "opl_1")
+        await queue.enqueue(first)
+        await queue.enqueue(second)
+        wire.answer = { sent in
+            // The sheet's save meets a 426 while this row is in the air; the row lands.
+            if sent.id == first.id { outbox.absorbClientTooOld(APIClient.APIError.clientTooOld) }
+        }
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.map(\.id), [first.id], "the next row went out into the same 426")
+        let left = await queue.all()
+        XCTAssertEqual(left.map(\.id), [second.id])
+        XCTAssertEqual(left.first?.attempts, 0)
+    }
+
+    /// THE BANNER. Once a 426 is known, the line saying the build is too old
+    /// — and that nothing is lost — stands where «Изпрати» was; also over a
+    /// pause, whose promised resumption would send nothing. Only while
+    /// something waits to be SENT: a lone conflict waits for the operator.
+    /// (That the banner shows and speaks this caption: the source check in
+    /// `OutboxRateLimitTests.testTheBannerReplacesTheButtonWithTheReason`.)
+    func testTheBannerSaysTheBuildIsTooOldInPlaceOfSend() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        defer { outbox.pause.reset() }
+        await outbox.enqueueMark(mark())
+        XCTAssertNil(OutboxBanner.caption(for: outbox), "positive control: «Изпрати» is offered")
+
+        wire.answer = { _ in throw APIClient.APIError.clientTooOld }
+        await outbox.flush()
+        XCTAssertEqual(OutboxBanner.caption(for: outbox), UserMessage.outboxClientTooOld)
+
+        outbox.pause.absorb(APIClient.APIError.http(
+            status: 429, code: "RATE_LIMITED", message: nil, retryAfterSeconds: 30))
+        XCTAssertTrue(outbox.pause.isPaused, "positive control: the pause closed")
+        XCTAssertEqual(OutboxBanner.caption(for: outbox), UserMessage.outboxClientTooOld,
+                       "the pause's line promises a resumption that will send nothing")
+
+        let parkedQueue = makeQueue()
+        let onlyAConflict = makeOutbox(parkedQueue, Wire(), Identity(owner))
+        var conflicted = mark(line: "opl_8")
+        conflicted.conflict = PendingOperation.Conflict(currentVersion: 5, at: clock)
+        await parkedQueue.enqueue(conflicted)
+        await onlyAConflict.refresh()
+        onlyAConflict.absorbClientTooOld(APIClient.APIError.clientTooOld)
+        XCTAssertNil(OutboxBanner.caption(for: onlyAConflict),
+                     "a lone conflict waits for the operator's choice, not for the update")
+
+        // The words: what happened, that nothing is lost, and what sends it.
+        let line = UserMessage.outboxClientTooOld
+        XCTAssertTrue(line.hasPrefix("Тази версия на приложението е остаряла."), line)
+        XCTAssertTrue(line.contains("запазени на телефона"), line)
+        XCTAssertTrue(line.contains("след обновяване"), line)
+        XCTAssertFalse(line.contains("автоматично"), "only an update sends them: \(line)")
+        XCTAssertTrue(line.hasSuffix("."), line)
     }
 }

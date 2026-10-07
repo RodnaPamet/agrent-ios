@@ -372,6 +372,11 @@ struct ParcelOperationSheet: View {
             failureIsRetriable = PendingOperations.isWorthRetrying(error)
             failureError = error
             feedback.refused()
+            // A 426 is about this BUILD, so it is the outbox's answer too:
+            // told now, its banner says why nothing is being sent instead of
+            // offering «Изпрати» for the same 426 (#168). Nothing is queued —
+            // the sheet stays open with the form intact, as on the web.
+            OutboxStore.shared.absorbClientTooOld(error)
         }
     }
 

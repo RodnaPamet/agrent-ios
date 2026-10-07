@@ -104,7 +104,10 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   signed out inside a pause, the alarm drained with no token and stamped
   every queued spray REFUSED — permanently, for records the server never
   saw. A drain now stops on `notSignedIn` and touches nothing, which also
-  covers the older case of a session that dies mid-drain. No seam answers a
+  covers the older case of a session that dies mid-drain. A 426 gets the same
+  stop since #168, and nothing asks again until a relaunch; never met — the
+  version gate reads `x-agrent-client-version`, which this app does not send —
+  and the banner's «…остаряла…» line never rendered. No seam answers a
   429 or carries `Retry-After` — the unit suite runs with no seam at all,
   and the UI-test fixture protocol serves recorded GETs with 200 and refuses
   everything else with 501 — so the chain is proven in pieces: the parser
