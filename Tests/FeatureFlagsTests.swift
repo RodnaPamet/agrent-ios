@@ -98,6 +98,9 @@ final class FeatureFlagsTests: XCTestCase {
         XCTAssertTrue(code.contains("FeatureFlags.shared"), "positive control: read the right file")
         XCTAssertTrue(code.contains("BgDate.clockSeconds"), "the time is not formatted through BgDate")
         XCTAssertTrue(code.contains("ClientHeader.value"))
+        // Both headers every request carries, the version gate's too (#169).
+        XCTAssertTrue(code.contains("ClientHeader.contractVersionHeader"))
+        XCTAssertTrue(code.contains("ClientHeader.contractVersion)"))
         for personal in ["CurrentUserStore", "SessionIdentity", "TokenStore", "CacheScope",
                          ".user", "userID", "email", "token", "egn", "ЕГН",
                          "adopt(", "reset(", "CachedResource", "APIClient"] {

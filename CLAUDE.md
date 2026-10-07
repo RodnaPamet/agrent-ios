@@ -38,7 +38,7 @@ DESTINATION="platform=iOS Simulator,name=iPhone 17 Pro" scripts/check.sh
 | Rule | Detail |
 |---|---|
 | Server contract from the spec | agri-saas `src/generated/openapi.json`, plus route code where the spec is thin. Peer sessions describe intent; spec and code are what shipped |
-| Client header on every request | All requests go through `ClientHeader.stamp` (`X-Agrent-Client: ios/<major>.<minor>`); a test fails on any unstamped `URLRequest` |
+| Client headers on every request | All requests go through `ClientHeader.stamp`: `X-Agrent-Client: ios/<major>.<minor>` (telemetry) and `x-agrent-client-version: <contract>` (the server's 426 gate). Raise `ClientHeader.contractVersion` only in a release that understands the newer contract. A test fails on any unstamped `URLRequest` |
 | No URL disk cache | Sessions use `NoURLCache`. The only on-disk cache is `ResponseCache`, keyed by user + farm; messaging and admin data never touch disk |
 | Every built path exists on the server | `RouteContractTests` checks against `Tests/Contract/agri-saas-routes.txt`; refresh via `scripts/refresh-agri-saas-routes.sh` |
 | Outward-facing writes ship unfired | Never send a message, open a thread, create a listing or write to production from development, CI or A11yShots — the owner makes the first real send |

@@ -132,6 +132,7 @@ final class AccountCardTests: XCTestCase {
         XCTAssertEqual(api.url?.host, Config.baseURL.host, "a relative value resolves on the API host")
         XCTAssertEqual(api.url?.path, "/api/account/avatar/usr_a")
         XCTAssertEqual(api.value(forHTTPHeaderField: ClientHeader.name), ClientHeader.value)
+        XCTAssertEqual(api.value(forHTTPHeaderField: ClientHeader.contractVersionHeader), "1")
 
         let absolute = try XCTUnwrap(AccountAvatarAPI.source("https://photos.example.invalid/a.jpg"))
         guard case .external(let url) = absolute else { return XCTFail("absolute read as \(absolute)") }
@@ -144,6 +145,8 @@ final class AccountCardTests: XCTestCase {
         XCTAssertEqual(external.httpMethod, "GET")
         XCTAssertEqual(external.value(forHTTPHeaderField: ClientHeader.name), ClientHeader.value,
                        "every request is stamped, a third-party one included")
+        XCTAssertEqual(external.value(forHTTPHeaderField: ClientHeader.contractVersionHeader), "1",
+                       "every request is stamped with both headers")
     }
 
     /// The session for the third-party fetch keeps nothing and sends nothing

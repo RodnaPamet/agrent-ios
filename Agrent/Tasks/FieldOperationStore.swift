@@ -279,8 +279,11 @@ final class FieldOperationStore {
                 // updated app like the rest of the queue, so what the line
                 // shows is still what will be sent. Nothing is queued: the
                 // tap is the operator's to make again once updated, as on
-                // the web, whose live mark queues nothing on a 426. Nothing
-                // is re-read: the read would meet the same 426.
+                // the web, whose live mark queues nothing on a 426. (The
+                // spray sheet parts from both on purpose, #169: it keeps a
+                // record TYPED in a field for the updated app, and a tap
+                // costs nothing to repeat.) Nothing is re-read: the read
+                // would meet the same 426.
                 //
                 // The outbox is told, so the banner says why nothing is being
                 // sent instead of offering «Изпрати» for the same answer.

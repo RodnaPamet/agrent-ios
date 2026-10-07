@@ -121,11 +121,20 @@ enum NoURLCache {
             at path: MKTileOverlayPath,
             result: @escaping (Data?, Error?) -> Void
         ) {
-            let request = URLRequest(
+            // Stamped like every request the app builds, a third-party one
+            // included — the account card's provider photo is too. This one
+            // went out unstamped from the day `ClientHeader` arrived (#144)
+            // until #169: the source scan matched `URLRequest(url:` on ONE
+            // line, and this constructor spans five. The scan now reads it
+            // whole. Earth Engine has no use for either header, and neither
+            // carries anything personal; the rule having no exceptions is
+            // what keeps "every request" checkable at all.
+            var request = URLRequest(
                 url: url(forTilePath: path),
                 cachePolicy: .reloadIgnoringLocalCacheData,
                 timeoutInterval: 15
             )
+            ClientHeader.stamp(&request)
             NoURLCache.session.dataTask(with: request) { data, response, error in
                 // A non-2xx body is an error envelope, not a PNG. Handing it
                 // to the renderer draws nothing either way; handing it back

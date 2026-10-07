@@ -136,11 +136,12 @@ actor APIClient {
         /// outbox, which also stops asking for the rest of the process
         /// (`OutboxStore.isClientTooOld`, agrent-ios#168).
         ///
-        /// The gate reads `x-agrent-client-version`, which this app does not
-        /// send (`ClientHeader` sends `X-Agrent-Client`, a counter), and an
-        /// absent header is served as compatible. So today's server never
-        /// answers this app with a 426: the handling is ready for the day a
-        /// version is declared, or anything else answers 426.
+        /// The gate reads `x-agrent-client-version`, which this app declares
+        /// on every request since #169 (`ClientHeader.contractVersion`). It
+        /// is 1, and so is the server's floor, so nothing answers this app
+        /// with a 426 yet: the day the floor passes this build's contract,
+        /// every gated route does. The spray sheet then keeps a record for
+        /// the updated app (`ParcelOperationSheet.QueueOffer`, #169).
         case clientTooOld
         /// 304 Not Modified — the server confirms the cached copy is current.
         ///

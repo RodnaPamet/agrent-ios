@@ -70,6 +70,52 @@ final class OutboxRetryPolicyTests: XCTestCase {
         XCTAssertTrue(PendingOperations.isWorthRetrying(unwell))
         XCTAssertNil(RateLimitGate.wait(for: unwell))
     }
+
+    /// THE SPRAY SHEET'S OFFER (#169). «Запази за по-късно» on exactly what
+    /// the retry policy calls retriable — AND on a 426, which the policy
+    /// calls final: the server's version gate turned the BUILD away, not the
+    /// record, so the record is kept for the updated app. The web keeps
+    /// nothing on a 426; the divergence is the owner's (PARITY.md, Locations).
+    func testTheSpraySheetKeepsA426ForTheUpdatedApp() {
+        typealias Offer = ParcelOperationSheet.QueueOffer
+        XCTAssertEqual(Offer.after(APIClient.APIError.clientTooOld), .afterUpdate)
+        // The policy itself is unchanged: retrying from the same build buys
+        // the same 426, and the drain and a line's tap rely on it (#168).
+        XCTAssertFalse(PendingOperations.isWorthRetrying(APIClient.APIError.clientTooOld))
+
+        // Positive controls: everything else gets the policy's answer, as before.
+        let retriable: [Error] = [
+            URLError(.notConnectedToInternet), URLError(.timedOut),
+            APIClient.APIError.http(status: 503, code: nil, message: nil),
+            APIClient.APIError.http(status: 408, code: nil, message: nil),
+            APIClient.APIError.http(status: 429, code: "RATE_LIMITED", message: nil, retryAfterSeconds: 12),
+        ]
+        for error in retriable {
+            XCTAssertEqual(Offer.after(error), .retry, "\(error)")
+        }
+        let refused: [Error] = [
+            APIClient.APIError.http(status: 400, code: nil, message: nil),
+            APIClient.APIError.http(status: 403, code: nil, message: nil),
+            APIClient.APIError.conflict(currentVersion: 5, expectedVersion: 3),
+            APIClient.APIError.notSignedIn,
+            DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x")),
+        ]
+        for error in refused {
+            XCTAssertEqual(Offer.after(error), .notOffered, "\(error)")
+        }
+
+        // What each one promises. The 426's names the update, not a
+        // connection — signal will not send it — and not «автоматично»,
+        // which would promise what only the operator can start.
+        XCTAssertNil(Offer.notOffered.caption, "a refusal is offered a queue")
+        XCTAssertEqual(Offer.retry.caption,
+                       "Записът остава на устройството и се изпраща автоматично, когато има връзка.")
+        let update = Offer.afterUpdate.caption ?? ""
+        XCTAssertTrue(update.contains("след обновяване на приложението"), update)
+        XCTAssertFalse(update.contains("връзка"), update)
+        XCTAssertFalse(update.contains("автоматично"), update)
+        XCTAssertTrue(update.hasSuffix("."), update)
+    }
 }
 
 final class PendingOperationTests: XCTestCase {
@@ -382,6 +428,30 @@ final class OutboxRateLimitTests: XCTestCase {
                           "the item joins the queue before the pause closes")
     }
 
+    /// THE SHEET'S 426 IS THE OUTBOX'S 426, told before anything is kept
+    /// (#169). The button stands on the decision
+    /// `testTheSpraySheetKeepsA426ForTheUpdatedApp` reads, and `save()` tells
+    /// the outbox of the 426 before «Запази за по-късно» can even be tapped,
+    /// so a record kept on one joins a queue that already waits for the
+    /// update — rather than being sent into the same 426 by the next trigger
+    /// while the banner still offers «Изпрати». Source checks, because
+    /// nothing in this suite renders the sheet; comments are stripped, so a
+    /// sentence ABOUT the call is not taken for it.
+    func testTheSheetTellsTheOutboxBeforeKeepingA426() {
+        let text = SignOutHygieneTests.code(read("Agrent/Locations/ParcelOperationSheet.swift"))
+        guard let save = text.range(of: "private func save() async {"),
+              let keep = text.range(of: "private func queueForLater() async {") else {
+            return XCTFail("positive control: the sheet's save and its queueing are where this expects them")
+        }
+        let saving = text[save.upperBound..<keep.lowerBound]
+        XCTAssertTrue(saving.contains("queueOffer = QueueOffer.after(error)"),
+                      "the offer is decided by something no test reads")
+        XCTAssertTrue(saving.contains("OutboxStore.shared.absorbClientTooOld(error)"),
+                      "the outbox learns of the 426 only by sending the kept record into it")
+        XCTAssertTrue(text.contains("if let promise = queueOffer.caption {"),
+                      "the button is shown on something other than the decision")
+    }
+
     /// THE BANNER HIDES «Изпрати» WHILE IT SHOWS THE WAIT, and says why.
     ///
     /// A tap inside the pause could only buy a guaranteed 429, and a control
@@ -426,7 +496,9 @@ final class OutboxRateLimitTests: XCTestCase {
 ///   5. rows written before #138 still read, as creates;
 ///   6. a 426 is about the BUILD (#168): it leaves every row of both kinds
 ///      exactly as it was, stops the pass, and nothing asks again — and the
-///      banner says why.
+///      banner says why;
+///   7. a spray the sheet KEEPS on a 426 (#169) stays parked for the rest of
+///      the process, and the updated app sends it.
 @MainActor
 final class OutboxLineMarkTests: XCTestCase {
 
@@ -1090,5 +1162,64 @@ final class OutboxLineMarkTests: XCTestCase {
         XCTAssertTrue(line.contains("след обновяване"), line)
         XCTAssertFalse(line.contains("автоматично"), "only an update sends them: \(line)")
         XCTAssertTrue(line.hasSuffix("."), line)
+    }
+
+    // MARK: - 7. A spray kept on a 426 (#169)
+
+    /// THE OWNER'S CALL (#169). The spray sheet's live save meets a 426 and
+    /// tells the outbox, as `save()` does; the operator taps «Запази за
+    /// по-късно», and the record is queued the way `queueForLater()` queues
+    /// it — the save's key as its id, its owner, the 426's sentence as its
+    /// last error, no attempt spent.
+    ///
+    /// It must then stay PARKED. Launch, the foreground, «Изпрати» and the
+    /// pause's alarm all come through `flush()`, and none of them may send it
+    /// from the build the server retired, or call it refused; the banner says
+    /// it waits for the update. A new process — the updated app — sends it
+    /// once, as the keyed POST the live save was.
+    func testASprayKeptOnA426StaysParkedUntilTheUpdatedAppSendsIt() async {
+        let queue = makeQueue(), wire = Wire(), identity = Identity(owner)
+        let outbox = makeOutbox(queue, wire, identity)
+        let refusal = APIClient.APIError.clientTooOld
+        XCTAssertEqual(ParcelOperationSheet.QueueOffer.after(refusal), .afterUpdate,
+                       "positive control: the sheet offers to keep it")
+
+        // `save()`: the live answer is the outbox's answer too.
+        outbox.absorbClientTooOld(refusal)
+        // `queueForLater()`: its 429 line is a no-op for a 426, and the row is
+        // the one the sheet writes.
+        outbox.pause.absorb(refusal)
+        clock.addTimeInterval(1)
+        let key = UUID().uuidString
+        await outbox.enqueue(PendingOperation(
+            id: key, locationID: "loc", ownerUserID: owner,
+            parcelSummary: "SYNTH-1 · Пръскане", payload: Data(#"{"operationType":"SPRAY"}"#.utf8),
+            createdAt: clock, attempts: 0, lastAttemptAt: nil,
+            lastError: UserMessage.text(for: refusal)))
+        let kept = await queue.all()
+        XCTAssertEqual(kept.map(\.id), [key], "positive control: the record is on the phone")
+        XCTAssertFalse(outbox.pause.isPaused, "a 426 closed the 429's pause")
+
+        // Every trigger, more than once.
+        for _ in 0..<3 { await outbox.flush() }
+        XCTAssertTrue(wire.sent.isEmpty, "a record kept on a 426 went out from the retired build")
+        let parked = await queue.all()
+        XCTAssertEqual(parked, kept, "the kept record changed on disk")
+        XCTAssertEqual(outbox.sendable.map(\.id), [key], "the kept record is not waiting to be sent")
+        XCTAssertTrue(outbox.refused.isEmpty, "the kept record reads as refused")
+        XCTAssertEqual(OutboxBanner.caption(for: outbox), UserMessage.outboxClientTooOld,
+                       "the banner offers «Изпрати» for the same 426")
+
+        // The updated app: a new process, so no flag — and the record goes
+        // out once, as the live save's keyed POST.
+        let updated = makeOutbox(queue, wire, identity)
+        XCTAssertFalse(updated.isClientTooOld, "positive control: the flag does not outlive the process")
+        await updated.flush()
+        XCTAssertEqual(wire.sent.map(\.id), [key], "the updated app did not send the kept record")
+        XCTAssertEqual(wire.sent.first.flatMap(OutboxStore.replay(for:)),
+                       .create(path: LocationsAPI.operationsPath("loc"), idempotencyKey: key),
+                       "the replay is not the live save's keyed POST")
+        let left = await queue.all()
+        XCTAssertTrue(left.isEmpty, "the sent record is still queued")
     }
 }

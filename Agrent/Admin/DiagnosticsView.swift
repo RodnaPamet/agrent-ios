@@ -20,7 +20,11 @@ import SwiftUI
 ///     moment the last FRESH `/me` was adopted — the number the measurement
 ///     is about;
 ///   · the `X-Agrent-Client` value, so a counter on the server can be matched
-///     to this phone's build.
+///     to this phone's build;
+///   · the `x-agrent-client-version` value, the contract this build declares
+///     to the server's version gate (#169) — so a phone being told to update
+///     can be matched to what it told the server. Both headers, because they
+///     are the two this app puts on every request (`ClientHeader`).
 ///
 /// NOT the user id, a token, a name, an email or anything else personal: a
 /// screenshot of this goes into an issue thread. That is why it reads
@@ -58,6 +62,7 @@ struct DiagnosticsView: View {
                 fact("Последен свеж отговор",
                      value: flags.lastFreshAt.map(BgDate.clockSeconds) ?? "Няма в тази сесия")
                 fact("X-Agrent-Client", value: ClientHeader.value ?? "Не се изпраща")
+                fact(ClientHeader.contractVersionHeader, value: String(ClientHeader.contractVersion))
             } header: {
                 SectionHeader("Сесия")
             } footer: {
