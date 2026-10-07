@@ -101,10 +101,10 @@ struct FarmProfileView: View {
     private var profileSection: some View {
         switch store.profile {
         case .loading:
-            Section(Self.heading) { ProgressView() }
+            Section(titled: Self.heading) { ProgressView() }
 
         case .failed(let message):
-            Section(Self.heading) {
+            Section(titled: Self.heading) {
                 ErrorState(message: message) { await store.load() }
             }
 
@@ -126,9 +126,9 @@ struct FarmProfileView: View {
                     Button("Попълни") { editing = true }
                 }
             } header: {
-                Text(Self.heading)
+                SectionHeader(Self.heading)
             } footer: {
-                Text(Self.about)
+                SectionFooter(Self.about)
             }
 
         case .loaded(let profile, _):
@@ -145,9 +145,9 @@ struct FarmProfileView: View {
                 sizeField(profile.sizeHa)
                 grainField(profile.grainProduced)
             } header: {
-                Text(Self.heading)
+                SectionHeader(Self.heading)
             } footer: {
-                Text(Self.about)
+                SectionFooter(Self.about)
             }
         }
     }
@@ -263,12 +263,15 @@ private struct EGNRow: View {
     @Binding var reveal: Bool
 
     var body: some View {
-        LabeledContent("ЕГН") {
+        ValueRow("ЕГН") {
             HStack(spacing: 10) {
                 Text(reveal ? egn : String(repeating: "•", count: egn.count))
                     .font(.body.monospacedDigit())
                 Button(reveal ? "Скрий" : "Покажи") { reveal.toggle() }
                     .font(.footnote)
+                    // The accent explicitly: `ValueRow` gives its value the
+                    // grey of a value, and this is a control, not a value.
+                    .foregroundStyle(Palette.accent)
             }
         }
         // The number itself is never in the label. VoiceOver reads
@@ -411,9 +414,9 @@ struct FarmProfileEditView: View {
                     }
                     sizeEditor
                 } header: {
-                    Text(FarmProfileView.heading)
+                    SectionHeader(FarmProfileView.heading)
                 } footer: {
-                    Text(FarmProfileView.about)
+                    SectionFooter(FarmProfileView.about)
                 }
 
                 cropsEditor
@@ -520,7 +523,7 @@ struct FarmProfileEditView: View {
                 // The field below carries the same words as its own label;
                 // read once, not twice.
                 .accessibilityHidden(true)
-            TextField(field.label, text: binding(field), prompt: Text("—"), axis: .vertical)
+            TextField(field.label, text: binding(field), prompt: .fieldPrompt("—"), axis: .vertical)
                 .autocorrectionDisabled(Self.identifiers.contains(field))
                 .textInputAutocapitalization(Self.identifiers.contains(field) ? .never : .sentences)
             if let hint = field.hint {
@@ -549,7 +552,7 @@ struct FarmProfileEditView: View {
                     .font(.footnote).foregroundStyle(Palette.secondaryText)
                     .accessibilityHidden(true)
                 HStack {
-                    TextField(FarmProfileText.egn.label, text: binding(.egn), prompt: Text("—"))
+                    TextField(FarmProfileText.egn.label, text: binding(.egn), prompt: .fieldPrompt("—"))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .font(.body.monospacedDigit())
@@ -588,7 +591,7 @@ struct FarmProfileEditView: View {
             Text("Размер на стопанството (ха)")
                 .font(.footnote).foregroundStyle(Palette.secondaryText)
                 .accessibilityHidden(true)
-            TextField("Размер на стопанството в хектари", text: $draft.sizeHa, prompt: Text("—"))
+            TextField("Размер на стопанството в хектари", text: $draft.sizeHa, prompt: .fieldPrompt("—"))
                 .keyboardType(.decimalPad)
             switch FarmProfileDraft.parseHectares(draft.sizeHa) {
             case .value(let ha):
@@ -626,7 +629,7 @@ struct FarmProfileEditView: View {
         Section {
             ForEach(draft.crops.indices, id: \.self) { index in
                 VStack(alignment: .leading, spacing: 2) {
-                    TextField("Култура", text: cropBinding(index), prompt: Text("—"))
+                    TextField("Култура", text: cropBinding(index), prompt: .fieldPrompt("—"))
                     // A slug from an older row (`wheat`) is shown as stored —
                     // editing a translation would rewrite the value — with
                     // what the profile page will show it as.
@@ -640,16 +643,16 @@ struct FarmProfileEditView: View {
             .onDelete { draft.crops.remove(atOffsets: $0) }
 
             HStack {
-                TextField("Нова култура", text: $newCrop)
+                TextField("Нова култура", text: $newCrop, prompt: .fieldPrompt("Нова култура"))
                     .onSubmit(addCrop)
                 Button("Добави", action: addCrop)
                     .buttonStyle(.borderless)
                     .disabled(newCrop.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         } header: {
-            Text("Произвеждани култури")
+            SectionHeader("Произвеждани култури")
         } footer: {
-            Text("Например „пшеница“, „слънчоглед“, „царевица“. Плъзнете наляво, за да премахнете.")
+            SectionFooter("Например „пшеница“, „слънчоглед“, „царевица“. Плъзнете наляво, за да премахнете.")
         }
     }
 

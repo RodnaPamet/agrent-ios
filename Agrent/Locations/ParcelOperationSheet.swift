@@ -161,7 +161,7 @@ struct ParcelOperationSheet: View {
                     }
                 }
 
-                Section(kind == .spray ? "Препарат" : "Тор") {
+                Section(titled: kind == .spray ? "Препарат" : "Тор") {
                     // `.value == nil` is TRUE FOR A FAILURE as well as for
                     // a load in progress, so this spun forever when the
                     // items decode broke — a screen that had nothing to
@@ -184,7 +184,10 @@ struct ParcelOperationSheet: View {
                         Text("Няма въведени артикули от този вид.")
                             .font(.footnote).foregroundStyle(Palette.secondaryText)
                     } else {
-                        Picker("Избор", selection: $product) {
+                        // `MenuPicker` here and below: a product name is the
+                        // longest value in this form, and the system menu
+                        // picker cuts a Bulgarian value short in the row (#160).
+                        MenuPicker("Избор", selection: $product, value: product?.name ?? "— изберете —") {
                             Text("— изберете —").tag(InputItem?.none)
                             ForEach(choices) { Text($0.name).tag(InputItem?.some($0)) }
                         }
@@ -228,26 +231,26 @@ struct ParcelOperationSheet: View {
                     }
                 }
 
-                Section("Доза") {
-                    LabeledContent("Количество") {
-                        TextField("0", text: $doseText)
+                Section(titled: "Доза") {
+                    FieldRow("Количество") {
+                        TextField("0", text: $doseText, prompt: .fieldPrompt("0"))
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    Picker("Мерна единица", selection: $doseUnit) {
+                    MenuPicker("Мерна единица", selection: $doseUnit, value: doseUnit?.symbol ?? "—") {
                         Text("—").tag(Unit?.none)
                         ForEach(units) { Text($0.symbol).tag(Unit?.some($0)) }
                     }
                 }
 
                 if kind == .spray {
-                    Section("Работен разтвор") {
-                        LabeledContent("Количество") {
-                            TextField("по избор", text: $waterText)
+                    Section(titled: "Работен разтвор") {
+                        FieldRow("Количество") {
+                            TextField("по избор", text: $waterText, prompt: .fieldPrompt("по избор"))
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                         }
-                        Picker("Мерна единица", selection: $waterUnit) {
+                        MenuPicker("Мерна единица", selection: $waterUnit, value: waterUnit?.symbol ?? "—") {
                             Text("—").tag(Unit?.none)
                             ForEach(units) { Text($0.symbol).tag(Unit?.some($0)) }
                         }
@@ -255,17 +258,19 @@ struct ParcelOperationSheet: View {
                 }
 
                 Section {
-                    Picker("Техника", selection: $technique) {
+                    MenuPicker("Техника", selection: $technique, value: technique.label) {
                         ForEach(ApplicationTechnique.allCases) { Text($0.label).tag($0) }
                     }
                 } footer: {
-                    // Said here because it changes what an operator should
-                    // expect to see later: this value is printed verbatim
-                    // on the filed register.
-                    Text("Техниката се записва в ДНЕВНИКА така, както е избрана.")
+                    SectionFooter {
+                        // Said here because it changes what an operator should
+                        // expect to see later: this value is printed verbatim
+                        // on the filed register.
+                        Text("Техниката се записва в ДНЕВНИКА така, както е избрана.")
+                    }
                 }
 
-                Section("Бележка") {
+                Section(titled: "Бележка") {
                     TextEditor(text: $note).frame(minHeight: 80)
                 }
 

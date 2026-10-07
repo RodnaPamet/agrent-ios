@@ -53,12 +53,12 @@ struct TrendsView: View {
             // out of room is truncate — at which point Уреа and Ечемик are
             // both three letters.
             Menu {
-                Section("Култури") {
+                Section(titled: "Култури") {
                     ForEach(ChartableCommodity.allCases.filter { !$0.isInput }) { item in
                         button(for: item)
                     }
                 }
-                Section("Ресурси") {
+                Section(titled: "Ресурси") {
                     ForEach(ChartableCommodity.allCases.filter(\.isInput)) { item in
                         button(for: item)
                     }

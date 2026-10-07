@@ -111,7 +111,7 @@ struct SpatialImportView: View {
             }
 
             if let chosen {
-                LabeledContent(chosen.name) {
+                ValueRow(chosen.name) {
                     Text("\(Num.text(Double(chosen.bytes.count) / (1024 * 1024))) MB")
                         .foregroundStyle(Palette.secondaryText)
                 }
@@ -122,13 +122,15 @@ struct SpatialImportView: View {
                 RefusalNote(text: refusal.text, icon: "exclamationmark.triangle")
             }
         } header: {
-            Text("Файл")
+            SectionHeader("Файл")
         } footer: {
-            // A shapefile is `.shp` plus `.dbf` plus `.shx` at minimum, so the
-            // bare `.shp` a farmer sees in a folder is not what the server
-            // needs. Said here rather than discovered from a refusal.
-            Text("Shapefile се качва като .zip с всички части. Приемат се "
-                 + "и .kml/.kmz и .geojson.")
+            SectionFooter {
+                // A shapefile is `.shp` plus `.dbf` plus `.shx` at minimum, so the
+                // bare `.shp` a farmer sees in a folder is not what the server
+                // needs. Said here rather than discovered from a refusal.
+                Text("Shapefile се качва като .zip с всички части. Приемат се "
+                     + "и .kml/.kmz и .geojson.")
+            }
         }
 
         Section {
@@ -140,7 +142,7 @@ struct SpatialImportView: View {
             }
             .pickerStyle(.navigationLink)
         } footer: {
-            Text("Стъпва се на всеки импортиран парцел. Може да се смени после.")
+            SectionFooter("Стъпва се на всеки импортиран парцел. Може да се смени после.")
         }
 
         Section {
@@ -216,12 +218,14 @@ struct SpatialImportView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         } footer: {
-            if case .working = phase {
-                // The parse never runs on the request thread and the map must
-                // not be refreshed until the job reports finished — so the
-                // screen says why it is still here.
-                Text("Границите се обработват на сървъра. Картата се "
-                     + "обновява, когато приключи.")
+            SectionFooter {
+                if case .working = phase {
+                    // The parse never runs on the request thread and the map must
+                    // not be refreshed until the job reports finished — so the
+                    // screen says why it is still here.
+                    Text("Границите се обработват на сървъра. Картата се "
+                         + "обновява, когато приключи.")
+                }
             }
         }
     }

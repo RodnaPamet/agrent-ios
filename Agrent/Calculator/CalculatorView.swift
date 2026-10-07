@@ -86,7 +86,7 @@ struct CalculatorView: View {
                 // gives it a row's height instead, which clipped the icon
                 // to a grey sliver. A component that assumes the whole
                 // screen does not become a section by being put in one.
-                Section("Стойност") {
+                Section(titled: "Стойност") {
                     Text("Няма какво да се изчисли")
                         .font(.headline)
                     Text("Калкулаторът показва стойност само когато има сезон със засети площи. За това стопанство още няма такива.")
@@ -138,23 +138,27 @@ struct CalculatorView: View {
     private var costsSection: some View {
         switch costs.state {
         case .loading:
-            Section("Разходи") { ProgressView() }
+            Section(titled: "Разходи") { ProgressView() }
 
         case .failed(let message):
-            Section("Разходи") {
+            Section(titled: "Разходи") {
                 Text(message).font(.footnote).foregroundStyle(Palette.error)
             }
 
         case .loaded(let page, _) where page.items.isEmpty:
-            Section("Разходи") {
+            Section(titled: "Разходи") {
                 Text("Още няма въведени разходи.")
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
             }
 
         case .loaded(let page, _):
-            Section(header: Text("Разходи"), footer: costsFooter(page)) {
+            Section {
                 ForEach(page.items) { cost in CostRow(cost: cost).pageRow() }
+            } header: {
+                SectionHeader("Разходи")
+            } footer: {
+                SectionFooter { costsFooter(page) }
             }
         }
     }
@@ -176,9 +180,9 @@ struct CalculatorView: View {
     @ViewBuilder
     private func farmSection(_ payload: CalculatorPayload) -> some View {
         if !payload.farm.totals.isEmpty {
-            Section("Общо за стопанството") {
+            Section(titled: "Общо за стопанството") {
                 ForEach(payload.farm.totals) { total in
-                    LabeledContent(total.currency) {
+                    ValueRow(total.currency) {
                         Text(Money.text(total.netWorth, total.currency))
                             .font(.headline)
                     }
@@ -201,7 +205,7 @@ struct CalculatorView: View {
     private func rowSection(_ row: CalculatorRow) -> some View {
         Section {
             if let net = row.netWorth {
-                LabeledContent("Нетна стойност") {
+                ValueRow("Нетна стойност") {
                     Text(Money.text(net, row.priceCurrency))
                         .font(.headline)
                 }
@@ -215,30 +219,30 @@ struct CalculatorView: View {
 
             // areaDca comes from the payload — never recomputed from
             // standingCropAreaHa. See PerArea's header.
-            LabeledContent("Площ") {
+            ValueRow("Площ") {
                 Text("\(Num.text(row.perArea.areaDca)) дка")
             }
-            LabeledContent("Очаквана реколта") {
+            ValueRow("Очаквана реколта") {
                 Text("\(Num.text(row.expectedTonnes)) т")
             }
 
             if let value = row.perArea.standingValuePerDca {
-                LabeledContent("Стойност / дка") { Text(Num.text(value)) }
+                ValueRow("Стойност / дка") { Text(Num.text(value)) }
             }
             if let cost = row.perArea.attributableCostPerDca {
-                LabeledContent("Разход / дка") { Text(Num.text(cost)) }
+                ValueRow("Разход / дка") { Text(Num.text(cost)) }
             }
             if let margin = row.perArea.marginPerDca {
-                LabeledContent("Марж / дка") { Text(Num.text(margin)) }
+                ValueRow("Марж / дка") { Text(Num.text(margin)) }
             }
 
             if let breakEven = row.breakEven.breakEvenPricePerTonne {
-                LabeledContent("Себестойност / т") {
+                ValueRow("Себестойност / т") {
                     Text(Money.text(breakEven, row.breakEven.currency))
                 }
             }
             if let cover = row.breakEven.coverPercent {
-                LabeledContent("Покритие") {
+                ValueRow("Покритие") {
                     Text("\(Num.text(cover))%")
                         .foregroundStyle(row.breakEven.covered == true ? Palette.success : Palette.warning)
                 }
@@ -247,13 +251,13 @@ struct CalculatorView: View {
             if let observed = row.priceObservedAt {
                 // A yyyy-mm-dd STRING, shown verbatim. Parsing it into a Date
                 // to reformat would be the trap this model exists to avoid.
-                LabeledContent("Цена от") {
+                ValueRow("Цена от") {
                     Text(observed).foregroundStyle(Palette.secondaryText)
                 }
             }
 
             if row.showProduceRent {
-                LabeledContent("Рента в натура") {
+                ValueRow("Рента в натура") {
                     Text("\(Num.text(row.rentCostProduceKg)) кг")
                 }
             }
@@ -262,10 +266,12 @@ struct CalculatorView: View {
                             icon: "questionmark.circle")
             }
         } header: {
-            HStack {
-                Text(CommodityName.canonical(row.commodity) ?? row.commodity)
-                Spacer()
-                UncertaintyBadge(row.netUncertainty)
+            SectionHeader {
+                HStack {
+                    Text(CommodityName.canonical(row.commodity) ?? row.commodity)
+                    Spacer()
+                    UncertaintyBadge(row.netUncertainty)
+                }
             }
         }
     }
@@ -275,7 +281,7 @@ struct CalculatorView: View {
     @ViewBuilder
     private func footnotes(_ payload: CalculatorPayload) -> some View {
         if !payload.exclusions.isEmpty || !payload.unvalued.isClean || payload.truncated {
-            Section("Извън изчислението") {
+            Section(titled: "Извън изчислението") {
                 ForEach(payload.exclusions.all) { item in
                     Text(item.label).font(.footnote)
                 }

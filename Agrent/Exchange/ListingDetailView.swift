@@ -9,23 +9,23 @@ struct ListingDetailView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Култура") { Text(CommodityName.canonical(listing.commodity) ?? listing.commodity) }
-                LabeledContent("Тип") { Text(listing.kind.label) }
-                LabeledContent("Посока") { Text(listing.side.label) }
+                ValueRow("Култура") { Text(CommodityName.canonical(listing.commodity) ?? listing.commodity) }
+                ValueRow("Тип") { Text(listing.kind.label) }
+                ValueRow("Посока") { Text(listing.side.label) }
                 if let quantity = listing.quantityTonnes {
-                    LabeledContent("Количество") { Text("\(Exchange.tonnes(quantity) ?? quantity) т") }
+                    ValueRow("Количество") { Text("\(Exchange.tonnes(quantity) ?? quantity) т") }
                 }
                 if let price = listing.pricePerTonne {
-                    LabeledContent("Цена / т") {
+                    ValueRow("Цена / т") {
                         Text("\(Exchange.money(price) ?? price) \(listing.priceCurrency ?? "")")
                     }
                 }
-                LabeledContent("Състояние") { Text(listing.status.label) }
+                ValueRow("Състояние") { Text(listing.status.label) }
             }
 
             if let region = listing.regionName {
-                Section("Регион") {
-                    LabeledContent(region) { Text(listing.regionCode ?? "") }
+                Section(titled: "Регион") {
+                    ValueRow(region) { Text(listing.regionCode ?? "") }
                 }
             }
 
@@ -33,18 +33,18 @@ struct ListingDetailView: View {
             // deliberately not encrypted, because cross-tenant readability is
             // what the marketplace is for. Absent when the seller wrote none.
             if let description = listing.description, !description.isEmpty {
-                Section("Описание") { Text(description) }
+                Section(titled: "Описание") { Text(description) }
             }
             if let seller = listing.sellerDisplayName, !seller.isEmpty {
-                Section("Продавач") { Text(seller) }
+                Section(titled: "Продавач") { Text(seller) }
             }
 
             Section {
-                LabeledContent("Публикувана") {
+                ValueRow("Публикувана") {
                     Text(BgDate.full(listing.createdAt))
                 }
                 if let expires = listing.expiresAt {
-                    LabeledContent("Валидна до") {
+                    ValueRow("Валидна до") {
                         Text(BgDate.full(expires))
                     }
                 }

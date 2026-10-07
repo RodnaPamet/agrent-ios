@@ -68,15 +68,15 @@ struct MembersView: View {
     private var membersSection: some View {
         switch store.members {
         case .loading:
-            Section("Достъп") { ProgressView() }
+            Section(titled: "Достъп") { ProgressView() }
 
         case .failed(let message):
-            Section("Достъп") {
+            Section(titled: "Достъп") {
                 ErrorState(message: message) { await store.load() }
             }
 
         case .loaded(let all, _) where all.isEmpty:
-            Section("Достъп") {
+            Section(titled: "Достъп") {
                 Text("Няма членове.").font(.footnote).foregroundStyle(Palette.secondaryText)
             }
 
@@ -100,7 +100,7 @@ struct MembersView: View {
                 }
             }
             ForEach(store.grouped(all), id: \.0) { status, rows in
-                Section(status.label) {
+                Section(titled: status.label) {
                     ForEach(rows) { member in
                         MemberRow(member: member)
                             // FULL SWIPE OFF, which is the owner's ruling and
@@ -308,13 +308,13 @@ private struct InviteMemberView: View {
     var body: some View {
         NavigationStack {
             PageForm {
-                Section("Имейл") {
-                    TextField("name@example.com", text: $email)
+                Section(titled: "Имейл") {
+                    TextField("name@example.com", text: $email, prompt: .fieldPrompt("name@example.com"))
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
-                Section("Роля") {
+                Section(titled: "Роля") {
                     Picker("Роля", selection: $role) {
                         // `unknown` is this client's sentinel for a role
                         // the server added and this build has not heard

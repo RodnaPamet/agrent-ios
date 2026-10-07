@@ -103,6 +103,26 @@ final class PaletteTokenTests: XCTestCase {
         ("field placeholder", Palette.Field.placeholder, Palette.Field.fill, [5.81, 5.32, 7.46]),
         // #150: Админ's row values, on page rows.
         ("Админ row value", Palette.secondaryText, Palette.Surface.page, [9.17, 6.98, 11.37]),
+        // #159: the text a List or Form draws around its rows, through
+        // `Palette.ListChrome` (`FormChrome.swift`). Headers and footers sit
+        // on a form's ground or a list's page; values on a form's card or a
+        // list's page row; prompts and menu values on the card.
+        ("section header on formPage", Palette.ListChrome.header, Palette.Surface.formPage, [9.17, 6.98, 9.28]),
+        ("section header on page", Palette.ListChrome.header, Palette.Surface.page, [9.17, 6.98, 11.37]),
+        ("row value on card", Palette.ListChrome.value, Palette.Surface.card, [7.64, 7.24, 11.37]),
+        ("row value on page", Palette.ListChrome.value, Palette.Surface.page, [9.17, 6.98, 11.37]),
+        ("field prompt on card", Palette.ListChrome.placeholder, Palette.Surface.card, [5.81, 5.32, 7.46]),
+        ("menu picker value on card", Palette.ListChrome.menuValue, Palette.Surface.card, [6.59, 5.09, 5.49]),
+        // Five lists are not on token surfaces yet — the tab customiser, a
+        // listing's detail, the calculator, the dashboard's block picker and
+        // the pages a `.navigationLink` picker pushes — so their headers sit
+        // on `systemGroupedBackground` and their values on
+        // `secondarySystemGroupedBackground`, resolved here with the same
+        // traits (Increase Contrast included).
+        ("section header on systemGroupedBackground", Palette.ListChrome.header,
+         Color(uiColor: .systemGroupedBackground), [11.57, 7.00, 9.57]),
+        ("row value on secondarySystemGroupedBackground", Palette.ListChrome.value,
+         Color(uiColor: .secondarySystemGroupedBackground), [9.38, 7.81, 11.37]),
     ]
 
     /// The one role that does NOT pass on a bar, written down so nobody

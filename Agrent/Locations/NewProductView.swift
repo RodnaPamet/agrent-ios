@@ -83,8 +83,8 @@ struct NewProductView: View {
     var body: some View {
         NavigationStack {
             PageForm {
-                Section("Наименование") {
-                    TextField("Търговско наименование", text: $name)
+                Section(titled: "Наименование") {
+                    TextField("Търговско наименование", text: $name, prompt: .fieldPrompt("Търговско наименование"))
                         .textInputAutocapitalization(.words)
                     if let duplicate {
                         Label(
@@ -97,7 +97,7 @@ struct NewProductView: View {
                     }
                 }
 
-                Section("Класификация") {
+                Section(titled: "Класификация") {
                     // `.navigationLink`, so the options are read at full
                     // width on their own screen. A menu picker renders the
                     // selection inside the row, where «Препарат за РЗ»
@@ -178,26 +178,28 @@ struct NewProductView: View {
     private var registerSection: some View {
         if category.appearsOnTheRegister {
             Section {
-                TextField("Активно вещество", text: $activeIngredient)
-                TextField("Рег. № по ЗЗР", text: $pppNo)
+                TextField("Активно вещество", text: $activeIngredient, prompt: .fieldPrompt("Активно вещество"))
+                TextField("Рег. № по ЗЗР", text: $pppNo, prompt: .fieldPrompt("Рег. № по ЗЗР"))
                     .textInputAutocapitalization(.characters)
-                LabeledContent(category == .pesticide ? "Карантина (дни) ∗"
+                FieldRow(category == .pesticide ? "Карантина (дни) ∗"
                                                       : "Карантина (дни)") {
-                    TextField("—", text: $quarantineText)
+                    TextField("—", text: $quarantineText, prompt: .fieldPrompt("—"))
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.trailing)
                 }
             } header: {
-                Text("За дневника")
+                SectionHeader("За дневника")
             } footer: {
-                if category == .pesticide {
-                    Text("Рег. № и карантинният срок са задължителни за препарат "
-                       + "за РЗ: те се отпечатват в колони 4, 8 и 9 на дневника "
-                       + "за химични обработки. Без тях записът се подава с "
-                       + "празни регулаторни колони.")
-                } else {
-                    Text("Тези полета се отпечатват в дневника за химични "
-                       + "обработки, ако са попълнени.")
+                SectionFooter {
+                    if category == .pesticide {
+                        Text("Рег. № и карантинният срок са задължителни за препарат "
+                           + "за РЗ: те се отпечатват в колони 4, 8 и 9 на дневника "
+                           + "за химични обработки. Без тях записът се подава с "
+                           + "празни регулаторни колони.")
+                    } else {
+                        Text("Тези полета се отпечатват в дневника за химични "
+                           + "обработки, ако са попълнени.")
+                    }
                 }
             }
         }

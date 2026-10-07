@@ -59,7 +59,7 @@ struct TasksListView: View {
                     )
                     .pageRow()
                 }
-                Section(Plural.bg(page.items.count, "задача", "задачи")) {
+                Section(titled: Plural.bg(page.items.count, "задача", "задачи")) {
                 ForEach(page.items) { item in
                     NavigationLink { TaskDetailView(summary: item) } label: {
                         TaskRow(item: item)

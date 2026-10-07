@@ -121,7 +121,9 @@ struct NewCostView: View {
         NavigationStack {
             PageForm {
                 Section {
-                    Picker("Категория", selection: $category) {
+                    // `MenuPicker`: the system menu picker cuts a Bulgarian
+                    // value short in the row (#160).
+                    MenuPicker("Категория", selection: $category, value: category.label) {
                         ForEach(CostCategory.selectable, id: \.self) {
                             Text($0.label).tag($0)
                         }
@@ -129,17 +131,17 @@ struct NewCostView: View {
                     // `.decimalPad` has no minus sign, which is right: the
                     // server requires amount > 0 and a negative cost is a
                     // different concept the books do not have here.
-                    TextField("Сума", text: $amountText)
+                    TextField("Сума", text: $amountText, prompt: .fieldPrompt("Сума"))
                         .keyboardType(.decimalPad)
-                    TextField("Валута", text: $currency)
+                    TextField("Валута", text: $currency, prompt: .fieldPrompt("Валута"))
                         .textInputAutocapitalization(.characters)
                     DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
                 }
 
-                Section("Доставчик") {
-                    TextField("по избор", text: $supplier, axis: .vertical)
+                Section(titled: "Доставчик") {
+                    TextField("по избор", text: $supplier, prompt: .fieldPrompt("по избор"), axis: .vertical)
                 }
-                Section("Бележки") {
+                Section(titled: "Бележки") {
                     TextEditor(text: $notes).frame(minHeight: 100)
                 }
 

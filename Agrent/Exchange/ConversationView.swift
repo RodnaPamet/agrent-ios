@@ -350,7 +350,7 @@ struct ConversationView: View {
             // (#156). `Palette.Field` has the pairs; the prompt is styled
             // so the hint is a token too, not UIKit's placeholder grey.
             TextField("Съобщение", text: $store.draft,
-                      prompt: Text("Напишете съобщение…").foregroundStyle(Palette.Field.placeholder),
+                      prompt: .fieldPrompt("Напишете съобщение…"),
                       axis: .vertical)
                 .lineLimit(1...6)
                 .foregroundStyle(Palette.Field.text)
