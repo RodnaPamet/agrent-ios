@@ -127,6 +127,10 @@ final class FixtureSeamTests: XCTestCase {
             (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
             (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
             (TrendsAPI.newsPath(.all), "trends-news"),
+            // agrent-ios#138 — the field-operation task and its lines.
+            (WorkItemAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID), "task-detail-fieldop"),
+            (FieldOperationAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID),
+             "field-operation-detail"),
         ]
         for (pathAndQuery, fixture) in expected {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
@@ -190,6 +194,13 @@ final class FixtureSeamTests: XCTestCase {
             TrendsAPI.pricesPath(.maize, range: .month3),
             TrendsAPI.pricesPath(.wheat, range: .year1),
             TrendsAPI.newsPath(.policy),
+            // #138: only the ONE field operation has lines; and a line's
+            // MARK path is a write, which no fixture may ever answer — the
+            // protocol refuses every non-GET before it looks, and this keeps
+            // the table from naming one should that ever change.
+            FieldOperationAPI.detailPath("tsk_fixture_1"),
+            FieldOperationAPI.linePath(taskID: FixtureCatalogue.fixtureFieldOperationTaskID,
+                                       lineID: "opl_synthetic_1"),
         ] {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
             XCTAssertNil(
@@ -242,6 +253,30 @@ final class FixtureSeamTests: XCTestCase {
         XCTAssertTrue(inbox.threads.map(\.id).contains(FixtureCatalogue.fixtureThreadID))
         let row = try XCTUnwrap(inbox.threads.first { $0.id == FixtureCatalogue.fixtureThreadID })
         XCTAssertEqual(row.listingId, thread.listingId, "the two files disagree about the listing")
+    }
+
+    /// The field-operation key names the task all three files hold
+    /// (agrent-ios#138): a FIELD_OPERATION row in the list, so a tap on it
+    /// builds the lines store at all; its detail; and its lines — three of
+    /// them, one in each state, which is what the capture is for.
+    func testTheFieldOperationKeyNamesTheTaskInAllThreeFixtures() async throws {
+        let id = FixtureCatalogue.fixtureFieldOperationTaskID
+        let list = try await WorkItemAPI.decodeList(from: try fixture("tasks-list"))
+        let row = try XCTUnwrap(list.items.first { $0.id == id }, "the list has no row to tap")
+        XCTAssertEqual(row.type, .fieldOperation, "the row would open with no lines section")
+        let detail = try await WorkItemAPI.decodeDetail(from: try fixture("task-detail-fieldop"))
+        XCTAssertEqual(detail.id, id)
+        XCTAssertEqual(detail.type, .fieldOperation)
+        let job = try await FieldOperationAPI.decodeDetail(from: try fixture("field-operation-detail"))
+        XCTAssertEqual(job.task.id, id)
+        XCTAssertEqual(Set(job.lines.map(\.status)), [.pending, .done, .skipped],
+                       "the capture is of mixed states")
+        XCTAssertTrue(job.lines.allSatisfy { $0.version != nil },
+                      "a line without a version shows no buttons, and the capture would show none")
+        // The fixture owner may mark: an OWNER writes. The positive control
+        // that the capture shows buttons at all.
+        let me = try await MeAPI.decode(from: try fixture("auth-me"))
+        XCTAssertTrue(FieldOperationRules.mayMark(me: me, assigneeUserID: job.task.assigneeUserId))
     }
 
     /// Paging and polling a conversation under the seam reach the same
@@ -368,6 +403,9 @@ final class FixtureSeamTests: XCTestCase {
         // is what runs here.
         ("trends-prices", { _ = try await APIClient.shared.decode($0, as: PricesResponse.self) }),
         ("trends-news", { _ = try await APIClient.shared.decode($0, as: NewsResponse.self) }),
+        // agrent-ios#138.
+        ("task-detail-fieldop", { _ = try await WorkItemAPI.decodeDetail(from: $0) }),
+        ("field-operation-detail", { _ = try await FieldOperationAPI.decodeDetail(from: $0) }),
     ]
 
     /// A MISSING FIXTURE IS A FAILURE, NOT A SKIP.

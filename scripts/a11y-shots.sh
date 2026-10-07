@@ -6,9 +6,14 @@
 #
 #     scripts/a11y-shots.sh                                  # the booted device
 #     UDID=<udid> scripts/a11y-shots.sh                    # a specific one
+#     VARIANT=default ONLY=08b-task-parcel-lines scripts/a11y-shots.sh
+#                                    # one screen, one setting — for a change
+#                                    # that needs only its own screen checked
 #
 # Knobs, all optional: UDID (default: the one booted device; it must be
-# booted), OUT_DIR, DERIVED.
+# booted), OUT_DIR, DERIVED, VARIANT (one row of the matrix below, by name),
+# ONLY (one capture the suite can take alone — the suite names which, and
+# fails on any other).
 #
 # ── What this is answering ──
 #
@@ -130,6 +135,20 @@ VARIANTS=(
   "sunlight|large|enabled|light"
 )
 
+# `VARIANT=<name>` keeps one row. An unknown name is an error rather than an
+# empty run: a typo that photographed nothing would otherwise exit 0.
+if [ -n "${VARIANT:-}" ]; then
+  KEPT=()
+  for variant in "${VARIANTS[@]}"; do
+    [ "${variant%%|*}" = "$VARIANT" ] && KEPT+=("$variant")
+  done
+  if [ ${#KEPT[@]} -eq 0 ]; then
+    echo "VARIANT=$VARIANT is not one of: $(printf '%s ' "${VARIANTS[@]%%|*}")" >&2
+    exit 1
+  fi
+  VARIANTS=("${KEPT[@]}")
+fi
+
 mkdir -p "$OUT_DIR"
 echo "device:     $UDID"
 echo "output:     $OUT_DIR"
@@ -154,8 +173,10 @@ for variant in "${VARIANTS[@]}"; do
   # flag for the app-under-test's arguments, and the suite sets it on
   # `XCUIApplication.launchArguments` itself. (A `ROW=` knob used to ride in
   # on `TEST_RUNNER_A11Y_LOCATION_ROW`; the fixture has one location, so it
-  # went.)
-  xcodebuild test \
+  # went.) `ONLY` rides the same channel: xcodebuild hands the runner every
+  # `TEST_RUNNER_`-prefixed variable with the prefix removed, so the suite
+  # reads `A11Y_ONLY`. Empty means the full walk.
+  TEST_RUNNER_A11Y_ONLY="${ONLY:-}" xcodebuild test \
     -project "$REPO/Agrent.xcodeproj" \
     -scheme AgrentA11yShots \
     -destination "id=$UDID" \

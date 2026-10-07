@@ -100,6 +100,23 @@ final class A11yShotsTests: XCTestCase {
 
         assertSeamActive(app)
 
+        // ── ONE capture, when a change needs only its own screen ──
+        //
+        // `ONLY=<name> scripts/a11y-shots.sh` arrives here as `A11Y_ONLY` —
+        // the `TEST_RUNNER_` channel the old `ROW=` knob used. The seam and
+        // the fixture world are still asserted first: a targeted run is no
+        // less able to be pointed at production than a full one. Unknown
+        // names FAIL rather than fall through to the full walk, so a typo
+        // cannot quietly cost a run of every screen.
+        if let only = Self.only {
+            assertFixtureWorld(app)
+            switch only {
+            case "08b-task-parcel-lines": captureFieldOperationTask(app)
+            default: XCTFail("A11Y_ONLY=\(only) names no capture this suite can run alone")
+            }
+            return
+        }
+
         // Дневник, the launch screen. #97 asks whether a list row stacks at
         // AX sizes and whether the `·` between the values disappears with it;
         // this row is `JournalRow` → `AdaptiveRow` → `MetaRow`, the exact
@@ -134,6 +151,7 @@ final class A11yShotsTests: XCTestCase {
         // "no Задачи button" for a farm that simply arranged its bar
         // differently.
         captureTabOrMenu("08-tasks", label: "Задачи", app: app)
+        captureFieldOperationTask(app)
 
         // Борса, and from it the messaging screens #114 built and #115 made
         // photographable. Its own method because it goes four screens deep.
@@ -339,6 +357,57 @@ final class A11yShotsTests: XCTestCase {
             return
         }
         captureFromMenu(name, label: label, app: app)
+    }
+
+    /// `A11Y_ONLY`, or nil — empty counts as unset, since the script passes
+    /// the variable through whether or not `ONLY` was given.
+    private static var only: String? {
+        let value = ProcessInfo.processInfo.environment["A11Y_ONLY"] ?? ""
+        return value.isEmpty ? nil : value
+    }
+
+    // MARK: - A field operation's parcel lines (agrent-ios#138)
+
+    /// The field-operation task from `tasks-list.json`, with its three lines
+    /// in their three states: «Чакащо» with «Готово» and «Пропусни»,
+    /// «Готово» and «Пропуснато» each with «Отвори отново».
+    ///
+    /// ── NOTHING ON THE SCREEN IS TAPPED ──
+    ///
+    /// A real mark deducts stock and files a ДНЕВНИК row, and the first one
+    /// is the owner's. Under the seam a mark is a 501 that never leaves the
+    /// process; the suite does not rely on that, as the header says. The row
+    /// that opens the task and the back button are the only taps.
+    private func captureFieldOperationTask(_ app: XCUIApplication) {
+        let tab = labelled("Задачи", in: app.tabBars.buttons)
+        let isTab = tab.waitForExistence(timeout: 3)
+        if isTab {
+            tab.tap()
+        } else {
+            XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Задачи")
+            XCTAssertTrue(tapMenuRow("Задачи", in: app), "«Задачи» is neither a tab nor a menu row")
+        }
+        // By its title: the row speaks one sentence that starts with it.
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Пръскане срещу плевели"))
+            .firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20),
+                      "Задачи has no field-operation row — tasks-list.json's third row")
+        row.tap()
+
+        // The progress line is the signal that field-operation-detail.json
+        // decoded: two of three finished, a skip counting as progress.
+        XCTAssertTrue(app.staticTexts["2 / 3 парцела завършени"].waitForExistence(timeout: 20),
+                      "the task opened without its parcel lines")
+        Thread.sleep(forTimeInterval: 2)
+        capture("08b-task-parcel-lines", app: app)
+
+        goBack(app, to: "Задачи")
+        if isTab {
+            app.tabBars.buttons["Дневник"].tap()
+        } else {
+            dismissSheet(app, named: "Задачи")
+        }
     }
 
     // MARK: - Борса and messaging (agrent-ios#115)

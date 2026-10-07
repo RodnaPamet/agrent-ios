@@ -1,8 +1,19 @@
 import Foundation
 
-/// A field operation recorded with no signal, kept until it lands.
+/// Field work recorded with no signal, kept until it lands.
 ///
-/// ── Why this can exist at all ──
+/// ── TWO KINDS, since agrent-ios#138 ──
+///
+///   - a field-operation CREATE (`POST /locations/{id}/operations`) — the
+///     spray sheet's «Запази за по-късно». `lineMark` is nil.
+///   - a parcel-line MARK (`PATCH /field-operations/{taskId}/parcels/
+///     {lineId}`) — «Готово», «Пропусни» or «Отвори отново» on a task's line,
+///     tapped with no signal. `lineMark` says which line, and the version the
+///     operator SAW.
+///
+/// Each is safe to replay for its own reason, and the reasons differ:
+///
+/// ── Why the create can exist at all ──
 ///
 /// Idempotency in this API is PER-USECASE, not global. `field-operation`
 /// is one of the routes that honour `Idempotency-Key` (the table is in
@@ -10,9 +21,19 @@ import Foundation
 /// write with the SAME key cannot create a second operation, no matter how
 /// many times it is retried or how long after the fact.
 ///
-/// That is the whole licence for this file. The exchange listing create
+/// That is the whole licence for the create. The exchange listing create
 /// honours no key and has no natural key, so a replay puts a second offer
 /// on a public board: it must never be queued, and it is not.
+///
+/// ── Why the mark can ──
+///
+/// NOT idempotency: the PATCH reads no key. Its licence is the optimistic
+/// lock. The mark replays with `If-Match: <the version it saw>`, so a
+/// replay of the operator's own success comes back 200 `alreadyApplied`
+/// (no second stock deduction, no second ДНЕВНИК row), and a replay over
+/// SOMEONE ELSE's change comes back 409 instead of overwriting it — which
+/// the drain parks as a `conflict` for the operator, never as refused and
+/// never as sent (#138; the web does the same in `use-offline-sync.ts`).
 ///
 /// An exchange MESSAGE is not queued either, although its send honours a
 /// key and a replay would be safe on the server (#114). Safe is not the
@@ -29,7 +50,15 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
     /// a legally filed register.
     let id: String
 
-    let locationID: String
+    /// The location a CREATE posts under. nil for a line mark, whose path is
+    /// the task and the line.
+    ///
+    /// Optional since #138, and only that: every row written before it has
+    /// the key, and an Optional decodes a PRESENT key exactly as the
+    /// non-optional did — so old rows read unchanged. What it gave up is the
+    /// compiler's word that a create has one; `target` takes that back by
+    /// refusing to name a destination for a row that has neither.
+    let locationID: String?
 
     /// WHO queued it — the `/api/auth/me` id of the user signed in when it
     /// was recorded (agri-saas#1191 P0.9).
@@ -85,6 +114,124 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
     /// to look at it. Showing both as "waiting to send" would leave a
     /// refused record waiting forever under a label that says it is fine.
     var isRefused: Bool = false
+
+    /// Present on a parcel-line MARK, absent on a create (#138).
+    ///
+    /// OPTIONAL, for the reason `ownerUserID` gives: a non-optional field,
+    /// even with a default, throws `keyNotFound` on every row already on
+    /// disk, and `all()`'s `try?` would then hide every queued spray. Its
+    /// ABSENCE is what says "a create", so the rows from before #138 — all
+    /// creates — say so without being rewritten.
+    var lineMark: LineMark? = nil
+
+    /// The server answered this mark's replay 409 STALE_DATA: the line moved
+    /// on while the mark sat on the phone (#138).
+    ///
+    /// NOT `isRefused`. A refusal is the server disagreeing with the work; a
+    /// conflict is somebody else's change arriving first, and the only person
+    /// who can say which one should stand is the operator. So it is held
+    /// apart — never re-sent by the drain, never counted as waiting, never
+    /// shown as refused — until they choose «Запази моята» (re-send at the
+    /// server's version, deliberately) or «Използвай сървъра» (discard
+    /// theirs). Optional, for the same on-disk reason as `lineMark`.
+    var conflict: Conflict? = nil
+
+    /// Which line a queued mark sets, and the version it was SEEN at.
+    struct LineMark: Codable, Equatable, Sendable {
+        let taskID: String
+        let lineID: String
+
+        /// The wire value the mark sets — `DONE`, `SKIPPED` or `PENDING` —
+        /// so a screen can show the queued state without parsing `payload`.
+        /// The PAYLOAD is what is sent; this only names it. A string rather
+        /// than `OperationLineStatus`, so a value this build cannot name is
+        /// still a row the queue can read.
+        let status: String
+
+        /// THE If-Match OF EVERY REPLAY: the line's version when the operator
+        /// looked at it, never bumped on the phone.
+        ///
+        /// Not bumped even when a second tap on the same line replaces this
+        /// one (`OutboxStore.enqueueMark`): at most one unsent mark exists per
+        /// line, and it must assert the version the SERVER is known to hold.
+        /// Bumping would guarantee the 409 the replacement exists to avoid —
+        /// the web learned that in #934. `var` for one writer only:
+        /// «Запази моята» moves it to the server's current version, which is
+        /// the operator choosing to overwrite.
+        var seenVersion: Int
+
+        var lineStatus: OperationLineStatus {
+            OperationLineStatus(rawValue: status) ?? .unknown
+        }
+    }
+
+    /// What the 409 said, kept for the operator's decision.
+    struct Conflict: Codable, Equatable, Sendable {
+        /// The line's version on the server when it refused — `error.details
+        /// .currentVersion`, never the body root (#922 on the web). It is what
+        /// «Запази моята» re-sends with. nil when the server could not say, and
+        /// then «Запази моята» is not offered: re-sending without a version
+        /// would be the unguarded overwrite, and re-sending with the old one
+        /// would only meet the same 409.
+        let currentVersion: Int?
+        let at: Date
+
+        init(currentVersion: Int?, at: Date) {
+            self.currentVersion = currentVersion
+            self.at = at
+        }
+
+        /// A 409 on a MARK's replay, and nothing else.
+        ///
+        /// A create that meets 409 stays what it always was — refused — since
+        /// its route has no lock and there is nothing to choose between. Pure,
+        /// because it is the whole rule the drain applies.
+        init?(replayOf item: PendingOperation, failedWith error: Error, at now: Date = Date()) {
+            guard item.lineMark != nil,
+                  case APIClient.APIError.conflict(let current, _) = error else { return nil }
+            currentVersion = current
+            at = now
+        }
+    }
+
+    /// Where a replay goes, for the two kinds.
+    enum Target: Equatable, Sendable {
+        case create(locationID: String)
+        case mark(LineMark)
+    }
+
+    /// nil only for a row with neither — which nothing in this app writes,
+    /// and which the drain then refuses rather than guessing a route for.
+    var target: Target? {
+        if let lineMark { return .mark(lineMark) }
+        if let locationID { return .create(locationID: locationID) }
+        return nil
+    }
+
+    /// Should the drain send it? Not when refused, and not while a conflict
+    /// waits for a person.
+    var awaitsSend: Bool { !isRefused && conflict == nil }
+
+    /// A mark for the outbox, built the one way the app builds one.
+    ///
+    /// The id is a fresh UUID — the file name and the identity, as for a
+    /// create; the route reads no key, so it is nothing more.
+    static func mark(
+        id: String = UUID().uuidString,
+        _ mark: LineMark,
+        ownerUserID: String,
+        summary: String,
+        payload: Data,
+        reason: String?,
+        at now: Date = Date()
+    ) -> PendingOperation {
+        PendingOperation(
+            id: id, locationID: nil, ownerUserID: ownerUserID,
+            parcelSummary: summary, payload: payload, createdAt: now,
+            attempts: 0, lastAttemptAt: nil, lastError: reason,
+            lineMark: mark
+        )
+    }
 }
 
 /// The outbox.
@@ -126,6 +273,11 @@ actor PendingOperations {
     ///
     /// Everything else is a decision the server has made. A 400 will be a
     /// 400 tomorrow; a 403 will be a 403.
+    ///
+    /// A 409 is not queued either, and on a parcel-line mark it is not a
+    /// refusal: it is a conflict, which the task screen states and reloads
+    /// when it meets one live, and the drain parks for the operator when a
+    /// replay meets one (`PendingOperation.Conflict`, #138).
     ///
     /// A DecodingError is NOT queued, and that is the subtle one: if the
     /// response failed to decode, the write very likely SUCCEEDED and only
@@ -179,6 +331,60 @@ actor PendingOperations {
 
     func update(_ operation: PendingOperation) {
         enqueue(operation)
+    }
+
+    /// Rewrite a row ONLY if it is still on disk — and say whether it was.
+    ///
+    /// The drain's write-back after a failed send, since #138 gave the queue
+    /// a way to lose a row other than delivering it: a second tap on a line
+    /// REPLACES the unsent mark for it (`OutboxStore.enqueueMark`), and
+    /// «Използвай сървъра» discards a conflict. Either can land while the
+    /// drain is awaiting that very row's send. A plain `update` would then
+    /// write the row back — resurrecting a mark the operator had replaced,
+    /// to replay over their newer one. The check and the write share one
+    /// actor turn, so nothing can remove the file between them.
+    @discardableResult
+    func updateIfPresent(_ operation: PendingOperation) -> Bool {
+        guard fileManager.fileExists(atPath: fileURL(operation.id).path) else { return false }
+        enqueue(operation)
+        return true
+    }
+
+    /// One row as it is on disk NOW, or nil if it is gone or unreadable.
+    ///
+    /// For the drain, which walks a list read when its pass began: a row
+    /// replaced or parked since then must be seen as it is, not as it was.
+    func row(_ id: String) -> PendingOperation? {
+        guard let data = try? Data(contentsOf: fileURL(id)) else { return nil }
+        return try? JSONDecoder().decode(PendingOperation.self, from: data)
+    }
+
+    /// «Запази моята», decided against the row on DISK in one actor turn:
+    /// only a row that is STILL `owner`'s parked conflict, with a version to
+    /// re-send at, is re-queued at that version. Returns whether it was.
+    ///
+    /// Not built from the screen's copy of the row. That copy can be a step
+    /// behind — a second tap on the button, or a resolution that landed in
+    /// between — and writing it back would overwrite whatever the row has
+    /// become since.
+    func requeueConflict(_ id: String, owner: String?) -> Bool {
+        guard var item = row(id), OutboxStore.belongs(item, to: owner),
+              let current = item.conflict?.currentVersion,
+              var mark = item.lineMark else { return false }
+        mark.seenVersion = current
+        item.lineMark = mark
+        item.conflict = nil
+        enqueue(item)
+        return true
+    }
+
+    /// «Използвай сървъра», on the same terms: only `owner`'s row that is
+    /// still a parked conflict is discarded. Never a row that could be sent.
+    func discardConflict(_ id: String, owner: String?) -> Bool {
+        guard let item = row(id), OutboxStore.belongs(item, to: owner),
+              item.conflict != nil else { return false }
+        remove(id)
+        return true
     }
 
     /// Stamp `owner` on every row that has none — see

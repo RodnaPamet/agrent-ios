@@ -462,6 +462,27 @@ enum UserMessage {
         "MESSAGE_NOT_FOUND": "Съобщението не беше намерено.",
         "MESSAGE_NOT_SENDER": "Можете да премахвате само съобщения, които сте изпратили Вие.",
 
+        // ── Marking a field operation's parcel lines (agrent-ios#138) ──
+        //
+        // The 403 is the common failure here, not the offline case: the
+        // route lets the ASSIGNED operator mark without general write
+        // permission, and nobody else — so a colleague's job refuses. The
+        // screen hides the buttons from whoever the role says cannot mark,
+        // but the role is the OLDEST membership's (`CurrentUser.role`) and
+        // the assignment can change under an open screen, so the refusal is
+        // still met. The web's own sentence, `ag.map.fieldOp.markForbidden`,
+        // VERBATIM — it says who CAN do it, which «Нямате права» does not.
+        "OPERATION_NOT_ASSIGNED_TO_YOU":
+            "Можете да отбелязвате само задания, възложени на вас. Потърсете "
+            + "отговорника за това задание.",
+        // `ag.map.fieldOp.notFound`, verbatim. Also what a task that is not
+        // a field operation answers — the route's 404 covers both.
+        "FIELD_OPERATION_NOT_FOUND": "Земеделската операция не е намерена.",
+        // The web has no sentence of its own for this one (its panel shows
+        // the generic «не беше запазено»). A line removed from the job while
+        // the screen was open, or a mark replayed after it was.
+        "OPERATION_PARCEL_NOT_FOUND": "Този ред вече не е част от операцията.",
+
         // Batch 1.
         "CROP_PLAN_NOT_READY": "Планът за културите не е готов.",
         "FILE_EMPTY": "Файлът е празен.",

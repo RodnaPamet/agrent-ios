@@ -24,9 +24,18 @@ struct TaskDetailView: View {
     /// Non-nil means the sheet is up.
     @State private var resolving: WorkItemStatus?
 
+    /// A field operation's parcel lines (agrent-ios#138) — nil for every
+    /// other kind of task. Decided from the ROW, so the lines start loading
+    /// beside the task rather than after it; the web renders its
+    /// `FieldOperationPanel` on exactly this condition.
+    @State private var lines: FieldOperationStore?
+
     init(summary: WorkItemSummary) {
         self.summary = summary
         _store = State(initialValue: TaskDetailStore(id: summary.id))
+        _lines = State(initialValue: summary.type == .fieldOperation
+            ? FieldOperationStore(taskID: summary.id, taskKey: summary.key)
+            : nil)
     }
 
     var body: some View {
@@ -53,6 +62,11 @@ struct TaskDetailView: View {
         }
         .writeFeedback(store.writeFeedback)
         .task { if store.state.value == nil { await store.load() } }
+        // The last line marked moved the job to PENDING_REVIEW on the
+        // server; the chip above should say so without a pull.
+        .onChange(of: lines?.finishedJob) { _, _ in
+            Task { await store.load() }
+        }
     }
 
     /// ONLY THE LEGAL MOVES.
@@ -129,6 +143,12 @@ struct TaskDetailView: View {
                             .foregroundStyle(Palette.error)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    // FIRST after the header, as the web puts its panel at
+                    // the top of the overview: on a field operation the lines
+                    // ARE the work, and the facts below describe it.
+                    if let lines {
+                        FieldOperationSection(store: lines)
+                    }
                     facts(item)
                     text("Описание", item.description)
                     text("Решение", item.resolution)
@@ -138,7 +158,12 @@ struct TaskDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             }
-            .refreshable { await PullToRefresh.bounded { await store.load() } }
+            .refreshable {
+                await PullToRefresh.bounded {
+                    await store.load()
+                    await lines?.load(showCachedFirst: false)
+                }
+            }
             .pageBackground()
         }
     }

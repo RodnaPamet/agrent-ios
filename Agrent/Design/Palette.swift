@@ -238,6 +238,7 @@ enum Palette {
     ///     input              7.33   5.29   5.83
     ///     activity           6.53   6.79   7.43
     ///     neutral            7.48   6.51  10.43
+    ///     success            7.02   6.02   7.36
     ///
     /// THE INPUT TEXT IS TWO TOKENS. The web's `brand` badge writes
     /// `--brand-muted` on `--brand-subtle`, which passes in dark (7.33) and
@@ -262,6 +263,14 @@ enum Palette {
         /// over a grey at 16%. The web's neutral badge is exactly this pair.
         static let neutralText = Color(token: AgrentColor.contentMuted)
         static let neutralFill = Color(token: AgrentColor.bgSubtle)
+        /// A field operation's DONE line (agrent-ios#138) — the web's
+        /// `success` badge, `bg-bg-success text-content-success`, which its
+        /// `operationParcel` status uses for DONE and nothing else here does.
+        /// Measured before it was used: 7.02 / 6.02 / 7.36. The lines sit on
+        /// `Surface.card`, where the translucent fill composites differently:
+        /// 5.83 / 6.24 / 7.36 there, and the neutral chip 6.46 / 6.74 / 10.43.
+        static let successText = Color(token: AgrentColor.contentSuccess)
+        static let successFill = Color(token: AgrentColor.bgSuccess)
     }
 
     /// The three speakers of an exchange conversation (agri-saas #1323): me,

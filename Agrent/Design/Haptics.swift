@@ -23,7 +23,7 @@ import SwiftUI
 /// a `WriteFeedback`. A phone that buzzes in a pocket because a conversation
 /// polled, or because a queued operation went out on reconnect, has told the
 /// person about something they did not do. Only the code path that runs
-/// because of a tap — `save`, `send`, `setStatus` — records an outcome, and
+/// because of a tap — `save`, `send`, `setStatus`, `mark` — records an outcome, and
 /// `HapticSiteTests` holds the list of those paths to exactly this.
 ///
 /// ── THE SITES, and why only these ──
@@ -32,12 +32,19 @@ import SwiftUI
 ///      (`ParcelMapView` / `ParcelOperationSheet`). The web's own haptic
 ///      moment: field work, often with gloves and no signal, where the sheet
 ///      closing is easy to miss.
-///   2. A task's status changed (`TaskDetailView`). The iOS counterpart of
-///      the web's "mark a parcel line done" — the other half of field work.
+///   2. A task's status changed (`TaskDetailView`) — the other half of field
+///      work, beside site 5.
 ///   3. A message sent (`ConversationView`). The bubble appears only when
 ///      the refetch brings the stored text, so the tap is otherwise followed
 ///      by nothing for a moment.
 ///   4. The farm profile saved (`FarmProfileView` / `FarmProfileEditView`).
+///   5. A parcel line of a field operation marked (`FieldOperationSection`
+///      ← `FieldOperationStore.mark`, agrent-ios#138) — the web's own haptic
+///      moment, ported at last. `.success` for a «Готово» that landed or is
+///      kept on the phone to send, as for site 1; `.warning` for a refusal
+///      or a conflict. Skip and reopen play nothing: the web gives them a
+///      `tap`, and this vocabulary has no tap. A conflict the DRAIN parks
+///      plays nothing either — the operator is not looking at it.
 ///
 /// The other writes — a cost, a listing, a journal entry, a product, an
 /// insurance request, a member invitation — close onto a list that shows the

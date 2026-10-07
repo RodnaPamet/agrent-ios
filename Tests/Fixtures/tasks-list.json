@@ -29,6 +29,23 @@
       "assigneeUserId": null,
       "createdAt": "2026-09-22T06:10:00.000Z",
       "updatedAt": "2026-09-22T06:10:00.000Z"
+    },
+    {
+      "id": "tsk_fixture_fieldop",
+      "key": "FT-102",
+      "title": "Пръскане срещу плевели",
+      "type": "FIELD_OPERATION",
+      "status": "IN_PROGRESS",
+      "severity": "MEDIUM",
+      "dueAt": "2026-10-08T07:00:00.000Z",
+      "assignee": {
+        "id": "usr_fixture_operator",
+        "name": "Петър Механизаторов",
+        "email": "operator@example.invalid"
+      },
+      "assigneeUserId": "usr_fixture_operator",
+      "createdAt": "2026-10-03T06:30:00.000Z",
+      "updatedAt": "2026-10-05T07:55:00.000Z"
     }
   ],
   "truncated": false

@@ -60,6 +60,8 @@ final class PaletteTokenTests: XCTestCase {
         ("input chip", Palette.Chip.inputText, Palette.Chip.inputFill, [7.33, 5.29, 5.83]),
         ("activity chip", Palette.Chip.activityText, Palette.Chip.activityFill, [6.53, 6.79, 7.43]),
         ("neutral chip", Palette.Chip.neutralText, Palette.Chip.neutralFill, [7.48, 6.51, 10.43]),
+        // #138: a DONE parcel line, the web's success badge.
+        ("success chip", Palette.Chip.successText, Palette.Chip.successFill, [7.02, 6.02, 7.36]),
         ("avatar", Palette.Avatar.ink, Palette.Avatar.fill, [8.45, 5.21, 6.19]),
         // The three speakers of a conversation (agri-saas #1323). Bubble text
         // is body size, so 4.5:1. The other side's pair was "measured by
