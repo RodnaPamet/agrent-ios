@@ -14,6 +14,11 @@ import SwiftUI
 // `LabeledContent`, anywhere outside this file — so the next form cannot
 // bring the greys back. Every colour is a `Palette.ListChrome` role, and
 // every pair is measured in `PaletteTokenTests`.
+//
+// The pickers are here for the same reason: `MenuPicker` for a short list,
+// `PagePicker` for a long one, and no `.pickerStyle(.navigationLink)` —
+// the page it pushes is the system's, on its grouped grey (#164), and
+// `ListChromeTests` fails on one.
 
 // MARK: - Section headers and footers
 
@@ -78,6 +83,83 @@ extension Text {
     /// what VoiceOver and Voice Control call the field.
     static func fieldPrompt(_ text: String) -> Text {
         Text(text).foregroundStyle(Palette.ListChrome.placeholder)
+    }
+}
+
+extension View {
+    /// Room for the whole of a vertical field's prompt — see `PromptRoom`:
+    ///
+    ///     TextField("Заглавие", text: $title,
+    ///               prompt: .fieldPrompt(example), axis: .vertical)
+    ///         .promptRoom(example)
+    func promptRoom(_ prompt: String) -> some View {
+        modifier(PromptRoom(prompt: prompt))
+    }
+}
+
+/// Gives a `TextField(axis: .vertical)` as many lines as its prompt needs,
+/// so a long prompt wraps instead of being cut (#164).
+///
+/// ── The defect ──
+///
+/// A vertical field draws its prompt in a label exactly as tall as the
+/// field, and an empty field is one line tall. So a prompt longer than a
+/// line is cut, however readily the field wraps what is TYPED: at AX5
+/// «Нов запис» read «напр. Трети…». Measured in a form hosted at the
+/// iPhone 17 Pro's width (iOS 26.5 simulator): 53 pt type, 767 pt of prompt
+/// in a 338 pt row, and a label that already allows any number of lines —
+/// it was one line HIGH, not one line long. It was cut from xxxLarge up,
+/// not only at the accessibility sizes.
+///
+/// ── The fix ──
+///
+/// `lineLimit(n...)`: at least n lines, and still growing as the farmer
+/// types. n is MEASURED rather than looked up by text size, because it
+/// depends on the width as much as the size — at xxxLarge the same prompt
+/// takes two lines on that phone and one on a 440 pt one, at AX5 four and
+/// three. Two hidden texts are laid out in the field's own width, the
+/// prompt and a single line, and n is the ratio of their heights. At the
+/// default size the prompt fits, n is 1, and the field is what it was.
+/// Checked the same way, hosted at 375, 402 and 440 pt from Large to AX5:
+/// the prompt's label had the height its text needs at every one.
+struct PromptRoom: ViewModifier {
+    let prompt: String
+
+    @State private var promptHeight: CGFloat = 0
+    @State private var lineHeight: CGFloat = 0
+
+    private var lines: Int {
+        guard lineHeight > 0 else { return 1 }
+        // A hair under, so a rounding error in the layout cannot turn a
+        // three-line prompt into four lines of room.
+        return max(1, Int((promptHeight / lineHeight - 0.05).rounded(.up)))
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .lineLimit(lines...)
+            .background(alignment: .topLeading) {
+                ZStack(alignment: .topLeading) {
+                    measured(Text(prompt), into: $promptHeight)
+                    measured(Text(verbatim: "Х"), into: $lineHeight)
+                }
+                .hidden()
+                .accessibilityHidden(true)
+            }
+    }
+
+    /// `text` wrapped in the width it is given, its height written back.
+    private func measured(_ text: Text, into height: Binding<CGFloat>) -> some View {
+        text
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { height.wrappedValue = proxy.size.height }
+                        .onChange(of: proxy.size.height) { _, new in height.wrappedValue = new }
+                }
+            }
     }
 }
 
@@ -150,7 +232,8 @@ struct FieldRow<Field: View>: View {
 /// measure-before-substitution shape `BulgarianLayout` describes, in a
 /// control that priming does not reach. «Препарат за РЗ» had already clipped
 /// to «Препа…за РЗ» on the product form, which went to `.navigationLink` for
-/// it; that pushes a system-styled list, so it is not the answer everywhere.
+/// it; that pushed a system-styled list, so it was not the answer anywhere
+/// (#164) — a long list of options is a `PagePicker` instead.
 ///
 /// ── The fix ──
 ///
@@ -221,5 +304,170 @@ struct MenuPicker<Selection: Hashable, Options: View>: View {
             .accessibilityValue(value)
             .accessibilityInputLabels(A11y.spokenNames(title, english))
         }
+    }
+}
+
+// MARK: - Pushed pickers
+
+/// One option of a `PagePicker`: the value it selects and what the row says.
+struct PickerChoice<Value: Hashable>: Identifiable {
+    let value: Value
+    let label: String
+    var id: Value { value }
+}
+
+/// A run of `PickerChoice`s under an optional section title — «Култури»,
+/// «Рискове».
+struct PickerChoiceSection<Value: Hashable> {
+    let title: String?
+    let choices: [PickerChoice<Value>]
+}
+
+/// A picker that pushes its options onto a page of their own, as
+/// `.pickerStyle(.navigationLink)` does, with that page on the token
+/// surfaces (#164).
+///
+/// ── The defect ──
+///
+/// `.navigationLink` pushes a List the SYSTEM builds, on
+/// `systemGroupedBackground` — black in dark mode under a green app, the
+/// grey #156 took off every other screen. Nothing reaches it: the pushed
+/// list is not in the view tree a modifier can be applied to, and
+/// `PageForm`'s `Group { … }.cardRow()` stops at the row that pushes.
+///
+/// ── Which pickers are this, and which are `MenuPicker` ──
+///
+/// A menu for a short, fixed set of options — the four crops, the seven
+/// product kinds, a tenant's ten units. This for a list that is LONG or
+/// UNBOUNDED, or whose labels are long enough that a menu would cut them:
+/// a location's parcels, an insurer's catalogue of products. The farmer
+/// reads each option at full width, on its own page, as before.
+///
+/// ── Behaviour ──
+///
+/// The same as the system page: the chosen row carries a check mark,
+/// choosing one goes back. The row that pushes shows the selection in
+/// `Palette.ListChrome.value`, wrapping, and stacks under its title at the
+/// accessibility sizes, as `MenuPicker` does.
+///
+/// ── Accessibility ──
+///
+/// The pushing row is one element, «Парцел, Южен блок», a button that
+/// Voice Control answers to by the title. On the page each option is a
+/// button whose name is its label, and the chosen one carries
+/// `.isSelected` — what VoiceOver says for the system's check mark.
+struct PagePicker<Selection: Hashable>: View {
+    private let title: String
+    private let english: String?
+    @Binding private var selection: Selection
+    private let value: String
+    private let sections: [PickerChoiceSection<Selection>]
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// `value` is what the row shows for the current selection, as for
+    /// `MenuPicker`.
+    init(_ title: String, english: String? = nil, selection: Binding<Selection>, value: String,
+         sections: [PickerChoiceSection<Selection>]) {
+        self.title = title
+        self.english = english
+        _selection = selection
+        self.value = value
+        // A run with nothing in it would be a title over no rows — a
+        // catalogue with no perils, say — so it is left out.
+        self.sections = sections.filter { !$0.choices.isEmpty }
+    }
+
+    /// One untitled run of options.
+    init(_ title: String, english: String? = nil, selection: Binding<Selection>, value: String,
+         choices: [PickerChoice<Selection>]) {
+        self.init(title, english: english, selection: selection, value: value,
+                  sections: [PickerChoiceSection(title: nil, choices: choices)])
+    }
+
+    var body: some View {
+        let stacked = typeSize.isAccessibilitySize
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
+
+        NavigationLink {
+            PagePickerList(title: title, selection: $selection, sections: sections)
+        } label: {
+            layout {
+                Text(title).layoutPriority(1)
+                Text(value)
+                    .foregroundStyle(Palette.ListChrome.value)
+                    .multilineTextAlignment(stacked ? .leading : .trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: stacked ? .leading : .trailing)
+            }
+        }
+        // The link is already one element, a button; these replace the
+        // two texts it would read with the title and the selection, as the
+        // system's own picker row reads.
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+        .accessibilityInputLabels(A11y.spokenNames(title, english))
+    }
+}
+
+/// The page a `PagePicker` pushes: a list on the page colour, as every
+/// list in the app is (`pageBackground()`, `pageRow()`).
+private struct PagePickerList<Selection: Hashable>: View {
+    let title: String
+    @Binding var selection: Selection
+    let sections: [PickerChoiceSection<Selection>]
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                if let heading = section.title {
+                    Section(titled: heading) { rows(section.choices) }
+                        .pageRow()
+                } else {
+                    Section { rows(section.choices) }
+                        .pageRow()
+                }
+            }
+        }
+        .pageBackground()
+        .inlineTitle(title)
+    }
+
+    private func rows(_ choices: [PickerChoice<Selection>]) -> some View {
+        ForEach(choices) { choice in
+            let chosen = choice.value == selection
+            Button {
+                choose(choice.value)
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(choice.label)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    if chosen {
+                        Image(systemName: "checkmark")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Palette.accent)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            // The check mark is hidden; this is what it says. No input
+            // label: an option is DATA (a parcel's name, an insurer's
+            // product), and Voice Control answers to the visible text.
+            .accessibilityAddTraits(chosen ? .isSelected : [])
+        }
+    }
+
+    /// Choosing goes back, as the system's page does: the choice is made,
+    /// and the form is where the farmer was going.
+    private func choose(_ value: Selection) {
+        selection = value
+        dismiss()
     }
 }

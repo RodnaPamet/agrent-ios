@@ -235,22 +235,15 @@ struct InsuranceRequestForm: View {
                         if available.count == 1, let only = available.first {
                             parcelLine(only)
                         } else {
-                            // A navigation-link picker, not a menu: parcel
-                            // names are long and the collapsed value of a
-                            // menu picker is the one place they get cut.
-                            Picker("Парцел", selection: $selectedID) {
-                                ForEach(available) { parcel in
-                                    // The marker travels with the name, so
-                                    // a farmer sees which fields they have
-                                    // already asked about while choosing,
-                                    // rather than after.
-                                    Text(alreadyAsked.contains(parcel.id)
-                                         ? "\(parcel.name) ✓"
-                                         : parcel.name)
-                                        .tag(Optional(parcel.id))
-                                }
-                            }
-                            .pickerStyle(.navigationLink)
+                            // A pushed page, not a menu: parcel names are
+                            // long and a location can hold many of them.
+                            // `PagePicker`, not `.navigationLink`, whose page
+                            // the system drew on its grouped grey (#164).
+                            PagePicker("Парцел", english: "Parcel", selection: $selectedID,
+                                       value: selected.map(parcelChoiceLabel) ?? "Изберете",
+                                       choices: available.map {
+                                           PickerChoice(value: Optional($0.id), label: parcelChoiceLabel($0))
+                                       })
                             .onChange(of: selectedID) { _, _ in
                                 areaText = Self.areaText(for: selected)
                             }
@@ -301,19 +294,18 @@ struct InsuranceRequestForm: View {
                         }
                     } else if wantsQuote, let catalogue {
                         Section {
-                            Picker("Покритие", selection: $productKey) {
-                                Section(titled: "Култури") {
-                                    ForEach(catalogue.products.filter(\.isCrop)) {
-                                        Text($0.name).tag(Optional($0.key))
-                                    }
-                                }
-                                Section(titled: "Рискове") {
-                                    ForEach(catalogue.products.filter { !$0.isCrop }) {
-                                        Text($0.name).tag(Optional($0.key))
-                                    }
-                                }
-                            }
-                            .pickerStyle(.navigationLink)
+                            // A pushed page: the insurer's catalogue, which
+                            // is fetched and has no fixed length, in two
+                            // titled runs. `PagePicker` rather than
+                            // `.navigationLink` for the reason «Парцел» is.
+                            PagePicker("Покритие", english: "Coverage", selection: $productKey,
+                                       value: product?.name ?? "Изберете",
+                                       sections: [
+                                           PickerChoiceSection(title: "Култури",
+                                                               choices: coverage(catalogue.products.filter(\.isCrop))),
+                                           PickerChoiceSection(title: "Рискове",
+                                                               choices: coverage(catalogue.products.filter { !$0.isCrop })),
+                                       ])
 
                             HStack {
                                 TextField("0", text: $sumInsuredText, prompt: .fieldPrompt("0"))
@@ -435,6 +427,18 @@ struct InsuranceRequestForm: View {
                 }
             }
         }
+    }
+
+    /// A parcel as «Парцел» offers it. The marker travels with the name, so
+    /// a farmer sees which fields they have already asked about while
+    /// choosing, rather than after.
+    private func parcelChoiceLabel(_ parcel: Parcel) -> String {
+        alreadyAsked.contains(parcel.id) ? "\(parcel.name) ✓" : parcel.name
+    }
+
+    /// Products as «Покритие» offers them.
+    private func coverage(_ products: [InsuranceCatalogue.Product]) -> [PickerChoice<String?>] {
+        products.map { PickerChoice(value: Optional($0.key), label: $0.name) }
     }
 
     private func parcelLine(_ parcel: Parcel) -> some View {

@@ -136,6 +136,9 @@ struct NewCostView: View {
                     TextField("Валута", text: $currency, prompt: .fieldPrompt("Валута"))
                         .textInputAutocapitalization(.characters)
                     DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
+                        // The date while its calendar is open — see
+                        // `Palette.DatePill` (#164).
+                        .tint(Palette.DatePill.tint)
                 }
 
                 Section(titled: "Доставчик") {

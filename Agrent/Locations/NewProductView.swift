@@ -98,16 +98,16 @@ struct NewProductView: View {
                 }
 
                 Section(titled: "Класификация") {
-                    // `.navigationLink`, so the options are read at full
-                    // width on their own screen. A menu picker renders the
-                    // selection inside the row, where «Препарат за РЗ»
-                    // clipped to «Препа…за РЗ» — and these labels cannot
-                    // get much shorter without becoming abbreviations
-                    // nobody uses.
-                    Picker("Вид", selection: $category) {
+                    // `MenuPicker`. The system's menu picker drew the
+                    // selection in a UIKit button, where «Препарат за РЗ»
+                    // clipped to «Препа…за РЗ», so this went to
+                    // `.navigationLink` — which pushed a page the system
+                    // draws on its grouped grey (#164). `MenuPicker`'s value
+                    // is SwiftUI text that wraps, which is what the
+                    // navigation link was for, and seven kinds fit a menu.
+                    MenuPicker("Вид", english: "Kind", selection: $category, value: category.label) {
                         ForEach(ItemCategory.allCases) { Text($0.label).tag($0) }
                     }
-                    .pickerStyle(.navigationLink)
 
                     switch store.units {
                     case .loading:
@@ -119,11 +119,15 @@ struct NewProductView: View {
                         // throws "Default unit not found." for an id it
                         // cannot look up, so this is a picker and never a
                         // text field.
-                        Picker("Единица", selection: $unit) {
-                            Text("— изберете —").tag(Unit?.none)
+                        //
+                        // A menu, for the reason «Вид» is one: a tenant's
+                        // units are a short list (ten in the fixture), and a
+                        // menu scrolls if one is not.
+                        MenuPicker("Единица", english: "Unit", selection: $unit,
+                                   value: unit?.pickerLabel ?? Self.noUnit) {
+                            Text(Self.noUnit).tag(Unit?.none)
                             ForEach(units) { Text($0.pickerLabel).tag(Unit?.some($0)) }
                         }
-                        .pickerStyle(.navigationLink)
                     }
                 }
 
@@ -228,6 +232,10 @@ struct NewProductView: View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
+
+    /// «Единица» before one is chosen: the menu's first option, and the
+    /// row's value while it is selected.
+    private static let noUnit = "— изберете —"
 }
 
 @Observable

@@ -184,6 +184,22 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   recorded in PARITY Gap 7: a sender name for same-farm senders; something
   per thread to tell sibling inbox rows apart; the person-level block
   (#1314), after which the block strings need re-reading.
+- **List and form chrome #164 — measured on the iOS 26.5 simulator only.**
+  There is no iOS 17 runtime on the build machine. Unverified:
+  - Борса's search prompt is a PLATFORM limit, kept open on #164:
+    `secondaryLabel` on `tertiarySystemFill`, 3.12:1 in light. A styled
+    `Text` prompt and an appearance proxy were read back from a hosted
+    `.searchable` field unchanged on iOS 26.5; iOS 17 may draw a different
+    grey, and nobody has measured it there;
+  - the date pill's open state is the tint in the DARK capture (#d4af37);
+    light and «Слънце» come from the resolved colours, not a capture. The
+    calendar popover the pill opens is system-drawn and not measured;
+  - the pickers that left `.navigationLink` — the dashboard's crop, spatial
+    import's crop, the product form's kind and unit (`MenuPicker`), the
+    insurance form's parcel and coverage (`PagePicker`) — and the lists
+    moved onto the page were not photographed (only Борса and «Нов запис»
+    were, to save usage). They are held by the build, `FormSurfaceTests` and
+    `ListChromeTests`.
 
 ## Decisions locked
 

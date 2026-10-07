@@ -57,6 +57,10 @@ struct NewsView: View {
                 List(response.items) { item in
                     row(item)
                         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        // The row's own background, on the page colour as
+                        // every list's is — `pageBackground()` below paints
+                        // only behind the rows (#164).
+                        .pageRow()
                 }
                 .listStyle(.plain)
             .pageBackground()

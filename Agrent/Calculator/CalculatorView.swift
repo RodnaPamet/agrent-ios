@@ -94,8 +94,12 @@ struct CalculatorView: View {
                         .foregroundStyle(Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                costsSection
+                .pageRow()
+                costsSection.pageRow()
             }
+            // On the page, as every list is (#164); both of this screen's
+            // lists were the system's grouped grey until then.
+            .pageBackground()
             .refreshable {
                 await PullToRefresh.bounded {
                     await store.load()
@@ -112,6 +116,7 @@ struct CalculatorView: View {
                 costsSection.pageRow()
                 footnotes(payload).pageRow()
             }
+            .pageBackground()
             .refreshable {
                 await PullToRefresh.bounded {
                     await store.load()
