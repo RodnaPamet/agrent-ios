@@ -52,7 +52,7 @@ struct OutboxBanner: View {
                     .scrollIndicatorsFlash(onAppear: true)
             }
             .font(.footnote)
-            .foregroundStyle(outbox.refused.isEmpty ? Color.primary : Palette.warning)
+            .foregroundStyle(needsAPerson ? Palette.warning : Color.primary)
             .solidBar(hairline: .bottom)
             // COMBINE THE TEXT, LEAVE THE BUTTON ALONE.
             //
@@ -74,12 +74,12 @@ struct OutboxBanner: View {
     /// above, which differ only in whether they scroll.
     private func row(caption: String?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: outbox.refused.isEmpty
-                  ? "tray.and.arrow.up" : "exclamationmark.triangle")
+            Image(systemName: needsAPerson
+                  ? "exclamationmark.triangle" : "tray.and.arrow.up")
             VStack(alignment: .leading, spacing: 2) {
                 Text(headline)
                     .fixedSize(horizontal: false, vertical: true)
-                if let first = outbox.pending.first {
+                if let first = focus {
                     // Fixed like its two siblings. It was the one line left
                     // flexible, so it was the one that gave way when the
                     // column ran short — at accessibility3 the caption cut it
@@ -88,6 +88,12 @@ struct OutboxBanner: View {
                     // gives the column every point it asks for; this keeps it
                     // whole should the row ever be laid out short again.
                     Text(first.parcelSummary)
+                        .font(.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let hint = conflictHint {
+                    Text(hint)
                         .font(.caption)
                         .foregroundStyle(Palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -108,11 +114,14 @@ struct OutboxBanner: View {
             // what gets read.
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(A11y.sentence(
-                [headline, outbox.pending.first?.parcelSummary, caption]))
+                [headline, focus?.parcelSummary, caption, conflictHint]))
             Spacer(minLength: 8)
             if outbox.isFlushing {
                 ProgressView().controlSize(.small)
-            } else if outbox.refused.isEmpty && caption == nil {
+            } else if !outbox.sendable.isEmpty && outbox.refused.isEmpty && caption == nil {
+                // Only with something a pass would SEND: a parked conflict is
+                // skipped by every drain, so with nothing else waiting the
+                // button would be found, named, and do nothing.
                 Button("Изпрати") { Task { await send() } }
                     .font(.footnote.weight(.medium))
                     // Its own element with its own name, so «Изпрати» is
@@ -170,12 +179,42 @@ struct OutboxBanner: View {
     /// Counts, because "some operations" is not something a person can
     /// act on. And refusals are named separately — they need a person to
     /// look at them, not a better signal.
+    ///
+    /// Conflicts too (#138), and for the same reason: a parcel-line mark
+    /// whose replay met somebody else's change waits for the operator to
+    /// choose, so «чака изпращане» would be false — nothing will send it —
+    /// and «не бяха приети» would be false too, since nothing was refused.
     private var headline: String {
         let refused = outbox.refused.count
         if refused > 0 {
             return "\(Plural.bg(refused, "операция", "операции")) не бяха приети от сървъра."
         }
+        let conflicts = outbox.conflicts.count
+        if conflicts > 0 {
+            return "\(Plural.bg(conflicts, "отбелязване чака", "отбелязвания чакат")) вашето решение."
+        }
         let waiting = outbox.sendable.count
         return "\(Plural.bg(waiting, "операция чака", "операции чакат")) изпращане."
+    }
+
+    /// Something here waits for a PERSON — a refusal to read or a conflict
+    /// to decide — rather than for signal. Drawn as the caveat, never as an
+    /// error: nothing is broken, and the work is still on the phone.
+    private var needsAPerson: Bool { !outbox.refused.isEmpty || !outbox.conflicts.isEmpty }
+
+    /// The row the headline is about, so the line under it names that one:
+    /// the first refusal, else the first conflict, else the first in line.
+    private var focus: PendingOperation? {
+        outbox.refused.first ?? outbox.conflicts.first ?? outbox.pending.first
+    }
+
+    /// Where a conflict is decided. The banner floats over every tab and
+    /// cannot show the line it is about, so it says where to go — the
+    /// summary above carries the task's key and the parcel. Only while the
+    /// headline is the conflicts': under a refusal it would name a decision
+    /// the headline never mentioned.
+    private var conflictHint: String? {
+        guard outbox.refused.isEmpty, !outbox.conflicts.isEmpty else { return nil }
+        return "На сървъра има по-нова промяна. Изберете в задачата коя да остане."
     }
 }

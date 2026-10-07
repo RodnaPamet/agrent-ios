@@ -448,6 +448,75 @@ term can be.
 
 ---
 
+## Tasks — a field operation's parcel lines
+
+Web `FieldOperationPanel` (on a FIELD_OPERATION task's overview) and the PWA's
+`OfflineFieldPanel` · iOS `Tasks/FieldOperationSection.swift` +
+`FieldOperationStore.swift`, on the task detail.
+
+### Gap 8 — parcel lines could not be marked — CLOSED 2026-10-07 (#138)
+
+The web lets an operator mark each prescription line of a spray job
+«Готово», «Пропусни» or «Отвори отново», including with no signal. iOS showed
+the task and nothing of its lines. Ported, read from the spec and the route
+(`PATCH /field-operations/{taskId}/parcels/{lineId}`, `markOperationParcel`)
+rather than from the issue:
+
+- **The lines**: parcel, product, dose, area in decares, status — the web's
+  wording, verbatim from `messages/bg.json` (`ag.status.operationParcel`,
+  `ag.map.fieldOp.*`, «{done} / {total} парцела завършени»). DONE is the web's
+  success badge, the rest neutral; `Palette.Chip.success*` is the measured pair.
+- **Who may mark**: the route's rule — `canWrite`, or the job's assignee
+  without it — as an affordance (`FieldOperationRules.mayMark`, the house
+  `CurrentUser.mayWrite`, failing open on an unknown role). Anyone else sees
+  the lines and a sentence saying who marks them. The 403
+  (`OPERATION_NOT_ASSIGNED_TO_YOU`) is still handled, in the web's
+  `markForbidden` words.
+- **The lock (#138's requirement)**: each line's `version` is read with it and
+  sent as `If-Match`, the BARE integer, on every mark — live and replayed. A
+  line the server sent without a version is shown and not markable: an absent
+  `If-Match` is a silent last-write-wins on this route. The web's in-app panel
+  sends no `If-Match` online; its offline panel does, and so does this.
+- **A 409 on a tap** is said in Bulgarian, the job is re-read, and nothing is
+  retried or queued: the operator looks at the line as it now is.
+- **No signal** (or a 5xx, 408, 429): the mark is QUEUED with the version it
+  saw, owned by whoever tapped, and replayed with that `If-Match`, as the PWA
+  does. A newer tap on the same line REPLACES the unsent one (the web's #934),
+  never bumping the version on the phone.
+- **A replay that meets 409** is a CONFLICT, not a refusal: parked, counted
+  apart in the outbox banner («N отбелязване чака вашето решение.»), and shown
+  on its line with the web's resolver — «Запази моята» re-sends at the
+  server's reported version, «Използвай сървъра» discards it. «Запази моята»
+  is not offered when the 409 carried no version.
+- **Haptics** (#155's two words): `.success` when a «Готово» lands or is kept
+  on the phone, `.warning` on a refusal or a conflict. Skip and reopen play
+  nothing — the web's `tap` has no iOS word.
+
+Where iOS goes further, deliberately:
+
+- **Undoing a queued mark sends nothing.** «Готово» then «Отвори отново» with
+  no signal leaves the server's status as the target, so the queued mark is
+  cancelled on the phone. The web sends PENDING over PENDING, which bumps the
+  version and files an audit row for nothing.
+- **A read asked before a write cannot undo it.** On a slow connection the
+  screen's opening read can answer after the mark's re-read; it is disowned.
+- **The drain re-reads each row before sending it**, so a mark replaced
+  mid-pass is not sent from the pass's old list. The web's `flushOutbox`
+  walks its snapshot.
+
+**Not ported:** the read-only parcel map with done parcels shaded; the
+«Необходимо: …» and «… вода» amounts (rate × area — the web's `totalLabel`,
+which also skips the ml→L promotion for Cyrillic unit symbols); the spray-job
+completion card; the reviewer's approve / request-changes on PENDING_REVIEW
+(`POST …/review`, admin-only). The job's move to PENDING_REVIEW after the
+last line IS shown: the task above re-reads.
+
+**Unverified**: everything above against the real server. No line has been
+marked from this app — the first real mark is the owner's (ROADMAP,
+known-unverified). Under the UI-test seam every mark is a 501.
+
+---
+
 ## Admin — Phase 4, not started
 
 Web `admin/members` + `admin/farm-profile` · iOS `ComingSoonView(title: "Админ")`
@@ -608,10 +677,12 @@ caller of `.sensoryFeedback`.
   segment ticks, nothing on navigation.
 - iOS keeps two words: `.success` for the person's write landing (or, for a
   field operation, kept on the device to send), `.warning` for it refused
-  with the screen saying what to do. Four sites: a field operation saved or
-  kept, a task status changed, a message sent, the farm profile saved. The
-  other writes close onto a list showing the new row; each is a one-line
-  addition if wanted. `HapticSiteTests` lists the sites exactly.
+  with the screen saying what to do. Five sites: a field operation saved or
+  kept, a task status changed, a message sent, the farm profile saved, and
+  — since 2026-10-07 (#138) — a parcel line marked: «Готово» `.success`,
+  a refusal or a conflict `.warning`, skip and reopen nothing (the web's
+  `tap`). The other writes close onto a list showing the new row; each is a
+  one-line addition if wanted. `HapticSiteTests` lists the sites exactly.
 - Never from the app's own work: polls, refreshes, cache revalidation and
   the outbox drain record nothing. The pull-to-refresh tick comes from the
   system's refresh control, not from this.
@@ -675,6 +746,10 @@ scrolls to a new message with an animation — the app's first — and reads
    write in it, and opening a conversation, is still the owner's first.
 2. **Phase 4 admin**, against the contract above. The only remaining
    stub screen, and it now has a home in the app menu rather than a tab.
+3. ~~**Gap 8 — marking a field operation's parcel lines.**~~ Closed
+   2026-10-07 (#138). Ships unfired too: a mark deducts stock and files a
+   ДНЕВНИК row, and the first real one is the owner's. The map and the
+   per-parcel amounts are follow-ups, not part of it.
 
 Everything else on this list is closed. The order the original version
 suggested held up: the AX3 failures first, because a screen that cannot

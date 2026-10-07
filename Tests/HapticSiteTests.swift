@@ -195,6 +195,7 @@ final class HapticSiteTests: XCTestCase {
             "Agrent/Tasks/TaskDetailView.swift": 1,           // status changed / refused
             "Agrent/Exchange/ConversationView.swift": 1,      // message sent / refused
             "Agrent/Admin/FarmProfileView.swift": 2,          // page: saved; editor: refused
+            "Agrent/Tasks/FieldOperationSection.swift": 1,    // parcel line marked / refused (#138)
         ]
         var found: [String: Int] = [:]
         for (path, text) in try appSources() {
@@ -218,6 +219,10 @@ final class HapticSiteTests: XCTestCase {
             "Agrent/Exchange/MessagingStores.swift send refused",
             "Agrent/Admin/AdminStore.swift saveProfile saved",
             "Agrent/Admin/FarmProfileView.swift submit refused",
+            // #138: a «Готово» that landed or was kept on the phone; a
+            // refusal or a conflict on the tap. Never from the drain.
+            "Agrent/Tasks/FieldOperationStore.swift mark saved",
+            "Agrent/Tasks/FieldOperationStore.swift mark refused",
         ]
         let regex = try NSRegularExpression(pattern: #"\w+\.(saved|refused)\(\)"#)
         var found: Set<String> = []
@@ -245,6 +250,11 @@ final class HapticSiteTests: XCTestCase {
             ("Agrent/Admin/AdminStore.swift", ["load", "loadMembers", "loadProfile", "reloadProfile"]),
             ("Agrent/Admin/FarmProfileView.swift", ["reloadAfterConflict"]),
             ("Agrent/Core/OutboxStore.swift", ["refresh", "enqueue", "flush", "drain", "post"]),
+            // #138: the lines' reads, including the re-read the outbox
+            // triggers when the drain sends or parks a mark — a phone that
+            // buzzed for that would be buzzing for the app's own work.
+            ("Agrent/Tasks/FieldOperationStore.swift",
+             ["load", "loadAfterWrite", "adopt", "disownReads", "fetchCacheFirst"]),
         ]
         for (path, functions) in readPaths {
             let text = try source(path)

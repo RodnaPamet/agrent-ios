@@ -79,16 +79,50 @@ final class OutboxStore {
     }
 
     static func post(_ item: PendingOperation) async throws {
-        _ = try await APIClient.shared.postRaw(
-            LocationsAPI.operationsPath(item.locationID),
-            body: item.payload,
-            // THE SAME KEY, every time, forever. This is what makes
-            // the whole queue safe — a replay of an operation the
-            // server already accepted returns the original rather
-            // than creating a second.
-            idempotencyKey: item.id
-        )
+        switch replay(for: item) {
+        case .create(let path, let key):
+            // THE SAME KEY, every time, forever. This is what makes the
+            // create safe — a replay of an operation the server already
+            // accepted returns the original rather than creating a second.
+            _ = try await APIClient.shared.postRaw(path, body: item.payload, idempotencyKey: key)
+        case .mark(let path, let seenVersion):
+            // THE SAME VERSION, every time — the one the operator saw. This
+            // is what makes the mark safe: their own success replays as 200
+            // `alreadyApplied`, and anybody else's change since answers 409,
+            // which the drain parks as a conflict (#138).
+            _ = try await APIClient.shared.patchRaw(path, body: item.payload, ifMatch: seenVersion)
+        case nil:
+            throw Unsendable()
+        }
     }
+
+    /// How one queued row goes out — decided here, PURE, so a test can read
+    /// the method, the path, the key and the If-Match of a replay without a
+    /// network (there is no URLProtocol seam in the unit suite).
+    enum Replay: Equatable {
+        /// `POST`, keyed by the row's id.
+        case create(path: String, idempotencyKey: String)
+        /// `PATCH`, guarded by the version the operator SAW — never a key,
+        /// since the route reads none.
+        case mark(path: String, seenVersion: Int)
+    }
+
+    nonisolated static func replay(for item: PendingOperation) -> Replay? {
+        switch item.target {
+        case .create(let locationID):
+            return .create(path: LocationsAPI.operationsPath(locationID), idempotencyKey: item.id)
+        case .mark(let mark):
+            return .mark(path: FieldOperationAPI.linePath(taskID: mark.taskID, lineID: mark.lineID),
+                         seenVersion: mark.seenVersion)
+        case nil:
+            return nil
+        }
+    }
+
+    /// A row with no destination — neither a location nor a line. Nothing in
+    /// this app writes one; if a damaged file ever reads as one, the drain
+    /// refuses it like any final answer instead of inventing a route.
+    struct Unsendable: Error {}
 
     /// May the user signed in as `owner` see and send `item`?
     ///
@@ -120,7 +154,11 @@ final class OutboxStore {
     /// neither the record nor the knowledge that it was lost.
     var refused: [PendingOperation] { pending.filter { $0.lastError != nil && $0.attempts > 0 && $0.isRefused } }
 
-    var sendable: [PendingOperation] { pending.filter { !$0.isRefused } }
+    var sendable: [PendingOperation] { pending.filter(\.awaitsSend) }
+
+    /// Marks whose replay met somebody else's change, waiting for the
+    /// operator to say which stands (#138). Neither waiting nor refused.
+    var conflicts: [PendingOperation] { pending.filter { $0.conflict != nil } }
 
     func refresh() async {
         let owner = currentOwner()
@@ -136,6 +174,80 @@ final class OutboxStore {
 
     func enqueue(_ operation: PendingOperation) async {
         await queue.enqueue(operation)
+        await refresh()
+    }
+
+    // MARK: - Parcel-line marks (#138)
+
+    /// Queue a mark, REPLACING any unsent mark for the same line.
+    ///
+    /// The web's #934, for the same reason. A mark is the absolute state of
+    /// one existing row, so the newest one is the whole intent: «Готово» then
+    /// «Отвори отново» with no signal means "pending", and replaying both
+    /// would land the DONE first — a stock deduction and a ДНЕВНИК row that
+    /// un-completing does not reverse — and then meet a 409 against the
+    /// operator's own write. Two queued marks for one line are never two
+    /// pieces of work.
+    ///
+    /// The new row is written FIRST and the old removed after: a crash
+    /// between the two leaves a duplicate of one state, never a hole.
+    func enqueueMark(_ operation: PendingOperation) async {
+        await queue.enqueue(operation)
+        if let mark = operation.lineMark {
+            await supersedeMarks(taskID: mark.taskID, lineID: mark.lineID, keeping: operation.id)
+        } else {
+            await refresh()
+        }
+    }
+
+    /// Drop this person's UNSENT marks for one line — after a tap whose
+    /// outcome makes them stale, whatever that outcome was: it landed, it
+    /// met a conflict, it was refused, or it was queued in their place.
+    ///
+    /// What it NEVER touches, and why each matters:
+    ///   - a CONFLICT: it is waiting for the operator's decision, and
+    ///     deleting it answers that question for them;
+    ///   - a REFUSED row: a record of something the server said, kept rather
+    ///     than discarded for the reason `refused` gives;
+    ///   - anybody else's row: `pending` holds only the signed-in person's,
+    ///     and with nobody known it is empty — FAIL CLOSED, so a guard that
+    ///     cannot tell whose work it is touches none (the web's #1005).
+    func supersedeMarks(taskID: String, lineID: String, keeping kept: String?) async {
+        await refresh()
+        let stale = pending.filter {
+            $0.id != kept && $0.awaitsSend
+                && $0.lineMark?.taskID == taskID && $0.lineMark?.lineID == lineID
+        }
+        for item in stale { await queue.remove(item.id) }
+        await refresh()
+    }
+
+    /// «Запази моята» — the operator's decision that THEIR mark stands.
+    ///
+    /// Re-queued at the version the 409 reported, so it is accepted over the
+    /// change it met — deliberately, this time, by a person who was shown
+    /// the conflict. If the line has moved AGAIN since, that version is stale
+    /// too and the replay parks a fresh conflict: a third person's change is
+    /// never overwritten by a decision made about the second one's.
+    ///
+    /// Sent by the ordinary drain, not by a send of its own: it is queued
+    /// work again, so the pause, the owner check and the stop on no signal
+    /// all apply, and with no signal it simply waits like any other mark.
+    ///
+    /// Decided on the row as it is on disk (`PendingOperations.requeueConflict`),
+    /// not on `pending`: a second tap arriving while the first is still
+    /// writing would otherwise write a stale copy over the first one's result.
+    func keepMine(_ id: String) async {
+        guard await queue.requeueConflict(id, owner: currentOwner()) else { return }
+        await refresh()
+        await flush()
+    }
+
+    /// «Използвай сървъра» — the server's state stands and the queued mark
+    /// is discarded. Only a parked conflict, and only the signed-in person's:
+    /// this must never become a way to delete work that could still be sent.
+    func takeServer(_ id: String) async {
+        guard await queue.discardConflict(id, owner: currentOwner()) else { return }
         await refresh()
     }
 
@@ -184,11 +296,24 @@ final class OutboxStore {
         if currentOwner() == nil { await identify() }
         await refresh()
 
-        for var item in pending where !item.isRefused {
+        // Refused rows and parked conflicts are never sent by a pass: one
+        // needs a person to read it, the other a person to decide it.
+        for listed in pending where listed.awaitsSend {
             // The pause can close from OUTSIDE this pass — the operation
             // sheet feeds it, because its live save spends the same budget —
             // and the next send would only confirm it.
             if pause.isPaused { break }
+            // ── THE ROW AS IT IS NOW, NOT AS IT WAS LISTED (#138) ──
+            //
+            // A tap on a line during the pass REPLACES that line's unsent
+            // mark (`enqueueMark`), and the list was read before it. Sending
+            // the listed copy would land the mark the operator had just
+            // replaced — a «Готово», with its stock deduction, they took
+            // back — and walk the newer one into a 409 against it. Gone, or
+            // no longer waiting: skip it. What this cannot see is a row
+            // replaced while ITS OWN request is in the air; the write-back
+            // below is guarded for that.
+            guard var item = await queue.row(listed.id), item.awaitsSend else { continue }
             // ── WHOSE, CHECKED PER ITEM, NOT ONCE PER PASS ──
             //
             // `pending` was filtered when the pass began. A sign-out and a
@@ -237,9 +362,27 @@ final class OutboxStore {
                 item.attempts += 1
                 item.lastAttemptAt = Date()
                 item.lastError = UserMessage.text(for: error)
-                item.isRefused = !PendingOperations.isWorthRetrying(error)
-                await queue.update(item)
-                if !item.isRefused {
+                if let conflict = PendingOperation.Conflict(replayOf: item, failedWith: error) {
+                    // ── A STALE MARK IS A CONFLICT, NOT A REFUSAL (#138) ──
+                    //
+                    // The line moved on while the mark sat here — somebody
+                    // else's change, since a replay of the operator's OWN
+                    // success comes back 200 `alreadyApplied`. Parked for
+                    // them to decide, with the server's version kept for
+                    // «Запази моята». Never refused (refused is "the server
+                    // will say no again", and this is not that), and never
+                    // retried by a pass: a blind resend would 409 again, or
+                    // clobber the other change once versions lined up. Like
+                    // a refusal it is this row's alone, so the pass goes on.
+                    item.conflict = conflict
+                } else {
+                    item.isRefused = !PendingOperations.isWorthRetrying(error)
+                }
+                // Only if the row is still there: a newer mark for the same
+                // line, or «Използвай сървъра», may have removed it while its
+                // send was in flight, and writing it back would resurrect it.
+                await queue.updateIfPresent(item)
+                if item.awaitsSend {
                     // Network is down; the rest will fail identically.
                     break
                 }

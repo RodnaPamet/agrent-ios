@@ -31,11 +31,19 @@ import Foundation
 /// ── What is deliberately absent ──
 ///
 /// Every write route, and every read this repo has no payload for: the agro
-/// tile routes, parcel history, the task detail, the insurance catalogue,
-/// every Тенденции price other than Табло's wheat, and every news filter
-/// other than «Всички». They are answered `501 NO_FIXTURE` by
-/// `FixtureURLProtocol` and the screen shows the ordinary server-error state.
-/// A screenshot of that is a true report; a fabricated 200 would not be.
+/// tile routes, parcel history, the task detail of every task but the one
+/// field operation (#138, below), the insurance catalogue, every Тенденции
+/// price other than Табло's wheat, and every news filter other than
+/// «Всички». They are answered `501 NO_FIXTURE` by `FixtureURLProtocol` and
+/// the screen shows the ordinary server-error state. A screenshot of that is
+/// a true report; a fabricated 200 would not be.
+///
+/// The parcel-line MARK is a write like any other here: 501 `WRITE_REFUSED`.
+/// A 5xx reads as the server being unwell, so a tap on «Готово» under the
+/// seam would keep the mark on the phone, and every replay would meet the
+/// same 501 — nothing leaves the process either way. The harness taps none
+/// regardless: a real mark deducts stock and files a ДНЕВНИК row, and the
+/// first one is the owner's.
 ///
 /// Табло, Новини, Риск and Админ WERE on that list until agrent-ios#115 put
 /// the screenshot harness on this seam. They now have SYNTHETIC payloads —
@@ -81,6 +89,13 @@ enum FixtureCatalogue {
     /// could not see the bug it was routing around. `_` now passes through
     /// untouched, and `byPath` keys on the DECODED path (see `decodedPath`),
     /// which is what `FixtureURLProtocol` compares against.
+    /// The one FIELD OPERATION the fixtures hold — `tasks-list.json`'s third
+    /// row — whose detail and parcel lines are served (agrent-ios#138), so
+    /// A11yShots can photograph a task with lines in all three states. Every
+    /// other task id stays `NO_FIXTURE`. Spelled by hand for the reason
+    /// `fixtureLocationID` is; `FixtureSeamTests` holds it against the files.
+    static let fixtureFieldOperationTaskID = "tsk_fixture_fieldop"
+
     static let fixtureRiskParcels: [(parcelID: String, fixture: String)] = [
         ("par_holes", "risk-analysis-holes"),
         ("par_simple", "risk-analysis-simple"),
@@ -135,6 +150,9 @@ enum FixtureCatalogue {
         (DashboardAPI.agPath, "dashboard-ag"),
         (DashboardAPI.taskTrendPath(days: DashboardAPI.DefaultWindow.tasks), "dashboard-task-trend"),
         (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
+        // agrent-ios#138: one field-operation task, its detail and its lines.
+        (WorkItemAPI.detailPath(fixtureFieldOperationTaskID), "task-detail-fieldop"),
+        (FieldOperationAPI.detailPath(fixtureFieldOperationTaskID), "field-operation-detail"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 

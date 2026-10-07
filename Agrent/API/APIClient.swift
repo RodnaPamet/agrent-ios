@@ -306,12 +306,16 @@ actor APIClient {
 
     /// The `If-Match` value for a version: the BARE integer, `5`.
     ///
-    /// One spelling for every locked route. The journal and field-operations
-    /// routes accept only this; the farm profile also takes a strong tag
-    /// (`"5"`) but REFUSES a weak one (`W/"5"`) with a 400, and unlike the
-    /// other two it does not fall through to "no precondition" on a value it
-    /// cannot parse (agri-saas#1182). The bare integer is the one form all
-    /// three read the same way.
+    /// One spelling for every locked route. Until agri-saas#1182 the journal
+    /// and field-operations routes read only this and fell through to "no
+    /// precondition" on anything else, a quoted tag included, while the farm
+    /// profile took a strong tag (`"5"`) and refused a weak one (`W/"5"`).
+    /// Since #1255 (2026-10-02) all three share one strict parser
+    /// (`src/lib/http/if-match.ts`): bare and strong both read as 5, and a
+    /// weak, empty or malformed header is a 400 `IF_MATCH_*` rather than a
+    /// silent fall-through. The bare integer stays the spelling here — it is
+    /// what both clients' outboxes send, the house convention the parser
+    /// documents, and the one form every server version reads the same way.
     static func ifMatch(_ version: Int) -> String { String(version) }
 
     // MARK: - Retry-After
@@ -563,6 +567,25 @@ actor APIClient {
     func postRaw(_ path: String, body: Data, idempotencyKey: String) async throws -> Data {
         try await send(path: path, method: "POST", body: body,
                        idempotencyKey: idempotencyKey)
+    }
+
+    /// PATCH a body that is ALREADY ENCODED, under the optimistic lock.
+    ///
+    /// The parcel-line mark (agrent-ios#138), live and replayed: the outbox
+    /// stores the bytes the operator's tap produced and the version the line
+    /// had when they saw it, and both attempts go out through here so the
+    /// two cannot drift apart.
+    ///
+    /// `version` is NOT optional, unlike `put`'s. The route treats an absent
+    /// `If-Match` as "no precondition", so a mark without one is a silent
+    /// last-write-wins — the overwrite #138 exists to stop. Making the
+    /// unguarded call unspellable is cheaper than remembering not to make it.
+    ///
+    /// No `Idempotency-Key`: the route reads none, and a replay is already
+    /// safe by the lock (`FieldOperationAPI`).
+    func patchRaw(_ path: String, body: Data, ifMatch version: Int) async throws -> Data {
+        try await send(path: path, method: "PATCH", body: body, idempotencyKey: nil,
+                       ifMatch: Self.ifMatch(version))
     }
 
     /// A DELETE, with its response bytes handed back.

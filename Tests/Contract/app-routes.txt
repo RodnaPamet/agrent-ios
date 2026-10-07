@@ -41,6 +41,8 @@
 /api/t/{tenantSlug}/exchange/threads/{threadId}/close
 /api/t/{tenantSlug}/exchange/threads/{threadId}/messages
 /api/t/{tenantSlug}/exchange/threads/{threadId}/read
+/api/t/{tenantSlug}/field-operations/{taskId}
+/api/t/{tenantSlug}/field-operations/{taskId}/parcels/{lineId}
 /api/t/{tenantSlug}/grain/calculator
 /api/t/{tenantSlug}/grain/costs
 /api/t/{tenantSlug}/insurance/leads

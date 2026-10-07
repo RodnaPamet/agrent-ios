@@ -172,6 +172,31 @@ Shipped and proven end to end on a device simulator (2026-09-21):
     Voice Control telling «Изпрати съобщението» / "Send message" apart from
     the outbox banner's «Изпрати» / "Send"; the composer above the keyboard
     and the tab bar at the accessibility sizes.
+- **Marking a field operation's parcel lines (#138, PARITY Gap 8) — built
+  and NOT EXERCISED. The first real mark is the owner's.** A DONE deducts
+  dose × area from the product's inventory lot and files an INPUT_APPLICATION
+  entry in the ДНЕВНИК; un-completing reverses neither, and the last line
+  moves the job to PENDING_REVIEW and queues the farm-record PDF. So nothing
+  here has been sent to the server — development, CI and A11yShots included
+  (the seam answers every mark 501) — and every piece is held by unit tests on
+  fakes and by READING the route. What that leaves unverified:
+  - `version` on each line of `GET /field-operations/{taskId}`. The spec's
+    `OperationParcel` does not list it; the route returns the raw Prisma row,
+    so it arrives by `.passthrough()`. Read in source, not seen in a
+    response. Without it a line shows and offers no button;
+  - the 409 body for this route (`currentVersion`, `currentStatus`,
+    `expectedVersion` under `error.details`), the `alreadyApplied` replay,
+    and the 403 `OPERATION_NOT_ASSIGNED_TO_YOU` — read in `field-operation
+    .ts`, never met;
+  - the outbox's replay of a mark and the conflict resolver («Запази моята»,
+    «Използвай сървъра»), end to end — the drain is proven with a recording
+    sender, the If-Match by a source check (no URLProtocol seam in the
+    suite);
+  - the task's move to PENDING_REVIEW after the last line, shown by a re-read
+    of the task when the mark's answer says `resolved`;
+  - **device-only:** the line buttons with gloves, and at the accessibility
+    sizes (the capture is default size only); VoiceOver's sentence per line
+    and per button; the conflict card on a real screen.
 - **Private conversations (agri-saas #1323, #1298) — adopted from the spec,
   never seen on the wire.** `senderUserId` / `fromMyFarm`, the per-person
   `mine`, `unreadCount` and `hasUnread`, several threads per buyer farm and
@@ -502,6 +527,11 @@ collapses the rest into "More", and Админ was spending the most valuable
 one on a placeholder that said "use the web app". Shipped: task list,
 task detail, status change, and cost entry on the calculator.
 
+**2026-10-07 (#138):** a FIELD_OPERATION task's detail shows its parcel
+lines and lets whoever may mark them do so — online, or queued with the
+version seen and replayed under the optimistic lock. PARITY.md, Gap 8; the
+known-unverified entry above.
+
 ### The contract is a FILE, and this repo can fetch it
 
     https://raw.githubusercontent.com/RodnaPamet/agri-saas/main/src/generated/openapi.json
@@ -738,6 +768,19 @@ the one action that makes it worse.
 compares STATE. The `Idempotency-Key` is not the mechanism there — a
 brand-new key behaves identically — and the resolution text is part of
 the compared state, so a retry that re-trims it stops being a replay.
+
+**The parcel-line mark (#138) reads NO key, and the outbox replays it
+anyway** — the second write it carries. `PATCH /field-operations/{taskId}/
+parcels/{lineId}` is protected by its optimistic lock instead: the mark goes
+out with `If-Match: <the version the operator saw>`, live and on every
+replay; a replay of the operator's own lost success comes back 200
+`alreadyApplied` (no second stock deduction, no second ДНЕВНИК row), and a
+replay over anybody else's change comes back 409, which the outbox parks as a
+CONFLICT for the operator — never refused, never sent over it. The app sends
+no key on it (`APIClient.patchRaw`): one the route ignores would read as
+protection. The `If-Match` is the bare integer; agri-saas#1255 (2026-10-02)
+made the server read a strong tag the same way and refuse weak or malformed
+ones with a 400, where before it silently dropped the precondition.
 
 ### Every status change is ONE-WAY
 

@@ -222,3 +222,32 @@ a point inside Ruse oblast, not any farm's location.
 `commodity=wheat&range=3m` and `limit=50` with no category — because the
 query names the commodity and the category, and a path-only match would draw
 wheat under «Царевица». See `FixtureCatalogue.byPathAndQuery`.
+
+## A field operation and its parcel lines (agrent-ios#138)
+
+`task-detail-fieldop.json`, `field-operation-detail.json`, and **row 2** of
+`tasks-list.json` (`tsk_fixture_fieldop`, «Пръскане срещу плевели»).
+
+**Synthetic, all of them**, added so A11yShots can photograph a task with its
+parcel lines (`ONLY=08b-task-parcel-lines`). Nothing was captured off the
+wire, and no line was ever marked to make them: a real mark deducts stock and
+files a ДНЕВНИК entry, and the first one is the owner's.
+
+What is NOT invented is the SHAPE. `field-operation-detail.json` follows the
+spec's `FieldOperationDetail` and `OperationParcel` and, where the spec is
+thin, the route itself (`getFieldOperation`): the raw Prisma row of each line
+with its five includes, Decimal columns as STRINGS (`doseValue`,
+`parcel.areaHa`), the location's parcels as numbers with no geometry, and the
+line's `version` — which the route sends and the spec's schema does not list.
+`task-detail-fieldop.json` follows `WorkItem`, like the task it shadows.
+
+| case | where |
+|---|---|
+| all three line states — PENDING (version 0), DONE and SKIPPED (version 1) | `field-operation-detail.json` lines 0–2 |
+| a target note on a skipped line, a null water rate, a null `completedBy` | lines 2, 2, 0 |
+| an `areaHa` of `"5"` with no fractional part | line 2 |
+| the assignee is the operator, the viewer (`auth-me.json`) the owner — so the buttons show because the OWNER may write, not because they are assigned | `task.assigneeUserId` |
+
+The parcels are the three `locations-parcels.json` holds, by id and name; the
+product is the dashboard's «Примерен хербицид». The line ids (`opl_synthetic_*`)
+follow no real format.

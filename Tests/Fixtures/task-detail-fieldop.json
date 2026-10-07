@@ -1,0 +1,46 @@
+{
+  "id": "tsk_fixture_fieldop",
+  "tenantId": "ten_synthetic",
+  "type": "FIELD_OPERATION",
+  "title": "Пръскане срещу плевели",
+  "description": null,
+  "severity": "MEDIUM",
+  "priority": "P2",
+  "status": "IN_PROGRESS",
+  "source": "MANUAL",
+  "key": "FT-102",
+  "resolution": null,
+  "dueAt": "2026-10-08T07:00:00.000Z",
+  "completedAt": null,
+  "createdByUserId": "usr_fixture_owner",
+  "assigneeUserId": "usr_fixture_operator",
+  "reviewerUserId": null,
+  "operationType": "SPRAY",
+  "applicationTechnique": "boom",
+  "clientMutationId": null,
+  "createdAt": "2026-10-03T06:30:00.000Z",
+  "updatedAt": "2026-10-05T07:55:00.000Z",
+  "assignee": {
+    "id": "usr_fixture_operator",
+    "name": "Петър Механизаторов",
+    "email": "operator@example.invalid"
+  },
+  "createdBy": {
+    "id": "usr_fixture_owner",
+    "name": "Иван Фикстуров",
+    "email": "owner@example.invalid"
+  },
+  "reviewer": null,
+  "comments": [],
+  "links": [],
+  "watchers": [],
+  "sla": null,
+  "_count": {
+    "comments": 0,
+    "evidence": 0,
+    "links": 1,
+    "watchers": 0
+  },
+  "deletedAt": null,
+  "retentionUntil": null
+}

@@ -147,6 +147,11 @@ final class RouteContractTests: XCTestCase {
             ("WorkItemAPI.swift", [
                 WorkItemAPI.listPath, WorkItemAPI.detailPath(id), WorkItemAPI.statusPath(id),
             ]),
+            // agrent-ios#138: a field operation's lines, and marking one.
+            ("FieldOperationAPI.swift", [
+                FieldOperationAPI.detailPath("{taskId}"),
+                FieldOperationAPI.linePath(taskID: "{taskId}", lineID: "{lineId}"),
+            ]),
             ("AdminAPI.swift", [
                 AdminAPI.membersPath, AdminAPI.invitesPath, AdminAPI.farmProfilePath,
                 AdminAPI.invitePath,
