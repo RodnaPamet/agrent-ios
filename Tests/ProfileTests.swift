@@ -48,6 +48,22 @@ final class ProfileTests: XCTestCase {
         }
     }
 
+    /// Админ has a section of its own (owner, 2026-10-07), where the account
+    /// rows used to be — not a row among the farm's screens.
+    func testAdminHasItsOwnMenuSection() throws {
+        let menu = try source("Agrent/Design/AppMenu.swift")
+        let screens = try XCTUnwrap(menu.range(of: "Section(titled: Config.tenantSlug) {"),
+                                    "positive control: the screens' section moved")
+        let admin = try XCTUnwrap(menu.range(of: #"Label("Админ", systemImage: "person.2")"#),
+                                  "positive control: «Админ» left the menu")
+        XCTAssertLessThan(screens.lowerBound, admin.lowerBound, "«Админ» is no longer last")
+        // Between the two, the screens' section closes and another opens.
+        let between = String(menu[screens.upperBound..<admin.lowerBound])
+        XCTAssertTrue(between.contains("ForEach(tabs.overflow)"), "positive control: no screens before Админ")
+        XCTAssertTrue(between.contains("\n            Section {"),
+                      "«Админ» is a row in the screens' section again")
+    }
+
     // MARK: - Админ, the one way in
 
     /// Профил is opened from ONE place, Админ's account row — and that row is
