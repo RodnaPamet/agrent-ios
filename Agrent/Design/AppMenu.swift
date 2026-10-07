@@ -22,7 +22,8 @@ import SwiftUI
 /// things to put in it, and a menu padded with disabled rows for features
 /// that do not exist reads as a broken app rather than a planned one. It
 /// carries what is true today: the screens that are not on the bottom bar,
-/// and Админ. Items get added when the screens behind them exist.
+/// and Админ in a section of its own. Items get added when the screens
+/// behind them exist.
 ///
 /// Nor the account (owner, 2026-10-07). «Профил» and «Изход» were rows here;
 /// both now sit one level down, in Админ: its top row opens Профил, which
@@ -84,9 +85,14 @@ struct AppMenuButton<Extra: View>: View {
                         )
                     }
                 }
+            }
 
-                // Also the way to the account and to Изход, for every role —
-                // see the type's header.
+            // ITS OWN SECTION, last — where «Профил» and «Изход» sat before
+            // they moved under it (owner, 2026-10-07). Админ is the way to the
+            // account and to Изход now, for every role (see the type's
+            // header), so it stands apart from the screens rather than
+            // reading as one more of them.
+            Section {
                 Button {
                     showingAdmin = true
                 } label: {

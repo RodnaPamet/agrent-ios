@@ -683,10 +683,10 @@ card (one `AccountCard`), for every role.
   sends — and «Изход», behind a confirmation (`SignOutConfirmation`).
 - **Differs from the web on purpose (owner, 2026-10-07):** the app menu has
   no «Профил» or «Изход» rows; the web's user menu keeps both. On iOS the
-  menu's «Админ» is the way to both. Админ draws the account row for every
-  role and in every state: above «Нямате достъп» for a reader, and as a plain
-  «Профил» row before `/me` answers. `UserMessage`'s session-expired text
-  says where Изход is now.
+  menu's «Админ», in a section of its own where they were, is the way to
+  both. Админ draws the account row for every role and in every state: above
+  «Нямате достъп» for a reader, and as a plain «Профил» row before `/me`
+  answers. `UserMessage`'s session-expired text says where Изход is now.
 - Not ported, and why: name editing (`PATCH /api/account/profile`) and the
   picture upload/removal (`POST`/`DELETE /api/account/avatar`) are route code
   absent from openapi.json — follow-ups once documented. «Сигурност»

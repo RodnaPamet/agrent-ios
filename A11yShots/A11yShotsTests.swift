@@ -276,9 +276,10 @@ final class A11yShotsTests: XCTestCase {
 
     /// «ИЗХОД» IS TWO TAPS FROM THE MENU, so nothing here may tap by index.
     ///
-    /// `AppMenuButton` lists the overflow surfaces, then Админ. Since
-    /// 2026-10-07 «Профил» and «Изход» are no longer menu rows: Админ's top
-    /// row pushes Профил, whose destructive «Изход» asks once and then calls
+    /// `AppMenuButton` lists the overflow surfaces, then Админ in a section
+    /// of its own. Since 2026-10-07 «Профил» and «Изход» are no longer menu
+    /// rows: Админ's top row pushes Профил, whose destructive «Изход» asks
+    /// once and then calls
     /// `auth.signOut()` — which clears the Keychain. The question is a second
     /// tap, not a guard to lean on. Under the seam `AuthClient.signOut` does less (see the note
     /// on `AgrentApp.openingState`), but the simulator this runs on may well
