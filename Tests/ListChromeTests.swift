@@ -13,7 +13,11 @@ import XCTest
 ///     `ValueRow` / `FieldRow` / `MenuPicker` — its default value grey is
 ///     3.34:1 on the light card;
 ///   - every `Picker` names its style — a bare one in a `Form` is the menu
-///     picker whose UIKit-drawn value cut «Дейност» to «Де…ст».
+///     picker whose UIKit-drawn value cut «Дейност» to «Де…ст»;
+///   - and the style is never `.navigationLink`, whose pushed page is a
+///     List the system draws on its grouped grey (#164);
+///   - every `DatePicker` is tinted `Palette.DatePill.tint`, measured on
+///     the system's pill (#164).
 ///
 /// There is no runtime hook that says what colour the system drew a header
 /// in, so this reads the source, as `FormSurfaceTests` does, with a positive
@@ -59,6 +63,9 @@ final class ListChromeTests: XCTestCase {
     private static let labeledContent = #"(?<![A-Za-z])LabeledContent\b"#
     private static let picker = #"(?<![A-Za-z])Picker\("#
     private static let pickerStyle = #"\.pickerStyle\("#
+    private static let pushedPicker = #"\.pickerStyle\(\s*\.navigationLink\s*\)"#
+    private static let datePicker = #"(?<![A-Za-z])DatePicker\("#
+    private static let datePillTint = #"\.tint\(Palette\.DatePill\.tint\)"#
 
     /// `TextField(` calls whose argument list carries no styled prompt.
     private static func unpromptedFields(in text: String) -> Int {
@@ -130,8 +137,36 @@ final class ListChromeTests: XCTestCase {
         XCTAssertEqual(offenders, [],
                        "a Picker with no style is a menu picker in a Form, whose UIKit-drawn value "
                      + "cut «Дейност» to «Де…ст» (#160) — use MenuPicker or name a style")
-        XCTAssertGreaterThanOrEqual(sources.map { Self.count(#"MenuPicker\("#, in: $0.1) }.reduce(0, +), 9,
-                                    "the menu pickers of #160 and its siblings")
+        XCTAssertGreaterThanOrEqual(sources.map { Self.count(#"MenuPicker\("#, in: $0.1) }.reduce(0, +), 13,
+                                    "the menu pickers of #160, its siblings, and the four of #164")
+    }
+
+    /// No picker pushes the system's page. `.pickerStyle(.navigationLink)`
+    /// pushes a List the system builds, on `systemGroupedBackground`, which
+    /// nothing in the app can reach to paint (#164) — a short list of
+    /// options is a `MenuPicker`, a long one a `PagePicker`.
+    func testNoPickerPushesASystemPage() {
+        let sources = appSources()
+        let offenders = sources.filter { Self.count(Self.pushedPicker, in: $0.1) != 0 }.map(\.0)
+        XCTAssertEqual(offenders, [],
+                       "a .navigationLink picker pushes a page on the system's grouped grey — "
+                     + "use MenuPicker for a short list or PagePicker for a long one")
+        XCTAssertGreaterThanOrEqual(sources.map { Self.count(#"PagePicker\("#, in: $0.1) }.reduce(0, +), 2,
+                                    "«Парцел» and «Покритие» on the insurance form")
+    }
+
+    /// Every `DatePicker` carries `Palette.DatePill.tint`: the app's tint is
+    /// 4.43:1 on the pill in light while the calendar is open (#164).
+    func testEveryDatePickerIsTintedForItsPill() {
+        let sources = appSources()
+        let offenders = sources.filter {
+            Self.count(Self.datePicker, in: $0.1) > Self.count(Self.datePillTint, in: $0.1)
+        }.map(\.0)
+        XCTAssertEqual(offenders, [],
+                       "a DatePicker in the app's tint draws its open date at 4.43:1 on its pill in light — "
+                     + "add .tint(Palette.DatePill.tint)")
+        XCTAssertGreaterThanOrEqual(sources.map { Self.count(Self.datePicker, in: $0.1) }.reduce(0, +), 3,
+                                    "positive control: «Дата» twice and «Валидна до»")
     }
 
     // MARK: - Positive controls
@@ -163,5 +198,12 @@ final class ListChromeTests: XCTestCase {
         XCTAssertEqual(Self.count(Self.picker, in: #"MenuPicker("Тип", selection: $t, value: v) {"#), 0)
         XCTAssertEqual(Self.count(Self.labeledContent, in: "ValueRow(\"a\") { b }"), 0)
         XCTAssertEqual(Self.count(Self.labeledContent, in: "LabeledContent {"), 1)
+        XCTAssertEqual(Self.count(Self.pushedPicker, in: ".pickerStyle(.navigationLink)"), 1)
+        XCTAssertEqual(Self.count(Self.pushedPicker, in: ".pickerStyle(.inline)"), 0)
+        XCTAssertEqual(Self.count(Self.datePicker, in: #"DatePicker("Дата", selection: $d)"#), 1)
+        XCTAssertEqual(Self.count(Self.datePicker, in: "struct MyDatePicker("), 0)
+        XCTAssertEqual(Self.count(Self.datePillTint, in: ".tint(Palette.DatePill.tint)"), 1)
+        XCTAssertEqual(Self.count(Self.datePillTint, in: ".tint(Palette.accent)"), 0)
+        XCTAssertEqual(Self.count(Self.picker, in: #"PagePicker("Парцел", selection: $p, value: v, choices: c)"#), 0)
     }
 }

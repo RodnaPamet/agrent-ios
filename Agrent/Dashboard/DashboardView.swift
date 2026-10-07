@@ -497,19 +497,23 @@ struct DashboardBlockPicker: View {
         NavigationStack {
             List {
                 Section {
-                    Picker("Култура", selection: Binding(
-                        get: { preferences.priceCommodity },
-                        set: { preferences.select($0); onChange() })) {
+                    // A MENU, where this was `.navigationLink` — which pushed
+                    // a page the system draws on its grouped grey, out of
+                    // reach of `pageRow()` (#164). Four crops fit a menu.
+                    MenuPicker("Култура", english: "Crop",
+                               selection: Binding(get: { preferences.priceCommodity },
+                                                  set: { preferences.select($0); onChange() }),
+                               value: preferences.priceCommodity.label) {
                         ForEach(ChartableCommodity.allCases.filter { !$0.isInput }) { item in
                             Text(item.label).tag(item)
                         }
                     }
-                    .pickerStyle(.navigationLink)
                 } header: {
                     SectionHeader("Цена")
                 } footer: {
                     SectionFooter("Показва се само ако блокът «\(DashboardBlock.grainPrice.label)» е включен.")
                 }
+                .pageRow()
 
                 Section {
                     // Shown in the STORED order, with the off ones after, so
@@ -538,6 +542,9 @@ struct DashboardBlockPicker: View {
                 }
             }
             .listStyle(.insetGrouped)
+            // The page, under rows of the page colour — the tab customiser's
+            // arrangement, and every other list's (#164).
+            .pageBackground()
             .inlineTitle("Табло")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

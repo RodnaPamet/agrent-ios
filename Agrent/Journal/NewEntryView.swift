@@ -28,13 +28,20 @@ struct NewEntryView: View {
                         ForEach(LogEntryType.selectable) { Text($0.label).tag($0) }
                     }
                     DatePicker("Дата", selection: $occurredAt, displayedComponents: .date)
+                        // The date while its calendar is open, in a tint
+                        // measured on the pill — see `Palette.DatePill` (#164).
+                        .tint(Palette.DatePill.tint)
                 }
                 Section(titled: "Заглавие") {
                     // No font-size dance here. UIKit's text input does not
                     // focus-zoom, which is the entire class of bug that took
                     // five fixes on the web.
+                    //
+                    // `promptRoom`, so the example WRAPS: at AX5 it was cut
+                    // to «напр. Трети…», which says nothing (#164).
                     TextField("Заглавие", text: $title,
-                              prompt: .fieldPrompt("напр. Третиране на южния блок"), axis: .vertical)
+                              prompt: .fieldPrompt(Self.titleExample), axis: .vertical)
+                        .promptRoom(Self.titleExample)
                 }
                 Section(titled: "Бележки") {
                     TextEditor(text: $notes).frame(minHeight: 140)
@@ -85,4 +92,7 @@ struct NewEntryView: View {
         }
         saving = false
     }
+
+    /// The title's prompt: an example, whole, at every text size.
+    private static let titleExample = "напр. Третиране на южния блок"
 }

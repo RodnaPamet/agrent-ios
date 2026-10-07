@@ -96,6 +96,10 @@ struct ExchangeMapView: View {
                 .pageRow()
             }
         }
+        // Here rather than at the call in `ExchangeView`, beside the list it
+        // paints — the arrangement `FormSurfaceTests` checks for every list
+        // in the app (#164).
+        .pageBackground()
     }
 
     @ViewBuilder

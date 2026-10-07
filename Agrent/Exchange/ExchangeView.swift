@@ -92,6 +92,12 @@ struct ExchangeView: View {
         .background(Palette.Surface.page)
 
         if tab == .browse {
+            // The prompt is a plain STRING on purpose. UIKit draws it, in
+            // `secondaryLabel` on `tertiarySystemFill` — 3.12:1 in light —
+            // and neither a styled `Text` prompt nor an appearance proxy on
+            // the field's labels changes that (both read back from a hosted
+            // field, #164). `Palette.ListChrome` records the pair as a
+            // platform limit and `PaletteTokenTests` pins it.
             content.searchable(
                 text: $listings.query.text,
                 prompt: "Търсене по култура или регион"
@@ -157,7 +163,6 @@ struct ExchangeView: View {
         case .loaded where showMap:
             ExchangeMapView(listings: listings.rows)
                 .refreshable { await PullToRefresh.bounded { await listings.load() } }
-            .pageBackground()
 
         case .loaded:
             List {
@@ -301,6 +306,11 @@ struct ExchangeView: View {
                     }
                 }
                 .padding(.vertical, 2)
+                // The row's own background, which `pageBackground()` does
+                // not reach: without it each listing sat on the system's
+                // grouped card colour on the page — found by the per-list
+                // check in `FormSurfaceTests` (#164).
+                .pageRow()
             }
             .refreshable { await PullToRefresh.bounded { await mine.load() } }
             .pageBackground()
@@ -326,7 +336,8 @@ struct ExchangeView: View {
             )
 
         case .loaded(let rows, _):
-            List(rows) { InquiryRow(inquiry: $0) }
+            // `pageRow()` for the reason «Моите обяви» has one.
+            List(rows) { InquiryRow(inquiry: $0).pageRow() }
                 .refreshable { await PullToRefresh.bounded { await inquiries.load() } }
             .pageBackground()
         }

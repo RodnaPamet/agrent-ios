@@ -8,62 +8,70 @@ struct ListingDetailView: View {
 
     var body: some View {
         List {
-            Section {
-                ValueRow("Култура") { Text(CommodityName.canonical(listing.commodity) ?? listing.commodity) }
-                ValueRow("Тип") { Text(listing.kind.label) }
-                ValueRow("Посока") { Text(listing.side.label) }
-                if let quantity = listing.quantityTonnes {
-                    ValueRow("Количество") { Text("\(Exchange.tonnes(quantity) ?? quantity) т") }
-                }
-                if let price = listing.pricePerTonne {
-                    ValueRow("Цена / т") {
-                        Text("\(Exchange.money(price) ?? price) \(listing.priceCurrency ?? "")")
-                    }
-                }
-                ValueRow("Състояние") { Text(listing.status.label) }
-            }
-
-            if let region = listing.regionName {
-                Section(titled: "Регион") {
-                    ValueRow(region) { Text(listing.regionCode ?? "") }
-                }
-            }
-
-            // Public plaintext by design — sanitised server-side and
-            // deliberately not encrypted, because cross-tenant readability is
-            // what the marketplace is for. Absent when the seller wrote none.
-            if let description = listing.description, !description.isEmpty {
-                Section(titled: "Описание") { Text(description) }
-            }
-            if let seller = listing.sellerDisplayName, !seller.isEmpty {
-                Section(titled: "Продавач") { Text(seller) }
-            }
-
-            Section {
-                ValueRow("Публикувана") {
-                    Text(BgDate.full(listing.createdAt))
-                }
-                if let expires = listing.expiresAt {
-                    ValueRow("Валидна до") {
-                        Text(BgDate.full(expires))
-                    }
-                }
-            }
-
-            if listing.isOwn {
+            // ON THE PAGE, as every list is (#164) — until then this was the
+            // system's grouped grey under the app's green bar. `Group` hands
+            // `pageRow()` to every section it resolves to, the ones behind an
+            // `if` included: one line, as in `PageForm`, rather than seven.
+            Group {
                 Section {
-                    Text("Това е обява на Вашето стопанство.")
-                        .font(.footnote)
-                        .foregroundStyle(Palette.secondaryText)
+                    ValueRow("Култура") { Text(CommodityName.canonical(listing.commodity) ?? listing.commodity) }
+                    ValueRow("Тип") { Text(listing.kind.label) }
+                    ValueRow("Посока") { Text(listing.side.label) }
+                    if let quantity = listing.quantityTonnes {
+                        ValueRow("Количество") { Text("\(Exchange.tonnes(quantity) ?? quantity) т") }
+                    }
+                    if let price = listing.pricePerTonne {
+                        ValueRow("Цена / т") {
+                            Text("\(Exchange.money(price) ?? price) \(listing.priceCurrency ?? "")")
+                        }
+                    }
+                    ValueRow("Състояние") { Text(listing.status.label) }
+                }
+
+                if let region = listing.regionName {
+                    Section(titled: "Регион") {
+                        ValueRow(region) { Text(listing.regionCode ?? "") }
+                    }
+                }
+
+                // Public plaintext by design — sanitised server-side and
+                // deliberately not encrypted, because cross-tenant readability is
+                // what the marketplace is for. Absent when the seller wrote none.
+                if let description = listing.description, !description.isEmpty {
+                    Section(titled: "Описание") { Text(description) }
+                }
+                if let seller = listing.sellerDisplayName, !seller.isEmpty {
+                    Section(titled: "Продавач") { Text(seller) }
+                }
+
+                Section {
+                    ValueRow("Публикувана") {
+                        Text(BgDate.full(listing.createdAt))
+                    }
+                    if let expires = listing.expiresAt {
+                        ValueRow("Валидна до") {
+                            Text(BgDate.full(expires))
+                        }
+                    }
+                }
+
+                if listing.isOwn {
+                    Section {
+                        Text("Това е обява на Вашето стопанство.")
+                            .font(.footnote)
+                            .foregroundStyle(Palette.secondaryText)
+                    }
+                }
+
+                if MessagingPolicy.offersMessageParty(
+                    isOwn: listing.isOwn, mayWrite: MessagingPolicy.mayWrite(user.user)
+                ) {
+                    messagePartySection
                 }
             }
-
-            if MessagingPolicy.offersMessageParty(
-                isOwn: listing.isOwn, mayWrite: MessagingPolicy.mayWrite(user.user)
-            ) {
-                messagePartySection
-            }
+            .pageRow()
         }
+        .pageBackground()
         .inlineTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
         .navigationDestination(item: $openedThread) { route in
             ConversationView(threadID: route.threadID, commodity: listing.commodity)

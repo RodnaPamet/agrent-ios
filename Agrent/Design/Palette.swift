@@ -349,9 +349,27 @@ enum Palette {
     ///     value on page               9.17   6.98  11.37
     ///     placeholder on card         5.81   5.32   7.46
     ///     menu value on card          6.59   5.09   5.49
+    ///     menu value on page          7.91   4.90   5.49
     ///
-    /// plus the same header and value on the system grouped surfaces, for
-    /// the lists that are not on tokens yet (see `PaletteTokenTests`).
+    /// The last is the dashboard's block picker, a list on page rows (#164).
+    /// Until #164 five lists, and the pages `.navigationLink` pickers push,
+    /// sat on the system's grouped surfaces and were measured there too; all
+    /// of them are on the page now (`FormSurfaceTests`), so those pairs went.
+    ///
+    /// ONE PAIR HERE IS THE SYSTEM'S AND FAILS: Борса's search prompt.
+    /// `.searchable` hands UIKit the prompt's STRING. A `Text` prompt styled
+    /// with `foregroundStyle` or `foregroundColor`, and an appearance proxy
+    /// on the labels inside `UISearchTextField`, were each read back from a
+    /// hosted `.searchable` field unchanged (iOS 26.5 simulator; there is no
+    /// iOS 17 runtime here to repeat it on). So the prompt is
+    /// `secondaryLabel` on `tertiarySystemFill` over the page, whatever this
+    /// file says — #9aa3a7 on #203733 in the dark capture:
+    ///
+    ///     search prompt               4.94   3.12   5.09
+    ///
+    /// Light is below 4.5, and it is a platform limit rather than a choice:
+    /// no fill fixes it, because `secondaryLabel` is under 4.5 on white
+    /// itself. `PaletteTokenTests` pins it, so a change in the platform shows.
     enum ListChrome {
         /// A section's header and footer — `SectionHeader`, `SectionFooter`,
         /// `Section(titled:)`.
@@ -366,6 +384,28 @@ enum Palette {
         /// because it is the control: the system's own menu picker draws its
         /// value in the tint, and this keeps that.
         static let menuValue = accent
+    }
+
+    /// A compact `DatePicker`'s pill — «Дата» in «Нов запис», «Нов разход»,
+    /// «Валидна до» on a new listing (#164). The system draws it: a
+    /// `tertiarySystemFill` lozenge on the form's card, the date in `label`,
+    /// and the date in the TINT while its calendar is open. Read off the
+    /// «Нов запис» captures first (dark, AX5): #ffffff on #24433c at rest —
+    /// `label` on that fill over the card — and #d4af37, the tint, with the
+    /// calendar open. Then measured here in every arm:
+    ///
+    ///     date at rest (label)        10.79  16.97  16.48
+    ///     date open, app tint         5.13   4.43   4.30   ← accent
+    ///     date open, this tint        5.13   5.26   5.11
+    ///
+    /// The app's tint is `accent`, which is 4.9 on the bare page in light
+    /// and loses the rest to the grey of the pill. So a date picker is tinted
+    /// with THIS: the accent in dark, where `accentDeep` would be 3.32 on
+    /// the pill, and `accentDeep` in light and «Слънце».
+    enum DatePill {
+        static let tint = Color(token: { theme in
+            theme == .dark ? AgrentColor.brandDefault(theme) : AgrentColor.brandEmphasis(theme)
+        })
     }
 
     /// Борса's map of Bulgaria (`ExchangeMapView`): the oblasti with no

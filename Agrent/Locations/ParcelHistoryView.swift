@@ -76,12 +76,19 @@ struct ParcelHistoryView: View {
 
         case .loaded(let archive, _):
             List {
-                header(archive)
-                if archive.isEmpty {
-                    emptyArchive
-                } else {
-                    cards(archive)
+                // Each helper below puts its own rows on the page; this
+                // `Group` does it once more for the whole list, so a row
+                // added here later is on the page too, and the per-list
+                // check in `FormSurfaceTests` can see it from the list (#164).
+                Group {
+                    header(archive)
+                    if archive.isEmpty {
+                        emptyArchive
+                    } else {
+                        cards(archive)
+                    }
                 }
+                .pageRow()
             }
             .listStyle(.plain)
             .pageBackground()

@@ -134,13 +134,16 @@ struct SpatialImportView: View {
         }
 
         Section {
-            Picker("Култура", selection: $cropType) {
-                Text("Смесени / по-късно").tag(ChartableCommodity?.none)
+            // A menu: five options, and `.navigationLink` pushed a page the
+            // system draws on its grouped grey, which no modifier here
+            // reaches (#164).
+            MenuPicker("Култура", english: "Crop", selection: $cropType,
+                       value: cropType?.label ?? Self.mixedCrops) {
+                Text(Self.mixedCrops).tag(ChartableCommodity?.none)
                 ForEach(ChartableCommodity.allCases.filter { !$0.isInput }) { crop in
                     Text(crop.label).tag(Optional(crop))
                 }
             }
-            .pickerStyle(.navigationLink)
         } footer: {
             SectionFooter("Стъпва се на всеки импортиран парцел. Може да се смени после.")
         }
@@ -338,4 +341,7 @@ struct SpatialImportView: View {
     /// inside the byte caps, short enough that a farmer is not held by a queue
     /// that has stopped answering.
     private static let maxPolls = 60
+
+    /// «Култура»'s no-crop option, and the row's value while it is chosen.
+    private static let mixedCrops = "Смесени / по-късно"
 }

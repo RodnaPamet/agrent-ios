@@ -113,16 +113,18 @@ final class PaletteTokenTests: XCTestCase {
         ("row value on page", Palette.ListChrome.value, Palette.Surface.page, [9.17, 6.98, 11.37]),
         ("field prompt on card", Palette.ListChrome.placeholder, Palette.Surface.card, [5.81, 5.32, 7.46]),
         ("menu picker value on card", Palette.ListChrome.menuValue, Palette.Surface.card, [6.59, 5.09, 5.49]),
-        // Five lists are not on token surfaces yet — the tab customiser, a
-        // listing's detail, the calculator, the dashboard's block picker and
-        // the pages a `.navigationLink` picker pushes — so their headers sit
-        // on `systemGroupedBackground` and their values on
-        // `secondarySystemGroupedBackground`, resolved here with the same
-        // traits (Increase Contrast included).
-        ("section header on systemGroupedBackground", Palette.ListChrome.header,
-         Color(uiColor: .systemGroupedBackground), [11.57, 7.00, 9.57]),
-        ("row value on secondarySystemGroupedBackground", Palette.ListChrome.value,
-         Color(uiColor: .secondarySystemGroupedBackground), [9.38, 7.81, 11.37]),
+        // #164: the five lists that were on the system's grouped surfaces —
+        // the tab customiser, a listing's detail, the calculator's two, the
+        // dashboard's block picker — and the pages `.navigationLink` pickers
+        // pushed are on the page now, so the pairs measured on
+        // `systemGroupedBackground` went. What those lists write on the
+        // page is above (primary, secondaryText, header, value, accent,
+        // error, success); the one new pair is the block picker's crop,
+        // now a `MenuPicker` on a page row rather than a pushed page. A
+        // `PagePicker`'s row sits on a form's card (value on card, above),
+        // and its page writes primary, the header and an accent check mark
+        // on the page (all above).
+        ("menu picker value on page", Palette.ListChrome.menuValue, Palette.Surface.page, [7.91, 4.90, 5.49]),
     ]
 
     /// The one role that does NOT pass on a bar, written down so nobody
@@ -189,6 +191,51 @@ final class PaletteTokenTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(ratio, 4.5)
             XCTAssertEqual(ratio, expected, accuracy: 0.02)
         }
+    }
+
+    /// A compact `DatePicker`'s pill (#164): `tertiarySystemFill` composited
+    /// over the form's CARD — not the page the generic helper uses — read
+    /// off the AX5 capture of «Нов запис» first (#24433c under #ffffff in
+    /// dark). The date at rest is `label`; while the calendar is open it is
+    /// the tint. The app's tint, `accent`, is the positive control: it is
+    /// the one that fails in light and «Слънце», and why date pickers carry
+    /// `Palette.DatePill.tint` instead.
+    func testTheDatePillIsReadableAtRestAndOpen() {
+        for (traits, arm, rest, open, appTint) in [(Self.dark, "dark", 10.79, 5.13, 5.13),
+                                                   (Self.light, "light", 16.97, 5.26, 4.43),
+                                                   (Self.sunlight, "«Слънце»", 16.48, 5.11, 4.30)] {
+            let card = Self.rgba(Palette.Surface.card, traits)
+            let pill = Self.over(Self.rgba(Color(uiColor: .tertiarySystemFill), traits), card)
+            func on(_ ink: Color) -> Double { Self.ratio(Self.over(Self.rgba(ink, traits), pill), pill) }
+
+            XCTAssertEqual(on(Color.primary), rest, accuracy: 0.02, "\(arm): at rest")
+            XCTAssertGreaterThanOrEqual(on(Color.primary), 4.5, "\(arm): at rest")
+            XCTAssertEqual(on(Palette.DatePill.tint), open, accuracy: 0.02, "\(arm): open")
+            XCTAssertGreaterThanOrEqual(on(Palette.DatePill.tint), 4.5, "\(arm): open")
+            XCTAssertEqual(on(Palette.accent), appTint, accuracy: 0.02, "\(arm): the app's tint")
+        }
+        XCTAssertLessThan(Self.contrast(Palette.accent, on: Color(uiColor: .tertiarySystemFill), Self.light), 4.5,
+                          "positive control: the app's tint fails on the pill in light")
+    }
+
+    /// Борса's search prompt, which UIKit draws: `secondaryLabel` on
+    /// `tertiarySystemFill` over the page (the navigation bar is the page,
+    /// `SolidChrome`). Read back from a hosted `.searchable` field and off
+    /// the capture (#9aa3a7 on #203733 in dark, 4.94). Neither a styled
+    /// `Text` prompt nor an appearance proxy changes it, so light is a
+    /// PLATFORM shortfall, pinned like the bar's `accentDeep` above: if this
+    /// starts passing, the platform moved and `Palette.ListChrome`'s note
+    /// can go. `secondaryLabel` on plain white is the second half of why
+    /// no fill could fix it.
+    func testTheSearchPromptIsThePlatformsShortfall() {
+        for (traits, expected) in zip([Self.dark, Self.light, Self.sunlight], [4.94, 3.12, 5.09]) {
+            XCTAssertEqual(Self.contrast(Color(uiColor: .secondaryLabel), on: Color(uiColor: .tertiarySystemFill), traits),
+                           expected, accuracy: 0.02)
+        }
+        XCTAssertLessThan(Self.contrast(Color(uiColor: .secondaryLabel), on: Color(uiColor: .tertiarySystemFill),
+                                        Self.light), 4.5)
+        XCTAssertLessThan(Self.contrast(Color(uiColor: .secondaryLabel), on: Color(hex: 0xFFFFFF), Self.light), 4.5,
+                          "secondaryLabel is under 4.5 on white, so no lighter fill could rescue it")
     }
 
     /// Every surface P2.8 introduced is OPAQUE, in every arm — the point of

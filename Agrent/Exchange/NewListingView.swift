@@ -180,6 +180,9 @@ struct NewListingView: View {
                     if hasExpiry {
                         DatePicker("Валидна до", selection: $expiresAt,
                                    in: Date()..., displayedComponents: .date)
+                            // The date while its calendar is open — see
+                            // `Palette.DatePill` (#164).
+                            .tint(Palette.DatePill.tint)
                     }
                 }
 

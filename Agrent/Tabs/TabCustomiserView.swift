@@ -50,6 +50,9 @@ struct TabCustomiserView: View {
                            + "Всичко останало е в менюто горе вляво и остава достъпно.")
                     }
                 }
+                // On the page colour, as every list is (#164). On the
+                // SECTION, so it reaches the rows of the `ForEach` inside.
+                .pageRow()
 
                 // `permitted`, not `allCases` — the editor must not offer a
                 // tab whose every screen would 403. An operator choosing
@@ -66,8 +69,10 @@ struct TabCustomiserView: View {
                             row(surface, inBar: false)
                         }
                     }
+                    .pageRow()
                 }
             }
+            .pageBackground()
             .environment(\.editMode, .constant(.active))
             .inlineTitle("Раздели")
             .toolbar {
