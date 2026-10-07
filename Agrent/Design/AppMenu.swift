@@ -21,9 +21,14 @@ import SwiftUI
 /// Nothing speculative. The owner asked for the menu, not for a list of
 /// things to put in it, and a menu padded with disabled rows for features
 /// that do not exist reads as a broken app rather than a planned one. It
-/// carries what is true today: who you are signed in as («Профил»), and the
-/// way out.
-/// Items get added when the screens behind them exist.
+/// carries what is true today: the screens that are not on the bottom bar,
+/// and Админ. Items get added when the screens behind them exist.
+///
+/// Nor the account (owner, 2026-10-07). «Профил» and «Изход» were rows here;
+/// both now sit one level down, in Админ: its top row opens Профил, which
+/// holds the app's only Изход. `AdminView` draws that row for every role and
+/// in every state, which is what makes taking them out of here safe: a
+/// reader whom Админ refuses still reaches Изход through it.
 struct AppMenuButton<Extra: View>: View {
     /// SCREEN-SPECIFIC ITEMS, above the global ones.
     ///
@@ -33,15 +38,13 @@ struct AppMenuButton<Extra: View>: View {
     /// which is exactly what this menu was described as being for.
     ///
     /// In its own `Section` so the two kinds never read as one list. A farmer
-    /// scanning for «Изход» must not have to step over an action that only
-    /// exists on this screen.
+    /// scanning for a screen must not have to step over an action that only
+    /// exists on this one.
     @ViewBuilder var extra: Extra
 
     @State private var tabs = BottomTabsStore.shared
     @State private var unread = ExchangeUnreadStore.shared
     @State private var showingAdmin = false
-    @State private var showingProfile = false
-    @State private var confirmingSignOut = false
 
     /// Which overflow screen is open, if any. One piece of state rather
     /// than a Bool per surface — the set is now derived from what is NOT
@@ -82,34 +85,13 @@ struct AppMenuButton<Extra: View>: View {
                     }
                 }
 
+                // Also the way to the account and to Изход, for every role —
+                // see the type's header.
                 Button {
                     showingAdmin = true
                 } label: {
                     Label("Админ", systemImage: "person.2")
                 }
-            }
-
-            // THE ACCOUNT, in a section of its own rather than under the
-            // farm's name: «Профил» is the person, whichever farm they are in —
-            // the web's `/account` works with zero farms for the same reason.
-            // For EVERY role (owner, 2026-10-06), unlike what Админ opens.
-            //
-            // «Изход» stays here, last, as on the web's user menu, and the
-            // Профил page has one too. Both ask first — `SignOutConfirmation`.
-            Section {
-                Button {
-                    showingProfile = true
-                } label: {
-                    Label("Профил", systemImage: "person.crop.circle")
-                }
-                .accessibilityInputLabels(A11y.Spoken.profile)
-
-                Button(role: .destructive) {
-                    confirmingSignOut = true
-                } label: {
-                    Label("Изход", systemImage: "rectangle.portrait.and.arrow.right")
-                }
-                .accessibilityInputLabels(A11y.Spoken.signOut)
             }
         } label: {
             // `line.3.horizontal` rather than the ellipsis iOS usually puts
@@ -126,14 +108,6 @@ struct AppMenuButton<Extra: View>: View {
         // action; presenting it modally says the same thing — you came here
         // on purpose and you will go back.
         .sheet(isPresented: $showingAdmin) { AdminView() }
-        // A sheet with its own stack, flagged as the menu's so `ProfileView`
-        // draws «Затвори». The same page pushed inside Админ draws a back
-        // button instead, because there the flag is unset.
-        .sheet(isPresented: $showingProfile) {
-            NavigationStack { ProfileView() }
-                .environment(\.presentedFromMenu, true)
-        }
-        .signOutConfirmation(isPresented: $confirmingSignOut)
         // Each screen owns its own NavigationStack, the same shape AdminView
         // uses. The «Затвори» does NOT belong to the screen, though (#119):
         // every surface can be a tab root or a menu sheet depending on the

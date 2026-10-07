@@ -112,6 +112,7 @@ final class A11yShotsTests: XCTestCase {
             assertFixtureWorld(app)
             switch only {
             case "08b-task-parcel-lines": captureFieldOperationTask(app)
+            case "16-profile": captureProfile(app)
             default: XCTFail("A11Y_ONLY=\(only) names no capture this suite can run alone")
             }
             return
@@ -273,10 +274,11 @@ final class A11yShotsTests: XCTestCase {
 
     // MARK: - reaching the screens that are not tabs
 
-    /// THE MENU HOLDS «ИЗХОД», so nothing here may tap by index.
+    /// «ИЗХОД» IS TWO TAPS FROM THE MENU, so nothing here may tap by index.
     ///
-    /// `AppMenuButton` lists the overflow surfaces, then Админ, then Профил
-    /// and a destructive «Изход» that asks once and then calls
+    /// `AppMenuButton` lists the overflow surfaces, then Админ. Since
+    /// 2026-10-07 «Профил» and «Изход» are no longer menu rows: Админ's top
+    /// row pushes Профил, whose destructive «Изход» asks once and then calls
     /// `auth.signOut()` — which clears the Keychain. The question is a second
     /// tap, not a guard to lean on. Under the seam `AuthClient.signOut` does less (see the note
     /// on `AgrentApp.openingState`), but the simulator this runs on may well
@@ -650,8 +652,8 @@ final class A11yShotsTests: XCTestCase {
     ///
     /// Админ is an index now: «Стопанство», «Долна лента», «Потребители» —
     /// under the account card, which this asserts before the capture and does
-    /// not tap here: since P2.8 it opens Профил, and `captureProfile` reaches
-    /// that page from the menu, which is the route every role has.
+    /// not tap here: it opens Профил, and `captureProfile` goes through it —
+    /// the one route to that page since 2026-10-07.
     /// The profile and the members each push their own page, so this walks
     /// into each and back rather than photographing one long list.
     ///
@@ -910,8 +912,9 @@ final class A11yShotsTests: XCTestCase {
         dismissSheet(app, named: "Админ")
     }
 
-    /// Профил from the menu (agri-saas#1193 P2.8): the shared account card and
-    /// the «Изход» row.
+    /// Профил (agri-saas#1193 P2.8): the shared account card and the «Изход»
+    /// row — reached the one way there is since 2026-10-07, the menu's
+    /// «Админ» and then the account card at its top.
     ///
     /// ── «Изход» is FOUND, never tapped ──
     ///
@@ -921,22 +924,29 @@ final class A11yShotsTests: XCTestCase {
     /// the label outright, and nothing here calls `.tap()` on the row.
     ///
     /// The card is the same `AccountCard` Админ draws, so the same sentence is
-    /// asserted: one VoiceOver stop, on the fixture account.
+    /// asserted: one VoiceOver stop, on the fixture account. It is tapped on
+    /// Админ — the card is the row — and found again on Профил.
     private func captureProfile(_ app: XCUIApplication) {
         XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Профил")
-        XCTAssertTrue(tapMenuRow("Профил", in: app), "«Профил» is not in the menu")
-        XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 20),
-                      "Профил did not present a sheet")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        XCTAssertTrue(app.navigationBars["Админ"].waitForExistence(timeout: 20),
+                      "Админ did not present a sheet")
 
         let card = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@",
                                   "Вписан като Иван Фикстуров, owner@example.invalid"))
             .firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Админ")
+        card.tap()
+        XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 10),
+                      "Админ's account card did not push Профил")
+
         XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Профил")
         XCTAssertTrue(app.buttons["Изход"].waitForExistence(timeout: 5), "no «Изход» on Профил")
         Thread.sleep(forTimeInterval: 2)
         capture("16-profile", app: app)
-        dismissSheet(app, named: "Профил")
+        goBack(app, to: "Админ")
+        dismissSheet(app, named: "Админ")
     }
 
     // MARK: - helpers

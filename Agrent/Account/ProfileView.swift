@@ -1,7 +1,15 @@
 import SwiftUI
 
 /// «Профил» — who is signed in, and the way out. For EVERY role (owner,
-/// 2026-10-06, agri-saas#1193 P2.8), not only the admins who see Админ.
+/// 2026-10-06, agri-saas#1193 P2.8), not only the admins Админ serves.
+///
+/// ── Reached from Админ, and only from there (owner, 2026-10-07) ──
+///
+/// The app menu had «Профил» and «Изход» rows of its own; the owner took both
+/// out. Админ's top row opens this page for every role — the readers Админ
+/// refuses included, for whom it is now the only way out — so `AdminView`
+/// draws that row in every state. Pushed inside Админ's stack, so the page has
+/// a back button and needs no «Затвори».
 ///
 /// ── The web's `/account`, cut to what a phone can back ──
 ///
@@ -25,9 +33,9 @@ import SwiftUI
 /// renderings of "who is signed in" would drift — the initials rule and the
 /// spoken sentence are exactly the kind of thing one copy gets fixed in.
 ///
-/// ── Изход here AND in the menu ──
+/// ── The app's only Изход ──
 ///
-/// See `SignOutConfirmation`: both go through the same question.
+/// Behind `SignOutConfirmation`, the one question any Изход asks.
 struct ProfileView: View {
     /// The shared instance, held as `@State` the way `AdminView` holds it, so
     /// the card appears when `/me` resolves while this page is open.
@@ -60,7 +68,6 @@ struct ProfileView: View {
         }
         .pageBackground()
         .inlineTitle("Профил")
-        .closeWhenPresentedFromMenu()
         // The launch already asked; this returns that answer without a request
         // when there is one, and asks again (cache first) when the launch got
         // nothing — the case where this page would otherwise spin forever.

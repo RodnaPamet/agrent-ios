@@ -5,12 +5,13 @@ import SwiftUI
 ///
 /// ── One card, two places (P2.8, 2026-10-06) ──
 ///
-/// At the top of Админ, as a link to Профил, and on Профил itself, which
-/// every role reaches from the menu. The SAME view in both, so the initials
-/// rule, the layout and the spoken sentence cannot drift between them.
+/// At the top of Админ, as the link to Профил, and on Профил itself. Since
+/// 2026-10-07 that link is every role's only way to Профил (the menu has no
+/// row for it). The SAME view in both, so the initials rule, the layout and
+/// the spoken sentence cannot drift between them.
 ///
 /// Read-only, and with no Изход on it: the card is identity, and Изход is a
-/// row of its own on Профил (and in the menu), behind a confirmation.
+/// row of its own on Профил, behind a confirmation.
 ///
 /// ── From `CurrentUserStore`, never a request of its own for the text ──
 ///
