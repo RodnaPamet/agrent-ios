@@ -126,7 +126,7 @@ enum AdminAPI {
     /// alone and an explicit null clears. `FarmProfileUpdate` encodes every
     /// writable key — twelve, correct either way, and it does not depend on
     /// which server build answers. NEVER `eik`: the route refuses any body
-    /// carrying it with FARM_PROFILE_EIK_NOT_EDITABLE (agri-saas#1352), and
+    /// that would change it with FARM_PROFILE_EIK_NOT_EDITABLE (agri-saas#1352), and
     /// absent leaves the stored ЕИК alone. Build it with
     /// `FarmProfileUpdate.build`.
     ///

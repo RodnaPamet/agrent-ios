@@ -211,6 +211,7 @@ The cases, each on purpose:
 | `unit: "t"` — the EC grain feed's spelling, not `EUR/t`: Табло prints `currency/unit`, so `EUR/t` rendered «EUR/EUR/t» | `trends-prices.json` |
 | a news summary carrying the feed's attribution line (`cleanedSummary` strips it), a null summary, and a category this build does not name | `trends-news.json` |
 | a listing that is NOT yours — the only way to reach «Съобщение до продавача» | `exchange-listings.json` row 1 |
+| `eikVerification: "DISPUTED"` (agri-saas#1355) — the longest status line and the only `warning` one, so the capture shows the wrap and the contrast that can fail; the other three values and unknown/absent are unit tests (`EikStatusTests`) | `admin-farm-profile.json` |
 
 `exchange-listings.json` row 0 is still the scrubbed production row the file
 was captured with; `ExchangeModelsTests` reads it through `.first`. Row 1 was

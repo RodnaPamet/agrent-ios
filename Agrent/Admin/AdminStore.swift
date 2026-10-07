@@ -139,8 +139,21 @@ final class AdminStore {
     /// Throws for the sheet to show and stay open. A 409 throws
     /// `APIError.conflict` and leaves `profile` UNTOUCHED: nothing was saved,
     /// and the sheet — not this — decides whether to reload.
+    ///
+    /// ── EXCEPT `eikVerification`, which the PUT does not compute ──
+    ///
+    /// Read in agri-saas `upsertFarmProfile` at #1355 (e9ec42574): the GET
+    /// derives the status from the farm's claims, but the PUT answers
+    /// `project(row)` with no status argument, so it defaults to `NONE`
+    /// whatever the claims say. Taken as sent, a VERIFIED farm's «Проверен»
+    /// would turn into «Непроверен» the moment it saved its address. A save
+    /// cannot change the status — the body has no key for it and no claim
+    /// moves — so the status held before the save is carried over; the next
+    /// GET (pull to refresh, reopening the page) brings any real change.
+    /// Filed as agri-saas#1358; drop this line once the PUT derives it.
     func saveProfile(_ body: FarmProfileUpdate, typed draft: FarmProfileDraft) async throws {
-        let saved = try await sendProfile(body)
+        var saved = try await sendProfile(body)
+        saved.eikVerification = profile.value?.eikVerification
         profile = .loaded(saved, .fresh)
         lastSaveNotes = FarmProfileSaveReport.notes(draft: draft, saved: saved)
         profileSaveFeedback.saved()

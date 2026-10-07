@@ -87,6 +87,12 @@ final class PaletteTokenTests: XCTestCase {
         ("accent on card (form buttons)", Palette.accent, Palette.Surface.card, [6.59, 5.09, 5.49]),
         ("error on card (form failures)", Palette.error, Palette.Surface.card, [6.05, 7.85, 7.75]),
         ("warning on card (form caveats)", Palette.warning, Palette.Surface.card, [8.30, 6.48, 7.13]),
+        // agri-saas#1355: the ЕИК status in the farm-profile EDITOR, whose
+        // rows are card. «Проверен» is `success`, the only role the editor
+        // had not yet written on a card; DISPUTED is `warning` and NONE /
+        // PENDING `secondaryText`, both above. On the profile PAGE the same
+        // three sit on `Surface.page`, measured at the top of this list.
+        ("success on card (ЕИК verified)", Palette.success, Palette.Surface.card, [8.54, 6.83, 8.08]),
         // #156: a form's footers and headers sit on `formPage`, which is the
         // page in dark and light and `--bg-muted` in «Слънце».
         ("secondaryText on formPage (footers)", Palette.secondaryText, Palette.Surface.formPage, [9.17, 6.98, 9.28]),

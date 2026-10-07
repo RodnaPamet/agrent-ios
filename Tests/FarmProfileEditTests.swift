@@ -11,8 +11,8 @@ final class FarmProfileEditTests: XCTestCase {
 
     /// The properties of `UpdateFarmProfileRequest` as agri-saas#1178
     /// documents them (13, none required; absent is left alone since #1181),
-    /// MINUS `eik`: agri-saas#1352 (P3.9) makes the PUT refuse any body that
-    /// CONTAINS that key — unchanged and null included — with 400
+    /// MINUS `eik`: agri-saas#1352 (P3.9) makes the PUT refuse any body whose
+    /// `eik` differs from the stored one — null included — with 400
     /// FARM_PROFILE_EIK_NOT_EDITABLE. Hard-coded rather than read from the
     /// spec at test time: the suite must not depend on another repository's
     /// branch.
@@ -83,7 +83,7 @@ final class FarmProfileEditTests: XCTestCase {
                                 grainProduced: [])
         let blank = try json(body(empty) { $0[.producerName] = "Ново стопанство" })
         XCTAssertEqual(Set(blank.keys), twelve, "nil fields were omitted — and omitted is erased")
-        XCTAssertNil(blank["eik"], "a null eik is still the key, and the key alone is a 400")
+        XCTAssertNil(blank["eik"], "a null eik would clear a stored ЕИК, which is a 400")
         XCTAssertTrue(blank["egn"] is NSNull)
         XCTAssertTrue(blank["sizeHa"] is NSNull)
         XCTAssertEqual(blank["grainProduced"] as? [String], [])
@@ -95,8 +95,8 @@ final class FarmProfileEditTests: XCTestCase {
         XCTAssertEqual(Set(try json(body(profile())).keys).subtracting(twelve), [])
     }
 
-    /// agri-saas#1352: the PUT refuses a body that CONTAINS `eik` — with the
-    /// stored value, with null, with anything — as 400
+    /// agri-saas#1352: the PUT refuses a body whose `eik` differs from the
+    /// stored one — null included — as 400
     /// FARM_PROFILE_EIK_NOT_EDITABLE. Absent, under #1181, leaves the stored
     /// ЕИК alone. So it is absent from every body: untouched, with a stored
     /// value, with none, and even if a caller writes into the draft's ЕИК,
