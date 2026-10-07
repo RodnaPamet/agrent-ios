@@ -117,6 +117,11 @@ struct FarmProfileView: View {
                 Text("Данните за стопанството още не са попълнени.")
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
+                // A claim under review with nothing else filled in is a real
+                // state: the server writes `eik` only at verification, so a
+                // farm that has just claimed its ЕИК has an empty profile
+                // and a PENDING status, and should hear about the second.
+                eikField(profile)
                 if store.canEditProfile {
                     Button("Попълни") { editing = true }
                 }
@@ -131,6 +136,8 @@ struct FarmProfileView: View {
                 ForEach(FarmProfileText.allCases, id: \.self) { field in
                     if field == .egn {
                         egnField(profile.egn)
+                    } else if field == .eik {
+                        eikField(profile)
                     } else {
                         self.field(field.label, profile[keyPath: field.wire])
                     }
@@ -159,6 +166,30 @@ struct FarmProfileView: View {
     private func egnField(_ egn: String?) -> some View {
         if let egn, !egn.isEmpty {
             EGNRow(egn: egn, reveal: $revealEGN)
+        }
+    }
+
+    /// The ЕИК and what Agrent's verification says about it (agri-saas#1355).
+    ///
+    /// Shown when there is a number OR something to say about one — see
+    /// `EikStatus.showsRow`. One accessibility element whose label is one
+    /// sentence: «ЕИК 2 0 3 …, Проверен.» Not masked: the owner's ruling is
+    /// that ЕИК is a business identifier on public filings.
+    @ViewBuilder
+    private func eikField(_ profile: FarmProfile) -> some View {
+        if EikStatus.showsRow(eik: profile.eik, state: profile.eikState) {
+            let number = (profile.eik ?? "").trimmingCharacters(in: .whitespaces)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(FarmProfileText.eik.label)
+                    .font(.footnote).foregroundStyle(Palette.secondaryText)
+                Text(number.isEmpty ? "—" : number)
+                    .font(.body.monospacedDigit())
+                    .fixedSize(horizontal: false, vertical: true)
+                EikStatusLine(status: EikStatus.of(profile.eikState,
+                                                   hasNumber: !number.isEmpty))
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(EikStatus.spoken(eik: profile.eik, state: profile.eikState))
         }
     }
 
@@ -443,14 +474,14 @@ struct FarmProfileEditView: View {
     private static let identifiers: Set<FarmProfileText> = [.egn, .urn, .registrationEkatte]
 
     /// The ЕИК: SHOWN, in its place in the web's order, and NOT EDITABLE
-    /// (agri-saas#1352). The server refuses any body carrying it; only
+    /// (agri-saas#1352). The server refuses any body that would change it; only
     /// Agrent staff write it, by verifying the farm's identity claim.
     ///
     /// Read from `original`, not the draft, so a reload after a 409 shows
-    /// the ЕИК stored NOW — a verification may have landed meanwhile. No
-    /// verification state (PENDING / VERIFIED) is shown because no response
-    /// exposes one; inventing it from the presence of a value would be a
-    /// claim the server never made.
+    /// the ЕИК stored NOW — a verification may have landed meanwhile — and
+    /// with it the verification status (agri-saas#1355), which the GET
+    /// derives from the farm's claims. The status is the server's word,
+    /// never inferred here from whether a number is present.
     @ViewBuilder
     private func readOnlyField(_ field: FarmProfileText) -> some View {
         let value = original[keyPath: field.wire] ?? ""
@@ -461,19 +492,23 @@ struct FarmProfileEditView: View {
                 .font(.body.monospacedDigit())
                 .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+            EikStatusLine(status: EikStatus.of(original.eikState,
+                                               hasNumber: EikStatus.hasNumber(value)))
             if let hint = field.hint {
                 Text(hint).font(.caption).foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text(FarmProfileText.eikReadOnlyNote)
                 .font(.caption).foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        // One element, read as label, value and why it cannot be changed —
-        // and with no editing trait, so VoiceOver does not offer a field
-        // that is not one. An empty ЕИК is said as such, not as «тире».
+        // One element: the number and its status as ONE sentence, the same
+        // one the profile page speaks (`EikStatus.spoken`), then why it
+        // cannot be changed as the hint — and with no editing trait, so
+        // VoiceOver does not offer a field that is not one. An empty ЕИК is
+        // said as such, not as «тире».
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(field.label)
-        .accessibilityValue(value.isEmpty ? "не е попълнено" : value)
+        .accessibilityLabel(EikStatus.spoken(eik: value, state: original.eikState))
         .accessibilityHint(FarmProfileText.eikReadOnlyNote)
     }
 

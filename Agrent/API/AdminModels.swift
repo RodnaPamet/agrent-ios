@@ -140,6 +140,38 @@ enum MembershipRole: String, LenientDecodable, Sendable {
     }
 }
 
+/// Where the farm's ЕИК stands with Agrent's staff verification —
+/// `FarmProfile.eikVerification`, agri-saas#1355.
+///
+/// The four wire values and what each means FOR THE FARMER, from the spec's
+/// own description of the enum (`components.schemas.FarmProfile`):
+///
+///   NONE      no claim has been made; a number shown predates verification
+///   PENDING   claimed, waiting for a reviewer — nothing wrong, nothing confirmed
+///   VERIFIED  a reviewer matched it against the Търговски регистър; the only
+///             state in which `eik` is authoritative
+///   DISPUTED  the claim collided with an existing verified claim on the
+///             same number
+///
+/// Precedence is the server's, not ours (`deriveEikVerification` in
+/// `usecases/farm-profile.ts`): VERIFIED > PENDING > DISPUTED, so a farm
+/// whose first claim collided and who has since filed another sees PENDING.
+/// The client renders the one value it is given and never combines claims.
+///
+/// `.unclaimed` rather than `.none` for NONE: a case called `none` on a type
+/// that is also used as an Optional makes `== .none` mean two things, and
+/// the compiler's warning about it would be a new source warning.
+enum EikVerification: String, LenientDecodable, Sendable {
+    case unclaimed = "NONE"
+    case pending = "PENDING"
+    case verified = "VERIFIED"
+    case disputed = "DISPUTED"
+    /// A value this build does not know. Shows NOTHING — see `EikStatus`.
+    case unknown = "UNKNOWN"
+
+    static var unknownCase: Self { .unknown }
+}
+
 /// The БАБХ identity block. Ten fields, all null on this tenant.
 ///
 /// ── `egn` IS A NATIONAL IDENTITY NUMBER ──
@@ -225,6 +257,26 @@ struct FarmProfile: Decodable, Equatable, Sendable {
     /// `var` with a default so the memberwise init — the all-null stand-in
     /// for a 403 and every test fixture — need not mention it.
     var version: Int? = nil
+
+    /// Whether Agrent staff have verified this farm's ЕИК (agri-saas#1355,
+    /// P3.9). READ-ONLY and DERIVED: the server computes it from the farm's
+    /// own identity claims on every GET, there is no column behind it, and
+    /// the PUT body has no key for it.
+    ///
+    /// OPTIONAL although the spec puts it in `required`, for the same reason
+    /// `version` is: a server from before #1355 omits it, and a non-optional
+    /// would turn the whole profile screen into an error over one status
+    /// line. Read it through `eikState`, which folds absent and null into
+    /// `.unknown` — and `.unknown` shows nothing, so an older server, a
+    /// value this build does not know and a missing key all look like "no
+    /// news" rather than like a problem with the farm.
+    ///
+    /// `var` with a default so the memberwise init — the 403 stand-in and
+    /// every fixture — need not mention it.
+    var eikVerification: EikVerification? = nil
+
+    /// `eikVerification`, with absence folded into `.unknown`.
+    var eikState: EikVerification { eikVerification ?? .unknown }
 
     /// Nothing filled in at all, which is the state this tenant is in and
     /// needs saying rather than showing thirteen empty rows.

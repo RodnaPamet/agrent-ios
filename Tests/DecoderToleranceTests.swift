@@ -148,15 +148,16 @@ final class DecoderToleranceTests: XCTestCase {
            "flagged":2,"jobRunId":"run1"}}
         """#) { _ = try await APIClient.shared.decode($0, as: JobRunEnvelope.self) },
 
-        // The farm profile, fourteen fields all in `required` — twelve
-        // nullable, `grainProduced` neither nullable nor optional, and the
-        // lock's `version`.
+        // The farm profile, fifteen fields all in `required` — twelve
+        // nullable, `grainProduced` neither nullable nor optional, the
+        // lock's `version` and `eikVerification` (agri-saas#1355).
         Probe("FarmProfile", #"""
         {"producerName":"Иван Петров","egn":"7501011234","eik":"203912345",
          "urn":"1234567","address":"ул. Дунав 3","municipality":"Плевен",
          "settlement":"Плевен","agricultureDirectorateCity":"Плевен",
          "registrationPlace":"Плевен","registrationEkatte":"56722",
-         "odbhCity":"Плевен","sizeHa":124.5,"grainProduced":["wheat"],"version":3}
+         "odbhCity":"Плевен","sizeHa":124.5,"grainProduced":["wheat"],"version":3,
+         "eikVerification":"VERIFIED"}
         """#) { _ = try await AdminAPI.decodeFarmProfile(from: $0) },
 
         // The catalogue, whose `commodity` is the only optional field.
@@ -424,6 +425,12 @@ final class DecoderToleranceTests: XCTestCase {
         // without the lock still loads the screen, and nil saves unguarded —
         // the route's documented absent-header behaviour. Requiring it would
         // trade a working read for a lock the server did not offer.
+        //
+        // `eikVerification` (agri-saas#1355, checked 2026-10-07) is a
+        // `required` string enum, and NOT here for the same reason: a server
+        // from before #1355 omits it, and the status line is one footnote,
+        // not the screen. Absent and null read as `.unknown`, which shows
+        // nothing (`EikStatus`).
         "FarmProfile": ["grainProduced"],
         "SpatialImportAccepted": ["fileRecordId", "format", "jobId", "status"],
         "ExchangeInquiry": ["id"],

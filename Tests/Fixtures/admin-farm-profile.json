@@ -12,5 +12,6 @@
   "agricultureDirectorateCity": null,
   "sizeHa": 39.758,
   "grainProduced": ["wheat", "maize"],
-  "version": 3
+  "version": 3,
+  "eikVerification": "DISPUTED"
 }

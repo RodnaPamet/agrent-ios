@@ -749,9 +749,10 @@ and "invite" is the whole "someone needs access and I'm not at my desk" case.
   conflict with a reload, no longer last-write-wins. ЕИК is read-only and
   never in the PUT body since 2026-10-07 (agri-saas#1352, P3.9: the key alone
   is a 400 `FARM_PROFILE_EIK_NOT_EDITABLE`; staff verification writes it).
-  Open: show a verification state (PENDING / VERIFIED) beside it once a
-  response exposes one — none does on agri-saas main. See PARITY.md,
-  "Farm profile".
+  ~~Open: show a verification state beside it~~ — done 2026-10-07 from
+  `FarmProfile.eikVerification` (agri-saas#1355): «Непроверен», «В процес на
+  проверка», «Проверен», and a neutral DISPUTED line pointing to the Agrent
+  team. See PARITY.md, "Farm profile".
 
 **Membership has THREE statuses, not two:** `ACTIVE`, `INVITED`,
 `DEACTIVATED`. A UI that models this as a boolean cannot render a pending

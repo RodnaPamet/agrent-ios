@@ -27,9 +27,12 @@ import Foundation
 //   been the same erase by another route; it stays replaced. An explicit null
 //   still clears, and that is the one way to.
 //
-//   ЕИК IS NEVER SENT (agri-saas#1352, enforced by P3.9). The PUT REJECTS any
-//   body that so much as CONTAINS the key `eik` — unchanged value and null
-//   included — with 400 FARM_PROFILE_EIK_NOT_EDITABLE. ЕИК is written only
+//   ЕИК IS NEVER SENT (agri-saas#1352, enforced by P3.9). The PUT REJECTS a
+//   body whose `eik` DIFFERS from the stored one — null included, which would
+//   clear it — with 400 FARM_PROFILE_EIK_NOT_EDITABLE. (As merged in #1355 an
+//   unchanged echo is accepted as a no-op; #1352's plan refused the key
+//   outright, and this client was built to that stricter reading. Leaving
+//   the key out is correct under both.) ЕИК is written only
 //   by Agrent staff verifying the farm's identity claim (P3.4/P3.9), because
 //   it reaches the ДНЕВНИК PDF and the БАБХ register export and a free-edit
 //   field let any ADMIN put an unchecked number there. So the body carries
@@ -139,8 +142,9 @@ enum FarmProfileText: String, CaseIterable, Sendable {
     static let writable: [FarmProfileText] = allCases.filter(\.isWritable)
 
     /// Under the read-only ЕИК in the editor. No web wording exists for it
-    /// (agri-saas `messages/bg.json` on main has none for P3.4/P3.9, and the
-    /// P3.9 branch is not pushed), so it is written here.
+    /// (agri-saas `messages/bg.json` has none for P3.4/P3.9, #1355 included),
+    /// so it is written here. The verification status beside it is
+    /// `EikStatus`.
     static let eikReadOnlyNote = "ЕИК се променя само след проверка от екипа на Agrent."
 
     var wire: KeyPath<FarmProfile, String?> {
@@ -306,7 +310,8 @@ struct FarmProfileUpdate: Encodable, Equatable, Sendable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: Key.self)
         // `writable`, NOT `allCases`: even a `text[.eik]` some caller set is
-        // never encoded, because the key alone is a 400 (agri-saas#1352).
+        // never encoded: a value differing from the stored ЕИК is a 400
+        // (agri-saas#1352), and absent is always safe.
         for field in FarmProfileText.writable {
             // `?? nil` flattens the dictionary's own optional: a missing key
             // is sent as null rather than skipped. The table is total today;
