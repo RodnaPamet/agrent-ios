@@ -35,15 +35,16 @@ import Foundation
 /// means rows were DROPPED by a cap and the screen must say so; `nextCursor`
 /// means there are more and here is how to ask.
 ///
-/// ── And the rule you would derive is wrong ──
+/// ── And the rule you would derive is still not a rule ──
 ///
 /// `/journal` splits the same way and keys its paginated branch `rows`:
 ///
-///     journal, paginated  →  { rows:  [LogEntry], nextCursor }
-///     tasks,   paginated  →  { items: [Task],     pageInfo }
+///     journal, paginated  →  { rows: [LogEntry], nextCursor }
+///     tasks,   paginated  →  { rows: [Task],     nextCursor }   ← was `items`
 ///
-/// So "the paginated branch is `rows`" is true, useful, and wrong on the
-/// next endpoint — which makes it more dangerous than having no rule at all.
+/// Tasks agree now — the spec documents both branches as `rows`
+/// (agrent-ios#182) — but "the paginated branch is `rows`" held for one of
+/// these two until recently, and nothing makes the next endpoint keep it.
 /// Each endpoint declares its own keys here rather than inheriting a habit.
 ///
 /// The journal's key is also not the one its USE CASE returns. The use case

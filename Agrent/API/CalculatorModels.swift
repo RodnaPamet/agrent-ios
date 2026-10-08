@@ -232,12 +232,33 @@ struct CostSlice: Decodable, Equatable, Sendable, Identifiable {
     let variant: String?
 }
 
-/// `refusedWithoutCurrency` is NOT modelled: it is empty in both the fixture
-/// and production, so its element type has never been observed. Guessing at
-/// it is the `LogEntryType` mistake — a wrong element type fails the whole
-/// payload. It can be added the moment something populates it.
+/// The farm's totals, one per currency — and the crops in none of them.
 struct FarmSummary: Decodable, Equatable, Sendable {
     let totals: [FarmTotal]
+
+    /// Crops left out of every total because they have no market price at
+    /// all — "no price currency either", so they belong to no currency's
+    /// bucket and no row above can name them. The server reports them "so the
+    /// omission is still visible" (`grain-net-worth.ts`), and the screen does.
+    ///
+    /// Not modelled until the spec typed it (`string[]`, agrent-ios#182): it
+    /// was empty everywhere observed, and guessing an element type is the
+    /// `LogEntryType` mistake. Read leniently — absent is "none" — because a
+    /// server without it must still give the farmer their totals.
+    let refusedWithoutCurrency: [String]
+
+    init(totals: [FarmTotal], refusedWithoutCurrency: [String] = []) {
+        self.totals = totals
+        self.refusedWithoutCurrency = refusedWithoutCurrency
+    }
+
+    private enum CodingKeys: String, CodingKey { case totals, refusedWithoutCurrency }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        totals = try c.decode([FarmTotal].self, forKey: .totals)
+        refusedWithoutCurrency = (try? c.decodeIfPresent([String].self, forKey: .refusedWithoutCurrency)) ?? []
+    }
 }
 
 struct FarmTotal: Decodable, Equatable, Sendable, Identifiable {
@@ -255,11 +276,12 @@ struct ExclusionItem: Decodable, Equatable, Sendable, Identifiable {
 
 /// Nine buckets of "what this figure could not account for".
 ///
-/// Only two are populated in the fixture and none in production, so seven
-/// element types rest on the two that were observed. They are decoded
-/// LENIENTLY for that reason: an element that does not match `ExclusionItem`
-/// is dropped rather than failing the payload, so a surprise in a footnote
-/// cannot take the whole calculator down with it.
+/// Only two were ever populated in the fixture and none in production, so
+/// seven element types rested on the two observed; the spec types all nine
+/// now (agrent-ios#182). Still decoded LENIENTLY: an element that does not
+/// match `ExclusionItem` is dropped rather than failing the payload, so a
+/// surprise in a footnote cannot take the whole calculator down with it —
+/// documented or not, that is the right trade for an explanation of a figure.
 struct Exclusions: Decodable, Equatable, Sendable {
     let plantingsMissingYieldEstimate: [ExclusionItem]
     let plantingsUnknownCommodity: [ExclusionItem]

@@ -124,20 +124,17 @@ struct OperationLine: Decodable, Identifiable, Equatable, Sendable {
     /// stores the one it SAW and replays with it — so a stale replay earns a
     /// 409 instead of overwriting whatever a supervisor did meanwhile.
     ///
-    /// ── OPTIONAL, though the column is `Int @default(0)` ──
+    /// ── REQUIRED, as the contract now has it ──
     ///
-    /// The spec's `OperationParcel` schema does not list `version` at all.
-    /// The route returns the raw Prisma row and the schema allows extra keys,
-    /// so it arrives today — but it arrives by `.passthrough()`, not by
-    /// contract. Required here, a server that stopped sending it would fail
-    /// the whole job, and every line with it.
-    ///
-    /// Optional is not the same as tolerated: a line without a version is
-    /// SHOWN and NOT MARKABLE (`FieldOperationRules.isMarkable`). The route
-    /// reads an absent `If-Match` as "no precondition" — a silent
-    /// last-write-wins — which is the exact overwrite #138 exists to stop, so
-    /// the app never sends a mark it cannot guard.
-    let version: Int?
+    /// It was optional while the spec's `OperationParcel` did not list it and
+    /// it arrived only by `.passthrough()`: a line without one was shown and
+    /// not markable, because the route reads an absent `If-Match` as "no
+    /// precondition" — the silent last-write-wins #138 exists to stop.
+    /// agri-saas#1381 made it a required integer in the spec, and the column
+    /// was always `Int @default(0)`, never null. So every line has one, every
+    /// line can be guarded, and the not-markable branch is gone (#173). A line
+    /// without one is a broken contract, and failing the decode says so.
+    let version: Int
 
     /// `Decimal(14,4)` through Prisma's `toJSON` — a STRING on this route,
     /// which `WireDecimal` reads along with the number form.

@@ -140,15 +140,15 @@ enum ParcelHistoryAPI {
     ///
     /// ── Branching on the STATUS, not on a code ──
     ///
-    /// The codes relayed for this pair were `CROP_SEASON_NOT_FOUND` and
-    /// `WEED_OBSERVATION_NOT_FOUND`. Neither string appears anywhere in the
-    /// generated spec — the 404 there is the generic "not found, or not
-    /// visible to this tenant" every route carries. So matching them would
-    /// be a guard that silently never fires, which is precisely the defect
-    /// found in `FarmRiskModels` this month: a 409 arm written against an
-    /// error the client could not throw, so the feature never worked.
+    /// The codes for this pair are `CROP_SEASON_NOT_FOUND` and
+    /// `WEED_OBSERVATION_NOT_FOUND`. When this was written neither appeared
+    /// anywhere in the generated spec, so matching them would have been a
+    /// guard that silently never fires — the defect found in `FarmRiskModels`
+    /// that month: a 409 arm written against an error the client could not
+    /// throw. The spec's delete routes name them now (agrent-ios#182).
     ///
-    /// The status is in the spec. The status is what this reads.
+    /// The status stays what this reads: it is typed in the spec, where the
+    /// codes are prose, and "already gone" is the whole of the decision.
     ///
     /// Pulled out as a PURE function so a test can prove the arm fires on the
     /// error this client actually throws. `FarmRiskModels.isAlreadyAsked`

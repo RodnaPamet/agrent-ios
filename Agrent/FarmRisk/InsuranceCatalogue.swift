@@ -15,7 +15,7 @@ import Foundation
 /// description says "it exists for a SEPARATE codebase, where a compiled-in
 /// tariff is a second description of one thing".
 ///
-/// ── `?locale=bg`, EXPLICITLY, and it is not in the spec ──
+/// ── `?locale=bg`, EXPLICITLY — in the spec since agri-saas#1140 ──
 ///
 /// The endpoint resolves names by `?locale=`, then a cookie, then `en`. It does
 /// NOT read `Accept-Language`, which was changed at this app's request: this

@@ -167,22 +167,23 @@ enum BgDate {
         return formatter
     }()
 
-    /// An agro timestamp whose RESPONSE schema does not pin a format.
+    /// A timestamp from a RESPONSE schema that may not pin a format.
     ///
     /// ── Why this is not `parseISODay`, and not a `Date` property either ──
     ///
-    /// The parcel-history contract is asymmetric, and deliberately read from
-    /// the generated spec rather than from anybody's memory of it
-    /// (`src/generated/openapi.json`, fetched 2026-09-25):
+    /// The parcel-history contract WAS asymmetric, read from the generated
+    /// spec rather than from anybody's memory of it (fetched 2026-09-25):
     ///
     ///     CreateParcelCropSeason.sownAt        string, format: date-time
     ///     ParcelCropSeason.sownAt              string, NO format
     ///     CreateParcelWeedObservation.observedAt   string, format: date-time
     ///     ParcelWeedObservation.observedAt     string, NO format
     ///
-    /// The writes are pinned to an instant. The reads are pinned to nothing
-    /// at all — so a full instant is what the server sends today, and a bare
-    /// `2026-09-19` is what its own published contract still permits.
+    /// Those reads pin `date-time` now (checked 2026-10-08, agrent-ios#182),
+    /// and this parser accepts exactly that. It stays the one path for every
+    /// such read because others still pin nothing — `AgDashboardJournalItem
+    /// .occurredAt`, `AgDashboardTaskItem.dueAt`, `ParcelRisk.generatedAt` —
+    /// and one parser for all of them is simpler than two styles of date.
     ///
     /// Declaring these as `Date` properties would decode them through
     /// `APIClient`'s strategy, which accepts ISO 8601 instants and THROWS on

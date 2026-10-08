@@ -136,11 +136,15 @@ extension WorkItemAPI {
     /// error.
     ///
     /// So nothing here decodes it. The caller reloads the task afterwards
-    /// and gets the detail shape, which is modelled and verified. That costs
-    /// one request and buys immunity to a shape that is not a contract.
+    /// and gets the detail shape, which is modelled and verified.
     ///
-    /// Counting today: four shapes on one model — the list's 11 keys, the
-    /// detail's 33, this write's 25, and this write's replay's 32.
+    /// ── Fixed server-side since; still discarded ──
+    ///
+    /// `setTaskStatus` now re-reads a replay BARE (`findBareById`), so both
+    /// outcomes answer in the change path's shape (agri-saas, confirmed
+    /// 2026-10-08). The reload stays: the screen needs the detail's
+    /// relations, which only the detail route sends. Three shapes on one
+    /// model now — the list's, the detail's, and this write's.
     @discardableResult
     static func setStatus(
         _ id: String,

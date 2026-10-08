@@ -184,7 +184,10 @@ struct CalculatorView: View {
 
     @ViewBuilder
     private func farmSection(_ payload: CalculatorPayload) -> some View {
-        if !payload.farm.totals.isEmpty {
+        // Shown when there is a total OR a crop left out of every total: a
+        // farm whose crops all lack a market price has no total at all, and a
+        // missing section would hide exactly the crops it should name.
+        if !payload.farm.totals.isEmpty || !payload.farm.refusedWithoutCurrency.isEmpty {
             Section(titled: "Общо за стопанството") {
                 ForEach(payload.farm.totals) { total in
                     ValueRow(total.currency) {
@@ -195,13 +198,26 @@ struct CalculatorView: View {
                         // Naming what is NOT in the total matters more than the
                         // total: a number that silently omits a crop reads as
                         // complete.
-                        Text("Без: \(total.refusedCommodities.joined(separator: ", "))")
+                        Text("Без: \(Self.cropNames(total.refusedCommodities))")
                             .font(.footnote)
                             .foregroundStyle(Palette.secondaryText)
                     }
                 }
+                if !payload.farm.refusedWithoutCurrency.isEmpty {
+                    // In no currency's total, so no row above names them —
+                    // the same reasoning, for crops with no price at all.
+                    Text("Без пазарна цена: \(Self.cropNames(payload.farm.refusedWithoutCurrency))")
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
+    }
+
+    /// The server's commodity values as the rows below name them.
+    static func cropNames(_ commodities: [String]) -> String {
+        commodities.map { CommodityName.canonical($0) ?? $0 }.joined(separator: ", ")
     }
 
     // MARK: - One commodity

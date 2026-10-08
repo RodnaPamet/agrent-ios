@@ -20,10 +20,10 @@ import Foundation
 ///
 /// The relation OBJECTS — `invoiceFile`, `item`, `location`, `parcel`,
 /// `planting`, `season` — are present and were all null on the only row
-/// that exists. Not modelled: their element shapes are unknown, and
-/// guessing an element shape has cost this app a screen once already.
-/// Their `*Id` siblings are modelled, because a string id has no shape to
-/// get wrong.
+/// observed. The spec documents their shapes now (agrent-ios#182); they stay
+/// unmodelled because no screen reads them, and a modelled field nothing
+/// reads is only a way for the list to fail. Their `*Id` siblings are
+/// modelled, because a string id has no shape to get wrong.
 struct CostEntry: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     let category: CostCategory

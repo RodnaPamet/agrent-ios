@@ -52,7 +52,7 @@ private func decodeDetail(_ json: String) async throws -> FieldOperationDetail {
 }
 
 private func line(
-    _ id: String = "opl_1", status: OperationLineStatus = .pending, version: Int? = 3,
+    _ id: String = "opl_1", status: OperationLineStatus = .pending, version: Int = 3,
     parcel: String = "SYNTH-1"
 ) -> OperationLine {
     OperationLine(
@@ -96,15 +96,14 @@ final class OperationLineDecodingTests: XCTestCase {
         XCTAssertEqual(FieldOperationRules.actions(for: row, mayMark: true), [.done, .skipped])
     }
 
-    /// The spec does not promise `version`. Without it the job still shows —
-    /// and the line offers NO button, because a mark it could not guard would
-    /// be the silent overwrite #138 forbids.
-    func testALineWithoutAVersionShowsButCannotBeMarked() async throws {
-        let detail = try await decodeDetail(detailJSON(lines: [lineJSON(version: nil)]))
-        let first = try XCTUnwrap(detail.lines.first)
-        XCTAssertNil(first.version)
-        let row = LineState(line: first, waiting: nil, conflict: nil, refused: [])
-        XCTAssertEqual(FieldOperationRules.actions(for: row, mayMark: true), [])
+    /// `version` is REQUIRED (agri-saas#1381; the column is `Int @default(0)`).
+    /// A line without one is a broken contract, and the decode says so rather
+    /// than showing a line that could only ever be marked unguarded (#173).
+    func testALineWithoutAVersionIsABrokenContract() async {
+        do {
+            _ = try await decodeDetail(detailJSON(lines: [lineJSON(version: nil)]))
+            XCTFail("a line without its version decoded")
+        } catch {}
     }
 
     /// Decimal columns arrive as STRINGS here; a number is read too.
@@ -383,7 +382,7 @@ final class FieldOperationRulesTests: XCTestCase {
         for text in [FieldOperationText.kept, FieldOperationText.cancelledOnPhone,
                      FieldOperationText.conflictLive, FieldOperationText.conflictDescription("x"),
                      FieldOperationText.keepMineUnavailable, FieldOperationText.refusedQueued(.done),
-                     FieldOperationText.notPermitted, FieldOperationText.noVersion] {
+                     FieldOperationText.notPermitted] {
             XCTAssertTrue(text.unicodeScalars.contains { $0.value >= 0x400 && $0.value <= 0x4FF }, text)
             XCTAssertTrue(text.hasSuffix("."), text)
         }
@@ -748,16 +747,12 @@ final class FieldOperationStoreTests: XCTestCase {
 
     // MARK: nothing sent
 
-    /// No version, no mark; nobody known, no mark; one mark at a time.
+    /// Nobody known, no mark: there is no owner to stamp the queued row with.
     func testWhatIsNeverSent() async {
         let network = Network()
         let (outbox, _) = makeOutbox()
         let store = makeStore(network, outbox: outbox)
-        await loaded(store, network, [line(version: nil)])
-        await store.mark(line(version: nil), as: .done, by: me)
-        XCTAssertTrue(network.marks.isEmpty, "a mark without a version is the unguarded overwrite")
-        XCTAssertEqual(store.notice?.text, FieldOperationText.noVersion)
-
+        await loaded(store, network, [line(version: 3)])
         await store.mark(line(version: 3), as: .done, by: nil)
         XCTAssertTrue(network.marks.isEmpty, "a mark with no owner to stamp")
     }

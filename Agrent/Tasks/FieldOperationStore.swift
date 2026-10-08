@@ -197,12 +197,8 @@ final class FieldOperationStore {
     /// screen does not offer the buttons until it is known.
     func mark(_ line: OperationLine, as target: OperationLineStatus, by me: CurrentUser?) async {
         guard busyLineID == nil, let me else { return }
-        guard let seen = line.version else {
-            // Unreachable from the screen, which offers no button for such a
-            // line — see `OperationLine.version`. Said rather than sent.
-            notice = Notice(lineID: line.id, kind: .refused, text: FieldOperationText.noVersion)
-            return
-        }
+        // The version the operator saw — every line has one (#173).
+        let seen = line.version
         busyLineID = line.id
         notice = nil
         defer { busyLineID = nil }
@@ -326,10 +322,9 @@ enum FieldOperationRules {
     /// What a line may be moved to from what it SHOWS — the web's buttons:
     /// a pending line can be done or skipped, a finished one reopened.
     /// Nothing for a line in conflict (it waits for the operator's choice),
-    /// for one with no version (it cannot be guarded), or for a status this
-    /// build does not know.
+    /// or for a status this build does not know.
     static func actions(for row: LineState, mayMark: Bool) -> [OperationLineStatus] {
-        guard mayMark, row.conflict == nil, row.line.version != nil else { return [] }
+        guard mayMark, row.conflict == nil else { return [] }
         switch row.shown {
         case .pending: return [.done, .skipped]
         case .done, .skipped: return [.pending]
@@ -518,7 +513,4 @@ enum FieldOperationText {
         + "или от потребител с права за редакция."
 
     static let waitingForUser = "Изчакване на потребителския профил…"
-
-    static let noVersion = "Сървърът не изпрати версия на този ред, затова той не "
-        + "може да бъде отбелязан безопасно."
 }

@@ -433,7 +433,12 @@ final class DecoderToleranceTests: XCTestCase {
         // nothing (`EikStatus`).
         "FarmProfile": ["grainProduced"],
         "SpatialImportAccepted": ["fileRecordId", "format", "jobId", "status"],
-        "ExchangeInquiry": ["id"],
+        // Checked 2026-10-08 (agrent-ios#182): the spec requires `id`,
+        // `message`, `status` and `createdAt` non-null — plus three nullable
+        // keys this model reads as optional or not at all. Required here
+        // because the contract does; the ARRAY stays per-element lenient
+        // (`OwnExchangeListing.inquiries`), so one bad row costs that row.
+        "ExchangeInquiry": ["createdAt", "id", "message", "status"],
         "PricePoint": ["date", "price"],
 
         // ── Checked 2026-09-26 against the schemas documented that day ──
@@ -506,8 +511,9 @@ final class DecoderToleranceTests: XCTestCase {
         // ── Checked 2026-10-01 against agri-saas #1209 (feat/p0-4-feature-flags) ──
         //
         // ONE of the three the spec requires (`user`, `tenant`,
-        // `featureFlags`). `tenant` is not modelled at all — see the
-        // `CurrentUser` header for the trap it is. `featureFlags` is required
+        // `featureFlags`). `tenant` is read leniently since #179 — only as a
+        // first sign-in's starting farm; see the `CurrentUser` header for the
+        // trap it otherwise is. `featureFlags` is required
         // by the spec and deliberately NOT here: absent means all off (a
         // server from before #1209), and a map this build cannot read must
         // cost the flags rather than the identity the spray sheet needs.
