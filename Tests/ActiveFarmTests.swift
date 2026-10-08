@@ -150,7 +150,7 @@ final class FarmStoreTests: XCTestCase {
     /// was pinned to — once, and only for them.
     func testThePinnedFarmIsKeptForWhoeverIsSignedInOnce() {
         let farms = store(identity: identity("usr_a"), answer: nil)
-        XCTAssertEqual(farms.activeFarm, Farm(slug: Config.legacyTenantSlug, name: nil))
+        XCTAssertEqual(farms.activeFarm, Farm(slug: Config.pinnedFarmSlug, name: nil))
 
         // A second person on the same phone afterwards is not seeded.
         let later = store(identity: identity("usr_b"), answer: nil)
@@ -189,8 +189,8 @@ final class FarmStoreTests: XCTestCase {
         let farms = store(identity: identity("usr_a"), answer: nil)
         farms.adoptName(from: .init(id: "ten_x", name: "Друга ферма", slug: "druga"))
         XCTAssertNil(farms.activeFarm?.name, "another farm's name was taken")
-        farms.adoptName(from: .init(id: "ten_a", name: "Агрент", slug: Config.legacyTenantSlug))
-        XCTAssertEqual(farms.activeFarm, Farm(slug: Config.legacyTenantSlug, name: "Агрент"))
+        farms.adoptName(from: .init(id: "ten_a", name: "Агрент", slug: Config.pinnedFarmSlug))
+        XCTAssertEqual(farms.activeFarm, Farm(slug: Config.pinnedFarmSlug, name: "Агрент"))
         XCTAssertEqual(FarmMemory(defaults: defaults).farm(for: "usr_a")?.name, "Агрент")
     }
 
@@ -203,7 +203,7 @@ final class FarmStoreTests: XCTestCase {
         farms.reset()
         XCTAssertEqual(farms.state, .resolving)
         XCTAssertNil(mirror.farm)
-        XCTAssertEqual(FarmMemory(defaults: defaults).farm(for: "usr_a")?.slug, Config.legacyTenantSlug)
+        XCTAssertEqual(FarmMemory(defaults: defaults).farm(for: "usr_a")?.slug, Config.pinnedFarmSlug)
     }
 
     // MARK: - The farm list (stage 3)
@@ -214,21 +214,21 @@ final class FarmStoreTests: XCTestCase {
     func testTheListNamesTheOpenFarmAndSaysTheRoleThere() async {
         var roles: [String?] = []
         var resets = 0
-        let list = FarmList([[member(Config.legacyTenantSlug, "Агрент", "MECHANISATOR"),
+        let list = FarmList([[member(Config.pinnedFarmSlug, "Агрент", "MECHANISATOR"),
                                member("ferma-2", "Ферма 2", "OWNER")]])
         let farms = store(identity: identity("usr_a"), answer: nil, changed: { resets += 1 },
                           list: list, roles: { roles.append($0) })
-        XCTAssertEqual(farms.activeFarm, Farm(slug: Config.legacyTenantSlug, name: nil),
+        XCTAssertEqual(farms.activeFarm, Farm(slug: Config.pinnedFarmSlug, name: nil),
                        "positive control: the seeded farm, unnamed and with no role")
 
         await farms.refreshFarms()
-        let named = Farm(slug: Config.legacyTenantSlug, name: "Агрент", role: "MECHANISATOR")
+        let named = Farm(slug: Config.pinnedFarmSlug, name: "Агрент", role: "MECHANISATOR")
         XCTAssertEqual(farms.activeFarm, named)
         XCTAssertEqual(roles.last, "MECHANISATOR", "the screens would gate on the oldest membership's role")
         XCTAssertEqual(resets, 0, "the same farm was treated as a switch")
         XCTAssertEqual(FarmMemory(defaults: defaults).farm(for: "usr_a"), named,
                        "a launch with no signal would forget the role")
-        XCTAssertEqual(farms.farms?.map(\.slug), [Config.legacyTenantSlug, "ferma-2"], "Профил has no list")
+        XCTAssertEqual(farms.farms?.map(\.slug), [Config.pinnedFarmSlug, "ferma-2"], "Профил has no list")
         XCTAssertNil(farms.lostAccess)
         XCTAssertFalse(farms.listUnavailable)
     }
@@ -395,7 +395,7 @@ final class FarmStoreTests: XCTestCase {
     func testSignOutForgetsTheListAndTheRole() async {
         var roles: [String?] = []
         let farms = store(identity: identity("usr_a"), answer: nil,
-                          list: FarmList([[member(Config.legacyTenantSlug, "Агрент", "OWNER")]]),
+                          list: FarmList([[member(Config.pinnedFarmSlug, "Агрент", "OWNER")]]),
                           roles: { roles.append($0) })
         await farms.refreshFarms()
         XCTAssertNotNil(farms.farms, "positive control")
@@ -411,7 +411,7 @@ final class FarmStoreTests: XCTestCase {
             FarmGate.lostAccessMessage(Farm(slug: "f2", name: "Ферма 2"), now: Farm(slug: "f1", name: "Ферма 1")),
             "«Ферма 2» вече не е сред стопанствата Ви. Отворено е стопанство «Ферма 1».")
         XCTAssertEqual(
-            FarmGate.lostAccessMessage(Farm(slug: Config.legacyTenantSlug, name: nil), now: nil),
+            FarmGate.lostAccessMessage(Farm(slug: Config.pinnedFarmSlug, name: nil), now: nil),
             "Стопанството, което беше отворено, вече не е сред стопанствата Ви.")
     }
 
@@ -440,10 +440,37 @@ final class FarmPathTests: XCTestCase {
 
     func testPathsFollowTheOpenFarm() {
         ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
-        XCTAssertEqual(Config.tenantSlug, "ferma-1")
+        XCTAssertEqual(FarmPath.openSlug, "ferma-1")
         XCTAssertEqual(LocationsAPI.listPath, "/api/t/ferma-1/locations")
+        ActiveFarm.shared.set(Farm(slug: "ferma-2", name: nil))
+        XCTAssertEqual(LocationsAPI.listPath, "/api/t/ferma-2/locations", "a path kept the farm before")
+    }
+
+    /// With no farm open a farm path names NO farm — never the pinned one —
+    /// and is refused before a request is built (#192, P4.3).
+    func testWithNoFarmOpenAPathGoesNowhere() {
         ActiveFarm.shared.set(nil)
-        XCTAssertEqual(Config.tenantSlug, Config.legacyTenantSlug, "no farm built /api/t//")
+        let path = LocationsAPI.listPath
+        XCTAssertEqual(path, "/api/t//locations", "a farm the person did not choose was put in the path")
+        XCTAssertTrue(FarmPath.isUnscoped(path))
+        XCTAssertThrowsError(try APIClient.url(for: path)) { error in
+            guard case APIClient.APIError.noFarmOpen = error else { return XCTFail("refused as \(error)") }
+        }
+        XCTAssertEqual(UserMessage.text(for: APIClient.APIError.noFarmOpen), "Няма отворено стопанство.")
+
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
+        XCTAssertFalse(FarmPath.isUnscoped(LocationsAPI.listPath))
+        XCTAssertNoThrow(try APIClient.url(for: LocationsAPI.listPath), "positive control: a farm is open")
+    }
+
+    /// No farm, no cache key: an entry has to belong to a farm, and keying it
+    /// under the pinned one is the guess #192 stopped making.
+    func testWithNoFarmOpenNothingIsCached() {
+        let identity = SessionIdentity(load: { "usr_a" }, save: { _ in })
+        ActiveFarm.shared.set(nil)
+        XCTAssertNil(CacheScope.current(identity: identity))
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
+        XCTAssertEqual(CacheScope.current(identity: identity), CacheScope(userID: "usr_a", tenant: "ferma-1"))
     }
 
     private func create(farm: String?) -> PendingOperation {
@@ -477,9 +504,9 @@ final class FarmPathTests: XCTestCase {
         object.removeValue(forKey: "tenantSlug")
         let legacy = try JSONDecoder().decode(
             PendingOperation.self, from: JSONSerialization.data(withJSONObject: object))
-        XCTAssertEqual(legacy.tenant, Config.legacyTenantSlug)
+        XCTAssertEqual(legacy.tenant, Config.pinnedFarmSlug)
         XCTAssertEqual(OutboxStore.replay(for: legacy),
-                       .create(path: "/api/t/\(Config.legacyTenantSlug)/locations/loc_1/operations",
+                       .create(path: "/api/t/\(Config.pinnedFarmSlug)/locations/loc_1/operations",
                                idempotencyKey: "op_1"))
     }
 
@@ -488,6 +515,9 @@ final class FarmPathTests: XCTestCase {
         ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
         XCTAssertEqual(OutboxStore.stamped(create(farm: nil)).tenantSlug, "ferma-1")
         XCTAssertEqual(OutboxStore.stamped(create(farm: "ferma-2")).tenantSlug, "ferma-2")
+        // No farm open: nothing to stamp — and not the pinned farm either.
+        ActiveFarm.shared.set(nil)
+        XCTAssertNil(OutboxStore.stamped(create(farm: nil)).tenantSlug, "a row was given a farm nobody had open")
     }
 }
 

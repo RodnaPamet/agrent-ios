@@ -26,7 +26,7 @@ import Foundation
 ///     queues the farm-record PDF. Never sent from development, CI or the
 ///     screenshot harness — the seam answers it 501.
 enum FieldOperationAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/field-operations" }
+    private static var base: String { "\(FarmPath.root)/field-operations" }
 
     /// The whole job — the task, its lines, the location and its parcels.
     /// The id is the TASK's: a field operation is a task of type
@@ -38,8 +38,8 @@ enum FieldOperationAPI {
     /// One prescription LINE of the job. `lineID` is the `OperationParcel`
     /// id, not a parcel id — the spec says so in as many words. Given the
     /// farm for the outbox's replay, as `LocationsAPI.operationsPath` is.
-    static func linePath(taskID: String, lineID: String, tenant: String = Config.tenantSlug) -> String {
-        "/api/t/\(tenant)/field-operations/\(URLEscape.segment(taskID))/parcels/\(URLEscape.segment(lineID))"
+    static func linePath(taskID: String, lineID: String, tenant: String? = FarmPath.openSlug) -> String {
+        "\(FarmPath.root(for: tenant))/field-operations/\(URLEscape.segment(taskID))/parcels/\(URLEscape.segment(lineID))"
     }
 
     static func decodeDetail(from data: Data) async throws -> FieldOperationDetail {

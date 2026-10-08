@@ -1,7 +1,7 @@
 import Foundation
 
 enum WorkItemAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/tasks" }
+    private static var base: String { "\(FarmPath.root)/tasks" }
 
     /// NO QUERY PARAMETERS, and that is a decision rather than a default.
     ///

@@ -2,7 +2,7 @@ import Foundation
 
 /// Parcel-boundary import: one upload, then a poll.
 enum SpatialImportAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/locations" }
+    private static var base: String { "\(FarmPath.root)/locations" }
 
     static func uploadPath(locationID: String) -> String {
         "\(base)/\(URLEscape.segment(locationID))/spatial-import"

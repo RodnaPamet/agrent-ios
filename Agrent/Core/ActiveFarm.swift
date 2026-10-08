@@ -38,7 +38,7 @@ struct Farm: Codable, Equatable, Hashable, Sendable {
 /// `CacheScope`, the outbox's replay — which is why `SessionIdentity` is a
 /// lock-protected mirror too. An `await` on every path would put a suspension
 /// point in the middle of decisions that must be atomic with the request.
-/// `FarmStore` is the ONE writer; everything else reads `Config.tenantSlug`.
+/// `FarmStore` is the ONE writer; everything else reads it through `FarmPath`.
 final class ActiveFarm: @unchecked Sendable {
     static let shared = ActiveFarm()
 
@@ -88,7 +88,7 @@ struct FarmMemory {
         guard !defaults.bool(forKey: Self.seededKey) else { return }
         defaults.set(true, forKey: Self.seededKey)
         guard let userID, farm(for: userID) == nil else { return }
-        remember(Farm(slug: Config.legacyTenantSlug, name: nil), for: userID)
+        remember(Farm(slug: Config.pinnedFarmSlug, name: nil), for: userID)
     }
 }
 
@@ -203,7 +203,7 @@ final class FarmStore {
         // recorded under; the seam never reads or writes a person's memory.
         if UITestSeam.isActive {
             remembers = false
-            activate(Farm(slug: Config.legacyTenantSlug, name: nil), remember: false)
+            activate(Farm(slug: Config.pinnedFarmSlug, name: nil), remember: false)
             return
         }
         #endif

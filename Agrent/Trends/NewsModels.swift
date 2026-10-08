@@ -91,14 +91,14 @@ struct NewsResponse: Decodable, Equatable, Sendable {
 
 enum TrendsAPI {
     static func pricesPath(_ commodity: ChartableCommodity, range: PriceRange) -> String {
-        "/api/t/\(Config.tenantSlug)/trends/prices"
+        "\(FarmPath.root)/trends/prices"
             + "?commodity=\(commodity.rawValue)&range=\(range.rawValue)"
     }
 
     /// `limit` is 1…100 server-side. 50 is its own default and is more
     /// than a phone will scroll in one sitting.
     static func newsPath(_ category: NewsCategory, limit: Int = 50) -> String {
-        var path = "/api/t/\(Config.tenantSlug)/trends/news?limit=\(min(max(limit, 1), 100))"
+        var path = "\(FarmPath.root)/trends/news?limit=\(min(max(limit, 1), 100))"
         if category != .all { path += "&category=\(category.rawValue)" }
         return path
     }

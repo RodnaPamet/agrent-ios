@@ -123,6 +123,13 @@ actor APIClient {
 
     enum APIError: LocalizedError {
         case notSignedIn
+        /// A farm path built while no farm was open (`FarmPath`, #192):
+        /// refused before a request leaves, because the only farm it could
+        /// have gone to is one the person did not choose. No screen asks in
+        /// that state — `FarmGate` shows nothing farm-scoped without a farm —
+        /// so this is a read that outlived its farm, or a bug, never a
+        /// person's mistake.
+        case noFarmOpen
         /// 409 STALE_DATA. `currentVersion` is what the server holds now —
         /// resend with `If-Match: currentVersion` to take-server, or show the
         /// operator both. NEVER treat this as a save: the web modal closed
@@ -211,6 +218,8 @@ actor APIClient {
             switch self {
             case .notSignedIn:
                 "Не сте влезли в профила си."
+            case .noFarmOpen:
+                "Няма отворено стопанство."
             case .conflict:
                 "Записът е променен на сървъра, докато го редактирахте."
             case .clientTooOld:
@@ -822,6 +831,8 @@ actor APIClient {
         guard URLEscape.isPercentEncoded(path, allowed: .urlPathAllowed),
               query.map({ URLEscape.isPercentEncoded($0, allowed: .urlQueryAllowed) }) ?? true
         else { throw URLError(.badURL) }
+        // A farm path with no farm in it goes nowhere — see `FarmPath`.
+        guard !FarmPath.isUnscoped(path) else { throw APIError.noFarmOpen }
         comps.percentEncodedPath = path
         comps.percentEncodedQuery = query
         guard let url = comps.url else { throw URLError(.badURL) }

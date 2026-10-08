@@ -271,9 +271,12 @@ final class UnreadBadgeTests: XCTestCase {
     /// Threads with `hasUnread`, and a mark lowers it at once — by the one
     /// thread, however many times.
     func testTheBadgeCountsThreadsAndDropsOnMark() {
+        let saved = ActiveFarm.shared.farm
+        defer { ActiveFarm.shared.set(saved) }
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
         let store = ExchangeUnreadStore()
         store.apply([row("a", unread: true), row("b", unread: false), row("c", unread: true)],
-                    asOf: SessionEpoch.current, farm: Config.tenantSlug)
+                    asOf: SessionEpoch.current, farm: "ferma-1")
         XCTAssertEqual(store.count, 2)
         store.markedRead("a")
         store.markedRead("a")

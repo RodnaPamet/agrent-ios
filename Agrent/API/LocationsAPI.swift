@@ -1,7 +1,7 @@
 import Foundation
 
 enum LocationsAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/locations" }
+    private static var base: String { "\(FarmPath.root)/locations" }
 
     /// A BARE ARRAY, not an envelope. Measured.
     static var listPath: String { base }
@@ -27,7 +27,7 @@ enum LocationsAPI {
     /// product/fertiliser split is a CLIENT-side negation — see
     /// `InputItem.isFertilizer` — and asking the server for one category
     /// would make the other list impossible to build from the same call.
-    static var itemsPath: String { "/api/t/\(Config.tenantSlug)/items" }
+    static var itemsPath: String { "\(FarmPath.root)/items" }
 
     /// `measure=RATE` is not optional: 4 units against 20, and the 20
     /// include `kg`, `ha`, `t` and `%`, none of which is a dose rate.
@@ -35,7 +35,7 @@ enum LocationsAPI {
     /// `Unit` has no write path and the server caches the list for 24h,
     /// so this is effectively static — cached hard on the device through
     /// the ordinary `CachedResource` path.
-    static var rateUnitsPath: String { "/api/t/\(Config.tenantSlug)/units?measure=RATE" }
+    static var rateUnitsPath: String { "\(FarmPath.root)/units?measure=RATE" }
 
     /// ALL units, for a product's `defaultUnitId`.
     ///
@@ -43,7 +43,7 @@ enum LocationsAPI {
     /// in litres or kilograms, and `createItem` rejects a `defaultUnitId`
     /// that does not resolve — so filtering to rate units here would offer
     /// four choices, none of which is what a product is counted in.
-    static var allUnitsPath: String { "/api/t/\(Config.tenantSlug)/units" }
+    static var allUnitsPath: String { "\(FarmPath.root)/units" }
 
     static func decodeItems(from data: Data) async throws -> [InputItem] {
         try await APIClient.shared.decode(data, as: [InputItem].self)
@@ -66,8 +66,8 @@ enum LocationsAPI {
     /// to the same place without reconstructing it from a literal — and
     /// given the farm, because a queued row goes to the farm it was made on,
     /// not the one open when it is replayed (#179).
-    static func operationsPath(_ locationID: String, tenant: String = Config.tenantSlug) -> String {
-        "/api/t/\(tenant)/locations/\(URLEscape.segment(locationID))/operations"
+    static func operationsPath(_ locationID: String, tenant: String? = FarmPath.openSlug) -> String {
+        "\(FarmPath.root(for: tenant))/locations/\(URLEscape.segment(locationID))/operations"
     }
 
     static func createOperation(

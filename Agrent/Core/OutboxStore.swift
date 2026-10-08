@@ -221,9 +221,14 @@ final class OutboxStore {
     /// The farm open NOW is the farm the record was made on: a record is
     /// queued by the screen that just failed to send it, inside that farm.
     /// A row that already carries a farm keeps it.
+    ///
+    /// With no farm open there is no screen to queue from, so nothing to
+    /// stamp; a row without a farm is one from before #179 (see
+    /// `PendingOperation.tenant`). It is not given the pinned farm here —
+    /// that would be the very guess `FarmPath` exists to stop making.
     nonisolated static func stamped(_ operation: PendingOperation) -> PendingOperation {
         var row = operation
-        if row.tenantSlug == nil { row.tenantSlug = Config.tenantSlug }
+        if row.tenantSlug == nil { row.tenantSlug = FarmPath.openSlug }
         return row
     }
 

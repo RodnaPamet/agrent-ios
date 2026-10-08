@@ -159,8 +159,11 @@ final class LineMarkWireTests: XCTestCase {
     }
 
     func testTheMarkGoesToTheLineNotTheParcel() {
+        let saved = ActiveFarm.shared.farm
+        defer { ActiveFarm.shared.set(saved) }
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
         let request = FieldOperationAPI.MarkRequest(taskID: "tsk_7", lineID: "opl_9", body: Data(), seenVersion: 2)
-        XCTAssertEqual(request.path, "/api/t/\(Config.tenantSlug)/field-operations/tsk_7/parcels/opl_9")
+        XCTAssertEqual(request.path, "/api/t/ferma-1/field-operations/tsk_7/parcels/opl_9")
     }
 
     /// THE If-Match. `patchRaw` takes the version as a non-optional Int and
@@ -637,7 +640,8 @@ final class FieldOperationStoreTests: XCTestCase {
         XCTAssertEqual(store.notice?.kind, .kept)
         XCTAssertEqual(store.feedback.feedback, .success)
         XCTAssertEqual(OutboxStore.replay(for: item),
-                       .mark(path: FieldOperationAPI.linePath(taskID: "tsk_1", lineID: "opl_1"), seenVersion: 3))
+                       .mark(path: FieldOperationAPI.linePath(taskID: "tsk_1", lineID: "opl_1", tenant: item.tenant),
+                             seenVersion: 3))
     }
 
     /// A 429 on the tap closes the OUTBOX's pause before the mark joins it —

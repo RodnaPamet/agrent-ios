@@ -1,7 +1,7 @@
 import Foundation
 
 enum JournalAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/journal" }
+    private static var base: String { "\(FarmPath.root)/journal" }
 
     static var listPath: String { path(cursor: nil) }
 

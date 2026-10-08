@@ -81,7 +81,7 @@ struct ParcelRisk: Decodable, Identifiable, Equatable, Sendable {
 }
 
 enum FarmRiskAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)" }
+    private static var base: String { "\(FarmPath.root)" }
 
     /// Per-parcel readings. ETagged server-side and cached per
     /// (tenant, parcel, day) for six hours. `If-None-Match` would be worth

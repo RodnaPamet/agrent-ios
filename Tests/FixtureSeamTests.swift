@@ -176,7 +176,7 @@ final class FixtureSeamTests: XCTestCase {
     /// shows a server error instead of invented farm data.
     func testUncoveredRoutesHaveNoFixture() {
         for pathAndQuery in [
-            "/api/t/\(Config.tenantSlug)/admin",
+            "\(FarmPath.root(for: Config.pinnedFarmSlug))/admin",
             WorkItemAPI.detailPath("tsk_fixture_1"),
             LocationsAPI.parcelsPath("loc_that_does_not_exist"),
             FarmRiskAPI.analysisPath("par_that_does_not_exist"),

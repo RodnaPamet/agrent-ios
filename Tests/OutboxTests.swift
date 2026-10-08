@@ -601,7 +601,8 @@ final class OutboxLineMarkTests: XCTestCase {
         let item = mark(line: "opl_9", seen: 4, task: "tsk_7")
         XCTAssertEqual(
             OutboxStore.replay(for: item),
-            .mark(path: FieldOperationAPI.linePath(taskID: "tsk_7", lineID: "opl_9"), seenVersion: 4))
+            .mark(path: FieldOperationAPI.linePath(taskID: "tsk_7", lineID: "opl_9", tenant: item.tenant),
+                  seenVersion: 4))
         // The header value that version becomes: the BARE integer.
         XCTAssertEqual(APIClient.ifMatch(4), "4")
     }
@@ -611,7 +612,7 @@ final class OutboxLineMarkTests: XCTestCase {
     func testACreateStillReplaysAsAKeyedPost() {
         let item = create()
         XCTAssertEqual(OutboxStore.replay(for: item),
-                       .create(path: LocationsAPI.operationsPath("loc"), idempotencyKey: item.id))
+                       .create(path: LocationsAPI.operationsPath("loc", tenant: item.tenant), idempotencyKey: item.id))
     }
 
     /// A row with neither a location nor a line is refused, not guessed at —
@@ -932,7 +933,8 @@ final class OutboxLineMarkTests: XCTestCase {
         XCTAssertTrue(row.awaitsSend, "an old waiting row stopped being sent")
         XCTAssertEqual(row.attempts, 2)
         XCTAssertEqual(OutboxStore.replay(for: row),
-                       .create(path: LocationsAPI.operationsPath("loc_old"), idempotencyKey: id))
+                       .create(path: LocationsAPI.operationsPath("loc_old", tenant: Config.pinnedFarmSlug),
+                               idempotencyKey: id))
     }
 
     /// And through the real queue: `all()` swallows a row it cannot decode,
@@ -1217,7 +1219,8 @@ final class OutboxLineMarkTests: XCTestCase {
         await updated.flush()
         XCTAssertEqual(wire.sent.map(\.id), [key], "the updated app did not send the kept record")
         XCTAssertEqual(wire.sent.first.flatMap(OutboxStore.replay(for:)),
-                       .create(path: LocationsAPI.operationsPath("loc"), idempotencyKey: key),
+                       .create(path: LocationsAPI.operationsPath("loc", tenant: wire.sent.first?.tenant),
+                               idempotencyKey: key),
                        "the replay is not the live save's keyed POST")
         let left = await queue.all()
         XCTAssertTrue(left.isEmpty, "the sent record is still queued")

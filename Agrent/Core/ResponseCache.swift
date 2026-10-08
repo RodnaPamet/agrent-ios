@@ -13,10 +13,10 @@ import Foundation
 ///     decoded models would also need a separate cache per type, where this is
 ///     one cache for every endpoint the app will ever add.
 ///
-///  2. KEYED ON USER AND TENANT, NOT JUST PATH (`CacheScope`). `Config.tenantSlug`
-///     is hard-coded to "agrent" today and will not always be; a cache keyed
-///     on path alone serves one farm's journal to another the moment a tenant
-///     switcher lands. And the USER is in the key because a farm phone is
+///  2. KEYED ON USER AND TENANT, NOT JUST PATH (`CacheScope`). The open farm
+///     changes (agrent-ios#179), and a cache keyed on path alone would serve
+///     one farm's journal to another; with NO farm open there is no key and
+///     no cache (#192). And the USER is in the key because a farm phone is
 ///     shared: until agri-saas#1191 P0.9 this survived sign-out keyed on the
 ///     tenant alone, so account B signing in on A's phone was served A's
 ///     cached journal, members and farm profile whenever the network was
@@ -186,6 +186,9 @@ struct CacheScope: Equatable, Sendable {
     let tenant: String
 
     static func current(identity: SessionIdentity = .shared) -> CacheScope? {
-        identity.userID.map { CacheScope(userID: $0, tenant: Config.tenantSlug) }
+        // No farm open, no cache: an entry needs a farm to belong to, and
+        // keying one under the pinned farm is the guess `FarmPath` stopped.
+        guard let userID = identity.userID, let farm = FarmPath.openSlug else { return nil }
+        return CacheScope(userID: userID, tenant: farm)
     }
 }

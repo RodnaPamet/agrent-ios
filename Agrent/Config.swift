@@ -9,21 +9,17 @@ import Foundation
 enum Config {
     static let baseURL = URL(string: "https://app.agrent.bg")!
 
-    /// The farm every tenant-scoped path is built for — app.agrent.bg/t/<slug>/…
-    /// — and since agrent-ios#179 that is the ACTIVE farm, which `FarmStore`
-    /// chooses and `ActiveFarm` mirrors for code that is not on the main actor.
+    /// The farm the app was pinned to until #179 — and since #192 (P4.3)
+    /// never a path's fallback: a farm path is built from the OPEN farm or
+    /// from none (`FarmPath`). What is left of it is a migration and a fixture:
     ///
-    /// With no farm active it falls back to `legacyTenantSlug`. No screen
-    /// reaches that: `FarmGate` shows nothing tenant-scoped without a farm.
-    /// It is there so a path built in a test, or by a read that outlives a
-    /// sign-out, goes where it always went instead of to `/api/t//`.
-    static var tenantSlug: String { ActiveFarm.shared.farm?.slug ?? legacyTenantSlug }
-
-    /// The farm the app was pinned to until #179. Every queued record written
-    /// before records carried their farm belongs to it (`PendingOperation
-    /// .tenant`), and a person signed in when this build first ran keeps it
-    /// (`FarmMemory.seedLegacyFarmOnce`), so nobody's screen changes under them.
-    static let legacyTenantSlug = "agrent"
+    /// - every queued record written before records carried their farm
+    ///   belongs to it (`PendingOperation.tenant`);
+    /// - a person signed in when the #179 build first ran keeps it
+    ///   (`FarmMemory.seedLegacyFarmOnce`), so nobody's screen changed under
+    ///   them;
+    /// - the UI-test seam's fixture world is this one farm.
+    static let pinnedFarmSlug = "agrent"
 
     static let redirectScheme = "bg.agrent.app"
     static let redirectURI = "\(redirectScheme)://auth/callback"

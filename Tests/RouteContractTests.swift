@@ -45,6 +45,25 @@ import XCTest
 /// are checked straight from the source.
 final class RouteContractTests: XCTestCase {
 
+    /// The farm the builders are evaluated under. Since #192 a builder with
+    /// no farm open names NO farm (`/api/t//…`) rather than the pinned one, so
+    /// a farm is opened for every test here, and `template` turns exactly
+    /// this slug back into `{tenantSlug}`. `built` is evaluated once, lazily,
+    /// inside a test — always under this farm.
+    static let farm = "route-contract-farm"
+    private var saved: Farm?
+
+    override func setUp() {
+        super.setUp()
+        saved = ActiveFarm.shared.farm
+        ActiveFarm.shared.set(Farm(slug: Self.farm, name: nil))
+    }
+
+    override func tearDown() {
+        ActiveFarm.shared.set(saved)
+        super.tearDown()
+    }
+
     // MARK: - Fixtures
 
     private static let root = URL(fileURLWithPath: #filePath)
@@ -292,7 +311,7 @@ final class RouteContractTests: XCTestCase {
     /// gone loose enough to have missed the defect it exists for.
     func testTheOldTilesRouteIsNotAccepted() throws {
         let inventory = try Inventory.load()
-        let old = Self.template("/api/t/\(Config.tenantSlug)/agro/ndvi-tiles?locationId=x")
+        let old = Self.template("\(FarmPath.root)/agro/ndvi-tiles?locationId=x")
         XCTAssertEqual(old, "/api/t/{tenantSlug}/agro/ndvi-tiles")
         XCTAssertNil(inventory.route(matching: old), "#130's route reads as served")
         XCTAssertNotNil(inventory.route(matching: Self.template(
@@ -415,7 +434,7 @@ final class RouteContractTests: XCTestCase {
         // "/api/in/a/comment"
         /* "/api/in/a/block" */
         let a = "/api/one"
-        let b = "/api/t/\\(Config.tenantSlug)/x/"
+        let b = "/api/t/\\(slug)/x/"
             + "\\(URLEscape.segment(id))/y"
         let c = "\\(base)/members/\\(seg(f("q")))/z?k=\\(v)"
         let d = "\\(n) of \\(m)"
@@ -423,7 +442,7 @@ final class RouteContractTests: XCTestCase {
         let found = PathLiteralScanner.literals(in: src).filter { PathLiteralScanner.kind($0.parts) != nil }
         XCTAssertEqual(found.map(\.rendered), [
             "/api/one",
-            "/api/t/\\(Config.tenantSlug)/x/\\(URLEscape.segment(id))/y",
+            "/api/t/\\(slug)/x/\\(URLEscape.segment(id))/y",
             "\\(base)/members/\\(seg(f(\"q\")))/z?k=\\(v)",
         ])
         XCTAssertEqual(found.map(\.line), [3, 4, 6])
@@ -438,7 +457,10 @@ final class RouteContractTests: XCTestCase {
         for b in built { out[template(b.path)] = out[template(b.path)] ?? b.file }
         for file in try appSources() {
             for literal in PathLiteralScanner.literals(in: try read(file))
-            where !literal.hasInterpolation && PathLiteralScanner.kind(literal.parts) == .anchored {
+            where !literal.hasInterpolation && PathLiteralScanner.kind(literal.parts) == .anchored
+                // `FarmPath.prefix`, the root every farm path starts from —
+                // not a route, so not one the server has to serve (#192).
+                && !(file == "Agrent/API/FarmPath.swift" && literal.rendered == FarmPath.prefix) {
                 let t = template(literal.rendered)
                 out[t] = out[t] ?? "\(file):\(literal.line)"
             }
@@ -454,7 +476,7 @@ final class RouteContractTests: XCTestCase {
         var segments = (path.removingPercentEncoding ?? path)
             .split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         if segments.count > 3, segments[1] == "api", segments[2] == "t",
-           segments[3] == Config.tenantSlug {
+           segments[3] == farm {
             segments[3] = "{tenantSlug}"
         }
         return segments.joined(separator: "/")

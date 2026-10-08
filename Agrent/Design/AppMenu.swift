@@ -67,7 +67,7 @@ struct AppMenuButton<Extra: View>: View {
             // The open farm by NAME (#179) — a person can hold several now,
             // and the slug is a URL fragment rather than what anyone calls
             // their farm. The slug stands in until the name is known.
-            Section(titled: farms.activeFarm?.name ?? Config.tenantSlug) {
+            Section(titled: farms.activeFarm.map { $0.name ?? $0.slug } ?? "") {
                 // EVERY surface not in the bottom row, always.
                 //
                 // This is what makes the tab customiser safe rather than a

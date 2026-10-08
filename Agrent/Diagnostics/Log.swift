@@ -97,6 +97,7 @@ enum Log {
         case let api as APIClient.APIError:
             switch api {
             case .notSignedIn: return "APIError.notSignedIn"
+            case .noFarmOpen: return "APIError.noFarmOpen"
             case .conflict: return "APIError.conflict"
             case .clientTooOld: return "APIError.clientTooOld"
             case .notModified: return "APIError.notModified"

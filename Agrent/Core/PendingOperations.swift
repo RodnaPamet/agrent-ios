@@ -111,7 +111,7 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
 
     /// Where the replay goes: the stamped farm, or the pinned one for a row
     /// queued before farms were stamped.
-    var tenant: String { tenantSlug ?? Config.legacyTenantSlug }
+    var tenant: String { tenantSlug ?? Config.pinnedFarmSlug }
 
     /// What to call it on screen. The parcel name and the kind of work —
     /// enough for a farmer to recognise which spray is waiting, without
