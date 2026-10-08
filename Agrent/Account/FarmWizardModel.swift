@@ -22,8 +22,9 @@ import Observation
 @Observable
 @MainActor
 final class FarmWizardModel {
-    enum Step: Equatable { case type, eik, name, done }
-    enum Kind: Equatable { case company, individual }
+    /// Codable for `FarmWizardDraft`.
+    enum Step: String, Equatable, Codable { case type, eik, name, done }
+    enum Kind: String, Equatable, Codable { case company, individual }
 
     /// What is known about the ЕИК typed so far.
     enum EikState: Equatable {
@@ -41,7 +42,9 @@ final class FarmWizardModel {
     private(set) var kind: Kind?
     private(set) var eik = ""
     private(set) var eikState: EikState = .idle
-    var name = ""
+    var name = "" {
+        didSet { persist() }
+    }
     private(set) var busy = false
     private(set) var error: String?
     /// The last refusal was the terms gate: the farmer can do something about
@@ -72,14 +75,71 @@ final class FarmWizardModel {
     /// replace it — but never a name the farmer typed themselves.
     @ObservationIgnored private var prefilled: String?
 
+    /// The ЕИК the register last called VALID, trimmed — the only one a draft
+    /// may keep. Kept apart from `eikState` because a resume asks the
+    /// register again, and a draft written while that answer is on its way
+    /// must not lose the ЕИК it already had.
+    @ObservationIgnored private(set) var verifiedEik: String?
+
+    /// Where this wizard keeps its draft, and whose it is (#197). Nil for
+    /// either keeps nothing: the default, so a test never touches the
+    /// phone's real storage; `FarmWizardView` passes both.
+    @ObservationIgnored private let drafts: FarmWizardDrafts?
+    @ObservationIgnored private let owner: String?
+
     init(
         check: @escaping @MainActor (String) async throws -> FarmsAPI.EikVerdict = { try await FarmsAPI.checkEik($0) },
         send: @escaping @MainActor (FarmsAPI.CreateFarm) async throws -> FarmsAPI.Created = { try await FarmsAPI.create($0) },
-        debounce: Duration = .milliseconds(400)
+        debounce: Duration = .milliseconds(400),
+        drafts: FarmWizardDrafts? = nil,
+        owner: String? = nil
     ) {
         self.check = check
         self.send = send
         self.debounce = debounce
+        self.drafts = drafts
+        self.owner = owner
+        if let owner, let draft = drafts?.draft(for: owner) { resume(draft) }
+    }
+
+    // MARK: - Resuming (#197)
+
+    /// Where the person left it. A kept ЕИК is asked of the register AGAIN —
+    /// a verdict from before the app was killed is not one to act on — and
+    /// until it answers, it is still the verified one (`verifiedEik`).
+    ///
+    /// The STEP FIRST: setting the ЕИК and the name each write the draft
+    /// back, and a draft written with the first step would bring the person
+    /// back to the start on the next kill.
+    private func resume(_ draft: FarmWizardDraft) {
+        step = draft.step
+        kind = draft.kind
+        prefilled = draft.prefilled
+        if !draft.eik.isEmpty {
+            verifiedEik = draft.eik
+            setEik(draft.eik)
+        }
+        name = draft.name
+    }
+
+    /// The draft as things stand: written at every move, cleared once the
+    /// farm exists — and never written for a wizard nobody has started.
+    private func persist() {
+        guard let drafts, let owner else { return }
+        if step == .done || (kind == nil && name.isEmpty) {
+            drafts.clear()
+            return
+        }
+        let typed = eik.trimmingCharacters(in: .whitespacesAndNewlines)
+        drafts.save(FarmWizardDraft(
+            owner: owner, step: step, kind: kind,
+            eik: verifiedEik == typed ? typed : "",
+            name: name, prefilled: prefilled))
+    }
+
+    /// «Отказ»: the person chose not to make this farm. Nothing to resume.
+    func discard() {
+        drafts?.clear()
     }
 
     // MARK: - Moving
@@ -88,6 +148,7 @@ final class FarmWizardModel {
         self.kind = kind
         error = nil
         step = kind == .company ? .eik : .name
+        persist()
     }
 
     /// One step back along this person's walk. Not from `done`: the farm
@@ -96,6 +157,7 @@ final class FarmWizardModel {
         guard step != .done, let index = walk.firstIndex(of: step), index > 0 else { return }
         error = nil
         step = walk[index - 1]
+        persist()
     }
 
     /// «Да, това е моето стопанство» — only on a VALID verdict.
@@ -107,6 +169,7 @@ final class FarmWizardModel {
         }
         error = nil
         step = .name
+        persist()
     }
 
     // MARK: - The ЕИК, live
@@ -119,6 +182,7 @@ final class FarmWizardModel {
         eik = text
         checking?.cancel()
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        defer { persist() }
         guard trimmed.count >= 9 else {
             eikState = .idle
             return
@@ -135,6 +199,9 @@ final class FarmWizardModel {
                 eikState = verdict.looksLikeEgn ? .looksLikeEgn
                     : verdict.valid ? .valid(registryName: verdict.registryName?.recorded)
                     : .invalid
+                // Only VALID is kept; a refusal or an ЕГН unkeeps it.
+                verifiedEik = verdict.valid && !verdict.looksLikeEgn ? trimmed : nil
+                self.persist()
             } catch {
                 guard !Task.isCancelled else { return }
                 eikState = .failed(UserMessage.text(for: error))
@@ -163,6 +230,7 @@ final class FarmWizardModel {
         do {
             created = try await send(request)
             step = .done
+            persist()
         } catch {
             self.error = UserMessage.text(for: error)
             needsTerms = Self.isTermsRefusal(error)
