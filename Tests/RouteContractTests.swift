@@ -104,7 +104,6 @@ final class RouteContractTests: XCTestCase {
     /// `/api/auth/native/revoke` (agri-saas#1206), until P4.4 (#193):
     private static let pendingServerRoutes: [String: String] = [
         "/api/auth/native/apple": "Sign in with Apple's exchange — agri-saas #1404 (P4.2), in review",
-        "/api/auth/terms": "the current terms version for in-app acceptance — backend 1, building 2026-10-08",
     ]
 
     /// Files whose `/x` literals are not API paths at all.
