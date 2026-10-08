@@ -4,7 +4,9 @@ import Observation
 // The STATE of exchange messaging (agrent-ios#114): the inbox, one
 // conversation, the unread badge, and the listing's «message the other
 // party». The rules they apply live in `ExchangeMessaging.swift` and in
-// `MessagingPolicy` below, so a test can hold each one without a network.
+// `MessagingPolicy` below — and, for chat itself, in ChatKit, whose
+// `ChatEngine` runs the conversation (agrent-ios#196) — so a test can hold
+// each one without a network.
 //
 // ── NOTHING HERE TOUCHES `ResponseCache` ──
 //
@@ -25,30 +27,14 @@ import Observation
 
 // MARK: - The screen rules
 
+/// Борса's own rules: who may write and where, blocks, the badge's label,
+/// the inbox's cadence. Chat's rules — the poll's backoff, Send, the
+/// composer, a failed send — are ChatKit's `ChatPolicy` (agrent-ios#196).
 enum MessagingPolicy {
-    /// The web's own cadences, kept: 5 s for an open conversation, 30 s for
-    /// the inbox. Polls run ONLY while the screen is on screen and the app
-    /// is active — the loop is a `.task` keyed on the scene phase, so leaving
-    /// the screen or locking the phone cancels it.
-    static let conversationInterval: Duration = .seconds(5)
+    /// The web's own cadence for the inbox, kept: 30 s (an open conversation
+    /// polls on `ChatPolicy.conversationInterval`). Polls run ONLY while the
+    /// screen is on screen and the app is active.
     static let inboxInterval: Duration = .seconds(30)
-
-    /// How long a poller waits before its next request.
-    ///
-    /// The interval, unless the last request was a 429 — then the server's
-    /// `Retry-After` (through `RateLimitGate.wait`, so its floor and its
-    /// fallback are the app's one rule), and never LESS than the interval: a
-    /// one-second `Retry-After` is not an invitation to poll the inbox
-    /// thirty times faster than it would have.
-    ///
-    /// A poll's 429 is NOT absorbed into `RateLimitPause.messages`. Reads are
-    /// limited by the edge's read tier, per (tenant, address, user); sends
-    /// draw on the farm's message budget. A throttled poll says nothing
-    /// about whether a message may be sent.
-    static func nextPoll(after error: Error?, interval: Duration) -> Duration {
-        guard let error, let wait = RateLimitGate.wait(for: error) else { return interval }
-        return max(wait, interval)
-    }
 
     /// «Съобщения (3)» for the segment, «Борса (3)» for the app menu row:
     /// the count only when there is one.
@@ -88,44 +74,11 @@ enum MessagingPolicy {
         !isOwn && mayWrite
     }
 
-    /// Whether Send is live.
-    ///
-    /// NOT the removed inquiry composer's `canSend`, which was `phase == .editing` and never
-    /// comes back after a failure. Here a failed send stays sendable — that
-    /// is the whole point of keeping its key — and what disables Send is only:
-    /// nothing to send (blank, or over the server's limit), a send already in
-    /// flight, the farm's message budget paused by a 429, or a block that
-    /// the server has already said refuses this farm.
-    static func canSend(draft: String, sending: Bool, paused: Bool, refusedByBlock: Bool) -> Bool {
-        guard !sending, !paused, !refusedByBlock else { return false }
-        if case .sendable = MessageBody.validate(draft) { return true }
-        return false
-    }
-
     /// A block refuses the INQUIRER only. The listing owner who set it can
     /// still write — and so can a role this build does not know, whom the
     /// server is left to answer.
     static func refusedByBlock(role: ExchangeThreadRole, blocked: Bool) -> Bool {
         blocked && role == .inquirer
-    }
-
-    /// What stays in the field after a 201.
-    ///
-    /// Empty, if what is there is still what was sent. If the farmer kept
-    /// typing while the send was in flight, what is there now is a NEW
-    /// message and it stays — the web clears it along with the sent one.
-    static func draftAfterDelivery(_ draft: String, sent: String) -> String {
-        if case .sendable(let now) = MessageBody.validate(draft), now == sent { return "" }
-        if case .empty = MessageBody.validate(draft) { return "" }
-        return draft
-    }
-
-    /// The counter under the composer, near the limit only.
-    static func counter(for draft: String) -> (text: String, spoken: String, over: Bool)? {
-        guard MessageBody.showsCounter(draft) else { return nil }
-        let length = MessageBody.length(of: draft)
-        let limit = MessageBody.maxLength
-        return ("\(length) / \(limit)", "\(length) от \(limit) знака", length > limit)
     }
 
     /// The notice at the end of a blocked conversation (after the newest
@@ -180,40 +133,6 @@ enum MessagingPolicy {
         + "неговото стопанство все още могат да започнат свои разговори с Вас. "
         + "Може да го отмените по всяко време."
 
-    /// Whether a failed send may in fact have been delivered.
-    ///
-    /// A timeout or a dropped connection after the request left says nothing
-    /// about whether the server stored it, and neither does a gateway's 5xx.
-    /// Every other failure is an answer from before the row was written.
-    static func outcomeUnknown(_ error: Error) -> Bool {
-        if let url = error as? URLError {
-            return url.code == .timedOut || url.code == .networkConnectionLost
-        }
-        if case APIClient.APIError.http(let status, _, _, _, _) = error {
-            return status >= 500
-        }
-        return false
-    }
-
-    /// The line under the composer after a send failed.
-    ///
-    /// When the outcome is unknown it says so, and says that pressing Send
-    /// again is safe — which it is, because the retry carries the same
-    /// `Idempotency-Key` and a stored message comes back `replayed`. «Не е
-    /// изпратено» there would be a claim the app cannot support.
-    static func sendFailure(for error: Error) -> String {
-        if outcomeUnknown(error) {
-            return "Не е ясно дали съобщението е изпратено. Изпратете го отново — "
-                + "няма да бъде получено два пъти."
-        }
-        return "Съобщението не е изпратено. \(UserMessage.text(for: error))"
-    }
-
-    /// What failed, then why — «Разговорът не може да бъде затворен. Няма
-    /// интернет връзка.» The web shows only the first half.
-    static func failure(_ what: String, _ error: Error) -> String {
-        "\(what) \(UserMessage.text(for: error))"
-    }
 }
 
 // MARK: - The unread badge
@@ -317,7 +236,7 @@ final class ExchangeInboxStore {
     func run() async {
         while !Task.isCancelled {
             let error = await load()
-            let wait = MessagingPolicy.nextPoll(after: error, interval: MessagingPolicy.inboxInterval)
+            let wait = ChatPolicy.nextPoll(after: error, interval: MessagingPolicy.inboxInterval)
             do { try await Task.sleep(for: wait) } catch { return }
         }
     }
@@ -347,7 +266,12 @@ final class ExchangeInboxStore {
 
 // MARK: - One conversation
 
-/// One conversation: its pages, its composer, its actions.
+/// One conversation: ChatKit's engine, and what is Борса's around it — the
+/// thread's header (role, commodity), close and block, the badge.
+///
+/// THE ENGINE is `chat` (agrent-ios#196): pages, poll, send, retract and
+/// mark-read live there. This class keeps the face the screen already knew,
+/// forwarding to it, so `ConversationView` reads one store as it always has.
 ///
 /// ── NOT FIRED ──
 ///
@@ -358,251 +282,84 @@ final class ExchangeInboxStore {
 @MainActor
 final class ConversationStore {
     let threadID: String
-
-    /// The newest page's header — role, commodity, `closed`, `blocked` —
-    /// as last read. Messages are in `conversation`, merged across pages.
-    private(set) var header: ExchangeThread?
-    private(set) var conversation: Conversation?
-
-    /// Only before anything has loaded. A failed POLL keeps the conversation
-    /// on screen: one missed request must not blank what the farmer is
-    /// reading, which is what the web does.
-    private(set) var loadFailure: String?
-
-    /// The server answered 404: this conversation is not available to this
-    /// PERSON (`ConversationAvailability`). Final for this screen — the
-    /// messages already shown are cleared, polling stops, and the screen says
-    /// so instead of offering a retry.
-    ///
-    /// Cleared rather than kept on screen: a 404 mid-conversation means the
-    /// person has left its audience (a role changed at the farm), and the
-    /// server has just said they may not read it.
-    private(set) var unavailable = false
+    let chat: ChatEngine<ExchangeChatTransport>
 
     /// Local copies of the header's two states, so a close or a block shows
-    /// the moment its 200 arrives rather than after the refetch.
+    /// the moment its 200 arrives rather than after the refetch. Every newest
+    /// page sets them again.
     private(set) var closed = false
     private(set) var blocked = false
 
-    var draft = ""
-    private(set) var sending = false
-    private(set) var sendFailure: String?
-
-    /// The outcome of the person's own send, for the screen to play. Only
-    /// `send()` changes it: a poll, the refetch after a write, mark-read and
-    /// the other writes never do. See `WriteFeedback`.
-    private(set) var sendFeedback = WriteFeedback()
-
-    /// Close, block, unblock, retract — one at a time.
-    private(set) var acting = false
-    private(set) var actionFailure: String?
-
-    private(set) var loadingOlder = false
-    private(set) var olderFailure: String?
-
-    @ObservationIgnored private var sendKeys = MessageSendKeys()
-    @ObservationIgnored private var readMarking = ReadMarking()
-
-    /// On screen and the app active: a `run()` is going. A refetch that
-    /// lands after the screen has gone marks nothing — nobody read it.
-    ///
-    /// A COUNT, not a flag. The screen's task restarts when the app goes
-    /// inactive and back, and a cancelled loop can still be unwinding — its
-    /// request finishing its cancellation — when the new one has started. A
-    /// flag cleared by the old loop's `defer` would say "not visible" under
-    /// a loop that is.
-    @ObservationIgnored private var runningLoops = 0
-    private var isVisible: Bool { runningLoops > 0 }
-
     init(threadID: String) {
         self.threadID = threadID
+        chat = ChatEngine(threadID: threadID, transport: ExchangeChatTransport(threadID: threadID))
+        chat.hooks = .init(
+            newestPage: { [weak self] page in
+                self?.closed = page.closed
+                self?.blocked = page.blocked
+            },
+            sent: { [weak self] sent in
+                if sent.reopened { self?.closed = false }
+            },
+            // The badge, lowered at once: a mark the server accepted, or a
+            // thread that is not in this person's inbox at all (404) — the
+            // next inbox load would drop it anyway.
+            markedRead: { ExchangeUnreadStore.shared.markedRead(threadID) },
+            unavailable: { ExchangeUnreadStore.shared.markedRead(threadID) }
+        )
     }
 
-    var role: ExchangeThreadRole { header?.role ?? .unknown }
+    /// The newest page's header — role, commodity, `closed`, `blocked` — as
+    /// last read.
+    var header: ExchangeThread? { chat.latestPage }
+    var conversation: Conversation? { chat.conversation }
+    var messages: [ExchangeMessage] { chat.messages }
+    var loadFailure: String? { chat.loadFailure }
+    var unavailable: Bool { chat.unavailable }
 
-    var messages: [ExchangeMessage] { conversation?.messages ?? [] }
+    var draft: String {
+        get { chat.draft }
+        set { chat.draft = newValue }
+    }
+
+    var sending: Bool { chat.sending }
+    var sendFailure: String? { chat.sendFailure }
+    var sendFeedback: WriteFeedback { chat.sendFeedback }
+    var acting: Bool { chat.acting }
+    var actionFailure: String? { chat.actionFailure }
+    var loadingOlder: Bool { chat.loadingOlder }
+    var olderFailure: String? { chat.olderFailure }
+
+    var role: ExchangeThreadRole { header?.role ?? .unknown }
 
     var refusedByBlock: Bool { MessagingPolicy.refusedByBlock(role: role, blocked: blocked) }
 
     var canSend: Bool {
-        MessagingPolicy.canSend(
+        ChatPolicy.canSend(
             draft: draft, sending: sending,
-            paused: RateLimitPause.messages.isPaused, refusedByBlock: refusedByBlock
+            paused: RateLimitPause.messages.isPaused, refused: refusedByBlock
         )
     }
 
-    // MARK: Reading
+    // MARK: Reading and the composer — the engine's
 
-    /// Load, then poll every `conversationInterval`, until cancelled.
-    func run() async {
-        runningLoops += 1
-        defer { runningLoops -= 1 }
-        while !Task.isCancelled, !unavailable {
-            let error = await refresh()
-            // Nothing to poll for: a 404 is not one a retry changes.
-            if unavailable { return }
-            let wait = MessagingPolicy.nextPoll(
-                after: error, interval: MessagingPolicy.conversationInterval
-            )
-            do { try await Task.sleep(for: wait) } catch { return }
-        }
-    }
+    func run() async { await chat.run() }
 
-    /// The newest page, merged into what is loaded — the first load, a poll,
-    /// or the refetch after a write. Returns the failure for the poller.
     @discardableResult
-    func refresh() async -> Error? {
-        let page: ExchangeThread
-        do {
-            let data = try await APIClient.shared.data(for: ExchangeAPI.threadPath(threadID))
-            page = try await ExchangeAPI.decodeThread(from: data)
-        } catch {
-            if Task.isCancelled { return nil }
-            if ConversationAvailability.isUnavailable(error) {
-                becomeUnavailable()
-            } else if conversation == nil {
-                loadFailure = UserMessage.text(for: error)
-            }
-            return error
-        }
+    func refresh() async -> Error? { await chat.refresh() }
 
-        header = page
-        closed = page.closed
-        blocked = page.blocked
-        loadFailure = nil
+    func loadOlder() async { await chat.loadOlder() }
 
-        let shouldMark: Bool
-        if var current = conversation {
-            let arrival = current.mergeNewest(page)
-            conversation = current
-            shouldMark = readMarking.shouldMark(after: arrival, visible: isVisible)
-        } else {
-            conversation = Conversation(page)
-            shouldMark = readMarking.shouldMarkAfterFirstLoad(visible: isVisible)
-        }
-        if shouldMark { await markRead() }
-        return nil
-    }
+    func send() async { await chat.send() }
 
-    /// See `unavailable`. The thread leaves the badge too: it is not in this
-    /// person's inbox, and the next inbox load would drop it anyway.
-    private func becomeUnavailable() {
-        unavailable = true
-        conversation = nil
-        header = nil
-        loadFailure = nil
-        sendFailure = nil
-        actionFailure = nil
-        olderFailure = nil
-        ExchangeUnreadStore.shared.markedRead(threadID)
-    }
+    func retract(_ message: ExchangeMessage) async { await chat.retract(message) }
 
-    /// A WRITE answered 404 — the send's or an action's `THREAD_NOT_FOUND`.
-    /// The newest page is the authority on whether the conversation is still
-    /// there, so it is asked; true when it is not, and the screen has already
-    /// changed to say so.
-    private func confirmedUnavailable(after error: Error) async -> Bool {
-        guard ConversationAvailability.isUnavailable(error) else { return false }
-        await refresh()
-        return unavailable
-    }
-
-    /// `POST …/read`, and the interim race rule after it.
-    ///
-    /// FAILURES ARE SWALLOWED. The seam answers 501, and a mark that did not
-    /// land is nothing a farmer can act on; the next message from the other
-    /// party marks again. A success lowers the badge at once.
-    ///
-    /// The refetch the rule asks for can itself bring a message from the
-    /// other farm and so mark again — bounded, because each round needs a
-    /// message that was not there before.
-    private func markRead() async {
-        let read: ExchangeThreadRead
-        do {
-            read = try await ExchangeAPI.markRead(threadID: threadID)
-        } catch {
-            return
-        }
-        ExchangeUnreadStore.shared.markedRead(threadID)
-        if ReadMarking.needsRefetch(readAt: read.readAt, newestShown: conversation?.newest?.createdAt) {
-            await refresh()
-        }
-    }
-
-    /// «Зареди по-стари съобщения». Not retried, not cached; a failure sits
-    /// beside the messages already shown, never in place of them.
-    func loadOlder() async {
-        guard let cursor = conversation?.olderCursor, conversation?.canLoadOlder == true,
-              !loadingOlder
-        else { return }
-        loadingOlder = true
-        olderFailure = nil
-        defer { loadingOlder = false }
-        do {
-            let data = try await APIClient.shared.data(
-                for: ExchangeAPI.threadPath(threadID, before: cursor)
-            )
-            let page = try await ExchangeAPI.decodeThread(from: data)
-            conversation?.mergeOlder(page)
-        } catch {
-            if Task.isCancelled { return }
-            if ConversationAvailability.isUnavailable(error) {
-                becomeUnavailable()
-                return
-            }
-            olderFailure = MessagingPolicy.failure("По-старите съобщения не могат да бъдат заредени.", error)
-        }
-    }
-
-    // MARK: Writing — every one NOT FIRED against production
-
-    /// Send the draft.
-    ///
-    /// The key comes from `MessageSendKeys`: the same one for every retry of
-    /// the same text, a new one when the text changes, dropped on any 201 —
-    /// a replay included. The draft stays until the 201; there is no
-    /// optimistic bubble, because the server sanitises and the 201 carries no
-    /// body, so the message appears when the refetch brings the stored text.
-    ///
-    /// A 429 goes to `RateLimitPause.messages` — the FARM's budget, shared by
-    /// every colleague and thread — and the composer says when from the pause
-    /// itself. Nothing sends automatically when it reopens: a message is a
-    /// person's act, not the app's.
-    ///
-    /// The key lives as long as this screen. A send whose response was lost,
-    /// followed by leaving the conversation and coming back, mints a new key
-    /// on the next tap — the one case this cannot replay.
-    func send() async {
-        guard case .sendable(let text) = MessageBody.validate(draft), !sending,
-              !RateLimitPause.messages.isPaused
-        else { return }
-        let key = sendKeys.key(threadID: threadID, text: text)
-        sending = true
-        sendFailure = nil
-        defer { sending = false }
-        do {
-            let sent = try await ExchangeAPI.sendMessage(
-                threadID: threadID, text: text, idempotencyKey: key
-            )
-            sendKeys.delivered()
-            draft = MessagingPolicy.draftAfterDelivery(draft, sent: text)
-            if sent.reopened { closed = false }
-            sendFeedback.saved()
-            await refresh()
-        } catch {
-            // A 429 is a refusal too: the message did not go, and the
-            // composer now says when it can.
-            sendFeedback.refused()
-            if RateLimitPause.messages.absorb(error) { return }
-            if await confirmedUnavailable(after: error) { return }
-            sendFailure = MessagingPolicy.sendFailure(for: error)
-        }
-    }
+    // MARK: Борса's own writes — every one NOT FIRED against production
 
     /// Either party, no confirmation: the next message from either side
     /// reopens it, so it is not a thing that needs undoing.
     func close() async {
-        await act("Разговорът не може да бъде затворен.") {
+        await chat.act("Разговорът не може да бъде затворен.") {
             _ = try await ExchangeAPI.closeThread(threadID: self.threadID)
             self.closed = true
         }
@@ -613,7 +370,7 @@ final class ConversationStore {
     /// that farm pick it up when they are next read, and the inbox — which
     /// carries no blocked flag — reloads whenever it reappears.
     func setBlocked(_ block: Bool) async {
-        await act("Промяната не може да бъде извършена.") {
+        await chat.act("Промяната не може да бъде извършена.") {
             if block {
                 _ = try await ExchangeAPI.blockParty(threadID: self.threadID)
             } else {
@@ -621,31 +378,6 @@ final class ConversationStore {
             }
             self.blocked = block
         }
-    }
-
-    /// Irreversible from here; confirmed on screen first. The web shows its
-    /// SEND failure when a retract fails; this says what failed.
-    func retract(_ message: ExchangeMessage) async {
-        guard message.mayRetract else { return }
-        await act("Съобщението не може да бъде премахнато.") {
-            _ = try await ExchangeAPI.retractMessage(messageID: message.id)
-            self.conversation?.tombstone(message.id)
-        }
-    }
-
-    private func act(_ what: String, _ write: () async throws -> Void) async {
-        guard !acting else { return }
-        acting = true
-        actionFailure = nil
-        defer { acting = false }
-        do {
-            try await write()
-        } catch {
-            if await confirmedUnavailable(after: error) { return }
-            actionFailure = MessagingPolicy.failure(what, error)
-            return
-        }
-        await refresh()
     }
 }
 
@@ -683,7 +415,7 @@ final class ListingThreadOpener {
                 return try await ExchangeAPI.openThread(listingID: listingID).id
             }
         } catch {
-            failure = MessagingPolicy.failure("Разговорът не може да бъде отворен.", error)
+            failure = ChatPolicy.failure("Разговорът не може да бъде отворен.", error)
             return nil
         }
     }

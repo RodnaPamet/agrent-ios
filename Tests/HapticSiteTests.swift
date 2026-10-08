@@ -215,8 +215,9 @@ final class HapticSiteTests: XCTestCase {
             "Agrent/Locations/ParcelOperationSheet.swift queueForLater refused",
             "Agrent/Tasks/TasksStore.swift setStatus saved",
             "Agrent/Tasks/TasksStore.swift setStatus refused",
-            "Agrent/Exchange/MessagingStores.swift send saved",
-            "Agrent/Exchange/MessagingStores.swift send refused",
+            // A message's send: ChatKit's engine since agrent-ios#196.
+            "Agrent/ChatKit/ChatEngine.swift send saved",
+            "Agrent/ChatKit/ChatEngine.swift send refused",
             "Agrent/Admin/AdminStore.swift saveProfile saved",
             "Agrent/Admin/FarmProfileView.swift submit refused",
             // #138: a «Готово» that landed or was kept on the phone; a
@@ -245,7 +246,9 @@ final class HapticSiteTests: XCTestCase {
     /// whole outbox, whose drain runs on reconnect — mentions no feedback.
     func testNoPollRefreshOrDrainRecordsAnOutcome() throws {
         let readPaths: [(String, [String])] = [
-            ("Agrent/Exchange/MessagingStores.swift", ["run", "load", "refresh", "markRead", "loadOlder"]),
+            ("Agrent/Exchange/MessagingStores.swift", ["run", "load", "refresh", "loadOlder"]),
+            // The conversation's engine, ChatKit's since agrent-ios#196.
+            ("Agrent/ChatKit/ChatEngine.swift", ["run", "refresh", "markRead", "loadOlder"]),
             ("Agrent/Tasks/TasksStore.swift", ["load"]),
             ("Agrent/Admin/AdminStore.swift", ["load", "loadMembers", "loadProfile", "reloadProfile"]),
             ("Agrent/Admin/FarmProfileView.swift", ["reloadAfterConflict"]),
@@ -279,7 +282,8 @@ final class HapticSiteTests: XCTestCase {
     /// write paths, so the absences above are real absences.
     func testTheExtractorSeesTheWritePaths() throws {
         let messaging = try source("Agrent/Exchange/MessagingStores.swift")
-        XCTAssertTrue(bodies(of: "send", in: messaging).contains { $0.contains("sendFeedback.saved()") })
+        let engine = try source("Agrent/ChatKit/ChatEngine.swift")
+        XCTAssertTrue(bodies(of: "send", in: engine).contains { $0.contains("sendFeedback.saved()") })
         let tasks = try source("Agrent/Tasks/TasksStore.swift")
         XCTAssertTrue(bodies(of: "setStatus", in: tasks).contains { $0.contains("writeFeedback.refused()") })
         // Two `refresh`es in one file are both read: the inbox's and the

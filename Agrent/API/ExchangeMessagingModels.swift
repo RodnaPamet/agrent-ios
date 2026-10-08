@@ -157,7 +157,10 @@ struct ExchangeThreadSummary: Decodable, Equatable, Sendable, Identifiable {
 /// The messages are the END of the conversation, oldest first. `olderCursor`
 /// passed as `before` gives the page before it. The header fields are
 /// recomputed on every page, older pages included.
-struct ExchangeThread: Decodable, Equatable, Sendable, Identifiable {
+///
+/// A ChatKit page (agrent-ios#196): `messages` and `olderCursor` are all
+/// the engine reads; the header is Борса's, read from `latestPage`.
+struct ExchangeThread: Decodable, Equatable, Sendable, Identifiable, ChatPage {
     let id: String
     let listingId: String
 
@@ -218,7 +221,11 @@ struct ExchangeThread: Decodable, Equatable, Sendable, Identifiable {
 ///     neither               -> the other side
 ///
 /// The server computes both flags for the caller; nothing here compares ids.
-struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
+///
+/// A ChatKit message (agrent-ios#196): what to show for the name
+/// (`displayName`) and who may retract (`mayRetract`) are ChatKit's rules,
+/// from `ChatMessage`.
+struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable, ChatMessage {
     let id: String
 
     /// A TENANT id, never a user. Optional because nothing reads it: who said
@@ -296,95 +303,20 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
 
     var speaker: MessageSpeaker { MessageSpeaker(mine: mine, fromMyFarm: fromMyFarm) }
 
-    /// The name to show, or nil for none — and then the caption says what
-    /// the sender is to me instead. None, for three kinds of name:
-    ///
-    /// - nothing but spaces: the spec asks for a fallback rather than an
-    ///   empty bubble label, and a blank one would be exactly that;
-    /// - a ciphertext: `User.name` is encrypted at rest, and a decryption
-    ///   that fails has reached a screen before (`WorkItemSummary.Assignee`,
-    ///   2026-09-22) — VoiceOver would spell it out before every message;
-    /// - one of the APP'S OWN speaker words. A name is the sender's to
-    ///   choose, and the other side named «Вие» or «Колега от
-    ///   стопанството» would otherwise caption their words as mine or a
-    ///   colleague's.
-    var displayName: String? {
-        guard let trimmed = senderName?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty,
-              !WorkItemSummary.Assignee.isCipherEnvelope(trimmed),
-              !MessageSpeaker.allCases.contains(where: {
-                  $0.label.compare(trimmed, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
-              })
-        else { return nil }
-        return trimmed
-    }
-
     /// Removed, whichever of the two fields says so. A body that is null on a
     /// message not marked deleted is a contract break, and showing an empty
     /// bubble would be worse than showing it as removed.
     var isTombstone: Bool { deleted || body == nil }
 
-    /// «Премахни» is offered only on MY OWN still-present messages. Since
-    /// #1323 the server checks the sending PERSON and answers anyone else
-    /// `MESSAGE_NOT_SENDER` — it used to compare the farm, so an admin could
-    /// retract the creator's words. A colleague's message is not offered.
-    var mayRetract: Bool { mine && !isTombstone }
-}
-
-/// Who said it, seen from the person holding the phone.
-///
-/// A pure mapping of the server's two flags, so the bubble's style, its
-/// caption and its VoiceOver sentence all read one value, and a test can
-/// hold every combination.
-enum MessageSpeaker: Equatable, Sendable, CaseIterable {
-    /// The person holding the phone.
-    case me
-    /// Someone else at the same farm who is in this conversation's audience.
-    case colleague
-    /// The other side of the listing — whoever there is writing.
-    case counterparty
-
-    /// `mine` wins. The server computes `fromMyFarm` as "my farm and not me",
-    /// so it never sends both; if it ever did, a message the server says I
-    /// sent is mine, retract included.
-    init(mine: Bool, fromMyFarm: Bool) {
-        if mine {
-            self = .me
-        } else if fromMyFarm {
-            self = .colleague
-        } else {
-            self = .counterparty
-        }
+    /// The shape the server sends a retracted message in: same id, same
+    /// sender, same time, no body, `deleted`.
+    func tombstoned() -> ExchangeMessage {
+        ExchangeMessage(
+            id: id, senderTenantId: senderTenantId, senderUserId: senderUserId,
+            senderName: senderName, mine: mine, fromMyFarm: fromMyFarm,
+            body: nil, deleted: true, createdAt: createdAt
+        )
     }
-
-    /// What this speaker is to me: «Вие», a colleague, the other side. The
-    /// caption when there is no name, and what VoiceOver adds to a
-    /// colleague's (`MessageBubble.spoken`).
-    ///
-    /// «Вие» is the PERSON since #1323, never the farm.
-    var label: String {
-        switch self {
-        case .me: "Вие"
-        case .colleague: "Колега от стопанството"
-        case .counterparty: "Отсрещната страна"
-        }
-    }
-
-    /// The caption over a bubble: «Вие» for my own words whatever my name is,
-    /// and for anyone else their name when the server has one (agri-saas
-    /// #1399), else what they are to me. Two colleagues used to read alike;
-    /// with names they do not.
-    func caption(name: String?) -> String {
-        switch self {
-        case .me: label
-        case .colleague, .counterparty: name ?? label
-        }
-    }
-
-    /// My farm's side — me and a colleague — sits on the trailing edge, the
-    /// other side on the leading one. A colleague DID write for my farm, so
-    /// they are told apart from me by caption and bubble style, not by side.
-    var isOurSide: Bool { self != .counterparty }
 }
 
 // MARK: - Write bodies and responses
