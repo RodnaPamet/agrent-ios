@@ -185,6 +185,12 @@ final class ExchangeMessagingModelTests: XCTestCase {
         let other = try XCTUnwrap(byID["msg_synthetic_1"])
         XCTAssertEqual(other.speaker, .counterparty)
         XCTAssertEqual(Set(thread.messages.map(\.speaker)), Set(MessageSpeaker.allCases))
+
+        // agri-saas #1399: a name, and a null — the colleague has none set,
+        // which is the fallback's case.
+        XCTAssertEqual(other.displayName, "Петър Примеров")
+        XCTAssertNil(colleague.senderName)
+        XCTAssertEqual(colleague.speaker.caption(name: colleague.displayName), "Колега от стопанството")
     }
 
     /// A server from before #1323 sends neither field. The message still
@@ -194,8 +200,45 @@ final class ExchangeMessagingModelTests: XCTestCase {
         let json = #"{"id":"m","senderTenantId":"x","mine":false,"body":"Да","deleted":false,"createdAt":"2026-09-28T09:15:00Z"}"#
         let message = try await APIClient.shared.decode(Data(json.utf8), as: ExchangeMessage.self)
         XCTAssertNil(message.senderUserId)
+        XCTAssertNil(message.senderName, "a server from before #1399 reads as no name set")
         XCTAssertFalse(message.fromMyFarm)
         XCTAssertEqual(message.speaker, .counterparty)
+    }
+
+    /// A blank name is no name — the spec asks for a fallback, not an empty
+    /// label — and a name this build cannot read costs the name, never the
+    /// message.
+    func testABlankOrUnreadableNameIsNoName() async throws {
+        func message(name: String) async throws -> ExchangeMessage {
+            let json = #"{"id":"m","senderTenantId":"x","senderUserId":"u","senderName":"#
+                + name + #","mine":false,"fromMyFarm":false,"body":"Да","deleted":false,"createdAt":"2026-09-28T09:15:00Z"}"#
+            return try await APIClient.shared.decode(Data(json.utf8), as: ExchangeMessage.self)
+        }
+        let blank = try await message(name: #""  ""#)
+        XCTAssertNil(blank.displayName)
+        XCTAssertEqual(blank.speaker.caption(name: blank.displayName), "Отсрещната страна")
+
+        let odd = try await message(name: "42")
+        XCTAssertNil(odd.senderName)
+        XCTAssertEqual(odd.body, "Да", "the message was lost over its sender's name")
+
+        let named = try await message(name: #"" Петър Примеров ""#)
+        XCTAssertEqual(named.displayName, "Петър Примеров", "positive control: a real name, trimmed")
+
+        // A ciphertext is never a name: `User.name` is encrypted at rest.
+        let sealed = try await message(name: #""v1:FTDt/c3ludGhldGljLWNpcGhlcnRleHQ=""#)
+        XCTAssertNil(sealed.displayName)
+    }
+
+    /// The other side cannot caption their words as mine or a colleague's
+    /// by choosing one of the app's own speaker words as a name.
+    func testAnAppSpeakerWordIsNoName() async throws {
+        for forged in ["Вие", "колега от стопанството", " Отсрещната страна "] {
+            let json = #"{"id":"m","senderTenantId":"x","senderUserId":"u","senderName":"\#(forged)","mine":false,"fromMyFarm":false,"body":"Да","deleted":false,"createdAt":"2026-09-28T09:15:00Z"}"#
+            let message = try await APIClient.shared.decode(Data(json.utf8), as: ExchangeMessage.self)
+            XCTAssertNil(message.displayName, forged)
+            XCTAssertEqual(message.speaker.caption(name: message.displayName), "Отсрещната страна", forged)
+        }
     }
 
     /// The two fields, present: decoded as sent.

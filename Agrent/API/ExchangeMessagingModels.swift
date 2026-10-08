@@ -170,10 +170,14 @@ struct ExchangeThread: Decodable, Equatable, Sendable, Identifiable {
     /// Closed refuses nothing: the next message from either party reopens it.
     let closed: Bool
 
-    /// The tenant-pair block, reported to BOTH parties. Still FARM-level after
-    /// #1323 (the person-level block is agri-saas #1314, not done): the
-    /// listing farm refuses every person at the other farm, on every listing
-    /// of its own, not only in this thread.
+    /// The block, reported to BOTH parties. PERSON-level since agri-saas
+    /// #1397: the listing farm refuses this conversation's other person, on
+    /// every listing of its own and not only in this thread — and not that
+    /// person's colleagues.
+    ///
+    /// The server does not report it reliably yet: every caller of its
+    /// `isBlocked` passes a tenant id where the block now holds a user id, so
+    /// this reads false for every thread (agri-saas #1403).
     let blocked: Bool
 
     /// The caller's exact unread count — the CALLER's, per person since
@@ -223,9 +227,21 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
     let senderTenantId: String?
 
     /// The sending PERSON's opaque id (#1323). Required by the spec, optional
-    /// here because nothing on screen depends on it: it is an id, not a name,
-    /// and the payload carries no name — a server follow-up, PARITY Gap 7.
+    /// here because nothing on screen depends on it: it is an id, not a name.
+    /// The name is `senderName`.
     let senderUserId: String?
+
+    /// The sender's display name (agri-saas #1399) — EVERY sender's: a
+    /// colleague at my own farm and the other side alike (owner's decision,
+    /// agri-saas #1348). The spec has it present-and-null: always sent, null
+    /// when that person has set no name — common for an account made through
+    /// a Google sign-in — and then the caption says what they are to me
+    /// instead (`MessageSpeaker.caption`). A server from before #1399 omits
+    /// it, which reads the same.
+    ///
+    /// A name only. It does not weaken the contact reveal, which gates the
+    /// phone and email: a name says who you are already talking to.
+    let senderName: String?
 
     /// SENT BY ME, the person (#1323). It used to mean "sent by my farm", so a
     /// colleague's message was `mine` too; it no longer is.
@@ -247,11 +263,12 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
     let createdAt: Date
 
     init(id: String, senderTenantId: String?, senderUserId: String? = nil,
-         mine: Bool, fromMyFarm: Bool = false,
+         senderName: String? = nil, mine: Bool, fromMyFarm: Bool = false,
          body: String?, deleted: Bool, createdAt: Date) {
         self.id = id
         self.senderTenantId = senderTenantId
         self.senderUserId = senderUserId
+        self.senderName = senderName
         self.mine = mine
         self.fromMyFarm = fromMyFarm
         self.body = body
@@ -260,7 +277,7 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, senderTenantId, senderUserId, mine, fromMyFarm, body, deleted, createdAt
+        case id, senderTenantId, senderUserId, senderName, mine, fromMyFarm, body, deleted, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -268,6 +285,8 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
         id = try c.decode(String.self, forKey: .id)
         senderTenantId = try c.decodeIfPresent(String.self, forKey: .senderTenantId)
         senderUserId = try c.decodeIfPresent(String.self, forKey: .senderUserId)
+        // A name this build cannot read costs the name, never the message.
+        senderName = (try? c.decodeIfPresent(String.self, forKey: .senderName)) ?? nil
         mine = try c.decode(Bool.self, forKey: .mine)
         fromMyFarm = try c.decodeIfPresent(Bool.self, forKey: .fromMyFarm) ?? false
         body = try c.decodeIfPresent(String.self, forKey: .body)
@@ -276,6 +295,29 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
     }
 
     var speaker: MessageSpeaker { MessageSpeaker(mine: mine, fromMyFarm: fromMyFarm) }
+
+    /// The name to show, or nil for none — and then the caption says what
+    /// the sender is to me instead. None, for three kinds of name:
+    ///
+    /// - nothing but spaces: the spec asks for a fallback rather than an
+    ///   empty bubble label, and a blank one would be exactly that;
+    /// - a ciphertext: `User.name` is encrypted at rest, and a decryption
+    ///   that fails has reached a screen before (`WorkItemSummary.Assignee`,
+    ///   2026-09-22) — VoiceOver would spell it out before every message;
+    /// - one of the APP'S OWN speaker words. A name is the sender's to
+    ///   choose, and the other side named «Вие» or «Колега от
+    ///   стопанството» would otherwise caption their words as mine or a
+    ///   colleague's.
+    var displayName: String? {
+        guard let trimmed = senderName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty,
+              !WorkItemSummary.Assignee.isCipherEnvelope(trimmed),
+              !MessageSpeaker.allCases.contains(where: {
+                  $0.label.compare(trimmed, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+              })
+        else { return nil }
+        return trimmed
+    }
 
     /// Removed, whichever of the two fields says so. A body that is null on a
     /// message not marked deleted is a contract break, and showing an empty
@@ -315,17 +357,27 @@ enum MessageSpeaker: Equatable, Sendable, CaseIterable {
         }
     }
 
-    /// The caption over a bubble, and the first thing VoiceOver says.
+    /// What this speaker is to me: «Вие», a colleague, the other side. The
+    /// caption when there is no name, and what VoiceOver adds to a
+    /// colleague's (`MessageBubble.spoken`).
     ///
-    /// «Вие» is the PERSON since #1323, never the farm. The colleague has no
-    /// name because the payload carries none — only an opaque id — so the
-    /// caption says what is known. A sender name is a server follow-up
-    /// (PARITY Gap 7).
+    /// «Вие» is the PERSON since #1323, never the farm.
     var label: String {
         switch self {
         case .me: "Вие"
         case .colleague: "Колега от стопанството"
         case .counterparty: "Отсрещната страна"
+        }
+    }
+
+    /// The caption over a bubble: «Вие» for my own words whatever my name is,
+    /// and for anyone else their name when the server has one (agri-saas
+    /// #1399), else what they are to me. Two colleagues used to read alike;
+    /// with names they do not.
+    func caption(name: String?) -> String {
+        switch self {
+        case .me: label
+        case .colleague, .counterparty: name ?? label
         }
     }
 

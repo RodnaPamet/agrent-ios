@@ -468,8 +468,9 @@ enum UserMessage {
         // retract (`MESSAGE_NOT_SENDER` compares the sender) and the read
         // pointer are per person. The FARM stays where the check is still a
         // farm's: your own listing (`THREAD_OWN_LISTING` compares tenants, so
-        // a colleague's listing counts) and the block, which is farm-to-farm
-        // until #1314. No sentence says «блокирахте това стопанство»; see
+        // a colleague's listing counts). The block is a PERSON's since
+        // agri-saas #1397, and `THREAD_BLOCKED` speaks to the person it
+        // refuses. No sentence says «блокирахте това стопанство»; see
         // `MessagingPolicy.blockedNotice`.
         //
         // NOTHING SAYS «В ТОЗИ РАЗГОВОР» about a limit. The send budget is
@@ -491,8 +492,11 @@ enum UserMessage {
         "BLOCK_SELLER_ONLY": "Само собственикът на обявата може да блокира или отблокира.",
         "LISTING_NOT_FOUND": "Обявата не беше намерена.",
         "THREAD_OWN_LISTING": "Не можете да започнете разговор по обява на Вашето стопанство.",
-        // True under the farm-level block of today and the person-level one
-        // of #1314 alike: you are refused either way.
+        // Said to whoever the server refuses: the person blocked, opening a
+        // conversation on any listing of that farm or writing in theirs. A
+        // colleague of theirs is not refused elsewhere; if the server refuses
+        // one in the blocked conversation, «от Вас» overstates it slightly,
+        // and the notice under the conversation says the exact scope.
         "THREAD_BLOCKED": "Собственикът на обявата не приема съобщения от Вас.",
         // Reached only when the server's sanitiser strips a draft the app
         // thought had text — `<ivan@abv.bg>` is a tag to it — because the

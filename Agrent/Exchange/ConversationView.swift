@@ -79,16 +79,15 @@ struct ConversationView: View {
             guard unavailable else { return }
             AccessibilityNotification.Announcement(ConversationAvailability.title).post()
         }
-        .alert("Да блокирате ли другата страна?", isPresented: $confirmingBlock) {
+        .alert(MessagingPolicy.blockTitle, isPresented: $confirmingBlock) {
             Button("Блокирай", role: .destructive) { Task { await store.setBlocked(true) } }
             Button("Отказ", role: .cancel) {}
         } message: {
-            // THE CONFIRMATION IS FOR THIS SENTENCE. A block is still stored
-            // once per pair of farms (#1323 did not move it; #1314 will), so
-            // pressing it here silences every person at the other farm on
-            // every listing of this farm — the web does it in one tap and
-            // never says so. Worded as what happens, not as "this farm":
-            // see `MessagingPolicy.blockedNotice`.
+            // THE CONFIRMATION IS FOR THIS SENTENCE. Since agri-saas #1397
+            // a block refuses this one PERSON on every listing of this farm,
+            // and not their colleagues — wider than this conversation and
+            // narrower than their farm, and the web does it in one tap and
+            // says neither. See `MessagingPolicy.blockedNotice`.
             Text(MessagingPolicy.blockConfirmation)
         }
         .alert("Да премахнете ли съобщението?", isPresented: $confirmingRetract,
@@ -447,11 +446,15 @@ struct MessageBubble: View {
         HStack(alignment: .bottom, spacing: 0) {
             if speaker.isOurSide { Spacer(minLength: 48) }
             VStack(alignment: speaker.isOurSide ? .trailing : .leading, spacing: 4) {
-                // No personal names: the payload carries none, only an
-                // opaque sender id (a server follow-up, PARITY Gap 7).
-                Text("\(speaker.label), \(time)")
+                // The sender's name when the server has one (#1399), else
+                // what they are to me; «Вие» for my own words. Aligned to its
+                // own side when it wraps — a long name does even at the
+                // default size — or a caption over my bubble would start at
+                // the other side's edge and read as theirs.
+                Text("\(speaker.caption(name: message.displayName)), \(time)")
                     .font(.caption)
                     .foregroundStyle(Palette.secondaryText)
+                    .multilineTextAlignment(speaker.isOurSide ? .trailing : .leading)
                 bubble
             }
             if !speaker.isOurSide { Spacer(minLength: 48) }
@@ -459,7 +462,8 @@ struct MessageBubble: View {
         // ONE element, spoken from the values — who, what, when. The speaker
         // first, so a colleague's words are never heard as the reader's own.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(MessageBubble.spoken(speaker: speaker, body: bodyText, time: time))
+        .accessibilityLabel(MessageBubble.spoken(speaker: speaker, name: message.displayName,
+                                                 body: bodyText, time: time))
         .accessibilityActions {
             if mayRetract {
                 Button("Премахни", action: onRetract)
@@ -482,10 +486,20 @@ struct MessageBubble: View {
         message.isTombstone ? "Съобщението е премахнато" : (message.body ?? "")
     }
 
-    /// The VoiceOver sentence: «Колега от стопанството, Може и в петък., 09:00».
-    /// A static function so a test can hold it per speaker without a view.
-    static func spoken(speaker: MessageSpeaker, body: String, time: String) -> String {
-        A11y.sentence([speaker.label, body, time])
+    /// The VoiceOver sentence: «Колега от стопанството, Мария Синтетична,
+    /// Може и в петък, 09:00.» A static function so a test can hold it per
+    /// speaker without a view.
+    ///
+    /// WHAT THEY ARE TO ME FIRST, in the app's own words, and then the name.
+    /// On screen a sender's side and style say whose words these are;
+    /// VoiceOver hears neither. A name is the sender's to choose — and
+    /// commas in it are joined into this sentence as any other — so led by
+    /// the name, the other side could be heard as a colleague, or as me.
+    /// My own words are «Вие» alone.
+    static func spoken(speaker: MessageSpeaker, name: String? = nil, body: String, time: String) -> String {
+        var who = [speaker.label]
+        if speaker != .me, let name { who.append(name) }
+        return A11y.sentence(who + [body, time])
     }
 
     private var fill: Color {
