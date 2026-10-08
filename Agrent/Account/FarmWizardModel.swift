@@ -169,8 +169,7 @@ final class FarmWizardModel {
         }
     }
 
-    /// The terms gate's 403 — coded by `APIClient.normalised` until the
-    /// server codes it itself.
+    /// The terms gate's 403, coded by the server since agri-saas #1405.
     static func isTermsRefusal(_ error: Error) -> Bool {
         guard case APIClient.APIError.http(_, let code, _, _, _) = error else { return false }
         return code == "TERMS_ACCEPTANCE_REQUIRED"
