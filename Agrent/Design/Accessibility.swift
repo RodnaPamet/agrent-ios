@@ -143,6 +143,8 @@ enum A11y {
         /// A task's comment (#225) — a different send from a message, so a
         /// different name: one screen could one day hold both.
         static let sendComment = spokenNames("Изпрати коментара", "Send comment")
+        /// The task screen's green tick (#226) — it only closes.
+        static let closeTask = spokenNames("Затвори задачата", "Close task")
         /// Close THIS conversation — an act the other farm sees.
         static let closeConversation = spokenNames("Затвори разговора", "Close conversation")
         /// The house search field (#164) and its clear button.

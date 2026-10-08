@@ -43,7 +43,6 @@ final class TaskDetailStore {
     init(id: String) { self.id = id }
 
     private(set) var saving = false
-    private(set) var writeError: String?
 
     /// The outcome of the person's own status change, for the screen to
     /// play. `load()` never touches it — a refresh is not something the
@@ -92,39 +91,72 @@ final class TaskDetailStore {
         }
     }
 
-    /// Change the status, then RELOAD rather than trusting the response.
+    /// What closing came to (#226).
+    enum CloseOutcome: Equatable {
+        case closed
+        /// Closed, with the weeds in its note — but `parcels` of the task's
+        /// parcels did not take the observation, for `reason`.
+        case closedWithoutWeeds(parcels: Int, reason: String)
+        /// Not closed. The form stays open with its answers: closing a form
+        /// after a refused write is the web's defect #921 — it reads as
+        /// success, and the operator's answers are gone.
+        case refused(String)
+    }
+
+    /// Said under the task when a close landed and its weeds did not.
+    private(set) var closeNotice: String?
+
+    /// The key for the close being sent, kept while its note is the same,
+    /// so a second tap on «Затвори» after a lost answer is the same request
+    /// — which the status route recognises as already applied.
+    @ObservationIgnored private var closeKey: (resolution: String, key: String)?
+
+    /// Close the task with the form's answers, then record its weeds.
     ///
-    /// The write answers in two different shapes depending on whether it
-    /// changed anything — see `WorkItemAPI.setStatus`. Reloading costs a
-    /// request and gets back the one shape that is modelled and verified.
+    /// CLOSE FIRST. The close is the one thing the form exists for, and the
+    /// status route is replay-safe; the weed route is not yet (agri-saas's
+    /// idempotency is per model and lands later), so it goes second and is
+    /// never retried here. A refused observation leaves the close standing —
+    /// the weeds are in the note either way — and is said under the task.
+    /// One observation per parcel, all with the same moment.
     ///
-    /// The key and the resolution are minted ONCE, here, and reused for
-    /// every attempt at this logical change. Regenerating either between
-    /// attempts turns a retry into a different request: a new key defeats
-    /// the dedupe, and a re-trimmed resolution stops the server recognising
-    /// the replay and earns a 400 for a no-op transition.
-    func setStatus(_ status: WorkItemStatus, resolution: String?) async {
-        guard !saving else { return }
+    /// Then RELOAD rather than trusting the response: the status route
+    /// answers in two shapes depending on whether it changed anything.
+    func close(resolution: String, weeds: [String], parcelIDs: [String], note: String) async -> CloseOutcome {
+        guard !saving else { return .refused(TaskCloseText.inProgress) }
         saving = true
-        writeError = nil
+        closeNotice = nil
         defer { saving = false }
 
-        let key = UUID().uuidString
-        let trimmed = resolution?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = (trimmed?.isEmpty ?? true) ? nil : trimmed
-
+        let key = closeKey.flatMap { $0.resolution == resolution ? $0.key : nil } ?? UUID().uuidString
+        closeKey = (resolution, key)
         do {
-            try await WorkItemAPI.setStatus(
-                id, to: status, resolution: body, idempotencyKey: key
-            )
-            writeFeedback.saved()
-            await load()
+            try await WorkItemAPI.setStatus(id, to: .closed, resolution: resolution, idempotencyKey: key)
         } catch {
-            // Stay on the screen with the error visible. Closing a form
-            // after a refused write is the defect filed against the web app
-            // as #921 — it reads as success and the operator's work is gone.
-            writeError = UserMessage.text(for: error)
             writeFeedback.refused()
+            return .refused(UserMessage.text(for: error))
         }
+        closeKey = nil
+        writeFeedback.saved()
+
+        var failed = 0
+        var reason: String?
+        if !weeds.isEmpty {
+            let observedAt = Date()
+            for parcelID in parcelIDs {
+                do {
+                    try await WorkItemAPI.recordWeeds(
+                        taskID: id, parcelID: parcelID, observedAt: observedAt, weeds: weeds,
+                        notes: note, idempotencyKey: UUID().uuidString)
+                } catch {
+                    failed += 1
+                    reason = reason ?? UserMessage.text(for: error)
+                }
+            }
+        }
+        await load()
+        guard failed > 0, let reason else { return .closed }
+        closeNotice = TaskCloseText.weedsNotRecorded(parcels: failed, reason: reason)
+        return .closedWithoutWeeds(parcels: failed, reason: reason)
     }
 }
