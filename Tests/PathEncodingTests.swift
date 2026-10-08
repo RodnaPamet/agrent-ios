@@ -19,7 +19,21 @@ import XCTest
 /// this change must not move any request that works today.
 final class PathEncodingTests: XCTestCase {
 
-    private let t = "/api/t/\(Config.tenantSlug)"
+    /// Every case goes through `url(for:)`, which refuses a farm path with no
+    /// farm in it (#192) — so these run with one open.
+    private let t = "/api/t/ferma-1"
+    private var saved: Farm?
+
+    override func setUp() {
+        super.setUp()
+        saved = ActiveFarm.shared.farm
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
+    }
+
+    override func tearDown() {
+        ActiveFarm.shared.set(saved)
+        super.tearDown()
+    }
     private let cuid = "cmg1abc2d0000xyz"
 
     private func wire(_ pathAndQuery: String) throws -> String {

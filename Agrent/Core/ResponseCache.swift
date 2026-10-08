@@ -13,10 +13,10 @@ import Foundation
 ///     decoded models would also need a separate cache per type, where this is
 ///     one cache for every endpoint the app will ever add.
 ///
-///  2. KEYED ON USER AND TENANT, NOT JUST PATH (`CacheScope`). `Config.tenantSlug`
-///     is hard-coded to "agrent" today and will not always be; a cache keyed
-///     on path alone serves one farm's journal to another the moment a tenant
-///     switcher lands. And the USER is in the key because a farm phone is
+///  2. KEYED ON USER AND TENANT, NOT JUST PATH (`CacheScope`). The open farm
+///     changes (agrent-ios#179), and a cache keyed on path alone would serve
+///     one farm's journal to another; with NO farm open there is no key and
+///     no cache (#192). And the USER is in the key because a farm phone is
 ///     shared: until agri-saas#1191 P0.9 this survived sign-out keyed on the
 ///     tenant alone, so account B signing in on A's phone was served A's
 ///     cached journal, members and farm profile whenever the network was
@@ -176,16 +176,30 @@ actor ResponseCache {
     }
 }
 
-/// Whose cache entry this is: the signed-in user and the farm.
+/// Whose cache entry this is: the signed-in user, and — for a farm's data —
+/// the farm.
 ///
-/// Built only by `current()` in the app, which returns nil when nobody's
+/// Built only by `current(for:)` in the app, which returns nil when nobody's
 /// identity is known — and nil means NO CACHE, not a shared one. See
 /// `SessionIdentity` for why unknown fails closed.
 struct CacheScope: Equatable, Sendable {
     let userID: String
+    /// The farm a farm path's entry belongs to; EMPTY for the person's own
+    /// data (`/api/auth/me`), which is no farm's.
     let tenant: String
 
-    static func current(identity: SessionIdentity = .shared) -> CacheScope? {
-        identity.userID.map { CacheScope(userID: $0, tenant: Config.tenantSlug) }
+    /// The scope for THIS path (agrent-ios#192).
+    ///
+    /// A FARM path belongs to the open farm, and with none open it has no
+    /// scope and is not cached: keying it under the pinned farm is the guess
+    /// `FarmPath` stopped making. Anything else is the PERSON's, whichever
+    /// farm is open or none: `/me` is one answer per person, so it is cached
+    /// once — and an offline launch with no farm, or the first one after a
+    /// switch, still has an identity to show and to record work under.
+    static func current(for pathAndQuery: String, identity: SessionIdentity = .shared) -> CacheScope? {
+        guard let userID = identity.userID else { return nil }
+        guard pathAndQuery.hasPrefix(FarmPath.prefix) else { return CacheScope(userID: userID, tenant: "") }
+        guard let farm = FarmPath.openSlug else { return nil }
+        return CacheScope(userID: userID, tenant: farm)
     }
 }

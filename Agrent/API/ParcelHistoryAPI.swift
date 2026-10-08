@@ -19,7 +19,7 @@ import Foundation
 /// timeout reported as UNKNOWN rather than as a failure — because telling an
 /// operator a write failed invites the retry that makes it a duplicate.
 enum ParcelHistoryAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/agro/parcels" }
+    private static var base: String { "\(FarmPath.root)/agro/parcels" }
 
     static func cropSeasonsPath(_ parcelID: String) -> String {
         "\(base)/\(URLEscape.segment(parcelID))/crop-seasons"

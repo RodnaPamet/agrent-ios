@@ -6,7 +6,7 @@ enum CalculatorAPI {
     /// passing one would diverge from the web for the same farm. It also keeps
     /// the request clear of the unified log: CFNetwork writes full request
     /// URLs, query included, and the app cannot suppress that.
-    static var path: String { "/api/t/\(Config.tenantSlug)/grain/calculator" }
+    static var path: String { "\(FarmPath.root)/grain/calculator" }
 
     static func decode(from data: Data) async throws -> CalculatorPayload {
         try await APIClient.shared.decode(data, as: CalculatorPayload.self)
@@ -14,7 +14,7 @@ enum CalculatorAPI {
 }
 
 enum CostsAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/grain/costs" }
+    private static var base: String { "\(FarmPath.root)/grain/costs" }
 
     /// `{ rows, totalCount, truncated }` — a FIFTH envelope variant in this
     /// API, measured, and documented now with both counts required

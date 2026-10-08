@@ -263,8 +263,7 @@ final class ExchangeUnreadStore {
     /// collect a 403 — when the user is KNOWN to be one. Unknown fails open,
     /// which costs at most one refused read.
     func refresh() async {
-        let farm = Config.tenantSlug
-        guard refreshingFarm != farm else { return }
+        guard let farm = FarmPath.openSlug, refreshingFarm != farm else { return }
         if let me = CurrentUserStore.shared.user, me.isOperator { return }
         refreshingFarm = farm
         defer { if refreshingFarm == farm { refreshingFarm = nil } }
@@ -282,8 +281,8 @@ final class ExchangeUnreadStore {
     /// started under A and lands after Изход is A's farm's threads, and is
     /// dropped (`SessionEpoch`) — and so is one that started on the farm
     /// open a moment ago and lands after a switch (agrent-ios#179).
-    func apply(_ threads: [ExchangeThreadSummary], asOf epoch: Int, farm: String) {
-        guard SessionEpoch.isCurrent(epoch), farm == Config.tenantSlug else { return }
+    func apply(_ threads: [ExchangeThreadSummary], asOf epoch: Int, farm: String?) {
+        guard SessionEpoch.isCurrent(epoch), farm != nil, farm == FarmPath.openSlug else { return }
         unreadThreadIDs = Set(threads.filter(\.hasUnread).map(\.id))
     }
 
@@ -331,7 +330,7 @@ final class ExchangeInboxStore {
     func load() async -> Error? {
         if state.value == nil { state = .loading }
         let epoch = SessionEpoch.current
-        let farm = Config.tenantSlug
+        let farm = FarmPath.openSlug
         do {
             let data = try await APIClient.shared.data(for: ExchangeAPI.threadsPath)
             let page = try await ExchangeAPI.decodeThreads(from: data)

@@ -26,7 +26,7 @@ import Foundation
 ///     queues the farm-record PDF. Never sent from development, CI or the
 ///     screenshot harness — the seam answers it 501.
 enum FieldOperationAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/field-operations" }
+    private static var base: String { "\(FarmPath.root)/field-operations" }
 
     /// The whole job — the task, its lines, the location and its parcels.
     /// The id is the TASK's: a field operation is a task of type
@@ -38,8 +38,8 @@ enum FieldOperationAPI {
     /// One prescription LINE of the job. `lineID` is the `OperationParcel`
     /// id, not a parcel id — the spec says so in as many words. Given the
     /// farm for the outbox's replay, as `LocationsAPI.operationsPath` is.
-    static func linePath(taskID: String, lineID: String, tenant: String = Config.tenantSlug) -> String {
-        "/api/t/\(tenant)/field-operations/\(URLEscape.segment(taskID))/parcels/\(URLEscape.segment(lineID))"
+    static func linePath(taskID: String, lineID: String, tenant: String? = FarmPath.openSlug) -> String {
+        "\(FarmPath.root(for: tenant))/field-operations/\(URLEscape.segment(taskID))/parcels/\(URLEscape.segment(lineID))"
     }
 
     static func decodeDetail(from data: Data) async throws -> FieldOperationDetail {
@@ -65,8 +65,13 @@ enum FieldOperationAPI {
         let body: Data
         /// The line's version as the screen READ it — the `If-Match`.
         let seenVersion: Int
+        /// The farm the mark was made on, taken when the request is BUILT.
+        /// A mark that fails to send is queued afterwards, from a task that
+        /// can outlive the screen — after a farm switch, or Изход — and the
+        /// queued copy has to go where the tap was, not where the app is.
+        var farm: String? = FarmPath.openSlug
 
-        var path: String { FieldOperationAPI.linePath(taskID: taskID, lineID: lineID) }
+        var path: String { FieldOperationAPI.linePath(taskID: taskID, lineID: lineID, tenant: farm) }
     }
 
     /// What a landed mark reports back, read leniently: the 200 carries

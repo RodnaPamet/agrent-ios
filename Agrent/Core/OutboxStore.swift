@@ -218,12 +218,20 @@ final class OutboxStore {
         await refresh()
     }
 
-    /// The farm open NOW is the farm the record was made on: a record is
-    /// queued by the screen that just failed to send it, inside that farm.
-    /// A row that already carries a farm keeps it.
+    /// A row that already carries a farm keeps it; otherwise the farm open
+    /// NOW is the one it was made on — a spray is queued by a tap in its
+    /// sheet, inside that farm. A parcel-line mark is queued AFTER its live
+    /// send fails, which can be after a switch, so it carries the farm its
+    /// request was built for (`MarkRequest.farm`) and never reaches this.
+    ///
+    /// A row left with no farm is read as one from before #179 and replayed
+    /// to the pinned farm (`PendingOperation.tenant`). No new row should be:
+    /// one that is gets logged, since it is the guess `FarmPath` exists to
+    /// stop making.
     nonisolated static func stamped(_ operation: PendingOperation) -> PendingOperation {
         var row = operation
-        if row.tenantSlug == nil { row.tenantSlug = Config.tenantSlug }
+        if row.tenantSlug == nil { row.tenantSlug = FarmPath.openSlug }
+        if row.tenantSlug == nil { Log.auth.error("queued a record with no farm open") }
         return row
     }
 
@@ -418,6 +426,11 @@ final class OutboxStore {
                 // out inside a pause is drained with no token. Stop and touch
                 // nothing; the next sign-in's launch flush sends them.
                 if case APIClient.APIError.notSignedIn = error { break }
+                // The same for a farm path with no farm in it (#192): refused
+                // before it left, so the server saw nothing. Unreachable
+                // while every row's `tenant` names a farm; kept so that a row
+                // that ever does not is parked, not stamped REFUSED.
+                if case APIClient.APIError.noFarmOpen = error { break }
 
                 // ── A 426 IS ABOUT THE BUILD, NOT THIS ITEM (#168) ──
                 //

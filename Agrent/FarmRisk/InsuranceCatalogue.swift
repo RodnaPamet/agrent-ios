@@ -124,7 +124,7 @@ enum InsuranceCatalogueAPI {
     /// `?locale=bg` because the app is Bulgarian by declaration, never by what
     /// the device reports. The default is `en` deliberately, so a client that
     /// forgets to declare is wrong loudly — this one declares.
-    static var path: String { "/api/t/\(Config.tenantSlug)/insurance/products?locale=bg" }
+    static var path: String { "\(FarmPath.root)/insurance/products?locale=bg" }
 
     static func decode(_ data: Data) async throws -> InsuranceCatalogue {
         try await APIClient.shared.decode(data, as: InsuranceCatalogue.self)

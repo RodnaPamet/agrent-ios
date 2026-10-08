@@ -236,6 +236,20 @@ final class PrivateConversationWordingTests: XCTestCase {
 
 @MainActor
 final class PersonalUnreadTests: XCTestCase {
+    /// A badge belongs to a farm, so these run with one open (#192).
+    private var saved: Farm?
+
+    override func setUp() {
+        super.setUp()
+        saved = ActiveFarm.shared.farm
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
+    }
+
+    override func tearDown() {
+        ActiveFarm.shared.set(saved)
+        super.tearDown()
+    }
+
 
     private func row(_ id: String, unread: Bool) -> ExchangeThreadSummary {
         ExchangeThreadSummary(id: id, listingId: "l", commodity: "wheat", listingRegionName: nil,
@@ -249,7 +263,7 @@ final class PersonalUnreadTests: XCTestCase {
     func testTwoThreadsOnOneListingCountTwice() {
         let store = ExchangeUnreadStore()
         store.apply([row("a", unread: true), row("b", unread: true)],
-                    asOf: SessionEpoch.current, farm: Config.tenantSlug)
+                    asOf: SessionEpoch.current, farm: FarmPath.openSlug)
         XCTAssertEqual(store.count, 2)
         store.markedRead("a")
         XCTAssertEqual(store.count, 1, "reading one leaves the other")

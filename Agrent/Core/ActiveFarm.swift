@@ -38,7 +38,7 @@ struct Farm: Codable, Equatable, Hashable, Sendable {
 /// `CacheScope`, the outbox's replay — which is why `SessionIdentity` is a
 /// lock-protected mirror too. An `await` on every path would put a suspension
 /// point in the middle of decisions that must be atomic with the request.
-/// `FarmStore` is the ONE writer; everything else reads `Config.tenantSlug`.
+/// `FarmStore` is the ONE writer; everything else reads it through `FarmPath`.
 final class ActiveFarm: @unchecked Sendable {
     static let shared = ActiveFarm()
 
@@ -59,7 +59,6 @@ struct FarmMemory {
     let defaults: UserDefaults
 
     private static func key(_ userID: String) -> String { "farm.active.v1.\(userID)" }
-    static let seededKey = "farm.legacySeeded.v1"
 
     func farm(for userID: String) -> Farm? {
         guard let data = defaults.data(forKey: Self.key(userID)) else { return nil }
@@ -77,19 +76,16 @@ struct FarmMemory {
         defaults.removeObject(forKey: Self.key(userID))
     }
 
-    /// ONCE PER INSTALL: whoever is signed in when this build first runs
-    /// keeps the farm the app was pinned to.
-    ///
-    /// `/me`'s tenant is the person's OLDEST membership, which need not be
-    /// the farm they have been using here — and a screen that switched farms
-    /// under somebody on an update would read as their records vanishing.
-    /// Nobody signed in, or a farm already remembered: nothing to keep.
-    func seedLegacyFarmOnce(for userID: String?) {
-        guard !defaults.bool(forKey: Self.seededKey) else { return }
-        defaults.set(true, forKey: Self.seededKey)
-        guard let userID, farm(for: userID) == nil else { return }
-        remember(Farm(slug: Config.legacyTenantSlug, name: nil), for: userID)
-    }
+    // ── No seed any more (agrent-ios#192) ──
+    //
+    // #179 seeded the pinned farm, once per install, for whoever was signed
+    // in when that build first ran, so nobody's screen switched under them
+    // on the update. It ran on the one install there was, the owner's phone,
+    // which has remembered its farm since. Kept, it was the last way onto a
+    // farm the person never chose: `UserDefaults` goes with the app and the
+    // Keychain's session does not, so a reinstall seeded the pinned farm for
+    // whoever was still signed in — member of it or not. A fresh install now
+    // starts where a first sign-in does: `/me`'s farm.
 }
 
 /// Which farm the app shows, decided before any of it is shown (#179).
@@ -203,11 +199,10 @@ final class FarmStore {
         // recorded under; the seam never reads or writes a person's memory.
         if UITestSeam.isActive {
             remembers = false
-            activate(Farm(slug: Config.legacyTenantSlug, name: nil), remember: false)
+            activate(Farm(slug: Config.pinnedFarmSlug, name: nil), remember: false)
             return
         }
         #endif
-        memory.seedLegacyFarmOnce(for: identity.userID)
         restoreRemembered()
     }
 

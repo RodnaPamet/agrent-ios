@@ -1,7 +1,7 @@
 import Foundation
 
 enum ExchangeAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/exchange" }
+    private static var base: String { "\(FarmPath.root)/exchange" }
 
     /// Envelope: `{ rows, nextCursor }`.
     static var listingsPath: String { listingsPath(ExchangeQuery()) }

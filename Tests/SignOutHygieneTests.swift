@@ -112,7 +112,9 @@ final class SignOutHygieneTests: XCTestCase {
 
         // ── A is signed in, and leaves a trace in every store ──
         identity.adopt(userA)
-        let scopeA = try XCTUnwrap(CacheScope.current(identity: identity))
+        // On the farm the paths above name: a cache entry needs a farm (#192).
+        ActiveFarm.shared.set(Farm(slug: Config.pinnedFarmSlug, name: nil))
+        let scopeA = try XCTUnwrap(CacheScope.current(for: paths[1], identity: identity))
         for path in paths {
             await cache.write(ResponseCache.key(scope: scopeA, pathAndQuery: path), Data("A's \(path)".utf8))
         }
@@ -126,7 +128,7 @@ final class SignOutHygieneTests: XCTestCase {
                         bottomTabOrder: ["/tasks"]))
         BottomTabsStore.shared.adopt(["/tasks", "/locations"], isOperator: true)
         ExchangeUnreadStore.shared.apply([thread("t1"), thread("t2")],
-                                         asOf: SessionEpoch.current, farm: Config.tenantSlug)
+                                         asOf: SessionEpoch.current, farm: FarmPath.openSlug)
         RateLimitPause.messages.absorb(tooMany)
         OutboxStore.shared.pause.absorb(tooMany)
         DashboardPreferences.shared.select(.sunflower)
@@ -158,7 +160,8 @@ final class SignOutHygieneTests: XCTestCase {
         XCTAssertNotEqual(SessionEpoch.current, epochBefore, "in-flight work from A is not invalidated")
         XCTAssertNil(identity.userID)
         XCTAssertNil(keychain.owner, "the identity outlived the session on disk")
-        XCTAssertNil(CacheScope.current(identity: identity), "a cache scope with nobody signed in")
+        XCTAssertNil(CacheScope.current(for: paths[1], identity: identity), "a cache scope with nobody signed in")
+        XCTAssertNil(CacheScope.current(for: MeAPI.path, identity: identity), "a person scope with nobody signed in")
         XCTAssertNil(CurrentUserStore.shared.user)
         XCTAssertNil(BottomTabsStore.shared.storedForTesting, "A's bar order survived")
         XCTAssertFalse(BottomTabsStore.shared.isOperator, "A's role survived")
@@ -185,7 +188,9 @@ final class SignOutHygieneTests: XCTestCase {
 
         // ── B signs in ──
         identity.adopt(userB)
-        let scopeB = try XCTUnwrap(CacheScope.current(identity: identity))
+        // The SAME farm as A: the key has to tell them apart by person alone.
+        ActiveFarm.shared.set(Farm(slug: Config.pinnedFarmSlug, name: nil))
+        let scopeB = try XCTUnwrap(CacheScope.current(for: paths[1], identity: identity))
         // Even a purge that FAILED cannot serve A to B: put A's bytes back,
         // as a crash mid-sign-out would have left them, and look as B.
         for path in paths {
@@ -317,13 +322,16 @@ final class SignOutHygieneTests: XCTestCase {
 
     /// A page fetched under A that lands after Изход is dropped.
     func testAnUnreadPageFromTheOldSessionIsDropped() {
+        let saved = ActiveFarm.shared.farm
+        defer { ActiveFarm.shared.set(saved) }
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
         let store = ExchangeUnreadStore()
         let stale = SessionEpoch.current
-        store.apply([thread("x")], asOf: stale, farm: Config.tenantSlug)
+        store.apply([thread("x")], asOf: stale, farm: "ferma-1")
         XCTAssertEqual(store.count, 1, "positive control: a current page applies")
         store.reset()
         SessionEpoch.advance()
-        store.apply([thread("x"), thread("y")], asOf: stale, farm: Config.tenantSlug)
+        store.apply([thread("x"), thread("y")], asOf: stale, farm: "ferma-1")
         XCTAssertEqual(store.count, 0, "A's inbox page landed in B's badge")
     }
 
@@ -386,16 +394,19 @@ final class SignOutHygieneTests: XCTestCase {
     /// No identity, no cache — and a response that lands after the session
     /// changed is not written.
     func testTheCacheIsOffWithoutAnIdentityAndChecksBeforeWriting() {
-        XCTAssertNil(CacheScope.current(identity: makeIdentity(FakeKeychain())))
+        let saved = ActiveFarm.shared.farm
+        defer { ActiveFarm.shared.set(saved) }
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
+        XCTAssertNil(CacheScope.current(for: MeAPI.path, identity: makeIdentity(FakeKeychain())))
         let keychain = FakeKeychain()
         keychain.owner = userA
-        XCTAssertEqual(CacheScope.current(identity: makeIdentity(keychain))?.userID, userA,
+        XCTAssertEqual(CacheScope.current(for: MeAPI.path, identity: makeIdentity(keychain))?.userID, userA,
                        "positive control: a stored owner is loaded")
 
         let source = read("Agrent/Core/CachedResource.swift")
-        XCTAssertTrue(source.contains("guard let scope = CacheScope.current() else {"),
+        XCTAssertTrue(source.contains("guard let scope = CacheScope.current(for: pathAndQuery) else {"),
                       "the cache-first path reads with no identity")
-        guard let check = source.range(of: "if let key, CacheScope.current() == scope {"),
+        guard let check = source.range(of: "if let key, CacheScope.current(for: pathAndQuery) == scope {"),
               let write = source.range(of: "await ResponseCache.shared.write(key, data)") else {
             return XCTFail("positive control: the write is guarded by the scope it was read under")
         }

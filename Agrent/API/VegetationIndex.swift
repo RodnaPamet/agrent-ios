@@ -162,7 +162,7 @@ enum AgroAPI {
     /// backwards, which is the behaviour wanted. Passing one would also
     /// put a date in a URL for no gain.
     static func path(_ index: VegetationIndex, locationID: String) -> String {
-        "/api/t/\(Config.tenantSlug)/agro/locations/"
+        "\(FarmPath.root)/agro/locations/"
             + "\(URLEscape.segment(locationID))/\(index.rawValue)-tiles"
     }
 

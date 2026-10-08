@@ -111,7 +111,7 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
 
     /// Where the replay goes: the stamped farm, or the pinned one for a row
     /// queued before farms were stamped.
-    var tenant: String { tenantSlug ?? Config.legacyTenantSlug }
+    var tenant: String { tenantSlug ?? Config.pinnedFarmSlug }
 
     /// What to call it on screen. The parcel name and the kind of work —
     /// enough for a farmer to recognise which spray is waiting, without
@@ -237,13 +237,14 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
         id: String = UUID().uuidString,
         _ mark: LineMark,
         ownerUserID: String,
+        farm: String? = nil,
         summary: String,
         payload: Data,
         reason: String?,
         at now: Date = Date()
     ) -> PendingOperation {
         PendingOperation(
-            id: id, locationID: nil, ownerUserID: ownerUserID,
+            id: id, locationID: nil, ownerUserID: ownerUserID, tenantSlug: farm,
             parcelSummary: summary, payload: payload, createdAt: now,
             attempts: 0, lastAttemptAt: nil, lastError: reason,
             lineMark: mark

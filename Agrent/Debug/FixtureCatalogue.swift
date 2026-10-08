@@ -179,8 +179,23 @@ enum FixtureCatalogue {
     /// The fixture that answers this request, or nil for "nothing recorded
     /// here".
     static func fixtureName(path: String, query: String?) -> String? {
+        let path = inFixtureFarm(path)
         let full = query.map { "\(path)?\($0)" } ?? path
         return byPathAndQuery[full] ?? byPath[path]
+    }
+
+    /// A farm path with NO farm in it, read as the fixture world's one farm.
+    ///
+    /// The tables are static, built on first use from the app's own path
+    /// builders — and since #192 a builder with no farm open builds
+    /// `/api/t//…` rather than the pinned farm's path (`FarmPath`). Built
+    /// before the seam opened its farm, or in a unit test that opens none, a
+    /// key would otherwise name no farm. Only the EMPTY farm is read this way:
+    /// a path for any other farm stays itself, and is `NO_FIXTURE`.
+    static func inFixtureFarm(_ path: String) -> String {
+        let unscoped = FarmPath.prefix + "/"
+        guard path.hasPrefix(unscoped) else { return path }
+        return FarmPath.root(for: Config.pinnedFarmSlug) + "/" + path.dropFirst(unscoped.count)
     }
 
     /// `"/a/b?c=d"` → `(path: "/a/b", query: "c=d")`.
@@ -209,7 +224,7 @@ enum FixtureCatalogue {
     ) -> [String: String] {
         var result: [String: String] = [:]
         for (pathAndQuery, fixture) in entries {
-            let k = key(pathAndQuery)
+            let k = inFixtureFarm(key(pathAndQuery))
             if let existing = result[k] {
                 preconditionFailure(
                     "Two fixtures claim \(k): \(existing) and \(fixture). "

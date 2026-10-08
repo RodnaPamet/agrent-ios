@@ -158,9 +158,32 @@ final class LineMarkWireTests: XCTestCase {
         XCTAssertEqual(json["status"] as? String, "SKIPPED")
     }
 
-    func testTheMarkGoesToTheLineNotTheParcel() {
+    /// A mark that fails to send is queued AFTERWARDS, from a task that can
+    /// outlive the screen — after a farm switch, or Изход. It goes to the
+    /// farm it was made on, taken when the request was built (#192).
+    func testAMarkKeepsTheFarmItWasMadeOn() {
+        let saved = ActiveFarm.shared.farm
+        defer { ActiveFarm.shared.set(saved) }
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
         let request = FieldOperationAPI.MarkRequest(taskID: "tsk_7", lineID: "opl_9", body: Data(), seenVersion: 2)
-        XCTAssertEqual(request.path, "/api/t/\(Config.tenantSlug)/field-operations/tsk_7/parcels/opl_9")
+        ActiveFarm.shared.set(Farm(slug: "ferma-2", name: nil))
+        XCTAssertEqual(request.path, "/api/t/ferma-1/field-operations/tsk_7/parcels/opl_9",
+                       "the mark followed the farm opened since")
+
+        let queued = PendingOperation.mark(
+            PendingOperation.LineMark(taskID: "tsk_7", lineID: "opl_9", status: "DONE", seenVersion: 2),
+            ownerUserID: "usr_a", farm: request.farm, summary: "x", payload: Data(), reason: nil)
+        XCTAssertEqual(OutboxStore.stamped(queued).tenantSlug, "ferma-1", "the queued copy took the open farm")
+        ActiveFarm.shared.set(nil)
+        XCTAssertEqual(OutboxStore.stamped(queued).tenantSlug, "ferma-1", "the queued copy lost its farm at Изход")
+    }
+
+    func testTheMarkGoesToTheLineNotTheParcel() {
+        let saved = ActiveFarm.shared.farm
+        defer { ActiveFarm.shared.set(saved) }
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
+        let request = FieldOperationAPI.MarkRequest(taskID: "tsk_7", lineID: "opl_9", body: Data(), seenVersion: 2)
+        XCTAssertEqual(request.path, "/api/t/ferma-1/field-operations/tsk_7/parcels/opl_9")
     }
 
     /// THE If-Match. `patchRaw` takes the version as a non-optional Int and
@@ -637,7 +660,8 @@ final class FieldOperationStoreTests: XCTestCase {
         XCTAssertEqual(store.notice?.kind, .kept)
         XCTAssertEqual(store.feedback.feedback, .success)
         XCTAssertEqual(OutboxStore.replay(for: item),
-                       .mark(path: FieldOperationAPI.linePath(taskID: "tsk_1", lineID: "opl_1"), seenVersion: 3))
+                       .mark(path: FieldOperationAPI.linePath(taskID: "tsk_1", lineID: "opl_1", tenant: item.tenant),
+                             seenVersion: 3))
     }
 
     /// A 429 on the tap closes the OUTBOX's pause before the mark joins it —

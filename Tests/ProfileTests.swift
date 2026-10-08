@@ -52,7 +52,7 @@ final class ProfileTests: XCTestCase {
     /// rows used to be — not a row among the farm's screens.
     func testAdminHasItsOwnMenuSection() throws {
         let menu = try source("Agrent/Design/AppMenu.swift")
-        let screens = try XCTUnwrap(menu.range(of: "Section(titled: farms.activeFarm?.name ?? Config.tenantSlug) {"),
+        let screens = try XCTUnwrap(menu.range(of: #"Section(titled: farms.activeFarm.map { $0.name ?? $0.slug } ?? "") {"#),
                                     "positive control: the screens' section moved")
         let admin = try XCTUnwrap(menu.range(of: #"Label("Админ", systemImage: "person.2")"#),
                                   "positive control: «Админ» left the menu")
@@ -138,7 +138,7 @@ final class ProfileTests: XCTestCase {
     func testTheProfilePageAsksForNothingTenantScoped() throws {
         let profile = try source("Agrent/Account/ProfileView.swift")
         XCTAssertTrue(profile.contains("CurrentUserStore.shared"), "positive control")
-        for tenantScoped in ["Config.tenantSlug", "/api/t/", "APIClient"] {
+        for tenantScoped in ["FarmPath", "/api/t/", "APIClient"] {
             XCTAssertFalse(profile.contains(tenantScoped), "Профил reaches for \(tenantScoped)")
         }
     }

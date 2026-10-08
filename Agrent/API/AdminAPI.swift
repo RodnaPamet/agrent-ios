@@ -1,7 +1,7 @@
 import Foundation
 
 enum AdminAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)/admin" }
+    private static var base: String { "\(FarmPath.root)/admin" }
 
     /// A BARE ARRAY, measured — not an envelope, and not paged.
     static var membersPath: String { "\(base)/members" }

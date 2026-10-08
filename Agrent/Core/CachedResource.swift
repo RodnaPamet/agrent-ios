@@ -57,7 +57,7 @@ enum CachedResource {
     ) async {
         // No known user, no cache — see `CacheScope`. The network answer is
         // still published, so the screen works; it is just not remembered.
-        guard let scope = CacheScope.current() else {
+        guard let scope = CacheScope.current(for: pathAndQuery) else {
             await publish(await load(pathAndQuery, decode: decode))
             return
         }
@@ -87,7 +87,7 @@ enum CachedResource {
         // Captured ONCE, before the request. Whoever this request is for is
         // whose cache it reads and writes — not whoever is signed in by the
         // time the response arrives.
-        let scope = CacheScope.current()
+        let scope = CacheScope.current(for: pathAndQuery)
         let key = scope.map { ResponseCache.key(scope: $0, pathAndQuery: pathAndQuery) }
 
         do {
@@ -102,7 +102,7 @@ enum CachedResource {
             // sign-out purge. They would be under A's key, so B could never
             // read them, but they would be A's data at rest on a phone A has
             // signed out of, which is what the purge is for.
-            if let key, CacheScope.current() == scope {
+            if let key, CacheScope.current(for: pathAndQuery) == scope {
                 await ResponseCache.shared.write(key, data)
             }
             return .loaded(value, .fresh)

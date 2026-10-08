@@ -11,7 +11,19 @@ import XCTest
 /// built and unfired, and this suite could not observe one anyway.
 final class ExchangeMessagingPathTests: XCTestCase {
 
-    private let base = "/api/t/\(Config.tenantSlug)/exchange"
+    private let base = "/api/t/ferma-1/exchange"
+    private var saved: Farm?
+
+    override func setUp() {
+        super.setUp()
+        saved = ActiveFarm.shared.farm
+        ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
+    }
+
+    override func tearDown() {
+        ActiveFarm.shared.set(saved)
+        super.tearDown()
+    }
 
     /// All nine operations, spelled as the spec spells them.
     func testEveryOperationHasTheSpecsPath() {

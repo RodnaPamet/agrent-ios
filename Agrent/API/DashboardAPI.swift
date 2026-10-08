@@ -9,7 +9,7 @@ import Foundation
 /// independent — so each is its own resource with its own cache entry and its
 /// own failure.
 enum DashboardAPI {
-    private static var base: String { "/api/t/\(Config.tenantSlug)" }
+    private static var base: String { "\(FarmPath.root)" }
 
     static var agPath: String { "\(base)/dashboard/ag" }
 
