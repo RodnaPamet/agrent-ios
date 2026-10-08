@@ -517,6 +517,17 @@ final class A11yShotsTests: XCTestCase {
         let floor = app.tabBars.firstMatch.exists
             ? app.tabBars.firstMatch.frame.minY
             : app.windows.firstMatch.frame.maxY
+        // FAR below first — the foot of a long page at the accessibility
+        // sizes, where a task's comments are (#225): whole swipes until it is
+        // on the screen at all, then the short drags place it. A swipe moves
+        // less than the screen is tall, so one that starts with the element
+        // below the floor cannot carry it past the top.
+        var swipes = 0
+        while element.frame.minY > floor, swipes < 12 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            swipes += 1
+        }
         var drags = 0
         while element.frame.maxY > floor, drags < 8 {
             let from = element.frame.minY < floor - 40
