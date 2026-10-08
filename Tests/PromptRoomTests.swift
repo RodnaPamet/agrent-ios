@@ -18,12 +18,13 @@ final class PromptRoomTests: XCTestCase {
 
     /// (height the prompt's label has, height its text needs), or nil when
     /// no label holds the prompt.
-    private func promptLabel(size: DynamicTypeSize, width: CGFloat, room: Bool) -> (has: CGFloat, needs: CGFloat)? {
+    private func promptLabel(size: DynamicTypeSize, width: CGFloat, room: Bool,
+                             atMost: Int? = nil) -> (has: CGFloat, needs: CGFloat)? {
         let field = TextField("Заглавие", text: .constant(""),
                               prompt: .fieldPrompt(Self.example), axis: .vertical)
         let root = PageForm {
             Section(titled: "Заглавие") {
-                if room { field.promptRoom(Self.example) } else { field }
+                if room { field.promptRoom(Self.example, atMost: atMost) } else { field }
             }
         }
         .environment(\.dynamicTypeSize, size)
@@ -70,6 +71,14 @@ final class PromptRoomTests: XCTestCase {
         let without = try XCTUnwrap(promptLabel(size: .large, width: 402, room: false))
         XCTAssertEqual(with.has, without.has, accuracy: 0.5)
         XCTAssertLessThanOrEqual(with.needs, with.has + 0.5)
+    }
+
+    /// A cap on TYPING never cuts the prompt (#225's composers cap at six):
+    /// capped at one line, below what the prompt needs at AX5, it still has
+    /// its room — the cap rises to the prompt's own lines.
+    func testACapNeverCutsThePrompt() throws {
+        let measured = try XCTUnwrap(promptLabel(size: .accessibility5, width: 402, room: true, atMost: 1))
+        XCTAssertLessThanOrEqual(measured.needs, measured.has + 0.5, "the cap cut the prompt")
     }
 
     /// A narrower phone needs more lines; the room is measured, not looked

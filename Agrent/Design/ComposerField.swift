@@ -20,7 +20,11 @@ struct ComposerField: View {
 
     var body: some View {
         TextField(title, text: $text, prompt: .fieldPrompt(prompt), axis: .vertical)
-            .lineLimit(1...6)
+            // Room for the WHOLE prompt (#164's `promptRoom`): at AX5
+            // «Напишете коментар…» was cut to «Напише…» in a one-line field.
+            // Six lines of typing at most, as before, so a composer pinned
+            // under a conversation cannot grow over it.
+            .promptRoom(prompt, atMost: 6)
             .foregroundStyle(Palette.Field.text)
             .focused($focused)
             .padding(.horizontal, 12)
