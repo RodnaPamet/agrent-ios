@@ -195,9 +195,11 @@ enum ExchangeAPI {
     ///
     /// No body is read by the route; `{}` is sent, as the web does, because
     /// `APIClient` has no bodiless POST. No `Idempotency-Key`: the domain is
-    /// idempotent — one thread per (listing, inquiring farm) — and a second
-    /// call answers 200 `created: false` with the same id. Two first opens
-    /// racing may answer 409 (unverified); one retry resolves it.
+    /// idempotent — one thread per (listing, inquiring PERSON) since agri-saas
+    /// #1323 — and a second call answers 200 `created: false` with the same
+    /// id. So does a second call RACING the first: since agri-saas #1418
+    /// (live 2026-10-08, read off `/api/health`) the insert is `ON CONFLICT DO
+    /// NOTHING` followed by a re-read, where the race used to answer 409.
     static func openThread(listingID: String) async throws -> ExchangeThreadOpened {
         let data = try await APIClient.shared.postReturningData(
             openThreadPath(listingID: listingID), body: NoBody(), idempotencyKey: nil
