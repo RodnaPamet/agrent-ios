@@ -19,36 +19,36 @@ final class MessagingPollTests: XCTestCase {
 
     /// The web's cadences: 5 s for a conversation, 30 s for the inbox.
     func testTheCadencesAreTheWebs() {
-        XCTAssertEqual(MessagingPolicy.conversationInterval, .seconds(5))
+        XCTAssertEqual(ChatPolicy.conversationInterval, .seconds(5))
         XCTAssertEqual(MessagingPolicy.inboxInterval, .seconds(30))
     }
 
     func testASuccessWaitsTheInterval() {
-        XCTAssertEqual(MessagingPolicy.nextPoll(after: nil, interval: .seconds(5)), .seconds(5))
+        XCTAssertEqual(ChatPolicy.nextPoll(after: nil, interval: .seconds(5)), .seconds(5))
     }
 
     /// A 429 waits what the server asked, instead of the interval.
     func testARateLimitWaitsTheServersTime() {
-        XCTAssertEqual(MessagingPolicy.nextPoll(after: http(429, retryAfter: 42), interval: .seconds(5)),
+        XCTAssertEqual(ChatPolicy.nextPoll(after: http(429, retryAfter: 42), interval: .seconds(5)),
                        .seconds(42))
     }
 
     /// With no header, the app's one fallback — a minute.
     func testARateLimitWithNoHeaderWaitsTheFallback() {
-        XCTAssertEqual(MessagingPolicy.nextPoll(after: http(429), interval: .seconds(5)), .seconds(60))
+        XCTAssertEqual(ChatPolicy.nextPoll(after: http(429), interval: .seconds(5)), .seconds(60))
     }
 
     /// A one-second `Retry-After` must not make the inbox poll FASTER.
     func testARateLimitNeverShortensTheInterval() {
-        XCTAssertEqual(MessagingPolicy.nextPoll(after: http(429, retryAfter: 1), interval: .seconds(30)),
+        XCTAssertEqual(ChatPolicy.nextPoll(after: http(429, retryAfter: 1), interval: .seconds(30)),
                        .seconds(30))
     }
 
     /// Anything else — a 503 with a header included — is an ordinary miss.
     func testOtherFailuresWaitTheInterval() {
-        XCTAssertEqual(MessagingPolicy.nextPoll(after: http(503, retryAfter: 90), interval: .seconds(5)),
+        XCTAssertEqual(ChatPolicy.nextPoll(after: http(503, retryAfter: 90), interval: .seconds(5)),
                        .seconds(5))
-        XCTAssertEqual(MessagingPolicy.nextPoll(after: URLError(.notConnectedToInternet),
+        XCTAssertEqual(ChatPolicy.nextPoll(after: URLError(.notConnectedToInternet),
                                                 interval: .seconds(30)),
                        .seconds(30))
     }
@@ -95,11 +95,11 @@ final class MessagingLabelTests: XCTestCase {
 
     /// Near the limit only, and in the server's UTF-16 measure.
     func testTheCounterAppearsNearTheLimitOnly() {
-        XCTAssertNil(MessagingPolicy.counter(for: "Здравейте"))
-        let near = MessagingPolicy.counter(for: String(repeating: "а", count: 3600))
+        XCTAssertNil(ChatPolicy.counter(for: "Здравейте"))
+        let near = ChatPolicy.counter(for: String(repeating: "а", count: 3600))
         XCTAssertEqual(near?.text, "3600 / 4000")
         XCTAssertEqual(near?.over, false)
-        let over = MessagingPolicy.counter(for: String(repeating: "👍🏽", count: 1001))
+        let over = ChatPolicy.counter(for: String(repeating: "👍🏽", count: 1001))
         XCTAssertEqual(over?.text, "4004 / 4000", "four UTF-16 units each, as the server counts")
         XCTAssertEqual(over?.over, true)
     }
@@ -153,7 +153,7 @@ final class ComposerTests: XCTestCase {
 
     private func canSend(_ draft: String, sending: Bool = false, paused: Bool = false,
                          refused: Bool = false) -> Bool {
-        MessagingPolicy.canSend(draft: draft, sending: sending, paused: paused, refusedByBlock: refused)
+        ChatPolicy.canSend(draft: draft, sending: sending, paused: paused, refused: refused)
     }
 
     func testSomethingToSayCanBeSent() {
@@ -195,10 +195,10 @@ final class ComposerTests: XCTestCase {
 
     /// The draft goes on a 201 — unless the farmer typed on while it flew.
     func testTheDraftClearsOnlyWhenItWasWhatWasSent() {
-        XCTAssertEqual(MessagingPolicy.draftAfterDelivery("Здравейте", sent: "Здравейте"), "")
-        XCTAssertEqual(MessagingPolicy.draftAfterDelivery("  Здравейте \n", sent: "Здравейте"), "")
-        XCTAssertEqual(MessagingPolicy.draftAfterDelivery("", sent: "Здравейте"), "")
-        XCTAssertEqual(MessagingPolicy.draftAfterDelivery("Здравейте, и още", sent: "Здравейте"),
+        XCTAssertEqual(ChatPolicy.draftAfterDelivery("Здравейте", sent: "Здравейте"), "")
+        XCTAssertEqual(ChatPolicy.draftAfterDelivery("  Здравейте \n", sent: "Здравейте"), "")
+        XCTAssertEqual(ChatPolicy.draftAfterDelivery("", sent: "Здравейте"), "")
+        XCTAssertEqual(ChatPolicy.draftAfterDelivery("Здравейте, и още", sent: "Здравейте"),
                        "Здравейте, и още")
     }
 
@@ -208,25 +208,25 @@ final class ComposerTests: XCTestCase {
     func testAnUnknownOutcomeIsSaidAsUnknown() {
         for error: Error in [URLError(.timedOut), URLError(.networkConnectionLost),
                              APIClient.APIError.http(status: 502, code: nil, message: nil)] {
-            XCTAssertTrue(MessagingPolicy.outcomeUnknown(error), "\(error)")
-            XCTAssertTrue(MessagingPolicy.sendFailure(for: error).hasPrefix("Не е ясно"), "\(error)")
+            XCTAssertTrue(ChatPolicy.outcomeUnknown(error), "\(error)")
+            XCTAssertTrue(ChatPolicy.sendFailure(for: error).hasPrefix("Не е ясно"), "\(error)")
         }
     }
 
     /// A refusal is a refusal, with the server's reason in Bulgarian.
     func testARefusalSaysNotSentAndWhy() {
         let error = APIClient.APIError.http(status: 400, code: "MESSAGE_TOO_LONG", message: nil)
-        XCTAssertFalse(MessagingPolicy.outcomeUnknown(error))
-        let text = MessagingPolicy.sendFailure(for: error)
+        XCTAssertFalse(ChatPolicy.outcomeUnknown(error))
+        let text = ChatPolicy.sendFailure(for: error)
         XCTAssertTrue(text.hasPrefix("Съобщението не е изпратено."), text)
         XCTAssertTrue(text.contains(UserMessage.text(for: error)), text)
-        XCTAssertFalse(MessagingPolicy.outcomeUnknown(URLError(.notConnectedToInternet)),
+        XCTAssertFalse(ChatPolicy.outcomeUnknown(URLError(.notConnectedToInternet)),
                        "no connection means the request never left")
     }
 
     /// What failed, then why — not the web's send failure for everything.
     func testAnActionFailureSaysWhatFailed() {
-        let text = MessagingPolicy.failure("Разговорът не може да бъде затворен.",
+        let text = ChatPolicy.failure("Разговорът не може да бъде затворен.",
                                            URLError(.notConnectedToInternet))
         XCTAssertEqual(text, "Разговорът не може да бъде затворен. Няма интернет връзка.")
     }
@@ -347,9 +347,18 @@ final class MessagingSourceTests: XCTestCase {
     /// the network; `CachedResource` would put them in `ResponseCache`, which
     /// survives sign-out.
     func testMessagingIsNeverCached() throws {
+        // And every file of ChatKit, where the conversation's engine and its
+        // transport's reads live since agrent-ios#196.
+        let chatKit = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Agrent/ChatKit")
+        let chatKitFiles = (try FileManager.default.contentsOfDirectory(atPath: chatKit.path))
+            .filter { $0.hasSuffix(".swift") }.map { "Agrent/ChatKit/\($0)" }
+        XCTAssertTrue(chatKitFiles.contains("Agrent/ChatKit/ChatEngine.swift"), "ChatKit moved")
         for path in ["Agrent/Exchange/MessagingStores.swift",
                      "Agrent/Exchange/ConversationView.swift",
-                     "Agrent/Exchange/ExchangeInboxView.swift"] {
+                     "Agrent/Exchange/ExchangeInboxView.swift",
+                     "Agrent/Exchange/ExchangeChatTransport.swift"] + chatKitFiles {
             let text = try source(path)
             XCTAssertFalse(text.contains("CachedResource."), path)
             XCTAssertFalse(text.contains("ResponseCache."), path)
@@ -363,14 +372,16 @@ final class MessagingSourceTests: XCTestCase {
     /// and a markdown-parsing `LocalizedStringKey` the day somebody writes it
     /// as a literal interpolation.
     func testTheBodyIsRenderedVerbatim() throws {
-        let text = try source("Agrent/Exchange/ConversationView.swift")
+        // ChatKit's bubble since agrent-ios#196.
+        let text = try source("Agrent/ChatKit/MessageBubble.swift")
         XCTAssertTrue(text.contains("Text(verbatim: message.body"))
         XCTAssertFalse(text.contains("RichText("), "RichText is for the server's HTML notes")
     }
 
     /// The composer answers to its own name, not the outbox's.
     func testTheComposerIsNamedAsTheMessagesSend() throws {
-        let text = try source("Agrent/Exchange/ConversationView.swift")
+        // ChatKit's composer since agrent-ios#196.
+        let text = try source("Agrent/ChatKit/ChatComposer.swift")
         XCTAssertTrue(text.contains("A11y.Spoken.sendMessage"))
         XCTAssertFalse(text.contains("A11y.Spoken.send)"))
         XCTAssertTrue(try source("Agrent/Core/OutboxBanner.swift")
@@ -380,10 +391,14 @@ final class MessagingSourceTests: XCTestCase {
 
     /// The send hands over the store's kept key, never `post`'s default.
     func testTheStoreSendsWithItsKeptKey() throws {
-        let text = try source("Agrent/Exchange/MessagingStores.swift")
+        // ChatKit's engine sends since agrent-ios#196, and Борса's transport
+        // hands the key it is given to the route.
+        let text = try source("Agrent/ChatKit/ChatEngine.swift")
         XCTAssertTrue(text.contains("sendKeys.key(threadID: threadID, text: text)"))
         XCTAssertTrue(text.contains("idempotencyKey: key"))
         XCTAssertTrue(text.contains("sendKeys.delivered()"))
+        XCTAssertTrue(try source("Agrent/Exchange/ExchangeChatTransport.swift")
+            .contains("idempotencyKey: idempotencyKey)"), "the transport drops the key")
     }
 
     /// The listing's button is NOT gated on the listing being active — a
