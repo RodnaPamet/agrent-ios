@@ -27,13 +27,19 @@ final class AppleSignInTests: XCTestCase {
     /// Apple gets the HASH; each request gets its OWN nonce, filed under the
     /// `state` Apple echoes back — so two that overlap (a double tap) cannot
     /// overwrite each other's — and only the email is asked for.
-    func testEachAppleRequestHasItsOwnNonce() async {
+    func testEachAppleRequestHasItsOwnNonce() async throws {
         let auth = AuthClient()
         let first = ASAuthorizationAppleIDProvider().createRequest()
         auth.prepareAppleRequest(first)
         XCTAssertEqual(first.requestedScopes, [.email], "asked for what the server never reads")
-        XCTAssertEqual(first.nonce?.count, 64, "Apple was given something other than the hash")
-        XCTAssertNotNil(first.state, "no key for Apple to echo the nonce back under")
+        let key = try XCTUnwrap(first.state, "no key for Apple to echo the nonce back under")
+        // Raw and hash are both 64 hex characters, so a length proves nothing;
+        // only the PAIRING does. The server checks the token's claim against
+        // `hashNonce(raw)`: swap the two and every sign-in is `invalid_grant`,
+        // indistinguishable from a bad signature.
+        let raw = try XCTUnwrap(auth.appleNonce(forState: key), "no raw nonce kept for the exchange")
+        XCTAssertEqual(first.nonce, AppleSignIn.hashed(raw), "Apple was given something other than the kept nonce's hash")
+        XCTAssertNotEqual(first.nonce, raw, "Apple was given the raw nonce")
 
         let second = ASAuthorizationAppleIDProvider().createRequest()
         auth.prepareAppleRequest(second)
@@ -59,6 +65,22 @@ final class AppleSignInTests: XCTestCase {
         let body = try JSONEncoder().encode(AppleSignIn.Request(identityToken: "t", nonce: "raw"))
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
         XCTAssertEqual(json, ["identityToken": "t", "nonce": "raw"])
+    }
+
+    /// The exchange sends the nonce it TOOK from its request's entry, as it
+    /// was kept: the raw value whose hash Apple got. Read from the source
+    /// because no runtime hook reaches that path: Apple's credential has no
+    /// public initialiser. The positive control fails a moved file.
+    func testTheExchangeSendsTheKeptRawNonce() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Agrent/Auth/AuthClient.swift")
+        let code = SignOutHygieneTests.code(try String(contentsOf: url, encoding: .utf8))
+        XCTAssertTrue(code.contains("func completeAppleSignIn("), "positive control: AuthClient moved")
+        XCTAssertTrue(code.contains("let raw = appleNonces.removeValue(forKey: key)"),
+                      "the exchange no longer takes its request's kept nonce")
+        XCTAssertTrue(code.contains("exchangeApple(identityToken: token, nonce: raw)"),
+                      "the exchange sends something other than the raw nonce")
     }
 
     /// `termsPending` read leniently: absent is not pending.
