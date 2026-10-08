@@ -63,10 +63,11 @@ struct CropSeason: Decodable, Identifiable, Equatable, Sendable {
     let cropType: String
     let notes: String?
 
-    /// The strings as they arrived. Parsed on demand rather than decoded,
-    /// because the response schema pins no format — see
-    /// `BgDate.parseInstantOrDay` for the asymmetry and what it costs to get
-    /// wrong.
+    /// The strings as they arrived, parsed on demand rather than decoded.
+    /// The response schema pinned no format when this was written; it pins
+    /// `date-time` now, which the parser accepts — see
+    /// `BgDate.parseInstantOrDay` for why it stays the one path, and what a
+    /// throwing `Date` decode would cost here.
     let sownAtRaw: String?
     let harvestedAtRaw: String?
 

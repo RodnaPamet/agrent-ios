@@ -17,8 +17,11 @@ enum CostsAPI {
     private static var base: String { "/api/t/\(Config.tenantSlug)/grain/costs" }
 
     /// `{ rows, totalCount, truncated }` — a FIFTH envelope variant in this
-    /// API, measured. `PagedResponse` reads `rows` and would ignore
-    /// `totalCount`, which is correct but lossy.
+    /// API, measured, and documented now with both counts required
+    /// (agrent-ios#182). `PagedResponse` reads `rows` and would ignore
+    /// `totalCount`, which is correct but lossy. The counts are still read as
+    /// optional: a missing count costs the «Показани N от M» line, never the
+    /// list itself.
     static var listPath: String { base }
 
     static func decodeList(from data: Data) async throws -> CostPage {

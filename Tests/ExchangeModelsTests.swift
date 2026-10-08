@@ -174,8 +174,8 @@ final class ExchangeModelsTests: XCTestCase {
 
     // MARK: - Inquiries
 
-    /// Every observed `inquiries` array was empty, so the element type is
-    /// unverified. Lenient decoding means a surprise there costs the seller a
+    /// The element type is in the spec now (agrent-ios#182), and decoding
+    /// stays per-element lenient: a surprise there costs the seller a
     /// missing row, not the page they need in order to withdraw a listing.
     func testMalformedInquiryIsDroppedNotFatal() throws {
         let json = Data("""
@@ -184,7 +184,9 @@ final class ExchangeModelsTests: XCTestCase {
          "priceCurrency":"EUR","regionCode":null,"regionName":null,
          "lat":null,"lon":null,"description":null,"sellerDisplayName":null,
          "createdAt":"2026-07-04T13:38:19.222Z","expiresAt":null,"isOwn":true,
-         "inquiries":[{"nope":1},{"id":"inq_1","status":"PENDING"}]}
+         "inquiries":[{"nope":1},{"id":"inq_1","status":"PENDING","message":"Синтетично запитване",
+          "quantityTonnes":null,"createdAt":"2026-07-04T13:40:00.000Z","counterpartyContact":null,
+          "contactSharedAt":null}]}
         """.utf8)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -197,8 +199,13 @@ final class ExchangeModelsTests: XCTestCase {
     /// `contactSharedAt` is the enforcement point, so a nil one must read as
     /// "not shared" rather than as missing data to paper over.
     func testContactIsNotSharedUntilTimestampExists() throws {
-        let json = Data(#"{"id":"inq_1","status":"PENDING"}"#.utf8)
-        let inquiry = try JSONDecoder().decode(ExchangeInquiry.self, from: json)
+        let json = Data(#"""
+        {"id":"inq_1","status":"PENDING","message":"Синтетично запитване","quantityTonnes":null,
+         "createdAt":"2026-07-04T13:40:00.000Z","counterpartyContact":null,"contactSharedAt":null}
+        """#.utf8)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let inquiry = try decoder.decode(ExchangeInquiry.self, from: json)
         XCTAssertFalse(inquiry.contactShared)
         XCTAssertNil(inquiry.contactSharedAt)
     }

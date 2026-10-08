@@ -271,8 +271,6 @@ final class FixtureSeamTests: XCTestCase {
         XCTAssertEqual(job.task.id, id)
         XCTAssertEqual(Set(job.lines.map(\.status)), [.pending, .done, .skipped],
                        "the capture is of mixed states")
-        XCTAssertTrue(job.lines.allSatisfy { $0.version != nil },
-                      "a line without a version shows no buttons, and the capture would show none")
         // The fixture owner may mark: an OWNER writes. The positive control
         // that the capture shows buttons at all.
         let me = try await MeAPI.decode(from: try fixture("auth-me"))

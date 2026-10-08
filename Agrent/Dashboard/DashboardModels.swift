@@ -51,17 +51,17 @@ struct AgDashboard: Decodable, Equatable, Sendable {
     /// thing that tells them apart, and a screen that says «Няма записи» for a
     /// module the farm never bought is telling a farmer his data is missing.
     ///
-    /// ── The names are not in the spec ──
+    /// ── The names are in the spec now ──
     ///
-    /// `items` is a bare `{type: string}` with no enum, so the vocabulary this
-    /// is compared against appears nowhere a client can read. The mechanism is
-    /// documented and the values are not — the same gap as the weed catalogue,
-    /// and raised with the server session as such.
+    /// `items` was a bare `{type: string}` with no enum, so the vocabulary this
+    /// is compared against appeared nowhere a client could read. It is an enum
+    /// now (agrent-ios#182): JOURNAL, INVENTORY, PLANNING, CERTIFICATION,
+    /// AUTOMATION, PROCESSES, AI, GRAIN, EXCHANGE.
     ///
-    /// So `isEnabled` matches case-insensitively and NOTHING here hardcodes a
-    /// list of modules. An unrecognised name is simply a module this build
-    /// does not ask about, which costs nothing; guessing the spelling of one
-    /// it does ask about would silently gate a section off.
+    /// Still decoded as strings, and `isEnabled` still matches
+    /// case-insensitively: an unrecognised name is simply a module this build
+    /// does not ask about, which costs nothing, and the matching costs nothing
+    /// either. NOTHING here hardcodes the list.
     let enabledModules: [String]
 
     let recentJournal: [JournalItem]
@@ -75,8 +75,8 @@ struct AgDashboard: Decodable, Equatable, Sendable {
 
     /// Whether the farm has this module, by the server's own list.
     ///
-    /// Case-insensitive because the spelling is unverifiable from here; see
-    /// `enabledModules`.
+    /// Case-insensitive — harmless, and it was the defence while the spelling
+    /// was unverifiable from here; see `enabledModules`.
     func isEnabled(_ module: String) -> Bool {
         enabledModules.contains { $0.caseInsensitiveCompare(module) == .orderedSame }
     }

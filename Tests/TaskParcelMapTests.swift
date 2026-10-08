@@ -221,7 +221,7 @@ final class FieldOperationMapDecodingTests: XCTestCase {
     func testApplyingAMarkKeepsTheMap() async throws {
         let job = try await FieldOperationAPI.decodeDetail(from: try fixture("field-operation-detail"))
         let line = try XCTUnwrap(job.lines.first)
-        let next = job.applying(.done, version: (line.version ?? 0) + 1, toLine: line.id)
+        let next = job.applying(.done, version: line.version + 1, toLine: line.id)
         XCTAssertEqual(next.lines.first?.status, .done, "positive control: the mark was applied")
         XCTAssertEqual(next.location, job.location)
         XCTAssertEqual(next.parcels, job.parcels)

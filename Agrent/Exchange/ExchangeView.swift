@@ -539,15 +539,13 @@ struct InquiryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(inquiry.status?.label ?? "—").font(.subheadline.weight(.medium))
+                Text(inquiry.status.label).font(.subheadline.weight(.medium))
                 Spacer()
-                if let created = inquiry.createdAt {
-                    Text(BgDate.full(created))
-                        .font(.footnote).foregroundStyle(Palette.secondaryText)
-                }
+                Text(BgDate.full(inquiry.createdAt))
+                    .font(.footnote).foregroundStyle(Palette.secondaryText)
             }
-            if let message = inquiry.message, !message.isEmpty {
-                Text(message).font(.footnote).foregroundStyle(Palette.secondaryText).lineLimit(3)
+            if !inquiry.message.isEmpty {
+                Text(inquiry.message).font(.footnote).foregroundStyle(Palette.secondaryText).lineLimit(3)
             }
             // CONTACT DETAILS ARE WITHHELD UNTIL contactSharedAt IS SET, and
             // that withholding is the feature. A PENDING or DECLINED inquiry

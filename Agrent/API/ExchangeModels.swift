@@ -104,11 +104,11 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     let expiresAt: Date?
     let isOwn: Bool
 
-    /// Empty in every row observed, so the ELEMENT type is unobserved. Decoded
-    /// leniently for that reason: an element that does not match is dropped
-    /// rather than failing the seller's whole listing page. A seller who
-    /// cannot load this page cannot withdraw a listing — which is why the
-    /// route is deliberately not module-gated server-side.
+    /// Decoded per element: one that does not match is dropped rather than
+    /// failing the seller's whole listing page. The element shape is in the
+    /// spec now (`ExchangeInquiry`); the tolerance stays because of what the
+    /// page is for — a seller who cannot load it cannot withdraw a listing,
+    /// which is why the route is deliberately not module-gated server-side.
     let inquiries: [ExchangeInquiry]
 
     /// Parsed with an EXPLICIT wire locale. `Decimal(string:)` without one
@@ -178,15 +178,21 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
 /// nothing. The absence of a contact field is the product working — never
 /// render a placeholder implying one exists.
 ///
-/// Shape is UNOBSERVED: every `inquiries` array on the wire was empty. The
-/// fields below are all optional so that a real one cannot fail to decode,
-/// and this type should be re-derived from a live payload before anything is
-/// built on it.
+/// ── As the spec has it now ──
+///
+/// This was modelled with every field optional while the shape was
+/// UNOBSERVED — every `inquiries` array on the wire was empty. The spec now
+/// documents `ExchangeInquiry` in full (agrent-ios#182): `id`, `message`,
+/// `status` and `createdAt` required, `contactSharedAt` nullable. So those
+/// four are required here; `status` stays lenient, so a new status costs a
+/// label, not the row. `quantityTonnes` and `counterpartyContact` are not
+/// modelled: nothing shows them, and a contact is the last thing to keep in
+/// memory for no reason.
 struct ExchangeInquiry: Decodable, Equatable, Sendable, Identifiable {
     let id: String
-    let status: ExchangeInquiryStatus?
-    let message: String?
-    let createdAt: Date?
+    let status: ExchangeInquiryStatus
+    let message: String
+    let createdAt: Date
     let contactSharedAt: Date?
 
     var contactShared: Bool { contactSharedAt != nil }
