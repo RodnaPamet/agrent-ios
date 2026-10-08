@@ -92,8 +92,12 @@ extension View {
     ///     TextField("Заглавие", text: $title,
     ///               prompt: .fieldPrompt(example), axis: .vertical)
     ///         .promptRoom(example)
-    func promptRoom(_ prompt: String) -> some View {
-        modifier(PromptRoom(prompt: prompt))
+    ///
+    /// `atMost` caps what TYPING may grow the field to — a composer pinned
+    /// under a conversation must not grow over it — and never cuts the
+    /// prompt: the cap rises to the prompt's own lines when it needs more.
+    func promptRoom(_ prompt: String, atMost: Int? = nil) -> some View {
+        modifier(PromptRoom(prompt: prompt, atMost: atMost))
     }
 }
 
@@ -124,6 +128,7 @@ extension View {
 /// the prompt's label had the height its text needs at every one.
 struct PromptRoom: ViewModifier {
     let prompt: String
+    var atMost: Int? = nil
 
     @State private var promptHeight: CGFloat = 0
     @State private var lineHeight: CGFloat = 0
@@ -136,16 +141,21 @@ struct PromptRoom: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content
-            .lineLimit(lines...)
-            .background(alignment: .topLeading) {
-                ZStack(alignment: .topLeading) {
-                    measured(Text(prompt), into: $promptHeight)
-                    measured(Text(verbatim: "Х"), into: $lineHeight)
-                }
-                .hidden()
-                .accessibilityHidden(true)
+        Group {
+            if let atMost {
+                content.lineLimit(lines...max(lines, atMost))
+            } else {
+                content.lineLimit(lines...)
             }
+        }
+        .background(alignment: .topLeading) {
+            ZStack(alignment: .topLeading) {
+                measured(Text(prompt), into: $promptHeight)
+                measured(Text(verbatim: "Х"), into: $lineHeight)
+            }
+            .hidden()
+            .accessibilityHidden(true)
+        }
     }
 
     /// `text` wrapped in the width it is given, its height written back.

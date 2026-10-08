@@ -31,7 +31,36 @@
     "email": "owner@example.invalid"
   },
   "reviewer": null,
-  "comments": [],
+  "comments": [
+    {
+      "id": "cmt_synthetic_1",
+      "tenantId": "ten_synthetic",
+      "taskId": "tsk_fixture_2",
+      "body": "<p>Пробите от SYNTH-1 и SYNTH-2 са взети.<br>SYNTH-3 остава за утре.</p>",
+      "createdByUserId": "usr_fixture_operator",
+      "createdAt": "2026-10-03T07:12:00.000Z",
+      "updatedAt": "2026-10-03T07:12:00.000Z",
+      "createdBy": {
+        "id": "usr_fixture_operator",
+        "name": "Петър Механизаторов",
+        "email": "operator@example.invalid"
+      }
+    },
+    {
+      "id": "cmt_synthetic_2",
+      "tenantId": "ten_synthetic",
+      "taskId": "tsk_fixture_2",
+      "body": "<p>Добре. Резултатите трябват &lt;до петък&gt;.</p>",
+      "createdByUserId": "usr_fixture_owner",
+      "createdAt": "2026-10-03T08:40:00.000Z",
+      "updatedAt": "2026-10-03T08:40:00.000Z",
+      "createdBy": {
+        "id": "usr_fixture_owner",
+        "name": "Иван Фикстуров",
+        "email": "owner@example.invalid"
+      }
+    }
+  ],
   "links": [
     {
       "id": "lnk_synthetic_1",
@@ -64,9 +93,9 @@
   "watchers": [],
   "sla": null,
   "_count": {
-    "comments": 0,
+    "comments": 2,
     "evidence": 0,
-    "links": 1,
+    "links": 3,
     "watchers": 0
   },
   "deletedAt": null,

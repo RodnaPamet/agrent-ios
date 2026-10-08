@@ -229,14 +229,22 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
 
     /// How many of each related thing exist, WITHOUT the things themselves.
     ///
-    /// The detail payload also carries `comments`, `links` and `watchers` as
-    /// arrays, and they are deliberately not modelled: all three were empty
-    /// on the task measured, so their element shapes are unknown, and
-    /// guessing an element shape is what cost the list screen its first run.
-    /// A count is honest and enough to say "3 коментара" — the elements can
-    /// be modelled the day a screen reads them, against a response that has
-    /// some.
+    /// The detail payload also carries `links` and `watchers` as arrays, and
+    /// they are deliberately not modelled: they were empty on the task
+    /// measured, so their element shapes are unknown, and guessing an element
+    /// shape is what cost the list screen its first run. `comments` was in
+    /// the same position until a screen read it (#225) — see `comments`.
     let counts: Counts?
+
+    /// The task's comments, oldest first — `TaskDetail.comments` in the spec,
+    /// «DETAIL ONLY», so they arrive with the task and are cached with it.
+    ///
+    /// Modelled from the spec's `TaskComment` (2026-10-08), not from a
+    /// measured response: every task measured before had none. So each one
+    /// decodes on its own — a comment of a shape this build does not read
+    /// costs that comment, never the task it hangs off.
+    var comments: [TaskComment] { commentsRaw?.items ?? [] }
+    private let commentsRaw: LossyList<TaskComment>?
 
     struct SLA: Decodable, Equatable, Sendable {
         /// NOT displayed, deliberately. It is a server-authored string and
@@ -269,6 +277,7 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
         /// The wire name is `_count`, which is not a legal Swift property
         /// name and would be a poor one anyway.
         case counts = "_count"
+        case commentsRaw = "comments"
     }
 
     /// `metadataJson` is NOT modelled, deliberately, and this is the same
@@ -495,3 +504,45 @@ enum FieldOperationType: String, LenientDecodable, Sendable {
         }
     }
 }
+
+/// One comment on a task — the spec's `TaskComment` (#225).
+///
+/// `body` is RICH TEXT the server sanitised (`sanitizeRichTextHtml`): a
+/// literal `<` comes back as `&lt;`. Shown through `RichText.plainText`,
+/// which decodes entities and keeps line breaks; never rendered as HTML.
+/// Encrypted at rest server-side, and on the phone only in the task's
+/// `ResponseCache` entry, like the task's own description.
+struct TaskComment: Decodable, Identifiable, Equatable, Sendable {
+    let id: String
+    let body: String
+    let createdByUserId: String?
+    let createdAt: Date?
+    /// `UserRef` — the same id, name and email as a task's people.
+    let createdBy: WorkItemSummary.Assignee?
+
+    /// What the comment says, as text.
+    var text: String { RichText.plainText(body) }
+}
+
+/// An array decoded element by element: one that does not decode is
+/// dropped and the rest kept. For a list hanging off a record — a bad
+/// element must cost that element, not the record.
+fileprivate struct LossyList<Element: Decodable & Sendable>: Decodable, Equatable, Sendable
+where Element: Equatable {
+    let items: [Element]
+
+    private struct Lossy: Decodable {
+        let value: Element?
+        init(from decoder: Decoder) throws { value = try? Element(from: decoder) }
+    }
+
+    init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var items: [Element] = []
+        while !container.isAtEnd {
+            if let value = try container.decode(Lossy.self).value { items.append(value) }
+        }
+        self.items = items
+    }
+}
+

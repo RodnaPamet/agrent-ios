@@ -63,6 +63,7 @@
 /api/t/{tenantSlug}/reports/field-briefing
 /api/t/{tenantSlug}/tasks
 /api/t/{tenantSlug}/tasks/{id}
+/api/t/{tenantSlug}/tasks/{id}/comments
 /api/t/{tenantSlug}/tasks/{id}/parcels
 /api/t/{tenantSlug}/tasks/{id}/status
 /api/t/{tenantSlug}/trends/news

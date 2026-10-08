@@ -57,6 +57,41 @@ final class TaskDetailStore {
         } publish: { [weak self] in self?.state = $0 }
     }
 
+    /// A comment being sent (#225), and what the last send came to.
+    private(set) var commenting = false
+    private(set) var commentError: String?
+
+    /// The key for the comment being sent, kept while its text is the same —
+    /// see `WorkItemAPI.addComment`. A different text is a different comment.
+    @ObservationIgnored private var commentKey: (html: String, key: String)?
+
+    /// Send a comment, then re-read the task, which carries its comments.
+    /// True when it landed: the screen clears its draft only then, so a
+    /// refused comment is still there to send again.
+    ///
+    /// Never retried here. The route reads no `Idempotency-Key` yet, and a
+    /// retry after a lost answer would post the comment twice.
+    func addComment(_ html: String) async -> Bool {
+        guard !commenting else { return false }
+        commenting = true
+        commentError = nil
+        defer { commenting = false }
+
+        let key = commentKey.flatMap { $0.html == html ? $0.key : nil } ?? UUID().uuidString
+        commentKey = (html, key)
+        do {
+            try await WorkItemAPI.addComment(id, html: html, idempotencyKey: key)
+            commentKey = nil
+            writeFeedback.saved()
+            await load()
+            return true
+        } catch {
+            commentError = UserMessage.text(for: error)
+            writeFeedback.refused()
+            return false
+        }
+    }
+
     /// Change the status, then RELOAD rather than trusting the response.
     ///
     /// The write answers in two different shapes depending on whether it

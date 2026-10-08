@@ -16,9 +16,6 @@ struct ChatComposer: View {
     let send: () async -> Void
 
     @State private var pause = RateLimitPause.messages
-    /// So a tap on the composer's padding — inside its drawn edge, outside
-    /// the text — focuses the field, as `.roundedBorder`'s whole box did.
-    @FocusState private var composing: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -36,31 +33,7 @@ struct ChatComposer: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(alignment: .bottom, spacing: 8) {
-                // Token-drawn rather than `.roundedBorder`, whose fill is system
-                // black in dark mode and whose hairline nobody measured
-                // (#156). `Palette.Field` has the pairs; the prompt is styled
-                // so the hint is a token too, not UIKit's placeholder grey.
-                TextField("Съобщение", text: $draft,
-                          prompt: .fieldPrompt("Напишете съобщение…"),
-                          axis: .vertical)
-                    .lineLimit(1...6)
-                    .foregroundStyle(Palette.Field.text)
-                    .focused($composing)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    // The tap is on the BACKGROUND, which only the padding
-                    // exposes: taps on the text still place the cursor.
-                    .background {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Palette.Field.fill)
-                            .onTapGesture { composing = true }
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10)
-                            .strokeBorder(Palette.Field.edge, lineWidth: 1)
-                            .allowsHitTesting(false)
-                    }
-                    .accessibilityLabel("Съобщение")
+                ComposerField(title: "Съобщение", prompt: "Напишете съобщение…", text: $draft)
                 sendButton
             }
             if let counter = ChatPolicy.counter(for: draft) {

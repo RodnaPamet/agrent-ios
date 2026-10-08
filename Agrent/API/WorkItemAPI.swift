@@ -232,3 +232,31 @@ struct TaskParcels: Decodable, Equatable, Sendable {
         }
     }
 }
+
+// MARK: - Comments (agrent-ios#225)
+
+extension WorkItemAPI {
+
+    /// `POST /tasks/{taskId}/comments`. There is no read here: the task's
+    /// detail carries its comments (`WorkItem.comments`), so the list comes
+    /// with the task and is refreshed by re-reading it.
+    static func commentsPath(_ id: String) -> String { "\(detailPath(id))/comments" }
+
+    /// The comment as RICH TEXT — `RichText.html(fromPlainText:)`, as the
+    /// journal's notes go — because the route sanitises it as rich text and
+    /// the web renders it as such: a plain newline would be eaten there.
+    ///
+    /// The key is sent although the route reads none yet (agri-saas is
+    /// adding it, 2026-10-08). Minted once per text by the caller, so the
+    /// day it is honoured a resend of the same comment cannot make two.
+    /// Until then nothing retries this on its own.
+    static func addComment(_ id: String, html: String, idempotencyKey: String) async throws {
+        _ = try await APIClient.shared.postReturningData(
+            commentsPath(id), body: CommentBody(body: html), idempotencyKey: idempotencyKey)
+    }
+
+    private struct CommentBody: Encodable, Sendable {
+        let body: String
+    }
+}
+

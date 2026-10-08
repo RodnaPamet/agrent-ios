@@ -215,6 +215,9 @@ final class HapticSiteTests: XCTestCase {
             "Agrent/Locations/ParcelOperationSheet.swift queueForLater refused",
             "Agrent/Tasks/TasksStore.swift setStatus saved",
             "Agrent/Tasks/TasksStore.swift setStatus refused",
+            // A task's comment, the person's own send (agrent-ios#225).
+            "Agrent/Tasks/TasksStore.swift addComment saved",
+            "Agrent/Tasks/TasksStore.swift addComment refused",
             // A message's send: ChatKit's engine since agrent-ios#196.
             "Agrent/ChatKit/ChatEngine.swift send saved",
             "Agrent/ChatKit/ChatEngine.swift send refused",

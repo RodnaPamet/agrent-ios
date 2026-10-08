@@ -15,6 +15,13 @@ final class SoftHyphensTests: XCTestCase {
                        "Сто\(shy)пан\(shy)ство\(shy)то Ви е онлайн")
     }
 
+    /// The composers' prompts (#225), broken at AX5 beside their send arrows.
+    func testTheComposerPromptsBreakAtASyllable() {
+        XCTAssertEqual(SoftHyphens.display("Напишете съобщение…"),
+                       "На\(shy)пи\(shy)ше\(shy)те съоб\(shy)ще\(shy)ние…")
+        XCTAssertEqual(SoftHyphens.display("Напишете коментар…"), "На\(shy)пи\(shy)ше\(shy)те коментар…")
+    }
+
     /// Invisible: take the soft hyphens out and every wizard string is itself
     /// again — what the accessibility label carries.
     func testDisplayChangesNothingButTheBreaks() {
