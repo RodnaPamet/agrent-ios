@@ -566,8 +566,13 @@ comment»).** Every task has «Коментари» at its foot.
 
 - **Reading:** the comments come with the task (`TaskDetail.comments`, oldest
   first), so they're cached with it and shown offline.
-- **Writing:** a composer for everyone but a READER. A comment goes as rich
-  text; a refused one keeps its draft.
+- **Writing:** a composer for everyone but a READER. A comment goes as the
+  plain text typed, because the route is plain text (`sanitizePlainText`
+  strips every tag). #225 first sent rich text, which would have lost its
+  line breaks; fixed before any real comment was sent. A refused comment
+  keeps its draft.
+- **Shown as stored:** the server keeps literal text («a < b» stays so), and
+  the app shows it verbatim, as the web does.
 - **Not retried:** the route reads no `Idempotency-Key` until agri-saas's
   idempotency PR, so a lost answer must not become two comments.
 - **Unverified:** no comment has been sent from this app; the first is the

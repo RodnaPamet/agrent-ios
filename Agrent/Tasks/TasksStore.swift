@@ -63,7 +63,7 @@ final class TaskDetailStore {
 
     /// The key for the comment being sent, kept while its text is the same —
     /// see `WorkItemAPI.addComment`. A different text is a different comment.
-    @ObservationIgnored private var commentKey: (html: String, key: String)?
+    @ObservationIgnored private var commentKey: (text: String, key: String)?
 
     /// Send a comment, then re-read the task, which carries its comments.
     /// True when it landed: the screen clears its draft only then, so a
@@ -71,16 +71,16 @@ final class TaskDetailStore {
     ///
     /// Never retried here. The route reads no `Idempotency-Key` yet, and a
     /// retry after a lost answer would post the comment twice.
-    func addComment(_ html: String) async -> Bool {
+    func addComment(_ text: String) async -> Bool {
         guard !commenting else { return false }
         commenting = true
         commentError = nil
         defer { commenting = false }
 
-        let key = commentKey.flatMap { $0.html == html ? $0.key : nil } ?? UUID().uuidString
-        commentKey = (html, key)
+        let key = commentKey.flatMap { $0.text == text ? $0.key : nil } ?? UUID().uuidString
+        commentKey = (text, key)
         do {
-            try await WorkItemAPI.addComment(id, html: html, idempotencyKey: key)
+            try await WorkItemAPI.addComment(id, text: text, idempotencyKey: key)
             commentKey = nil
             writeFeedback.saved()
             await load()

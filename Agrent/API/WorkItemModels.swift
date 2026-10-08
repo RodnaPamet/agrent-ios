@@ -507,11 +507,14 @@ enum FieldOperationType: String, LenientDecodable, Sendable {
 
 /// One comment on a task — the spec's `TaskComment` (#225).
 ///
-/// `body` is RICH TEXT the server sanitised (`sanitizeRichTextHtml`): a
-/// literal `<` comes back as `&lt;`. Shown through `RichText.plainText`,
-/// which decodes entities and keeps line breaks; never rendered as HTML.
-/// Encrypted at rest server-side, and on the phone only in the task's
-/// `ResponseCache` entry, like the task's own description.
+/// `body` is PLAIN TEXT: the server strips every tag and decodes entities
+/// on the way in (`sanitizePlainText`), so what is stored is the literal
+/// text — «a < b» stays «a < b», and a `<script>` can only be characters.
+/// Shown VERBATIM, as the web shows it (a JSX text child): SwiftUI's `Text`
+/// draws a string literally, so nothing in it is ever markup here, and no
+/// `RichText` pass second-guesses what someone wrote. Encrypted at rest
+/// server-side, and on the phone only in the task's `ResponseCache` entry,
+/// like the task's own description.
 struct TaskComment: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     let body: String
@@ -520,8 +523,8 @@ struct TaskComment: Decodable, Identifiable, Equatable, Sendable {
     /// `UserRef` — the same id, name and email as a task's people.
     let createdBy: WorkItemSummary.Assignee?
 
-    /// What the comment says, as text.
-    var text: String { RichText.plainText(body) }
+    /// What the comment says, as stored.
+    var text: String { body.trimmingCharacters(in: .whitespacesAndNewlines) }
 }
 
 /// An array decoded element by element: one that does not decode is

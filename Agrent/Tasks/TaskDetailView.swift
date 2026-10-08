@@ -182,8 +182,8 @@ struct TaskDetailView: View {
                         draft: $commentDraft,
                         sending: store.commenting,
                         failure: store.commentError
-                    ) { html in
-                        if await store.addComment(html) { commentDraft = "" }
+                    ) { text in
+                        if await store.addComment(text) { commentDraft = "" }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
