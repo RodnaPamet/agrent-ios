@@ -52,6 +52,30 @@ final class MessageSpeakerTests: XCTestCase {
                        "Отсрещната страна, Здравейте, 08:00.")
     }
 
+    /// agri-saas #1399: the sender's name when the server has one, what they
+    /// are to me when it has none — and «Вие» for my own words whatever my
+    /// name is.
+    func testTheCaptionIsTheSendersNameWhenThereIsOne() {
+        XCTAssertEqual(MessageSpeaker.me.caption(name: "Иван Фикстуров"), "Вие")
+        XCTAssertEqual(MessageSpeaker.colleague.caption(name: "Мария Синтетична"), "Мария Синтетична")
+        XCTAssertEqual(MessageSpeaker.counterparty.caption(name: "Петър Примеров"), "Петър Примеров")
+        XCTAssertEqual(MessageSpeaker.colleague.caption(name: nil), "Колега от стопанството")
+        XCTAssertEqual(MessageSpeaker.counterparty.caption(name: nil), "Отсрещната страна")
+    }
+
+    /// A NAMED colleague is still said to be one: VoiceOver hears neither the
+    /// side nor the bubble's style that tell a sighted reader so.
+    func testVoiceOverSaysANamedColleagueIsOne() {
+        XCTAssertEqual(MessageBubble.spoken(speaker: .colleague, name: "Мария Синтетична",
+                                            body: "Може и в петък", time: "08:45"),
+                       "Мария Синтетична, колега от стопанството, Може и в петък, 08:45.")
+        XCTAssertEqual(MessageBubble.spoken(speaker: .counterparty, name: "Петър Примеров",
+                                            body: "Здравейте", time: "08:00"),
+                       "Петър Примеров, Здравейте, 08:00.")
+        XCTAssertEqual(MessageBubble.spoken(speaker: .me, name: "Иван Фикстуров", body: "Да", time: "08:30"),
+                       "Вие, Да, 08:30.")
+    }
+
     /// Only my own message offers «Премахни» — the server compares the
     /// sending PERSON since #1323.
     func testOnlyMyOwnMessageMayBeRetracted() {

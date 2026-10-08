@@ -283,10 +283,11 @@ and the nine paths in `openapi.json`, cross-checked in
 
 **Server follow-ups (none invented client-side):**
 
-- **A sender name on `ExchangeMessage`.** Only the opaque `senderUserId`
-  ships, so a colleague is «Колега от стопанството», never by name, and two
-  colleagues read alike. A display name for same-farm senders (no
-  contact-reveal concern inside one farm) would let the caption name them.
+- ~~**A sender name on `ExchangeMessage`.**~~ **Shipped** as `senderName`
+  (agri-saas #1399, live 2026-10-08; agrent-ios#187) — for EVERY sender, the
+  other side included (owner's decision, agri-saas #1348), present-and-null.
+  The caption names the person when there is a name, and falls back to
+  «Колега от стопанството» / «Отсрещната страна» when there is none.
 - **Something to tell sibling inbox rows apart.** `ExchangeThreadSummary`
   has nothing per inquirer. An opaque, stable per-listing ordinal (or the
   thread's `createdAt`, so a client can number «разговор 1, 2» stably)

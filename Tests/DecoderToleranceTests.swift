@@ -257,8 +257,8 @@ final class DecoderToleranceTests: XCTestCase {
         """#) { _ = try await ExchangeAPI.decodeThread(from: $0) },
 
         Probe("ExchangeMessage", #"""
-        {"id":"m","senderTenantId":"x","senderUserId":"u","mine":true,"fromMyFarm":false,"body":"Да",
-         "deleted":false,"createdAt":"2026-09-28T09:15:00.000Z"}
+        {"id":"m","senderTenantId":"x","senderUserId":"u","senderName":"Иван","mine":true,"fromMyFarm":false,
+         "body":"Да","deleted":false,"createdAt":"2026-09-28T09:15:00.000Z"}
         """#) { _ = try await APIClient.shared.decode($0, as: ExchangeMessage.self) },
 
         Probe("ExchangeThreadOpened", #"""
@@ -483,7 +483,8 @@ final class DecoderToleranceTests: XCTestCase {
         // out, and why:
         //
         //   - present-and-null keys (`["string","null"]` AND required):
-        //     `nextCursor`, `sellerDisplayName`, `olderCursor`, `body`. Swift
+        //     `nextCursor`, `sellerDisplayName`, `olderCursor`, `body`, and
+        //     `senderName` (agri-saas #1399, checked against 66688b0a). Swift
         //     optionals, so absent from these sets on purpose — the
         //     `Parcel.absentFromImportAt` precedent. Copying the spec's lists
         //     word for word would turn this suite red.

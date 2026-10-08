@@ -446,9 +446,9 @@ struct MessageBubble: View {
         HStack(alignment: .bottom, spacing: 0) {
             if speaker.isOurSide { Spacer(minLength: 48) }
             VStack(alignment: speaker.isOurSide ? .trailing : .leading, spacing: 4) {
-                // No personal names: the payload carries none, only an
-                // opaque sender id (a server follow-up, PARITY Gap 7).
-                Text("\(speaker.label), \(time)")
+                // The sender's name when the server has one (#1399), else
+                // what they are to me; «Вие» for my own words.
+                Text("\(speaker.caption(name: message.displayName)), \(time)")
                     .font(.caption)
                     .foregroundStyle(Palette.secondaryText)
                 bubble
@@ -458,7 +458,8 @@ struct MessageBubble: View {
         // ONE element, spoken from the values — who, what, when. The speaker
         // first, so a colleague's words are never heard as the reader's own.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(MessageBubble.spoken(speaker: speaker, body: bodyText, time: time))
+        .accessibilityLabel(MessageBubble.spoken(speaker: speaker, name: message.displayName,
+                                                 body: bodyText, time: time))
         .accessibilityActions {
             if mayRetract {
                 Button("Премахни", action: onRetract)
@@ -481,10 +482,20 @@ struct MessageBubble: View {
         message.isTombstone ? "Съобщението е премахнато" : (message.body ?? "")
     }
 
-    /// The VoiceOver sentence: «Колега от стопанството, Може и в петък., 09:00».
-    /// A static function so a test can hold it per speaker without a view.
-    static func spoken(speaker: MessageSpeaker, body: String, time: String) -> String {
-        A11y.sentence([speaker.label, body, time])
+    /// The VoiceOver sentence: «Мария Синтетична, колега от стопанството,
+    /// Може и в петък, 09:00.» A static function so a test can hold it per
+    /// speaker without a view.
+    ///
+    /// A NAMED colleague is still said to be one. On screen their words sit
+    /// on my farm's side in the colleague's style; VoiceOver hears neither,
+    /// and a name alone would leave a listener to work out whose side spoke.
+    /// The other side needs no such word: theirs is the only other side.
+    static func spoken(speaker: MessageSpeaker, name: String? = nil, body: String, time: String) -> String {
+        var who = [speaker.caption(name: name)]
+        if speaker == .colleague, name != nil {
+            who.append(speaker.label.lowercased())
+        }
+        return A11y.sentence(who + [body, time])
     }
 
     private var fill: Color {

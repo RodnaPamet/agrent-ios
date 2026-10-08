@@ -134,6 +134,7 @@ The hard cases, each on purpose:
 |---|---|
 | tombstone — `deleted: true`, `body: null` | `exchange-thread.json`, `msg_synthetic_3` |
 | all THREE speakers (agri-saas #1323): me (`mine`), a colleague (`fromMyFarm`, not `mine`), the other side (neither) | `msg_synthetic_2` / `msg_synthetic_5` / `msg_synthetic_1` |
+| `senderName` (agri-saas #1399): a name on the other side's messages and on mine, and `null` on the colleague's — the fallback caption's case | `msg_synthetic_1`, `_2`, `_3`, `_4` / `msg_synthetic_5` |
 | two rows on ONE listing — two people, as from one buyer farm (#1323: a thread is per inquirer person) | `thr_synthetic_1` and `thr_synthetic_4`, both `lst_synthetic_1` |
 | a role this build does not know (`broker`) → `.unknown` | `exchange-threads.json`, `thr_synthetic_3` |
 | `sellerDisplayName: null` | `thr_synthetic_2` and `thr_synthetic_3` |
