@@ -557,8 +557,21 @@ section is absent for a task without parcels. Not covered:
 - A parcel name is not a link to its location: the route's parcels carry no
   location id.
 
-**Unverified:** the route against the real server (merged, deploy pending on
-2026-10-08); fixtures only.
+**Live since 2026-10-08, 17:31 UTC**: `/api/health` read 48b36050f, #1410's
+merge commit. **Unverified:** a real task with parcels on a phone; fixtures
+only so far.
+
+**Comments — 2026-10-08 (#225, owner: «for the mechanisator to leave a
+comment»).** Every task has «Коментари» at its foot.
+
+- **Reading:** the comments come with the task (`TaskDetail.comments`, oldest
+  first), so they're cached with it and shown offline.
+- **Writing:** a composer for everyone but a READER. A comment goes as rich
+  text; a refused one keeps its draft.
+- **Not retried:** the route reads no `Idempotency-Key` until agri-saas's
+  idempotency PR, so a lost answer must not become two comments.
+- **Unverified:** no comment has been sent from this app; the first is the
+  owner's.
 
 **Not ported:** the «Необходимо: …» and «… вода» amounts (rate × area — the web's `totalLabel`,
 which also skips the ml→L promotion for Cyrillic unit symbols); the spray-job
