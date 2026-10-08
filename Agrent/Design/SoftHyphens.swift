@@ -24,6 +24,10 @@ enum SoftHyphens {
         ("Стопанството", ["Сто", "пан", "ство", "то"]),
         ("стопанство", ["сто", "пан", "ство"]),
         ("Стопанство", ["Сто", "пан", "ство"]),
+        // The composers' prompts (#225): in a field beside its send arrow,
+        // AX5 broke «Напишет / е» and «съобщени / е».
+        ("Напишете", ["На", "пи", "ше", "те"]),
+        ("съобщение", ["съоб", "ще", "ние"]),
     ]
 
     /// `text` with soft hyphens in its long words; otherwise unchanged.

@@ -19,12 +19,15 @@ struct ComposerField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        TextField(title, text: $text, prompt: .fieldPrompt(prompt), axis: .vertical)
+        // The prompt as SHOWN: soft hyphens in the words AX5 broke mid-word
+        // (`SoftHyphens`). The field is named by `title`, plain.
+        let shown = SoftHyphens.display(prompt)
+        TextField(title, text: $text, prompt: .fieldPrompt(shown), axis: .vertical)
             // Room for the WHOLE prompt (#164's `promptRoom`): at AX5
             // «Напишете коментар…» was cut to «Напише…» in a one-line field.
             // Six lines of typing at most, as before, so a composer pinned
             // under a conversation cannot grow over it.
-            .promptRoom(prompt, atMost: 6)
+            .promptRoom(shown, atMost: 6)
             .foregroundStyle(Palette.Field.text)
             .focused($focused)
             .padding(.horizontal, 12)
