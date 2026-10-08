@@ -17,6 +17,14 @@ name: Agrent
 
 options:
   bundleIdPrefix: bg.agrent
+  # BULGARIAN, DECLARED (agrent-ios#201). Every word the app writes is
+  # Bulgarian, but the bundle said `en`, so whatever the SYSTEM draws for it —
+  # Sign in with Apple's button above all, which the guidelines forbid
+  # relabelling — came out in English beside «Вход с Google». This is the
+  # project's development region; `CFBundleLocalizations` below makes `bg`
+  # the app's only language, so the system uses it whatever languages the
+  # phone prefers — checked on a simulator set to English alone.
+  developmentLanguage: bg
   deploymentTarget:
     iOS: "17.0"          # @Observable, @Environment(_.self),
                          # MainActor.assumeIsolated, ContentUnavailableView
@@ -107,6 +115,9 @@ targets:
       path: Agrent/Info.plist
       properties:
         CFBundleDisplayName: Agrent
+        # The app's ONLY language — see `developmentLanguage` above.
+        CFBundleLocalizations:
+          - bg
         # Every Xcode iOS template sets it and XcodeGen's generated plist does
         # not; the processed Info.plist of an Xcode 26.6 archive lacked it.
         # Declared so an App Store validator never has to infer it.
