@@ -101,10 +101,11 @@ final class RouteContractTests: XCTestCase {
     /// take it off this list. An entry cannot outlive its reason.
     ///
     /// Empty from agri-saas main a3df5f0, which served
-    /// `/api/auth/native/revoke` (agri-saas#1206), until P4.4 (#193):
-    private static let pendingServerRoutes: [String: String] = [
-        "/api/auth/native/apple": "Sign in with Apple's exchange — agri-saas #1404 (P4.2), in review",
-    ]
+    /// `/api/auth/native/revoke` (agri-saas#1206), until P4.4 (#193) — and
+    /// empty again from b46192f, which serves both of P4.4's:
+    /// `/api/auth/terms` (#1412) and `/api/auth/native/apple` (#1404), each
+    /// taken off once live by `/api/health` ancestry.
+    private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
