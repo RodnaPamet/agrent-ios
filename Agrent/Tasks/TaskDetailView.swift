@@ -30,6 +30,13 @@ struct TaskDetailView: View {
     /// `FieldOperationPanel` on exactly this condition.
     @State private var lines: FieldOperationStore?
 
+    /// A comment being written (#225). Here rather than in the section, so
+    /// it survives the task being re-read under it.
+    @State private var commentDraft = ""
+
+    /// Who is signed in — whether they may comment (`TaskCommentRules`).
+    @State private var people = CurrentUserStore.shared
+
     /// Every OTHER kind of task's parcels, for its map (agrent-ios#177) —
     /// nil for a field operation, whose lines carry its map. Started beside
     /// the task, as the lines are, not after it.
@@ -69,6 +76,7 @@ struct TaskDetailView: View {
         }
         .writeFeedback(store.writeFeedback)
         .task { if store.state.value == nil { await store.load() } }
+        .task { _ = await people.load() }
         // Here and not in the section: the section draws nothing until its
         // parcels arrive, and a task on an empty view is not one to rely on.
         .task { if let parcels, parcels.state.value == nil { await parcels.load() } }
@@ -168,6 +176,15 @@ struct TaskDetailView: View {
                     text("Описание", item.description)
                     text("Решение", item.resolution)
                     related(item)
+                    TaskCommentsSection(
+                        comments: item.comments,
+                        mayComment: TaskCommentRules.mayComment(people.user),
+                        draft: $commentDraft,
+                        sending: store.commenting,
+                        failure: store.commentError
+                    ) { html in
+                        if await store.addComment(html) { commentDraft = "" }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
@@ -261,8 +278,9 @@ struct TaskDetailView: View {
     /// some.
     @ViewBuilder
     private func related(_ item: WorkItem) -> some View {
+        // No comments here since #225: they are on this screen, under it,
+        // and «visible in the web app» would no longer be true of them.
         let parts: [String?] = [
-            item.counts?.comments.flatMap { $0 > 0 ? Plural.bg($0, "коментар", "коментара") : nil },
             item.counts?.evidence.flatMap { $0 > 0 ? Plural.bg($0, "доказателство", "доказателства") : nil },
             item.counts?.links.flatMap { $0 > 0 ? Plural.bg($0, "връзка", "връзки") : nil },
         ]

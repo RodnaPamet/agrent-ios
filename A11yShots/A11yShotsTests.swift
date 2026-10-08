@@ -479,6 +479,23 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 2)
         capture("08d-task-parcels", app: app)
 
+        // ── The comments at the foot of the same task (agrent-ios#225) ──
+        //
+        // Found by the composer, the section's last element, so the capture
+        // holds the comments above it. Nothing is typed and nothing is sent:
+        // a comment is a write to the task, and the first one is the owner's.
+        // A vertical field may surface as a text view, so both types match.
+        let composer = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ AND (elementType == %d OR elementType == %d)",
+                                  "Коментар",
+                                  XCUIElement.ElementType.textField.rawValue,
+                                  XCUIElement.ElementType.textView.rawValue))
+            .firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 10), "the task has no comment composer")
+        XCTAssertTrue(scrollWhollyIntoView(composer, in: app), "the page would not scroll the comments into view")
+        Thread.sleep(forTimeInterval: 1)
+        capture("08e-task-comments", app: app)
+
         goBack(app, to: "Задачи")
         if isTab {
             app.tabBars.buttons["Дневник"].tap()

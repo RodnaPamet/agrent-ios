@@ -140,6 +140,9 @@ enum A11y {
 
         /// The composer's send, which names its object.
         static let sendMessage = spokenNames("Изпрати съобщението", "Send message")
+        /// A task's comment (#225) — a different send from a message, so a
+        /// different name: one screen could one day hold both.
+        static let sendComment = spokenNames("Изпрати коментара", "Send comment")
         /// Close THIS conversation — an act the other farm sees.
         static let closeConversation = spokenNames("Затвори разговора", "Close conversation")
         /// The house search field (#164) and its clear button.

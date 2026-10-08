@@ -274,6 +274,11 @@ field operation with its parcels (`ONLY=08d-task-parcels`).
   `TASK`: no key (as its list row has none), no operation, and three `PARCEL`
   links shaped as the spec's `TaskLink`. The app reads no `links`; they are
   there so the detail says what the parcels route answers.
+- `task-detail-task.json` also holds two `comments`, shaped as the spec's
+  `TaskComment` (agrent-ios#225): the operator's, with a `<br>` that must
+  stay a line break, and the owner's, with an escaped `&lt;`, the way the
+  server's rich-text sanitiser returns a typed `<`. Nobody posted them:
+  the first real comment is the owner's.
 
 ## `auth-me.json`: the fixture person's farm and flags (agrent-ios#179)
 
