@@ -218,7 +218,7 @@ extension WeedObservation {
     /// « 11 юни » over the weeds seen, joined with ", ".
     ///
     /// `displayNames` already renders a catalogue weed as
-    /// « балур (Sorghum halepense) » and free text verbatim, and already puts
+    /// « Балур (Sorghum halepense) » and free text verbatim, and already puts
     /// the catalogue half first. Nothing here re-orders or re-translates it:
     /// the split between the two halves is the server's, and the free-text
     /// half is whatever somebody typed.

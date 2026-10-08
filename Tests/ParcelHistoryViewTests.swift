@@ -443,8 +443,8 @@ final class ParcelHistoryViewTests: XCTestCase {
         let line = seen.historyLine
 
         XCTAssertEqual(line.lead, "11 юни")
-        XCTAssertEqual(line.headline, "балур (Sorghum halepense), някакъв друг плевел")
-        XCTAssertEqual(line.text, "11 юни · балур (Sorghum halepense), някакъв друг плевел")
+        XCTAssertEqual(line.headline, "Балур (Sorghum halepense), някакъв друг плевел")
+        XCTAssertEqual(line.text, "11 юни · Балур (Sorghum halepense), някакъв друг плевел")
     }
 
     /// A weed the catalogue does not carry renders as its binomial rather than

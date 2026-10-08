@@ -333,7 +333,7 @@ final class ParcelHistoryTests: XCTestCase {
     func testBothHalvesRenderTogetherWithTheCatalogueFirst() async throws {
         let seen = try await decode(Self.observation, as: WeedObservation.self)
         XCTAssertEqual(seen.displayNames.count, 3)
-        XCTAssertTrue(seen.displayNames[0].hasPrefix("балур"), seen.displayNames[0])
+        XCTAssertTrue(seen.displayNames[0].hasPrefix("Балур"), seen.displayNames[0])
         XCTAssertEqual(seen.displayNames.last, "някакъв друг плевел")
     }
 
@@ -398,8 +398,31 @@ final class ParcelHistoryTests: XCTestCase {
     /// write itself.
     func testAKnownWeedCarriesBothNames() {
         let name = WeedCatalogue.name(for: "Cirsium arvense")
-        XCTAssertTrue(name.contains("паламида"), name)
+        XCTAssertTrue(name.contains("Паламида"), name)
         XCTAssertTrue(name.contains("Cirsium arvense"), name)
+    }
+
+    /// THE NAMES ARE THE WEB'S, verbatim — `messages/bg.json` `weeds` on
+    /// agri-saas main (6d50aeb77). Owner, 2026-10-08: «make them match»; the
+    /// app had «полска паламида» and lower case where the web had «Паламида»
+    /// and capitals. A farmer reads one name for one weed on both.
+    func testTheNamesAreTheWebsVerbatim() {
+        let web: [String: String] = [
+            "Sorghum halepense": "Балур",
+            "Echinochloa crus-galli": "Кокоше просо",
+            "Setaria viridis": "Зелена кощрява",
+            "Avena fatua": "Див овес",
+            "Cynodon dactylon": "Троскот",
+            "Cirsium arvense": "Паламида",
+            "Convolvulus arvensis": "Полска поветица",
+            "Chenopodium album": "Бяла лобода",
+            "Amaranthus retroflexus": "Обикновен щир",
+            "Sinapis arvensis": "Полски синап",
+            "Raphanus raphanistrum": "Дива ряпа",
+            "Papaver rhoeas": "Полски мак",
+            "Galium aparine": "Лепка",
+        ]
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: WeedCatalogue.entries.map { ($0.key, $0.value) }), web)
     }
 
     func testTheCatalogueHasNoDuplicateKeysOrNames() {

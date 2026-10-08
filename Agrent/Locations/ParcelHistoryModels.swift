@@ -387,12 +387,16 @@ struct WeedObservation: Decodable, Identifiable, Equatable, Sendable {
 /// table drifting from the contract is a red test rather than a wrong name on
 /// a screen.
 ///
-/// ── The Bulgarian names are still mine ──
+/// ── The Bulgarian names are the web's ──
 ///
-/// The enum pins the KEYS. What to call them in Bulgarian is not in any
-/// contract and was written here. Confirmed by the farm owner on 2026-09-25,
-/// which is the only verification available for that half and is a better one
-/// than a schema would be.
+/// The enum pins the KEYS; the names are not in any contract. They were
+/// written here first and confirmed by the farm owner on 2026-09-25 — then
+/// the web named the same thirteen in `messages/bg.json` (`weeds`), and the
+/// two differed: «полска паламида» against «Паламида», and lower case against
+/// capitals. Owner, 2026-10-08: «make them match». So they are the web's,
+/// verbatim (agri-saas main, `messages/bg.json` at 6d50aeb77), and a farmer
+/// reads the same name for the same weed on both. `ParcelHistoryTests` pins
+/// them, so drifting from that table is a red test.
 ///
 /// The fallback stays regardless: an unmapped key renders as its binomial, so
 /// a fourteenth weed shows as `Lolium perenne` rather than as a blank, a
@@ -402,19 +406,19 @@ enum WeedCatalogue {
     /// A `KeyValuePairs` rather than a dictionary so the picker's order is
     /// stable and reviewable.
     static let entries: KeyValuePairs<String, String> = [
-        "Sorghum halepense": "балур",
-        "Echinochloa crus-galli": "кокоше просо",
-        "Setaria viridis": "зелена кощрява",
-        "Avena fatua": "див овес",
-        "Cynodon dactylon": "троскот",
-        "Cirsium arvense": "полска паламида",
-        "Convolvulus arvensis": "полска поветица",
-        "Chenopodium album": "бяла лобода",
-        "Amaranthus retroflexus": "обикновен щир",
-        "Sinapis arvensis": "полски синап",
-        "Raphanus raphanistrum": "дива ряпа",
-        "Papaver rhoeas": "полски мак",
-        "Galium aparine": "лепка",
+        "Sorghum halepense": "Балур",
+        "Echinochloa crus-galli": "Кокоше просо",
+        "Setaria viridis": "Зелена кощрява",
+        "Avena fatua": "Див овес",
+        "Cynodon dactylon": "Троскот",
+        "Cirsium arvense": "Паламида",
+        "Convolvulus arvensis": "Полска поветица",
+        "Chenopodium album": "Бяла лобода",
+        "Amaranthus retroflexus": "Обикновен щир",
+        "Sinapis arvensis": "Полски синап",
+        "Raphanus raphanistrum": "Дива ряпа",
+        "Papaver rhoeas": "Полски мак",
+        "Galium aparine": "Лепка",
     ]
 
     /// The binomials, for a picker. NOT for validation, and the reason is
@@ -430,7 +434,7 @@ enum WeedCatalogue {
     /// So: offer these, accept anything.
     static var binomials: [String] { entries.map(\.key) }
 
-    /// «балур (Sorghum halepense)» for a known one, the binomial verbatim
+    /// «Балур (Sorghum halepense)» for a known one, the binomial verbatim
     /// for anything else.
     ///
     /// The Latin stays alongside the Bulgarian on purpose: it is what the
