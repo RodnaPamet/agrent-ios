@@ -536,7 +536,10 @@ struct ListingRow: View {
     ///
     /// Units as words, as the inbox and the map speak them: «тона», and
     /// «на тон» for the slash, which a voice reads as a slash.
-    static func spoken(_ listing: ExchangeListing) -> String {
+    ///
+    /// `nonisolated`: a `View`'s members are the main actor's, and this is a
+    /// pure function of a `Sendable` value that the tests call directly.
+    nonisolated static func spoken(_ listing: ExchangeListing) -> String {
         A11y.sentence([
             CommodityName.canonical(listing.commodity) ?? listing.commodity,
             listing.isOwn ? "ваша" : nil,
