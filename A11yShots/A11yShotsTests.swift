@@ -112,6 +112,7 @@ final class A11yShotsTests: XCTestCase {
             assertFixtureWorld(app)
             switch only {
             case "08b-task-parcel-lines": captureFieldOperationTask(app)
+            case "08d-task-parcels": captureTaskParcels(app)
             case "16-profile": captureProfile(app)
             case "17-farm-wizard": captureFarmWizard(app)
             default: XCTFail("A11Y_ONLY=\(only) names no capture this suite can run alone")
@@ -155,6 +156,7 @@ final class A11yShotsTests: XCTestCase {
         // differently.
         captureTabOrMenu("08-tasks", label: "Задачи", app: app)
         captureFieldOperationTask(app)
+        captureTaskParcels(app)
 
         // Борса, and from it the messaging screens #114 built and #115 made
         // photographable. Its own method because it goes four screens deep.
@@ -419,31 +421,14 @@ final class A11yShotsTests: XCTestCase {
         //
         // Found by its spoken summary, which also proves the fixture's two
         // outlined parcels made it onto the map. Below the fold at these
-        // sizes, so the page is scrolled until the WHOLE map clears the tab
-        // bar — `isHittable` is already true for a map whose top edge shows.
-        //
-        // Short drags, started where the map is: the map takes no gestures
-        // (`interactionModes: []`), so a finger on it must still scroll the
-        // page. If it ever swallows the drag, the map never rises and the
-        // assertion below says so — which is a bug a farmer would meet.
+        // sizes, so the page is scrolled until the whole map shows — see
+        // `scrollWhollyIntoView`.
         let map = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Карта на парцелите. Чакащо: SYNTH-1. Готово: SYNTH-2."))
             .firstMatch
         XCTAssertTrue(map.waitForExistence(timeout: 10), "the field operation has no task map")
         if UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory {
-            let floor = app.tabBars.firstMatch.exists
-                ? app.tabBars.firstMatch.frame.minY
-                : app.windows.firstMatch.frame.maxY
-            var drags = 0
-            while map.frame.maxY > floor, drags < 8 {
-                let from = map.frame.minY < floor - 40
-                    ? map.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
-                    : app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
-                from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -220)))
-                Thread.sleep(forTimeInterval: 0.5)
-                drags += 1
-            }
-            XCTAssertLessThanOrEqual(map.frame.maxY, floor, "the page would not scroll the task map into view")
+            XCTAssertTrue(scrollWhollyIntoView(map, in: app), "the page would not scroll the task map into view")
             Thread.sleep(forTimeInterval: 2)
             capture("08c-task-map", app: app)
         }
@@ -454,6 +439,77 @@ final class A11yShotsTests: XCTestCase {
         } else {
             dismissSheet(app, named: "Задачи")
         }
+    }
+
+    /// A task that is NOT a field operation, with its parcels (agrent-ios#177):
+    /// `tasks-list.json`'s row 1, «Заявка за анализ на почвата», whose
+    /// `task-parcels.json` holds two outlined parcels and one without. The
+    /// row that opens the task and the back button are the only taps.
+    private func captureTaskParcels(_ app: XCUIApplication) {
+        let tab = labelled("Задачи", in: app.tabBars.buttons)
+        let isTab = tab.waitForExistence(timeout: 3)
+        if isTab {
+            tab.tap()
+        } else {
+            XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Задачи")
+            XCTAssertTrue(tapMenuRow("Задачи", in: app), "«Задачи» is neither a tab nor a menu row")
+        }
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Заявка за анализ на почвата"))
+            .firstMatch
+        // UP first: the field operation's capture may have left the list
+        // scrolled to its third row, and a List builds rows lazily, so the
+        // first row may not exist until the list is back at its top.
+        var swipes = 0
+        while !row.waitForExistence(timeout: swipes == 0 ? 20 : 3), swipes < 6 {
+            if swipes < 2 { app.swipeDown() } else { app.swipeUp() }
+            swipes += 1
+        }
+        XCTAssertTrue(row.exists, "Задачи has no plain-task row — tasks-list.json's row 1")
+        row.tap()
+
+        // The map's spoken summary is the signal that task-parcels.json
+        // decoded and both outlines made it onto the map.
+        let map = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@",
+                                  "Карта на парцелите. Парцели на задачата: SYNTH-1, SYNTH-2."))
+            .firstMatch
+        XCTAssertTrue(map.waitForExistence(timeout: 20), "the task opened without its parcels map")
+        XCTAssertTrue(scrollWhollyIntoView(map, in: app), "the page would not scroll the parcels map into view")
+        Thread.sleep(forTimeInterval: 2)
+        capture("08d-task-parcels", app: app)
+
+        goBack(app, to: "Задачи")
+        if isTab {
+            app.tabBars.buttons["Дневник"].tap()
+        } else {
+            dismissSheet(app, named: "Задачи")
+        }
+    }
+
+    /// Scrolls the page until `element`'s WHOLE frame clears the tab bar (or
+    /// the window's foot when there is none) — `isHittable` is already true
+    /// for an element whose top edge shows. True when it got there.
+    ///
+    /// Short drags, started on the element while it is well up the screen:
+    /// a task map takes no gestures (`interactionModes: []`), so a finger on
+    /// it must still scroll the page. If it ever swallows the drag, the map
+    /// never rises and the caller's assertion says so — which is a bug a
+    /// farmer would meet.
+    private func scrollWhollyIntoView(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        let floor = app.tabBars.firstMatch.exists
+            ? app.tabBars.firstMatch.frame.minY
+            : app.windows.firstMatch.frame.maxY
+        var drags = 0
+        while element.frame.maxY > floor, drags < 8 {
+            let from = element.frame.minY < floor - 40
+                ? element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+                : app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+            from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -220)))
+            Thread.sleep(forTimeInterval: 0.5)
+            drags += 1
+        }
+        return element.frame.maxY <= floor
     }
 
     // MARK: - Борса and messaging (agrent-ios#115)

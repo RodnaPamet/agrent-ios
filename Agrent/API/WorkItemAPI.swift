@@ -169,3 +169,66 @@ extension WorkItemAPI {
         let resolution: String?
     }
 }
+
+// MARK: - A task's parcels (agrent-ios#177)
+
+extension WorkItemAPI {
+
+    /// `GET /tasks/{taskId}/parcels` (agri-saas #1410): the task's parcels
+    /// with their outlines, in ONE shape for every kind of task —
+    /// deduplicated by parcel id, ordered by name then id, and `[]` for a
+    /// task with none. A 404 is the task's, never "no parcels".
+    ///
+    /// Not where a field operation is drawn from. `GET /field-operations/{id}`
+    /// carries each parcel's line status and the location around them, and
+    /// the route's own documentation sends a field operation there.
+    ///
+    /// A task linked to a whole LOCATION has no parcels here: whether that
+    /// link means «its parcels now» or «the ones it had when linked» is
+    /// undecided server-side, so the route leaves it unexpanded.
+    static func parcelsPath(_ id: String) -> String { "\(detailPath(id))/parcels" }
+
+    static func decodeParcels(from data: Data) async throws -> [Parcel] {
+        try await APIClient.shared.decode(data, as: TaskParcels.self).parcels
+    }
+}
+
+/// The body of `GET /tasks/{taskId}/parcels`, each item as a `Parcel` — the
+/// location route's type, whose every field past `id` and `name` is
+/// optional — so these outlines are drawn by the code that draws every
+/// other outline in the app.
+struct TaskParcels: Decodable, Equatable, Sendable {
+    let parcels: [Parcel]
+
+    private enum CodingKeys: String, CodingKey { case parcels }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        parcels = try container.decode([Lenient].self, forKey: .parcels).compactMap(\.parcel)
+    }
+
+    /// An outline this build cannot read is a parcel WITHOUT one — listed,
+    /// and said to be off the map. Never dropped: the route's documentation
+    /// asks for exactly that, «or your count will disagree with the task».
+    /// Only an item with no id or name is dropped, which is not a parcel.
+    private struct Lenient: Decodable {
+        let parcel: Parcel?
+
+        private struct Named: Decodable {
+            let id: String
+            let name: String
+        }
+
+        init(from decoder: Decoder) throws {
+            if let whole = try? Parcel(from: decoder) {
+                parcel = whole
+            } else if let named = try? Named(from: decoder) {
+                parcel = Parcel(id: named.id, name: named.name, cropType: nil, areaHa: nil,
+                                geometry: nil, soilType: nil, cadastralId: nil, ekatte: nil,
+                                hasActiveLease: nil, absentFromImportAt: nil)
+            } else {
+                parcel = nil
+            }
+        }
+    }
+}

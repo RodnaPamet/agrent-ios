@@ -30,12 +30,19 @@ struct TaskDetailView: View {
     /// `FieldOperationPanel` on exactly this condition.
     @State private var lines: FieldOperationStore?
 
+    /// Every OTHER kind of task's parcels, for its map (agrent-ios#177) —
+    /// nil for a field operation, whose lines carry its map. Started beside
+    /// the task, as the lines are, not after it.
+    @State private var parcels: TaskParcelsStore?
+
     init(summary: WorkItemSummary) {
         self.summary = summary
         _store = State(initialValue: TaskDetailStore(id: summary.id))
-        _lines = State(initialValue: summary.type == .fieldOperation
+        let isFieldOperation = summary.type == .fieldOperation
+        _lines = State(initialValue: isFieldOperation
             ? FieldOperationStore(taskID: summary.id, taskKey: summary.key)
             : nil)
+        _parcels = State(initialValue: isFieldOperation ? nil : TaskParcelsStore(taskID: summary.id))
     }
 
     var body: some View {
@@ -62,6 +69,9 @@ struct TaskDetailView: View {
         }
         .writeFeedback(store.writeFeedback)
         .task { if store.state.value == nil { await store.load() } }
+        // Here and not in the section: the section draws nothing until its
+        // parcels arrive, and a task on an empty view is not one to rely on.
+        .task { if let parcels, parcels.state.value == nil { await parcels.load() } }
         // The last line marked moved the job to PENDING_REVIEW on the
         // server; the chip above should say so without a pull.
         .onChange(of: lines?.finishedJob) { _, _ in
@@ -149,6 +159,11 @@ struct TaskDetailView: View {
                     if let lines {
                         FieldOperationSection(store: lines)
                     }
+                    // In the same place for every other task, so a task's
+                    // parcels are where they are on a field operation.
+                    if let parcels {
+                        TaskParcelsSection(store: parcels)
+                    }
                     facts(item)
                     text("Описание", item.description)
                     text("Решение", item.resolution)
@@ -162,6 +177,7 @@ struct TaskDetailView: View {
                 await PullToRefresh.bounded {
                     await store.load()
                     await lines?.load(showCachedFirst: false)
+                    await parcels?.load()
                 }
             }
             .pageBackground()

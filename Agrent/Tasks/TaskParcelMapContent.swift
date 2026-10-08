@@ -117,6 +117,16 @@ extension TaskParcelMapContent {
             parcels: parcels,
             marks: order.map { (parcelID: $0, mark: TaskParcelMark(lines: shown[$0] ?? [])) })
     }
+
+    /// Any other task's map: every parcel the task links, all marked alike,
+    /// in the route's order (by name).
+    ///
+    /// No backdrop. `GET /tasks/{id}/parcels` sends the task's own parcels
+    /// and no location with them, so there is nothing to place them among —
+    /// the camera frames them on the imagery, which is still where they are.
+    static func linked(_ parcels: [Parcel]) -> TaskParcelMapContent? {
+        TaskParcelMapContent(parcels: parcels, marks: parcels.map { (parcelID: $0.id, mark: .linked) })
+    }
 }
 
 /// How one of a task's parcels is drawn.

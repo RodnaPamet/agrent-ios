@@ -14,6 +14,26 @@ final class TasksStore {
     }
 }
 
+/// A task's parcels, for its map (agrent-ios#177) — every kind of task but a
+/// field operation, whose map comes with its lines (`FieldOperationStore`).
+/// Cached like the task beside it, so a task opened with no signal still
+/// shows where it is.
+@Observable
+@MainActor
+final class TaskParcelsStore {
+    private(set) var state: LoadState<[Parcel]> = .loading
+    let taskID: String
+
+    init(taskID: String) { self.taskID = taskID }
+
+    func load() async {
+        if state.value == nil { state = .loading }
+        await CachedResource.loadShowingCacheFirst(WorkItemAPI.parcelsPath(taskID)) { data in
+            try await WorkItemAPI.decodeParcels(from: data)
+        } publish: { [weak self] in self?.state = $0 }
+    }
+}
+
 @Observable
 @MainActor
 final class TaskDetailStore {
