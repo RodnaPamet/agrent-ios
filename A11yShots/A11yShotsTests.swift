@@ -500,6 +500,7 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 3)
         capture("09-exchange", app: app)
         captureExchangeMap(app)
+        captureMyListings(app)
 
         captureListingWithMessageParty(app)
         captureInboxAndConversation(app)
@@ -519,6 +520,26 @@ final class A11yShotsTests: XCTestCase {
             goBack(app, to: "Борса")
             dismissSheet(app, named: "Борса")
         }
+    }
+
+    /// «Моите обяви» (`exchange-my-listings.json`), the seller's own rows:
+    /// the crop beside its status, which a plain `HStack` would break
+    /// mid-word at AX5 as it broke the board's crop beside «ваша». A GET
+    /// only. Put back on «Обяви» at once — the steps after this find the
+    /// board's rows.
+    private func captureMyListings(_ app: XCUIApplication) {
+        let mine = app.buttons["Моите обяви"]
+        guard mine.waitForExistence(timeout: 5) else {
+            XCTFail("no «Моите обяви» on Борса")
+            return
+        }
+        mine.tap()
+        Thread.sleep(forTimeInterval: 2)
+        capture("09c-exchange-mine", app: app)
+        let browse = app.buttons["Обяви"]
+        XCTAssertTrue(browse.waitForExistence(timeout: 5), "no «Обяви» to put Борса back")
+        browse.tap()
+        Thread.sleep(forTimeInterval: 1)
     }
 
     /// Борса's map (`ExchangeMapView`), for its oblast fills (#156). The

@@ -36,7 +36,7 @@ struct ListingDetailView: View {
                     ValueRow("Състояние") { Text(listing.status.label) }
                 }
 
-                if let region = listing.regionName {
+                if let region = listing.region {
                     Section(titled: "Регион") {
                         ValueRow(region) { Text(listing.regionCode ?? "") }
                     }

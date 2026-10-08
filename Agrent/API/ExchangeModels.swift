@@ -73,6 +73,14 @@ struct ExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     var quantity: Decimal? { WireDecimal.parse(quantityTonnes) }
     var price: Decimal? { WireDecimal.parse(pricePerTonne) }
 
+    /// The region as a person reads it: Bulgarian, from the code.
+    ///
+    /// `regionName` is the server's ENGLISH — see `BulgarianRegion` — and
+    /// the board's rows and the listing's own page printed it as sent, so
+    /// the screen that searches «по култура или регион» said «Pleven» and
+    /// «Ruse» (A11yShots, 2026-10-08). The map was already reading the code.
+    var region: String? { BulgarianRegion.name(code: regionCode, fallback: regionName) }
+
     var isActive: Bool { status == .active }
 }
 
