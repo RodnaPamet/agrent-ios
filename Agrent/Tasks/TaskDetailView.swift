@@ -205,7 +205,7 @@ struct TaskDetailView: View {
             if let who = item.assignee?.displayName { fact("Възложена на", who) }
             if let who = item.reviewer?.displayName { fact("Проверява", who) }
             if let who = item.createdBy?.displayName { fact("Създадена от", who) }
-            fact("Създадена", BgDate.full(item.createdAt))
+            if let created = item.createdAt { fact("Създадена", BgDate.full(created)) }
 
             // The server sends an `sla.label` too. It is not rendered — it is
             // a server-authored string and nothing establishes it is

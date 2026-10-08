@@ -55,7 +55,7 @@ final class ClientHeaderTests: XCTestCase {
     func testStampSetsBothHeaders() throws {
         var req = URLRequest(url: try XCTUnwrap(URL(string: "https://example.invalid/x")))
         ClientHeader.stamp(&req)
-        XCTAssertEqual(req.value(forHTTPHeaderField: "x-agrent-client-version"), "1")
+        XCTAssertEqual(req.value(forHTTPHeaderField: "x-agrent-client-version"), "2")
         let client = try XCTUnwrap(req.value(forHTTPHeaderField: "X-Agrent-Client"),
                                    "positive control: this build's version is readable")
         XCTAssertEqual(client, ClientHeader.value, "the counter's value changed on its way out")
@@ -72,24 +72,25 @@ final class ClientHeaderTests: XCTestCase {
         ClientHeader.stamp(&unreadable, client: ClientHeader.make(shortVersion: "1.x"))
         XCTAssertNil(unreadable.value(forHTTPHeaderField: "X-Agrent-Client"),
                      "an unreadable version is sent as no header, not as a guess")
-        XCTAssertEqual(unreadable.value(forHTTPHeaderField: "x-agrent-client-version"), "1",
+        XCTAssertEqual(unreadable.value(forHTTPHeaderField: "x-agrent-client-version"), "2",
                        "an unreadable version hid the build from the version gate")
 
         // Positive control: a readable one goes out exactly as computed.
         var readable = URLRequest(url: url)
         ClientHeader.stamp(&readable, client: ClientHeader.make(shortVersion: "2.3.4"))
         XCTAssertEqual(readable.value(forHTTPHeaderField: "X-Agrent-Client"), "ios/2.3")
-        XCTAssertEqual(readable.value(forHTTPHeaderField: "x-agrent-client-version"), "1")
+        XCTAssertEqual(readable.value(forHTTPHeaderField: "x-agrent-client-version"), "2")
     }
 
-    /// THE CONTRACT. 1 is agri-saas's `x-api-version` at main 261463d
-    /// (2026-10-07), and the header is the spec's `x-client-version-header`.
+    /// THE CONTRACT. 2 is agri-saas's `x-api-version` since #1390 (live
+    /// 2026-10-08, read at the deployed SHA 8d3e5a4c; 1 before it), and the
+    /// header is the spec's `x-client-version-header`.
     ///
     /// Pinned so that changing it is a decision someone makes: raise it only
     /// in the release that decodes the newer contract, never on its own
     /// (ROADMAP, «Decisions locked» 7), and change this test in that release.
     func testTheDeclaredContractIsTheOneThisBuildReads() {
-        XCTAssertEqual(ClientHeader.contractVersion, 1,
+        XCTAssertEqual(ClientHeader.contractVersion, 2,
                        "raised outside a release that understands the newer contract? "
                        + "ROADMAP, «Decisions locked» 7")
         XCTAssertEqual(ClientHeader.contractVersionHeader, "x-agrent-client-version")
