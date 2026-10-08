@@ -165,20 +165,25 @@ final class ConversationAvailabilityTests: XCTestCase {
 
 final class PrivateConversationWordingTests: XCTestCase {
 
-    /// The block is still farm-to-farm (#1314 is not done), but no string
-    /// says «блокирахте това стопанство»: the seller side states the real
-    /// scope as what happens, the inquirer side is true under either rule.
+    /// The block refuses one PERSON since agri-saas #1397 (#186), and no
+    /// string says «блокирахте това стопанство» — nor any longer that it
+    /// stops «всички хора» at the other farm, which it does not. The seller
+    /// side states the real scope as what happens; the inquirer side is true
+    /// under either rule.
     func testNoStringSaysYouBlockedThisFarm() {
         let strings = ExchangeThreadRole.allCases.map(MessagingPolicy.blockedNotice(role:))
             + [MessagingPolicy.blockConfirmation, UserMessage.bulgarian["THREAD_BLOCKED"] ?? ""]
         for text in strings {
             XCTAssertFalse(text.lowercased().contains("това стопанство"), text)
             XCTAssertFalse(text.lowercased().contains("блокирали сте"), text)
+            XCTAssertFalse(text.contains("всички хора"), "the farm-wide block is gone since #1397: \(text)")
             XCTAssertTrue(text.hasSuffix("."), text)
         }
-        // Positive control: the scope IS said, on the side that can block.
+        // Positive control: the scope IS said, on the side that can block —
+        // wider than this conversation, and not the other farm's colleagues.
         XCTAssertTrue(MessagingPolicy.blockedNotice(role: .seller).contains("всички обяви"))
-        XCTAssertTrue(MessagingPolicy.blockConfirmation.contains("всички хора"))
+        XCTAssertTrue(MessagingPolicy.blockConfirmation.contains("всички обяви"))
+        XCTAssertTrue(MessagingPolicy.blockConfirmation.contains("Другите хора от нейното стопанство все още могат"))
     }
 
     /// The person-level codes speak to the person; the farm-level ones still

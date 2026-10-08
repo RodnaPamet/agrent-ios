@@ -135,24 +135,24 @@ enum MessagingPolicy {
     /// carries no listing side, and on a BUY listing the owner is the one
     /// buying.
     ///
-    /// ── What a block IS today, said without "you blocked this farm" ──
+    /// ── What a block IS: one PERSON, on every listing of this farm ──
     ///
-    /// Conversations became private to people in #1323, but the block did not
-    /// move with them: it is still stored once per pair of FARMS (the
-    /// person-level block is agri-saas #1314, not done). So the listing
-    /// farm's block refuses every person at the other farm, on every listing
-    /// the listing farm has — including listings a colleague created, and
-    /// whoever at the listing farm pressed it. The owner's side is told that
-    /// scope, because nothing else on this screen says it, and it is said as
-    /// what happens rather than as «блокирахте това стопанство»: in a
-    /// conversation between people, "this farm" reads as "this person", and
-    /// the sentence would turn false the day #1314 lands. The other side's
-    /// wording is true under either rule.
+    /// Since agri-saas #1397 (the owner's ruling on #1314, live 2026-10-08)
+    /// the block is stored per PERSON: `sellerTenantId` + `blockedUserId`.
+    /// It refuses the one person this conversation is with, on every listing
+    /// the listing farm has — including listings a colleague created — and
+    /// NOT their colleagues, who can still write. The owner chose that
+    /// knowing a blocked person can ask a colleague to write instead.
+    ///
+    /// Until then it was stored per pair of FARMS and this sentence said
+    /// «от всички хора в нейното стопанство»; that went false the day #1397
+    /// deployed (agrent-ios#186). The owner's side is told the scope because
+    /// nothing else on this screen says it. The other side's wording was true
+    /// under both rules and has not changed.
     static func blockedNotice(role: ExchangeThreadRole) -> String {
         switch role {
         case .seller:
-            "Съобщенията от другата страна са спрени — от всички хора в нейното стопанство, "
-                + "по всички обяви на Вашето стопанство."
+            "Съобщенията от другата страна са спрени по всички обяви на Вашето стопанство."
         case .inquirer:
             "Собственикът на обявата не приема съобщения от Вас."
         case .unknown:
@@ -161,10 +161,12 @@ enum MessagingPolicy {
     }
 
     /// The block confirmation's body. The SCOPE is the point of confirming —
-    /// see `blockedNotice` for why it is said this way and not as a farm.
-    static let blockConfirmation = "Блокирането спира съобщенията от всички хора в другото "
-        + "стопанство, по всички обяви на Вашето стопанство — не само в този разговор. "
-        + "Може да го отмените по всяко време."
+    /// see `blockedNotice`. Both halves of it: more than this conversation
+    /// (every listing of this farm), and less than the other farm (only this
+    /// person; their colleagues can still write).
+    static let blockConfirmation = "Блокирането спира съобщенията от другата страна по всички "
+        + "обяви на Вашето стопанство — не само в този разговор. Другите хора от нейното "
+        + "стопанство все още могат да Ви пишат. Може да го отмените по всяко време."
 
     /// Whether a failed send may in fact have been delivered.
     ///

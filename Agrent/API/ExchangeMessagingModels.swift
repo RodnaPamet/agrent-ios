@@ -170,10 +170,14 @@ struct ExchangeThread: Decodable, Equatable, Sendable, Identifiable {
     /// Closed refuses nothing: the next message from either party reopens it.
     let closed: Bool
 
-    /// The tenant-pair block, reported to BOTH parties. Still FARM-level after
-    /// #1323 (the person-level block is agri-saas #1314, not done): the
-    /// listing farm refuses every person at the other farm, on every listing
-    /// of its own, not only in this thread.
+    /// The block, reported to BOTH parties. PERSON-level since agri-saas
+    /// #1397: the listing farm refuses this conversation's other person, on
+    /// every listing of its own and not only in this thread — and not that
+    /// person's colleagues.
+    ///
+    /// The server does not report it reliably yet: every caller of its
+    /// `isBlocked` passes a tenant id where the block now holds a user id, so
+    /// this reads false for every thread (agri-saas #1403).
     let blocked: Bool
 
     /// The caller's exact unread count — the CALLER's, per person since

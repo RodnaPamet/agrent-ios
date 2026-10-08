@@ -83,12 +83,11 @@ struct ConversationView: View {
             Button("Блокирай", role: .destructive) { Task { await store.setBlocked(true) } }
             Button("Отказ", role: .cancel) {}
         } message: {
-            // THE CONFIRMATION IS FOR THIS SENTENCE. A block is still stored
-            // once per pair of farms (#1323 did not move it; #1314 will), so
-            // pressing it here silences every person at the other farm on
-            // every listing of this farm — the web does it in one tap and
-            // never says so. Worded as what happens, not as "this farm":
-            // see `MessagingPolicy.blockedNotice`.
+            // THE CONFIRMATION IS FOR THIS SENTENCE. Since agri-saas #1397
+            // a block refuses this one PERSON on every listing of this farm,
+            // and not their colleagues — wider than this conversation and
+            // narrower than their farm, and the web does it in one tap and
+            // says neither. See `MessagingPolicy.blockedNotice`.
             Text(MessagingPolicy.blockConfirmation)
         }
         .alert("Да премахнете ли съобщението?", isPresented: $confirmingRetract,
