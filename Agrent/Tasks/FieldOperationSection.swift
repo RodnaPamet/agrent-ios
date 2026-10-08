@@ -266,8 +266,9 @@ private struct ConflictCard: View {
 /// Outlined: `accent` text and edge on the line's `Surface.card` (6.59 / 5.09
 /// / 5.49). Not `.bordered`: its tinted fill is a pair nobody has measured.
 /// 50 points, the height of the system's large prominent button, so the two
-/// sit level when they share a row.
-private struct MarkButtonStyle: ButtonStyle {
+/// sit level when they share a row. Also `TaskParcelsSection`'s «Опитай пак»,
+/// so the two sections on a task retry alike.
+struct MarkButtonStyle: ButtonStyle {
     let prominent: Bool
 
     @Environment(\.isEnabled) private var isEnabled

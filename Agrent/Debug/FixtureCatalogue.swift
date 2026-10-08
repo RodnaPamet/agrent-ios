@@ -92,9 +92,13 @@ enum FixtureCatalogue {
     /// The one FIELD OPERATION the fixtures hold — `tasks-list.json`'s third
     /// row — whose detail and parcel lines are served (agrent-ios#138), so
     /// A11yShots can photograph a task with lines in all three states. Every
-    /// other task id stays `NO_FIXTURE`. Spelled by hand for the reason
+    /// other task id but `fixtureTaskID` stays `NO_FIXTURE`. Spelled by hand for the reason
     /// `fixtureLocationID` is; `FixtureSeamTests` holds it against the files.
     static let fixtureFieldOperationTaskID = "tsk_fixture_fieldop"
+
+    /// `tasks-list.json`'s row 1, a plain `TASK` with linked parcels — for
+    /// the parcels map every other kind of task has (agrent-ios#177).
+    static let fixtureTaskID = "tsk_fixture_2"
 
     static let fixtureRiskParcels: [(parcelID: String, fixture: String)] = [
         ("par_holes", "risk-analysis-holes"),
@@ -153,6 +157,9 @@ enum FixtureCatalogue {
         // agrent-ios#138: one field-operation task, its detail and its lines.
         (WorkItemAPI.detailPath(fixtureFieldOperationTaskID), "task-detail-fieldop"),
         (FieldOperationAPI.detailPath(fixtureFieldOperationTaskID), "field-operation-detail"),
+        // agrent-ios#177: a plain task, its detail and its parcels.
+        (WorkItemAPI.detailPath(fixtureTaskID), "task-detail-task"),
+        (WorkItemAPI.parcelsPath(fixtureTaskID), "task-parcels"),
         // agrent-ios#179 stage 3: the person's farms, for Профил's list. A GET
         // only — the POST on the same path is a write, answered 501 as every
         // write is.

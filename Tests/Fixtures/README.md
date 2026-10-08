@@ -257,6 +257,24 @@ The parcels are the three `locations-parcels.json` holds, by id and name; the
 product is the dashboard's «Примерен хербицид». The line ids (`opl_synthetic_*`)
 follow no real format.
 
+## Any other task's parcels (agrent-ios#177)
+
+`task-detail-task.json`, `task-parcels.json`, and **row 1** of
+`tasks-list.json` (`tsk_fixture_2`, «Заявка за анализ на почвата»).
+
+**Synthetic, both**, added so A11yShots can photograph a task that is not a
+field operation with its parcels (`ONLY=08d-task-parcels`).
+
+- `task-parcels.json` follows the spec's `TaskParcelsResponse` (agri-saas
+  #1410): `{ parcels: [{ id, name, geometry }] }`, ordered by name. The three
+  parcels are `field-operation-detail.json`'s, copied: SYNTH-1 with four
+  holes, SYNTH-2, and SYNTH-3 with `geometry: null`. So the map draws two
+  parcels and notes the third, and the list marks SYNTH-3 «без очертания».
+- `task-detail-task.json` is `task-detail-fieldop.json` made into a plain
+  `TASK`: no key (as its list row has none), no operation, and three `PARCEL`
+  links shaped as the spec's `TaskLink`. The app reads no `links`; they are
+  there so the detail says what the parcels route answers.
+
 ## `auth-me.json`: the fixture person's farm and flags (agrent-ios#179)
 
 **Synthetic.** `tenant` is the fixture world's one farm («Синтетично

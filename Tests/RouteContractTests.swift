@@ -173,6 +173,8 @@ final class RouteContractTests: XCTestCase {
             ]),
             ("WorkItemAPI.swift", [
                 WorkItemAPI.listPath, WorkItemAPI.detailPath(id), WorkItemAPI.statusPath(id),
+                // agrent-ios#177: any task's parcels (agri-saas #1410).
+                WorkItemAPI.parcelsPath(id),
             ]),
             // agrent-ios#138: a field operation's lines, and marking one.
             ("FieldOperationAPI.swift", [

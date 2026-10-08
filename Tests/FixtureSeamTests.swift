@@ -131,6 +131,9 @@ final class FixtureSeamTests: XCTestCase {
             (WorkItemAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID), "task-detail-fieldop"),
             (FieldOperationAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID),
              "field-operation-detail"),
+            // agrent-ios#177 — a plain task and its parcels.
+            (WorkItemAPI.detailPath(FixtureCatalogue.fixtureTaskID), "task-detail-task"),
+            (WorkItemAPI.parcelsPath(FixtureCatalogue.fixtureTaskID), "task-parcels"),
             // agrent-ios#179 stage 3 — Профил's farm list.
             (FarmsAPI.farmsPath, "me-farms"),
         ]
@@ -201,6 +204,8 @@ final class FixtureSeamTests: XCTestCase {
             // protocol refuses every non-GET before it looks, and this keeps
             // the table from naming one should that ever change.
             FieldOperationAPI.detailPath("tsk_fixture_1"),
+            // #177: only the ONE plain task has parcels.
+            WorkItemAPI.parcelsPath("tsk_fixture_1"),
             FieldOperationAPI.linePath(taskID: FixtureCatalogue.fixtureFieldOperationTaskID,
                                        lineID: "opl_synthetic_1"),
         ] {
@@ -277,6 +282,25 @@ final class FixtureSeamTests: XCTestCase {
         // that the capture shows buttons at all.
         let me = try await MeAPI.decode(from: try fixture("auth-me"))
         XCTAssertTrue(FieldOperationRules.mayMark(me: me, assigneeUserID: job.task.assigneeUserId))
+    }
+
+    /// The plain-task key names the task all three files hold (agrent-ios#177):
+    /// a row in the list that is NOT a field operation, so a tap builds the
+    /// parcels store rather than the lines; its detail; and its parcels —
+    /// two with outlines and one without, which is what the capture is for.
+    func testThePlainTaskKeyNamesTheTaskInAllThreeFixtures() async throws {
+        let id = FixtureCatalogue.fixtureTaskID
+        let list = try await WorkItemAPI.decodeList(from: try fixture("tasks-list"))
+        let row = try XCTUnwrap(list.items.first { $0.id == id }, "the list has no row to tap")
+        XCTAssertNotEqual(row.type, .fieldOperation, "the row would open the lines, not the parcels")
+        let detail = try await WorkItemAPI.decodeDetail(from: try fixture("task-detail-task"))
+        XCTAssertEqual(detail.id, id)
+        XCTAssertEqual(detail.type, row.type)
+        let parcels = try await WorkItemAPI.decodeParcels(from: try fixture("task-parcels"))
+        XCTAssertEqual(parcels.map(\.name), ["SYNTH-1", "SYNTH-2", "SYNTH-3"])
+        let map = try XCTUnwrap(TaskParcelMapContent.linked(parcels), "the capture would have no map")
+        XCTAssertEqual(map.marked.count, 2)
+        XCTAssertEqual(map.undrawable, 1, "the capture is of a parcel noted under the map")
     }
 
     /// Paging and polling a conversation under the seam reach the same
@@ -405,6 +429,8 @@ final class FixtureSeamTests: XCTestCase {
         ("trends-news", { _ = try await APIClient.shared.decode($0, as: NewsResponse.self) }),
         // agrent-ios#138.
         ("task-detail-fieldop", { _ = try await WorkItemAPI.decodeDetail(from: $0) }),
+        ("task-detail-task", { _ = try await WorkItemAPI.decodeDetail(from: $0) }),
+        ("task-parcels", { _ = try await WorkItemAPI.decodeParcels(from: $0) }),
         ("field-operation-detail", { _ = try await FieldOperationAPI.decodeDetail(from: $0) }),
         // agrent-ios#179 stage 3.
         ("me-farms", { _ = try await FarmsAPI.decodeFarms(from: $0) }),

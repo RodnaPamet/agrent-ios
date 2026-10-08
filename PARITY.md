@@ -544,6 +544,22 @@ outline is counted under the map, not silently missing from it.
 `GET /locations/{id}/parcels`; agri-saas is documenting it as `ParcelGeo`
 (backend 1, 2026-10-07).
 
+**Every other task — 2026-10-08 (#177, agri-saas #1410).** A task that is not
+a field operation has a «Парцели» section in the same place: its parcels from
+`GET /tasks/{taskId}/parcels` on the same map, all marked alike with no
+legend, and their names under it, one marked «без очертания» when it has no
+outline. There is no backdrop, because the route sends no location. The
+section is absent for a task without parcels. Not covered:
+
+- A task linked to a whole LOCATION shows no parcels. The route does not
+  expand that link; «its parcels now» or «the ones it had when linked» is
+  undecided server-side.
+- A parcel name is not a link to its location: the route's parcels carry no
+  location id.
+
+**Unverified:** the route against the real server (merged, deploy pending on
+2026-10-08); fixtures only.
+
 **Not ported:** the «Необходимо: …» and «… вода» amounts (rate × area — the web's `totalLabel`,
 which also skips the ml→L promotion for Cyrillic unit symbols); the spray-job
 completion card; the reviewer's approve / request-changes on PENDING_REVIEW

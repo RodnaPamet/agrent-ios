@@ -1,0 +1,74 @@
+{
+  "id": "tsk_fixture_2",
+  "tenantId": "ten_synthetic",
+  "type": "TASK",
+  "title": "Заявка за анализ на почвата",
+  "description": "Синтетична задача: проби от почвата на трите парцела.",
+  "severity": "MEDIUM",
+  "priority": "P2",
+  "status": "IN_PROGRESS",
+  "source": "MANUAL",
+  "key": null,
+  "resolution": null,
+  "dueAt": "2026-10-08T07:00:00.000Z",
+  "completedAt": null,
+  "createdByUserId": "usr_fixture_owner",
+  "assigneeUserId": "usr_fixture_operator",
+  "reviewerUserId": null,
+  "operationType": null,
+  "applicationTechnique": null,
+  "clientMutationId": null,
+  "createdAt": "2026-10-03T06:30:00.000Z",
+  "updatedAt": "2026-10-05T07:55:00.000Z",
+  "assignee": {
+    "id": "usr_fixture_operator",
+    "name": "Петър Механизаторов",
+    "email": "operator@example.invalid"
+  },
+  "createdBy": {
+    "id": "usr_fixture_owner",
+    "name": "Иван Фикстуров",
+    "email": "owner@example.invalid"
+  },
+  "reviewer": null,
+  "comments": [],
+  "links": [
+    {
+      "id": "lnk_synthetic_1",
+      "tenantId": "ten_synthetic",
+      "taskId": "tsk_fixture_2",
+      "entityType": "PARCEL",
+      "entityId": "par_holes",
+      "relation": "RELATES_TO",
+      "createdAt": "2026-10-03T06:30:00.000Z"
+    },
+    {
+      "id": "lnk_synthetic_2",
+      "tenantId": "ten_synthetic",
+      "taskId": "tsk_fixture_2",
+      "entityType": "PARCEL",
+      "entityId": "par_simple",
+      "relation": "RELATES_TO",
+      "createdAt": "2026-10-03T06:30:00.000Z"
+    },
+    {
+      "id": "lnk_synthetic_3",
+      "tenantId": "ten_synthetic",
+      "taskId": "tsk_fixture_2",
+      "entityType": "PARCEL",
+      "entityId": "par_nogeom",
+      "relation": "RELATES_TO",
+      "createdAt": "2026-10-03T06:30:00.000Z"
+    }
+  ],
+  "watchers": [],
+  "sla": null,
+  "_count": {
+    "comments": 0,
+    "evidence": 0,
+    "links": 1,
+    "watchers": 0
+  },
+  "deletedAt": null,
+  "retentionUntil": null
+}
