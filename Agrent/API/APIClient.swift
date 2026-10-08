@@ -793,6 +793,15 @@ actor APIClient {
             throw APIError.clientTooOld
         default:
             let env = Self.envelope(from: data)
+            // THE TERMS GATE, from ANY route (agrent-ios#193): the session's
+            // account has not accepted the terms. Since agri-saas #1404 the
+            // server carries that in the bearer, for every provider — a Google
+            // or Microsoft account included, mid-session after a refresh — and
+            // only `/api/auth/` gets past it. So it is not one screen's error:
+            // the session is marked and `AuthClient` shows the terms screen.
+            if http.statusCode == 403, env?.code == "TERMS_ACCEPTANCE_REQUIRED" {
+                markTermsPending(for: tokens)
+            }
             // `http` is the FINAL response — after the 401 → refresh → retry
             // above — so the wait read here belongs to the answer being
             // reported, not to the request it replaced.
@@ -958,6 +967,44 @@ actor APIClient {
     /// rather than by the timing of one.
     static func mayCommitRefresh(seen: Tokens, stored: Tokens?) -> Bool {
         stored?.refreshToken == seen.refreshToken
+    }
+
+    // MARK: - The terms gate (agrent-ios#193)
+
+    /// Posted when a route answered the terms gate's 403; `AuthClient` turns
+    /// a signed-in session into the terms screen.
+    static let termsPendingNotification = Notification.Name("bg.agrent.app.termsPending")
+
+    /// The session's account must accept the terms: kept WITH the pair, so a
+    /// relaunch opens on the terms screen too. On this actor, like every other
+    /// write of the pair, so it cannot interleave with a refresh's commit.
+    ///
+    /// Only for the session the refused request was made under — the same
+    /// check a refresh commits by. After an Изход, or another person's
+    /// sign-in, a 403 that answers late is nobody's, and must not send the
+    /// next person to the terms.
+    private func markTermsPending(for seen: Tokens) {
+        guard Self.mayCommitRefresh(seen: seen, stored: TokenStore.load()),
+              var tokens = TokenStore.load() else { return }
+        if tokens.termsPending != true {
+            tokens.termsPending = true
+            TokenStore.save(tokens)
+        }
+        NotificationCenter.default.post(name: Self.termsPendingNotification, object: nil)
+    }
+
+    /// The terms are accepted: the flag off, and the access token treated as
+    /// EXPIRED, in one step on this actor.
+    ///
+    /// The server's gate reads `termsPending` out of the bearer, so the token
+    /// minted before the acceptance keeps every farm and person route a 403
+    /// until it lapses — up to fifteen minutes. Expired here, the very next
+    /// request refreshes first and carries a token minted after it.
+    func termsAccepted() {
+        guard var tokens = TokenStore.load() else { return }
+        tokens.termsPending = nil
+        tokens.expiresAt = .distantPast
+        TokenStore.save(tokens)
     }
 
     static func refreshDecision(seen: Tokens, stored: Tokens?) -> RefreshDecision {
@@ -1141,7 +1188,7 @@ actor APIClient {
             }
             struct R: Decodable { let accessToken: String; let refreshToken: String; let expiresIn: Int }
             let r = try JSONDecoder().decode(R.self, from: data)
-            let fresh = Tokens(
+            var fresh = Tokens(
                 accessToken: r.accessToken,
                 refreshToken: r.refreshToken,
                 expiresAt: Date().addingTimeInterval(TimeInterval(r.expiresIn))
@@ -1150,6 +1197,11 @@ actor APIClient {
             // would resurrect a signed-out user's tokens. The pair is still
             // returned to this caller, whose request was made under it.
             if Self.mayCommitRefresh(seen: seen, stored: TokenStore.load()) {
+                // A refresh is the same session, so the terms flag carries
+                // over — as STORED NOW, not as it was when this began: an
+                // acceptance recorded while the request was out must not be
+                // undone by its answer.
+                fresh.termsPending = TokenStore.load()?.termsPending
                 TokenStore.save(fresh)
             } else {
                 Log.auth.info("refresh answered after the session changed, not saved")

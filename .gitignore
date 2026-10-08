@@ -2,6 +2,7 @@
 Agrent.xcodeproj/
 Agrent.xcworkspace/
 Agrent/Info.plist
+Agrent/Agrent.entitlements
 
 # Xcode local state
 xcuserdata/

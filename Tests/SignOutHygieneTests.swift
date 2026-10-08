@@ -347,11 +347,17 @@ final class SignOutHygieneTests: XCTestCase {
                        "A's refused refresh clears B's tokens")
 
         let api = read("Agrent/API/APIClient.swift")
-        XCTAssertEqual(api.components(separatedBy: "TokenStore.save(").count - 1, 1,
-                       "positive control: one save in the refresh path")
-        let guarded = #"if Self\.mayCommitRefresh\(seen: seen, stored: TokenStore\.load\(\)\) \{\s*TokenStore\.%@"#
+        // Three writes of the pair: the refresh's, and the terms flag's two
+        // (#193) — each of the STORED pair, and the two that a late answer
+        // could make (the refresh, a terms refusal) behind the session check.
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.save(").count - 1, 3,
+                       "positive control: the writes of the pair are the three known ones")
+        let guarded = #"if Self\.mayCommitRefresh\(seen: seen, stored: TokenStore\.load\(\)\) \{[^{}]*TokenStore\.%@"#
         XCTAssertNotNil(api.range(of: String(format: guarded, #"save\(fresh\)"#), options: .regularExpression),
                         "the refresh saves without checking the session is still its own")
+        XCTAssertNotNil(api.range(of: #"guard Self\.mayCommitRefresh\(seen: seen, stored: TokenStore\.load\(\)\),\s*var tokens = TokenStore\.load\(\) else \{ return \}"#,
+                                  options: .regularExpression),
+                        "a late terms refusal marks whichever session is stored now")
         XCTAssertNotNil(api.range(of: String(format: guarded, #"clear\(\)"#), options: .regularExpression),
                         "a refused refresh clears without checking the session is still its own")
         XCTAssertEqual(api.components(separatedBy: "TokenStore.clear()").count - 1, 1,

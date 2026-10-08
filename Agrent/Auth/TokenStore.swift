@@ -10,6 +10,14 @@ struct Tokens: Codable, Equatable, Sendable {
     var accessToken: String
     var refreshToken: String
     var expiresAt: Date
+    /// This session's account has not accepted the terms yet (a first Sign
+    /// in with Apple, agrent-ios#193): every farm and person route answers
+    /// 403 until it does. Kept WITH the pair, so it lasts exactly as long as
+    /// the session — a relaunch, or a reinstall that keeps the Keychain,
+    /// opens on the terms screen again, and Изход takes it away with the
+    /// tokens. Carried across a refresh by `APIClient`. Absent on every pair
+    /// stored before it existed, which reads as not pending.
+    var termsPending: Bool? = nil
 
     var isExpired: Bool { Date() >= expiresAt.addingTimeInterval(-30) }
 }

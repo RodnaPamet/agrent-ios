@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 @main
@@ -52,6 +53,10 @@ struct AgrentApp: App {
                 case .signedIn:
                     // Which farm, before any of it — see `FarmGate`.
                     FarmGate()
+                case .termsPending:
+                    // Nothing of a farm or a person can be read until the
+                    // terms are accepted — see `TermsAPI` (#193).
+                    TermsAcceptanceView()
                 default:
                     SignInView()
                 }
@@ -215,8 +220,18 @@ struct ForegroundReturn {
 
 struct SignInView: View {
     @Environment(AuthClient.self) private var auth
+    @Environment(\.colorScheme) private var colorScheme
+    /// Apple's button takes ANY height it is offered — with only a minimum it
+    /// filled the screen below the other two. So it gets one: the HIG's 50 at
+    /// the default text size, growing with it like the buttons above, capped
+    /// where a taller black bar stops helping anyone read it.
+    @ScaledMetric(relativeTo: .body) private var appleButtonHeight: CGFloat = 50
 
     var body: some View {
+        // Scrollable when it has to be: with three buttons, AX5 runs past the
+        // screen, and a VStack that cannot scroll truncates instead —
+        // «Земеделския…» — or pushes a way in off the bottom.
+        ScrollableState {
         VStack(spacing: 20) {
             Image(systemName: "leaf.circle.fill")
                 .font(.system(size: 64))
@@ -230,7 +245,9 @@ struct SignInView: View {
                 // exemption in the CI file.
                 .foregroundStyle(Color(hex: 0x34C759))
             Text("Agrent").font(.largeTitle.bold())
-            Text("Земеделският агент").foregroundStyle(Palette.secondaryText)
+            Text("Земеделският агент")
+                .foregroundStyle(Palette.secondaryText)
+                .multilineTextAlignment(.center)
 
             if case .failed(let message) = auth.state {
                 Text(message)
@@ -240,20 +257,85 @@ struct SignInView: View {
                     .padding(.horizontal)
             }
 
-            Button {
-                Task { await auth.signIn() }
-            } label: {
-                if auth.state == .signingIn {
-                    ProgressView()
-                } else {
-                    Text("Вход").frame(maxWidth: .infinity)
+            // ── Three ways in (agrent-ios#193, P4.4) ──
+            //
+            // Google first and prominent: it is how every account so far was
+            // made. Microsoft through the same browser flow — the server's
+            // other configured provider. Apple through Apple's OWN button,
+            // which the guidelines require as-is and which App Review
+            // requires beside any third-party sign-in. It labels itself in
+            // the APP's declared language, and this app declares no Bulgarian
+            // localisation yet, so it reads "Sign in with Apple" — its Voice
+            // Control names are given in both. Until the server has an Apple
+            // audience, a tap ends in «…все още не е включен», and Google and
+            // Microsoft are untouched by it.
+            VStack(spacing: 12) {
+                Button {
+                    Task { await auth.signIn(with: .google) }
+                } label: {
+                    if auth.signingInVia == .google {
+                        ProgressView().accessibilityLabel(SignInText.signingIn)
+                    } else {
+                        // Wraps rather than truncating: at AX5 the prominent
+                        // style cut it to «Вход с…».
+                        Text(SignInText.google)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .prominentButton()
+                .accessibilityInputLabels(A11y.spokenNames(SignInText.google, "Sign in with Google"))
+
+                Button {
+                    Task { await auth.signIn(with: .microsoft) }
+                } label: {
+                    if auth.signingInVia == .microsoft {
+                        ProgressView().accessibilityLabel(SignInText.signingIn)
+                    } else {
+                        Text(SignInText.microsoft)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .accessibilityInputLabels(A11y.spokenNames(SignInText.microsoft, "Sign in with Microsoft"))
+
+                SignInWithAppleButton(.signIn) { request in
+                    auth.prepareAppleRequest(request)
+                } onCompletion: { result in
+                    Task { await auth.completeAppleSignIn(result) }
+                }
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: min(appleButtonHeight, 88))
+                .accessibilityInputLabels(A11y.spokenNames(SignInText.apple, "Sign in with Apple"))
+
+                // Apple's button cannot show a spinner of its own.
+                if auth.signingInVia == .apple {
+                    ProgressView().accessibilityLabel(SignInText.signingIn)
                 }
             }
-            .prominentButton()
             .controlSize(.large)
             .disabled(auth.state == .signingIn)
             .padding(.horizontal, 40)
         }
         .padding()
+        }
+        // A refusal is said, not only shown: the words appear above buttons a
+        // VoiceOver user's focus is on — and `email_required` tells them what
+        // to do in Settings.
+        .onChange(of: auth.state) { _, state in
+            if case .failed(let message) = state {
+                AccessibilityNotification.Announcement(message).post()
+            }
+        }
     }
+}
+
+enum SignInText {
+    static let google = "Вход с Google"
+    static let microsoft = "Вход с Microsoft"
+    static let apple = "Вход с Apple"
+    static let signingIn = "Влизане"
 }

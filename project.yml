@@ -90,6 +90,19 @@ targets:
         # is the configuration a build that could reach a phone uses.
         Release:
           EXCLUDED_SOURCE_FILE_NAMES: "$(SRCROOT)/Agrent/Debug/* $(SRCROOT)/Tests/Fixtures/*"
+    # SIGN IN WITH APPLE (agrent-ios#193, P4.4). GENERATED, like Info.plist:
+    # XcodeGen writes the file from these properties — and, given a `path`
+    # with no properties, writes an EMPTY one over whatever was there, which
+    # is how a committed file once signed every build with no entitlement at
+    # all. So it is declared here and kept out of git. The capability itself
+    # lives on the App ID `bg.agrent.app` in the owner's developer account,
+    # enabled by a device build with `-allowProvisioningUpdates` (the owner's
+    # choice, 2026-10-08).
+    entitlements:
+      path: Agrent/Agrent.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
     info:
       path: Agrent/Info.plist
       properties:
