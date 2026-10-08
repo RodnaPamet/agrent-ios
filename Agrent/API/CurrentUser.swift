@@ -38,9 +38,13 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     let name: String?
     let email: String?
 
-    /// The role on the user's OLDEST membership — same caveat as the
-    /// tenant block, and it is NOT a permission decision. It is used only
-    /// to decide whether to OFFER an affordance.
+    /// The role IN THE OPEN FARM once anything has said what that is —
+    /// `CurrentUserStore.user` carries it (#179 stage 3, see `inFarm`).
+    /// Until then, and as `/me` sends it, the role on the OLDEST membership:
+    /// the same caveat as the tenant block.
+    ///
+    /// It is NOT a permission decision either way. It is used only to decide
+    /// whether to OFFER an affordance; the server decides.
     let role: String?
 
     /// The saved bottom-row order, or nil when never chosen.
@@ -127,16 +131,20 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     ///
     /// ── FAILS OPEN, deliberately ──
     ///
-    /// `role` comes from the OLDEST membership, so for anyone in two
-    /// tenants it may not be their role HERE. An unrecognised or absent
-    /// role therefore shows the control and lets the server refuse.
+    /// Until the farm list has said, `role` comes from the OLDEST
+    /// membership, so for anyone in two tenants it may not be their role
+    /// HERE. An unrecognised or absent role therefore shows the control and
+    /// lets the server refuse. The spec's advice for a role it has not met is
+    /// "the least privilege"; that is advice for deciding access, and this
+    /// decides only what to offer.
     ///
     /// Hiding a button from somebody who could have used it is worse than
     /// showing one that might be refused: the refusal is a sentence they
     /// can read and report, the absence is a feature they conclude does
     /// not exist. The server is the authority either way, and its refusal
     /// is rendered.
-    /// A MECHANISATOR, as far as the OLDEST membership knows.
+    /// A MECHANISATOR, as far as `role` knows — the open farm's role once the
+    /// farm list has said it, the OLDEST membership's until then.
     ///
     /// `isOperatorAllowedPath` in the server's `guard.ts` is a middleware
     /// lockdown, not presentation: anything under `/api/t/{slug}/` outside
@@ -150,12 +158,14 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// to them is not something this app has been told. Extending a rule
     /// past what was verified is how a screen gets taken away from
     /// somebody who could have used it.
-    var isOperator: Bool { role?.uppercased() == "MECHANISATOR" }
+    var isOperator: Bool { Self.isOperator(role: role) }
+
+    static func isOperator(role: String?) -> Bool { role?.uppercased() == "MECHANISATOR" }
 
     var mayCreateOperations: Bool { mayWrite }
 
-    /// The server's `canWrite` — `ROLE_ORDER >= 3` — as far as the OLDEST
-    /// membership knows, failing open for the reasons above.
+    /// The server's `canWrite` — `ROLE_ORDER >= 3` — as far as `role` knows,
+    /// failing open for the reasons above.
     ///
     /// Named for what it is rather than for the first screen that needed it:
     /// exchange messaging gates the same way (open, send, close, block,
@@ -167,6 +177,15 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         case "MECHANISATOR", "READER", "AUDITOR": false
         default: true
         }
+    }
+
+    /// This person as they stand in ONE farm: `role` replaced by their role
+    /// there, when it is known. Everything else is the person's own.
+    func inFarm(role farmRole: String?) -> CurrentUser {
+        guard let farmRole, farmRole != role else { return self }
+        return CurrentUser(id: id, name: name, email: email, role: farmRole,
+                           bottomTabOrder: bottomTabOrder, featureFlags: featureFlags,
+                           avatarUrl: avatarUrl, tenant: tenant)
     }
 
     init(id: String, name: String?, email: String?, role: String?,
@@ -206,7 +225,17 @@ enum MeAPI {
 final class CurrentUserStore {
     static let shared = CurrentUserStore()
 
-    private(set) var user: CurrentUser?
+    /// Who is signed in — with `role` as their role in the OPEN farm, when
+    /// `FarmStore` knows it (#179 stage 3). Every screen reads this, so every
+    /// role gate follows the farm that is open without knowing farms exist.
+    var user: CurrentUser? { here(answered) }
+
+    /// `/me` as it answered: its `role` is the OLDEST membership's.
+    private var answered: CurrentUser?
+
+    /// This person's role in the open farm; nil while nothing has said, and
+    /// then `/me`'s stands. Written by `FarmStore` alone — `adoptRoleHere`.
+    private var roleHere: String?
     /// ONE slot for `load()` and `refresh()` alike: whichever started first is
     /// the request, and the other awaits it. Two slots would mean two `/me`s
     /// racing to write `user` and the flags, and the later ANSWER — not the
@@ -228,6 +257,7 @@ final class CurrentUserStore {
     @ObservationIgnored private let identity: SessionIdentity
     @ObservationIgnored private let flags: FeatureFlags
     @ObservationIgnored private let adoptTabs: @MainActor (CurrentUser) -> Void
+    @ObservationIgnored private let adoptOperator: @MainActor (Bool) -> Void
 
     /// What the cache-first read settled on: the user from the LAST publish
     /// that carried one (the network's when there is a network, the disk's
@@ -278,6 +308,9 @@ final class CurrentUserStore {
         flags: FeatureFlags? = nil,
         adoptTabs: @escaping @MainActor (CurrentUser) -> Void = {
             BottomTabsStore.shared.adopt($0.bottomTabOrder, isOperator: $0.isOperator)
+        },
+        adoptOperator: @escaping @MainActor (Bool) -> Void = {
+            BottomTabsStore.shared.adoptOperator($0)
         }
     ) {
         self.fetchCacheFirst = fetchCacheFirst
@@ -285,6 +318,7 @@ final class CurrentUserStore {
         self.identity = identity
         self.flags = flags ?? FeatureFlags.shared
         self.adoptTabs = adoptTabs
+        self.adoptOperator = adoptOperator
     }
 
     /// Who is signed in — from cache first, like every other read.
@@ -307,7 +341,7 @@ final class CurrentUserStore {
     /// per caller, the second avoids a network round trip per launch.
     func load() async -> CurrentUser? {
         if let user { return user }
-        if let inFlight { return await inFlight.value }
+        if let inFlight { return here(await inFlight.value) }
 
         // ── A `/me` that answers after Изход is not anybody's ──
         //
@@ -330,7 +364,7 @@ final class CurrentUserStore {
             return resolved
         }
         inFlight = task
-        return await task.value
+        return here(await task.value)
     }
 
     /// Re-read `/me` from the NETWORK, past the session memo, every time the
@@ -362,7 +396,7 @@ final class CurrentUserStore {
     /// needs an identity to record offline.
     @discardableResult
     func refresh() async -> CurrentUser? {
-        if let inFlight { return await inFlight.value }
+        if let inFlight { return here(await inFlight.value) }
 
         // The same guard as `load()`: an answer for A that lands after Изход
         // is dropped, flags and all — B must not open on A's cohort.
@@ -376,13 +410,13 @@ final class CurrentUserStore {
             // adopted from one.
             guard case .loaded(let fresh, .fresh) = answer else {
                 Log.auth.info("foreground /me refresh failed; keeping the session's user and flags")
-                return user
+                return answered
             }
             commit(fresh, freshFlags: .some(fresh.featureFlags))
             return fresh
         }
         inFlight = task
-        return await task.value
+        return here(await task.value)
     }
 
     /// Who is signed in, as far as a `/me` ALREADY ASKED will say — never a
@@ -411,8 +445,27 @@ final class CurrentUserStore {
     /// (so the prefetch's own writes land under the identity that answer
     /// adopts) and otherwise returns what is held, nil included.
     func settled() async -> CurrentUser? {
-        if let inFlight { return await inFlight.value }
+        if let inFlight { return here(await inFlight.value) }
         return user
+    }
+
+    /// The open farm's role for this person: `FarmStore`'s to say, as it
+    /// opens a farm or reads the farm list. nil when nothing knows it.
+    ///
+    /// The bar is the one consumer that HOLDS the operator flag rather than
+    /// reading it from `user`, so it is told — the flag alone. Re-adopting the
+    /// whole `/me` would put back a bar order saved since `/me` answered. And
+    /// told even before `/me` has answered: a remembered MECHANISATOR's
+    /// offline launch then draws their own tabs, not tabs that 403.
+    func adoptRoleHere(_ role: String?) {
+        guard role != roleHere else { return }
+        roleHere = role
+        adoptOperator(CurrentUser.isOperator(role: user?.role ?? role))
+    }
+
+    /// `/me`'s answer as it stands in the open farm.
+    private func here(_ answer: CurrentUser?) -> CurrentUser? {
+        answer?.inFarm(role: roleHere)
     }
 
     /// The one place a resolved `/me` is adopted, by both paths, and only
@@ -430,10 +483,11 @@ final class CurrentUserStore {
             // The bar, HERE rather than after `load()` in `MainTabView.task`
             // where it used to be: a refresh needs it too, and so does a
             // `load()` another screen started that the launch coalesced
-            // onto. Same answer, same moment, one place.
-            adoptTabs(resolved)
+            // onto. Same answer, same moment, one place. As it stands in the
+            // open farm: the operator's tab set is a farm's, not the oldest's.
+            adoptTabs(resolved.inFarm(role: roleHere))
         }
-        user = resolved
+        answered = resolved
         if let freshFlags { flags.adopt(freshFlags) }
     }
 
@@ -441,12 +495,13 @@ final class CurrentUserStore {
     /// in flight is let go rather than cancelled: it may be the same one a
     /// caller is awaiting, and the epoch guard above already discards it.
     func clear() {
-        user = nil
+        answered = nil
+        roleHere = nil
         inFlight = nil
     }
 
     #if DEBUG
     /// For `SignOutHygieneTests`, which needs A signed in without a network.
-    func adoptForTesting(_ user: CurrentUser) { self.user = user }
+    func adoptForTesting(_ user: CurrentUser) { answered = user }
     #endif
 }

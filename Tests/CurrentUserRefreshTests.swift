@@ -369,7 +369,8 @@ final class CurrentUserRefreshTests: XCTestCase {
               let refresh = code.range(of: "func refresh() async -> CurrentUser? {") else {
             return XCTFail("positive control: both entry points exist")
         }
-        let join = "if let inFlight { return await inFlight.value }"
+        // `here(…)`: the answer as it stands in the open farm (#179 stage 3).
+        let join = "if let inFlight { return here(await inFlight.value) }"
         XCTAssertTrue(code[load.upperBound...].prefix(120).contains(join), "load() does not join a refresh")
         XCTAssertTrue(code[refresh.upperBound...].prefix(80).contains(join), "refresh() does not join a load")
     }

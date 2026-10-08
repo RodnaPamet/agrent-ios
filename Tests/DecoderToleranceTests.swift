@@ -298,6 +298,14 @@ final class DecoderToleranceTests: XCTestCase {
          "tenant":{"id":"t","name":"Ферма","slug":"agrent"},
          "featureFlags":{"social.dm":true}}
         """#) { _ = try await MeAPI.decode(from: $0) },
+
+        // `GET /api/me/farms` (agri-saas#1396), the envelope and one row.
+        Probe("FarmsAPI.Farms", #"""
+        {"farms":[{"id":"t","slug":"agrent","name":"Ферма","role":"OWNER"}]}
+        """#) { _ = try await FarmsAPI.decodeFarms(from: $0) },
+        Probe("FarmsAPI.Membership", #"""
+        {"id":"t","slug":"agrent","name":"Ферма","role":"OWNER"}
+        """#) { _ = try await APIClient.shared.decode($0, as: FarmsAPI.Membership.self) },
     ]
 
     // MARK: - The measurement
@@ -518,6 +526,18 @@ final class DecoderToleranceTests: XCTestCase {
         // server from before #1209), and a map this build cannot read must
         // cost the flags rather than the identity the spray sheet needs.
         "CurrentUser": ["user"],
+
+        // ── Checked 2026-10-08 against agri-saas 9f988dd4 (#1396) ──
+        //
+        // The schema requires `id`, `slug`, `name` and `role` on a row and
+        // `farms` on the envelope. `id` is the one left out: nothing reads
+        // it. The other three are what a row IS here — the farm's path, what
+        // the person reads, and the role the screens gate on — and a row is
+        // never dropped for missing one: a dropped row would read as a farm
+        // the person no longer has, which `FarmStore` closes. So the whole
+        // list fails instead, and a list that fails changes nothing.
+        "FarmsAPI.Farms": ["farms"],
+        "FarmsAPI.Membership": ["name", "role", "slug"],
     ]
 
     /// THE GUARD. A field going non-optional turns this red and names it.

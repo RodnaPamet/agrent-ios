@@ -268,3 +268,19 @@ directly and never remembered, so this only names it.
 photograph «Добави стопанство» and the wizard's first steps
 (`ONLY=17-farm-wizard`). It never taps «Готово»: that would create a real
 farm. Under the seam it would get a 501, but the suite doesn't rely on that.
+
+## `me-farms.json`: the fixture person's farms (agrent-ios#179, stage 3)
+
+**Synthetic.** Two farms, oldest first as the contract orders them. The first
+is the fixture world's one farm («Синтетично стопанство», slug `agrent`,
+`OWNER` — the farm and role `auth-me.json` names, as the spec says `farms[0]`
+always is). The second is invented, with the fixture person as a
+`MECHANISATOR`, so Профил shows a list with a tick, two roles and a farm to
+switch to.
+
+The first entry must stay slug `agrent`: `FarmStore` CLOSES an open farm the
+list does not have, and under the seam the open farm is always `agrent`.
+
+The second farm has no fixtures of its own. A11yShots never taps it; a tap
+under the seam would open a farm whose every path is `NO_FIXTURE`, which is a
+true report of a fixture world with one farm in it.

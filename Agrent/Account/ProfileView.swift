@@ -33,6 +33,18 @@ import SwiftUI
 /// renderings of "who is signed in" would drift — the initials rule and the
 /// spoken sentence are exactly the kind of thing one copy gets fixed in.
 ///
+/// ── The person's farms (agrent-ios#179, stage 3) ──
+///
+/// Every farm this person belongs to, from `GET /api/me/farms`, with their
+/// role in each and a tick on the open one; choosing another opens it, and
+/// `FarmGate` rebuilds the tabs for it — which takes this page away with the
+/// old farm, as creating a farm does. The list is UNGATED: a person reaches
+/// the farms they already belong to whatever `social.farm-registration`
+/// says, and only «Добави стопанство» follows that flag.
+///
+/// Not tenant-scoped either: `/api/me/farms` has no slug in its path, and
+/// `FarmStore` reads it.
+///
 /// ── The app's only Изход ──
 ///
 /// Behind `SignOutConfirmation`, the one question any Изход asks.
@@ -45,6 +57,7 @@ struct ProfileView: View {
     @State private var identityUnavailable = false
     @State private var confirmingSignOut = false
     @State private var flags = FeatureFlags.shared
+    @State private var farms = FarmStore.shared
     @State private var addingFarm = false
 
     var body: some View {
@@ -52,17 +65,34 @@ struct ProfileView: View {
             Section { identity }.pageRow()
 
             // A person's farms are the person's, not one farm's — so Профил,
-            // not Админ (owner, 2026-10-08, agrent-ios#179). Offered only when
-            // the server offers it to this person: `POST /api/me/farms`
-            // follows the same flag, and an absent flag is off.
-            if flags.isOn(FarmWizardText.flag) {
+            // not Админ (owner, 2026-10-08, agrent-ios#179).
+            if showsFarms {
                 Section {
-                    Button {
-                        addingFarm = true
-                    } label: {
-                        Label(FarmWizardText.addTitle, systemImage: "plus.circle")
+                    ForEach(farmRows, id: \.slug) { farm in
+                        let isOpen = farm.slug == farms.activeFarm?.slug
+                        FarmRow(farm: farm, isOpen: isOpen) {
+                            if !isOpen { farms.open(farm) }
+                        }
                     }
-                    .accessibilityInputLabels(A11y.spokenNames(FarmWizardText.addTitle, "Add farm"))
+                    // Offered only when the server offers it to this person:
+                    // `POST /api/me/farms` follows the same flag, and an
+                    // absent flag is off. The list above does not.
+                    if canAddFarm {
+                        Button {
+                            addingFarm = true
+                        } label: {
+                            Label(FarmWizardText.addTitle, systemImage: "plus.circle")
+                        }
+                        .accessibilityInputLabels(A11y.spokenNames(FarmWizardText.addTitle, "Add farm"))
+                    }
+                } header: {
+                    SectionHeader(Self.farmsTitle)
+                } footer: {
+                    SectionFooter {
+                        if farms.farms == nil, farms.listUnavailable {
+                            Text(Self.farmsUnavailable)
+                        }
+                    }
                 }
                 .pageRow()
             }
@@ -91,7 +121,7 @@ struct ProfileView: View {
         // takes this sheet and the screens under it away with the old farm.
         .sheet(isPresented: $addingFarm) {
             NavigationStack {
-                FarmWizardView(context: .adding) { FarmStore.shared.activate($0) }
+                FarmWizardView(context: .adding) { farms.openCreated($0) }
             }
         }
         // The launch already asked; this returns that answer without a request
@@ -100,6 +130,22 @@ struct ProfileView: View {
         .task {
             if await me.load() == nil { identityUnavailable = true }
         }
+        // Read again whenever the page opens — alongside `/me`, not after it:
+        // a farm someone was added to on the web an hour ago belongs here now.
+        .task { await farms.refreshFarms() }
+    }
+
+    /// The list once it has been read; until then the open farm alone, so
+    /// this page never says less than the menu above it does.
+    private var farmRows: [Farm] {
+        farms.farms ?? farms.activeFarm.map { [$0] } ?? []
+    }
+
+    private var canAddFarm: Bool { flags.isOn(FarmWizardText.flag) }
+
+    /// Nothing to list, nothing to add and nothing to say is no section.
+    private var showsFarms: Bool {
+        !farmRows.isEmpty || canAddFarm || farms.listUnavailable
     }
 
     @ViewBuilder
@@ -119,4 +165,76 @@ struct ProfileView: View {
     /// No network and no cached `/me`. Not `Palette.error`: the account is
     /// fine, this phone just cannot say whose it is right now.
     static let unavailable = "Профилът не може да бъде зареден в момента."
+
+    static let farmsTitle = "Стопанства"
+
+    /// Under the open farm, which can still be shown: it is remembered.
+    static let farmsUnavailable = "Списъкът със стопанствата Ви не може да бъде зареден в момента."
+
+    /// A role in Bulgarian, from `MembershipRole` — the server's own
+    /// vocabulary, verbatim. A role this build does not know shows nothing
+    /// rather than an English token on a Bulgarian page.
+    static func roleLabel(_ role: String?) -> String? {
+        guard let role, let known = MembershipRole(rawValue: role), known != .unknown else { return nil }
+        return known.label
+    }
+}
+
+/// One of the person's farms: its name, their role there, and a tick on the
+/// open one. The picker page's row (`FormChrome`), so choosing a farm reads
+/// like every other choice in the app.
+private struct FarmRow: View {
+    let farm: Farm
+    let isOpen: Bool
+    let open: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        // The tick beside the name, and UNDER it at accessibility sizes: at
+        // AX5 a tick beside «Синтетично» left the word too little width and it
+        // broke in the middle (A11yShots, 16-profile). Decided from the size
+        // and through `AnyLayout`, as `MetaRow` is, so the row re-lays out
+        // rather than being rebuilt when the size changes.
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+        Button(action: open) {
+            layout {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(farm.name ?? farm.slug)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let role = ProfileView.roleLabel(farm.role) {
+                        Text(role)
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if isOpen {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Palette.accent)
+                        .accessibilityHidden(true)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // The NAME is the label and the role its value. Left to itself the
+        // button's label would be both texts, «Второ стопанство, Механизатор»,
+        // and Voice Control answers to the whole label — so «Tap Второ
+        // стопанство» could miss. VoiceOver still says both. No input label:
+        // a farm's name is DATA, and this way the visible name is the name.
+        .accessibilityLabel(farm.name ?? farm.slug)
+        .accessibilityValue(ProfileView.roleLabel(farm.role) ?? "")
+        // The tick is hidden; this is what it says.
+        .accessibilityAddTraits(isOpen ? .isSelected : [])
+        // What a choice does here is bigger than a picker's: everything on
+        // screen becomes the other farm's.
+        .accessibilityHint(isOpen ? "" : Self.opensHint)
+    }
+
+    static let opensHint = "Отваря стопанството."
 }

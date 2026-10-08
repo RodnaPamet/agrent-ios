@@ -511,9 +511,9 @@ enum UserMessage {
         // route lets the ASSIGNED operator mark without general write
         // permission, and nobody else — so a colleague's job refuses. The
         // screen hides the buttons from whoever the role says cannot mark,
-        // but the role is the OLDEST membership's (`CurrentUser.role`) and
-        // the assignment can change under an open screen, so the refusal is
-        // still met. The web's own sentence, `ag.map.fieldOp.markForbidden`,
+        // but the role can be the OLDEST membership's until the farm list
+        // has said (`CurrentUser.role`), and the assignment can change under
+        // an open screen, so the refusal is still met. The web's own sentence, `ag.map.fieldOp.markForbidden`,
         // VERBATIM — it says who CAN do it, which «Нямате права» does not.
         "OPERATION_NOT_ASSIGNED_TO_YOU":
             "Можете да отбелязвате само задания, възложени на вас. Потърсете "

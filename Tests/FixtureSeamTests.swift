@@ -131,6 +131,8 @@ final class FixtureSeamTests: XCTestCase {
             (WorkItemAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID), "task-detail-fieldop"),
             (FieldOperationAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID),
              "field-operation-detail"),
+            // agrent-ios#179 stage 3 — Профил's farm list.
+            (FarmsAPI.farmsPath, "me-farms"),
         ]
         for (pathAndQuery, fixture) in expected {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
@@ -404,6 +406,8 @@ final class FixtureSeamTests: XCTestCase {
         // agrent-ios#138.
         ("task-detail-fieldop", { _ = try await WorkItemAPI.decodeDetail(from: $0) }),
         ("field-operation-detail", { _ = try await FieldOperationAPI.decodeDetail(from: $0) }),
+        // agrent-ios#179 stage 3.
+        ("me-farms", { _ = try await FarmsAPI.decodeFarms(from: $0) }),
     ]
 
     /// A MISSING FIXTURE IS A FAILURE, NOT A SKIP.

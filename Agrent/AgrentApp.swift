@@ -139,6 +139,8 @@ struct MainTabView: View {
             // about. `foreground` decides which `.active` is a return.
             if foreground.isReturn(to: phase), auth.state == .signedIn {
                 Task { await CurrentUserStore.shared.refresh() }
+                // The farm list is read on the same return by `FarmGate`,
+                // which is there in every state; the tabs are not.
             }
         }
         .task {

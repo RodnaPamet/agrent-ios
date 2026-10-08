@@ -307,10 +307,10 @@ enum FieldOperationRules {
     /// (`markOperationParcel`: `!canWrite && !isAssignee` → 403).
     ///
     /// The house pattern (`CurrentUser.mayWrite`), so it FAILS OPEN on a role
-    /// this build does not know — the role is the oldest membership's, and a
-    /// hidden button is a feature the person concludes does not exist. The
-    /// server's 403 is still handled: the assignment can change under an
-    /// open screen.
+    /// this build does not know — until the farm list has said, the role is
+    /// the oldest membership's, and a hidden button is a feature the person
+    /// concludes does not exist. The server's 403 is still handled: the
+    /// assignment can change under an open screen.
     ///
     /// Nobody known → false, unlike the role: a mark that has to wait on the
     /// phone is stamped with its owner, and there is none to stamp.
