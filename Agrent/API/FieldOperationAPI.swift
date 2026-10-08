@@ -36,9 +36,10 @@ enum FieldOperationAPI {
     }
 
     /// One prescription LINE of the job. `lineID` is the `OperationParcel`
-    /// id, not a parcel id — the spec says so in as many words.
-    static func linePath(taskID: String, lineID: String) -> String {
-        "\(detailPath(taskID))/parcels/\(URLEscape.segment(lineID))"
+    /// id, not a parcel id — the spec says so in as many words. Given the
+    /// farm for the outbox's replay, as `LocationsAPI.operationsPath` is.
+    static func linePath(taskID: String, lineID: String, tenant: String = Config.tenantSlug) -> String {
+        "/api/t/\(tenant)/field-operations/\(URLEscape.segment(taskID))/parcels/\(URLEscape.segment(lineID))"
     }
 
     static func decodeDetail(from data: Data) async throws -> FieldOperationDetail {

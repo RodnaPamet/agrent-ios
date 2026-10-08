@@ -96,6 +96,23 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
     /// cannot wander on to a THIRD account later.
     var ownerUserID: String? = nil
 
+    /// THE FARM THE RECORD WAS MADE ON (agrent-ios#179), and the farm its
+    /// replay goes to — whichever farm is open when the drain runs.
+    ///
+    /// A record names a location or a line by id, and an id means nothing in
+    /// another farm: replayed against the farm opened since, a spray would
+    /// meet "not found" and be refused — the only copy of regulated work,
+    /// lost to a farm switch. Stamped once, at `OutboxStore.enqueue`.
+    ///
+    /// Optional for the reason `ownerUserID` is: rows already on disk have
+    /// no such key. nil is a row from before farms could change, and every
+    /// one of those was made on the farm the app was pinned to — see `tenant`.
+    var tenantSlug: String? = nil
+
+    /// Where the replay goes: the stamped farm, or the pinned one for a row
+    /// queued before farms were stamped.
+    var tenant: String { tenantSlug ?? Config.legacyTenantSlug }
+
     /// What to call it on screen. The parcel name and the kind of work —
     /// enough for a farmer to recognise which spray is waiting, without
     /// the outbox having to hold a second copy of the whole form.

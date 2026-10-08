@@ -57,6 +57,13 @@ import Foundation
 ///     · `AccountAvatarStore.shared` — A's picture on the account card.
 ///                                      In memory only (#136), so the reset is
 ///                                      the whole of it; B's Админ asks for B's.
+///     · `FarmStore.shared`          — which farm A had open (#179), and with
+///                                      it `ActiveFarm.shared`, the mirror it
+///                                      alone writes. B's sign-in settles B's
+///                                      farm. A's CHOICE stays remembered on
+///                                      the phone under A's id (`FarmMemory`),
+///                                      for when A signs back in — it names a
+///                                      farm A belongs to, never B's data.
 ///
 ///   PURGED, then made unreachable by key:
 ///     · `ResponseCache.shared`      — `removeAll()` here, and every entry is
@@ -146,6 +153,7 @@ enum SessionReset {
         DashboardPreferences.shared.reset()
         FeatureFlags.shared.reset()
         AccountAvatarStore.shared.reset()
+        FarmStore.shared.reset()
     }
 }
 

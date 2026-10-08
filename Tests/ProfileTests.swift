@@ -52,7 +52,7 @@ final class ProfileTests: XCTestCase {
     /// rows used to be — not a row among the farm's screens.
     func testAdminHasItsOwnMenuSection() throws {
         let menu = try source("Agrent/Design/AppMenu.swift")
-        let screens = try XCTUnwrap(menu.range(of: "Section(titled: Config.tenantSlug) {"),
+        let screens = try XCTUnwrap(menu.range(of: "Section(titled: farms.activeFarm?.name ?? Config.tenantSlug) {"),
                                     "positive control: the screens' section moved")
         let admin = try XCTUnwrap(menu.range(of: #"Label("Админ", systemImage: "person.2")"#),
                                   "positive control: «Админ» left the menu")
@@ -66,13 +66,17 @@ final class ProfileTests: XCTestCase {
 
     // MARK: - Админ, the one way in
 
-    /// Профил is opened from ONE place, Админ's account row — and that row is
-    /// drawn OUTSIDE the access switch, so a reader whom Админ refuses still
-    /// has it, and with it the app's only Изход.
+    /// Профил is opened from Админ's account row — and that row is drawn
+    /// OUTSIDE the access switch, so a reader whom Админ refuses still has it,
+    /// and with it the app's only Изход.
+    ///
+    /// The one other opener is `FarmGate`'s farm-less states (#179): with no
+    /// farm open there are no tabs, no menu and so no Админ, and a person who
+    /// belongs to no farm must still be able to reach Изход.
     func testAdminOpensProfileInEveryState() throws {
         let openers = try appSources().filter { $0.1.contains("ProfileView()") }
-        XCTAssertEqual(openers.map(\.0), ["Agrent/Admin/AdminView.swift"],
-                       "Профил is opened from somewhere other than Админ")
+        XCTAssertEqual(Set(openers.map(\.0)), ["Agrent/Admin/AdminView.swift", "Agrent/Core/FarmGate.swift"],
+                       "Профил is opened from somewhere other than Админ and the farm gate")
 
         let admin = try source("Agrent/Admin/AdminView.swift")
         let row = try XCTUnwrap(admin.range(of: "Section { accountRow }"),
