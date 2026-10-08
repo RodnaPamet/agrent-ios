@@ -221,24 +221,20 @@ final class PaletteTokenTests: XCTestCase {
                           "positive control: the app's tint fails on the pill in light")
     }
 
-    /// Борса's search prompt, which UIKit draws: `secondaryLabel` on
-    /// `tertiarySystemFill` over the page (the navigation bar is the page,
-    /// `SolidChrome`). Read back from a hosted `.searchable` field and off
-    /// the capture (#9aa3a7 on #203733 in dark, 4.94). Neither a styled
-    /// `Text` prompt nor an appearance proxy changes it, so light is a
-    /// PLATFORM shortfall, pinned like the bar's `accentDeep` above: if this
-    /// starts passing, the platform moved and `Palette.ListChrome`'s note
-    /// can go. `secondaryLabel` on plain white is the second half of why
-    /// no fill could fix it.
-    func testTheSearchPromptIsThePlatformsShortfall() {
-        for (traits, expected) in zip([Self.dark, Self.light, Self.sunlight], [4.94, 3.12, 5.09]) {
-            XCTAssertEqual(Self.contrast(Color(uiColor: .secondaryLabel), on: Color(uiColor: .tertiarySystemFill), traits),
-                           expected, accuracy: 0.02)
+    /// Борса's search prompt is the app's own since #164: `SearchField` writes
+    /// it as `Text.fieldPrompt` on `Palette.Field.fill` — the composer's
+    /// pair — and passes AA in every arm. The positive control is why it
+    /// moved: the system's `.searchable` drew `secondaryLabel` on
+    /// `tertiarySystemFill`, under 4.5 in light, and nothing styles that.
+    func testTheSearchPromptIsTheAppsAndPasses() {
+        for (traits, expected) in zip([Self.dark, Self.light, Self.sunlight], [5.81, 5.32, 7.46]) {
+            let measured = Self.contrast(Palette.ListChrome.placeholder, on: Palette.Field.fill, traits)
+            XCTAssertEqual(measured, expected, accuracy: 0.02)
+            XCTAssertGreaterThanOrEqual(measured, 4.5)
         }
         XCTAssertLessThan(Self.contrast(Color(uiColor: .secondaryLabel), on: Color(uiColor: .tertiarySystemFill),
-                                        Self.light), 4.5)
-        XCTAssertLessThan(Self.contrast(Color(uiColor: .secondaryLabel), on: Color(hex: 0xFFFFFF), Self.light), 4.5,
-                          "secondaryLabel is under 4.5 on white, so no lighter fill could rescue it")
+                                        Self.light), 4.5,
+                          "positive control: the system's search prompt, which this replaced, fails in light")
     }
 
     /// Every surface P2.8 introduced is OPAQUE, in every arm — the point of
