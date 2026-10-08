@@ -171,7 +171,7 @@ enum SeriesVocabulary {
             // price is in one of them and nothing here can say which — so
             // it falls through to showing both as sent rather than picking.
             if shape.currency == nil || shape.currency == field {
-                let name = currencyName(shape.currency ?? field, afterNumber: afterNumber)
+                let name = CurrencyWords.name(shape.currency ?? field, afterNumber: afterNumber)
                 return "\(name) на \(measure)"
             }
         }
@@ -194,21 +194,6 @@ enum SeriesVocabulary {
         "1000l": "1000 литра",
         "100kg": "100 кг",
     ]
-
-    /// «долар на тон», «лева на тон» — the wording the old table set for a
-    /// heading. Only the dollar changes after a number: «евро» does not
-    /// inflect and «лева» already is the counting form (the table used it
-    /// for the heading too, and it stays for parity).
-    /// A currency without a Bulgarian name here keeps its ISO code: «RON на
-    /// тон» is neutral, a guessed «леи» is a claim (same rule as `region`).
-    private static func currencyName(_ code: String, afterNumber: Bool) -> String {
-        switch code {
-        case "EUR": "евро"
-        case "USD": afterNumber ? "долара" : "долар"
-        case "BGN": "лева"
-        default: code
-        }
-    }
 
     /// `<currency>/<measure>`, `<currency> per <measure>`, or a bare measure.
     private struct UnitShape {

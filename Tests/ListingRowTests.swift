@@ -60,7 +60,32 @@ final class ListingRowTests: XCTestCase {
     /// crop, the side and the region: no «ваша», no quantity, no price.
     func testTheBoardRowSaysWhatItPrints() {
         XCTAssertEqual(ListingRow.spoken(listing()),
-                       "Пшеница, ваша, Продава, Култура, 250 тона, 51,13 EUR на тон, Плевен.")
+                       "Пшеница, ваша, Продава, Култура, 250 тона, 51,13 евро на тон, Плевен.")
+    }
+
+    /// The currency as a word (#220) — the printed «EUR / т» is read out as
+    /// letters and a slash. Trends' table, so the dollar counts and an
+    /// unknown code stays a code; no currency leaves no gap.
+    func testAPriceIsSpokenWithItsCurrencyAsAWord() {
+        XCTAssertEqual(Exchange.spokenPrice("51.13", currency: "EUR"), "51,13 евро на тон")
+        XCTAssertEqual(Exchange.spokenPrice("51.13", currency: "eur"), "51,13 евро на тон")
+        XCTAssertEqual(Exchange.spokenPrice("512", currency: "USD"), "512,00 долара на тон")
+        XCTAssertEqual(Exchange.spokenPrice("380", currency: "BGN"), "380,00 лева на тон")
+        XCTAssertEqual(Exchange.spokenPrice("900", currency: "RON"), "900,00 RON на тон")
+        XCTAssertEqual(Exchange.spokenPrice("51.13", currency: nil), "51,13 на тон")
+        XCTAssertEqual(Exchange.spokenPrice("51.13", currency: ""), "51,13 на тон")
+        XCTAssertNil(Exchange.spokenPrice(nil, currency: "EUR"))
+    }
+
+    /// «Моите обяви»: one stop per listing (#220), its status where the
+    /// board says «ваша», and the same figures as words. Fixture row 0 is
+    /// the expired 10 t at 50 EUR.
+    func testMyListingIsOneStopSpokenFromTheValues() async throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "exchange-my-listings",
+                                                           withExtension: "json"))
+        let rows = try await APIClient.shared.decode(Data(contentsOf: url), as: [OwnExchangeListing].self)
+        XCTAssertEqual(MyListingRow.spoken(rows[0]),
+                       "Пшеница, Изтекла, Продава, Култура, 10 тона, 50,00 евро на тон.")
     }
 
     /// One tonne is «тон», as the inbox says it; another tenant's listing
@@ -69,6 +94,8 @@ final class ListingRowTests: XCTestCase {
     func testOneTonneAnotherTenantsRowAndAMissingPrice() {
         XCTAssertEqual(ListingRow.spoken(listing(isOwn: false, quantity: "1", price: nil)),
                        "Пшеница, Продава, Култура, 1 тон, Плевен.")
+        XCTAssertEqual(Exchange.spokenTonnes("0.5"), "0,5 тона")
+        XCTAssertEqual(Exchange.spokenTonnes("21"), "21 тона")
     }
 
     // MARK: - The region's language

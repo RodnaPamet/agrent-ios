@@ -267,16 +267,19 @@ struct RegionRow: View {
 
 extension RegionAggregate {
     /// Spoken as one stop. Prices are named per currency here too — the
-    /// rule is about the figure, not about the channel it reaches.
+    /// rule is about the figure, not about the channel it reaches — and the
+    /// currency as a word, «евро», where the code was read out as letters
+    /// (#220).
     var accessibilityText: String {
         var parts: [String?] = [name, Plural.bg(count, "обява", "обяви")]
         for price in prices {
             let money = { (d: Decimal) in
                 d.formatted(.number.precision(.fractionLength(2)).locale(BgDate.locale))
             }
+            let currency = CurrencyWords.name(price.currency, afterNumber: true)
             parts.append(price.isSinglePrice
-                ? "\(money(price.low)) \(price.currency) на тон"
-                : "от \(money(price.low)) до \(money(price.high)) \(price.currency) на тон")
+                ? "\(money(price.low)) \(currency) на тон"
+                : "от \(money(price.low)) до \(money(price.high)) \(currency) на тон")
         }
         if isMixedCurrency { parts.append("в различни валути") }
         return A11y.sentence(parts)
