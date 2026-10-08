@@ -269,3 +269,46 @@ extension WorkItemAPI {
     }
 }
 
+
+// MARK: - Weeds seen on a task's parcels (agrent-ios#226)
+
+extension WorkItemAPI {
+
+    /// `POST /tasks/{taskId}/weed-observations` — agri-saas's task-scoped
+    /// weed route (backend 1's PR A, 2026-10-08), written for #226. It takes
+    /// the parcel route's body plus `parcelId`, and accepts general task
+    /// write OR the task's ASSIGNEE posting against one of the task's own
+    /// parcels — the self-serve rule `setTaskStatus` already applies, so the
+    /// mechanisator who closes a task can say what grew on it. The parcels
+    /// it accepts are exactly `GET /tasks/{taskId}/parcels`.
+    ///
+    /// Refusals worth telling apart: `PARCEL_NOT_ON_TASK` (400) is the scope
+    /// check, not a malformed body; `WEEDS_REQUIRED` (400) cannot come from
+    /// the form, which posts nothing for «Няма плевели».
+    static func weedObservationsPath(_ id: String) -> String { "\(detailPath(id))/weed-observations" }
+
+    /// One observation on one parcel. `weeds` mixes catalogue binomials and
+    /// free text; the SERVER sorts them into `weedKeys` and `otherWeeds`.
+    ///
+    /// The key is sent although the route reads none yet — idempotency
+    /// needs a column and a migration there (backend 1's PR B). Minted once
+    /// per submission and parcel by the caller; nothing retries this on its
+    /// own until PR B is live, because a retry after a lost answer would
+    /// record the same weeds twice.
+    static func recordWeeds(
+        taskID: String, parcelID: String, observedAt: Date, weeds: [String], notes: String?,
+        idempotencyKey: String
+    ) async throws {
+        _ = try await APIClient.shared.postReturningData(
+            weedObservationsPath(taskID),
+            body: WeedObservation(parcelId: parcelID, observedAt: observedAt, weeds: weeds, notes: notes),
+            idempotencyKey: idempotencyKey)
+    }
+
+    private struct WeedObservation: Encodable, Sendable {
+        let parcelId: String
+        let observedAt: Date
+        let weeds: [String]
+        let notes: String?
+    }
+}

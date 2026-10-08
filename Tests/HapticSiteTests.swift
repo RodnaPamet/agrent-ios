@@ -213,8 +213,10 @@ final class HapticSiteTests: XCTestCase {
             "Agrent/Locations/ParcelMapView.swift var body saved",
             "Agrent/Locations/ParcelOperationSheet.swift save refused",
             "Agrent/Locations/ParcelOperationSheet.swift queueForLater refused",
-            "Agrent/Tasks/TasksStore.swift setStatus saved",
-            "Agrent/Tasks/TasksStore.swift setStatus refused",
+            // The green tick's close (#226), which replaced the status menu's
+            // `setStatus`.
+            "Agrent/Tasks/TasksStore.swift close saved",
+            "Agrent/Tasks/TasksStore.swift close refused",
             // A task's comment, the person's own send (agrent-ios#225).
             "Agrent/Tasks/TasksStore.swift addComment saved",
             "Agrent/Tasks/TasksStore.swift addComment refused",
@@ -288,7 +290,7 @@ final class HapticSiteTests: XCTestCase {
         let engine = try source("Agrent/ChatKit/ChatEngine.swift")
         XCTAssertTrue(bodies(of: "send", in: engine).contains { $0.contains("sendFeedback.saved()") })
         let tasks = try source("Agrent/Tasks/TasksStore.swift")
-        XCTAssertTrue(bodies(of: "setStatus", in: tasks).contains { $0.contains("writeFeedback.refused()") })
+        XCTAssertTrue(bodies(of: "close", in: tasks).contains { $0.contains("writeFeedback.refused()") })
         // Two `refresh`es in one file are both read: the inbox's and the
         // conversation's.
         XCTAssertEqual(bodies(of: "refresh", in: messaging).count, 2)

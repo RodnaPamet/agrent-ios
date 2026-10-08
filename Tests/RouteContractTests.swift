@@ -105,6 +105,11 @@ final class RouteContractTests: XCTestCase {
     /// empty again from b46192f, which serves both of P4.4's:
     /// `/api/auth/terms` (#1412) and `/api/auth/native/apple` (#1404), each
     /// taken off once live by `/api/health` ancestry.
+    ///
+    /// Empty again from agri-saas main 0699750: #226's task-scoped weed route
+    /// (`/tasks/{taskId}/weed-observations`, agri-saas #1434) sat here until
+    /// `/api/health` carried it (a11e72163, 2026-10-08) and was taken off by
+    /// the refresh that brought it in.
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -177,6 +182,8 @@ final class RouteContractTests: XCTestCase {
                 WorkItemAPI.parcelsPath(id),
                 // agrent-ios#225: a task's comment.
                 WorkItemAPI.commentsPath(id),
+                // agrent-ios#226: the weeds seen on a task's parcels.
+                WorkItemAPI.weedObservationsPath(id),
             ]),
             // agrent-ios#138: a field operation's lines, and marking one.
             ("FieldOperationAPI.swift", [

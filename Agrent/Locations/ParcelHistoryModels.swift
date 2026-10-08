@@ -434,6 +434,21 @@ enum WeedCatalogue {
     /// So: offer these, accept anything.
     static var binomials: [String] { entries.map(\.key) }
 
+    /// The grasses among them — the first five, as agri-saas's
+    /// `weed-options.ts` groups them («Житен плевел»; the rest are
+    /// «Широколистен плевел»). The division that decides the herbicide, so
+    /// the order a farmer scans a list in (#226's close form).
+    static let grasses: Set<String> = [
+        "Sorghum halepense", "Echinochloa crus-galli", "Setaria viridis", "Avena fatua", "Cynodon dactylon",
+    ]
+
+    /// The Bulgarian name alone, for a row of its own: «Балур» — the form
+    /// lists the Latin nowhere, since every row is one of these thirteen.
+    /// A key this build lacks stays its binomial, as in `name(for:)`.
+    static func rowName(for key: String) -> String {
+        entries.first(where: { $0.key == key })?.value ?? key
+    }
+
     /// «Балур (Sorghum halepense)» for a known one, the binomial verbatim
     /// for anything else.
     ///

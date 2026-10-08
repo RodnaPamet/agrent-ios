@@ -496,6 +496,23 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("08e-task-comments", app: app)
 
+        // ── The green tick's form (agrent-ios#226) ──
+        //
+        // Opened and photographed, then «Отказ»: «Затвори» would close the
+        // task, which is a write — the first real one is the owner's. The
+        // fixture person is the farm's OWNER, so the tick is there.
+        let tick = app.navigationBars.buttons["Затвори задачата"]
+        XCTAssertTrue(tick.waitForExistence(timeout: 10), "the task has no green tick")
+        tick.tap()
+        XCTAssertTrue(app.staticTexts["Задачата изпълнена ли е успешно?"].waitForExistence(timeout: 10),
+                      "the tick opened no form")
+        Thread.sleep(forTimeInterval: 1)
+        capture("08f-task-close", app: app)
+        let cancel = app.navigationBars.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the form has no «Отказ»")
+        cancel.tap()
+        XCTAssertTrue(tick.waitForExistence(timeout: 10), "«Отказ» did not put the task back")
+
         goBack(app, to: "Задачи")
         if isTab {
             app.tabBars.buttons["Дневник"].tap()

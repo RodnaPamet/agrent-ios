@@ -20,9 +20,14 @@ struct TaskDetailView: View {
 
     @State private var store: TaskDetailStore
 
-    /// The status being moved to, while its resolution is being written.
-    /// Non-nil means the sheet is up.
-    @State private var resolving: WorkItemStatus?
+    /// The close form is up (#226).
+    @State private var closing = false
+
+    /// Whether the open form asks about weeds — decided when the tick is
+    /// tapped and kept, so the question cannot appear or vanish under the
+    /// person's thumb when the parcels finish loading, and the note says
+    /// what was asked.
+    @State private var closeAsksWeeds = true
 
     /// A field operation's parcel lines (agrent-ios#138) — nil for every
     /// other kind of task. Decided from the ROW, so the lines start loading
@@ -62,16 +67,15 @@ struct TaskDetailView: View {
         // while costing the width that made `inlineTitle` necessary.
         .inlineTitle(summary.key ?? "Задача")
         .toolbar {
-            if let item = store.state.value, !item.status.allowedNext.isEmpty {
-                ToolbarItem(placement: .primaryAction) { statusMenu(item) }
+            if let item = store.state.value, TaskCloseRules.mayClose(item, me: people.user) {
+                ToolbarItem(placement: .primaryAction) { closeButton }
             }
         }
-        .sheet(item: $resolving) { target in
-            ResolutionSheet(target: target) { text in
-                resolving = nil
-                Task { await store.setStatus(target, resolution: text) }
+        .sheet(isPresented: $closing) {
+            CloseTaskSheet(asksWeeds: closeAsksWeeds) { answers in
+                await close(with: answers)
             } cancel: {
-                resolving = nil
+                closing = false
             }
         }
         .writeFeedback(store.writeFeedback)
@@ -87,39 +91,60 @@ struct TaskDetailView: View {
         }
     }
 
-    /// ONLY THE LEGAL MOVES.
+    /// THE GREEN TICK (#226): the one status action on this screen, and it
+    /// only closes. Owner, 2026-10-08 — the menu of every legal move it
+    /// replaces is gone from the app; «В процес», «Блокирана» and «Отказана»
+    /// are made on the web.
     ///
-    /// The server enforces `WORK_ITEM_TRANSITIONS` and refuses the rest —
-    /// measured: `IN_PROGRESS → OPEN` comes back 400 "Illegal work-item
-    /// transition". Offering a button that cannot work tells an operator the
-    /// app is broken when they asked for something that was never possible,
-    /// and the refusal arrives in English besides.
-    ///
-    /// The menu is absent entirely on CLOSED and CANCELED, which are sinks.
-    /// A disabled menu invites tapping; no menu says the task is finished.
-    @ViewBuilder
-    private func statusMenu(_ item: WorkItem) -> some View {
-        Menu {
-            ForEach(item.status.allowedNext, id: \.self) { next in
-                Button(next.label) {
-                    // A terminal status needs a resolution, and the server
-                    // checks it AFTER sanitising — so a resolution of pure
-                    // markup is refused rather than stored as something that
-                    // renders as nothing. Asking for it here means the
-                    // operator writes it once, on the screen, instead of
-                    // meeting a 400.
-                    if next.requiresResolution {
-                        resolving = next
-                    } else {
-                        Task { await store.setStatus(next, resolution: nil) }
-                    }
-                }
-            }
+    /// Shown when the task can still be closed and this person may close it
+    /// (`TaskCloseRules.mayClose`), so it is absent on a closed or canceled
+    /// task rather than present and refused. Green is `Palette.success`, the
+    /// success tick's colour, not the accent — on the bar 8.54 / 6.83 / 8.08
+    /// (dark / light / «Слънце», `PaletteTokenTests`).
+    private var closeButton: some View {
+        Button {
+            closeAsksWeeds = weedParcelIDs != []
+            closing = true
         } label: {
-            Label("Промени статуса", systemImage: "arrow.triangle.swap")
+            Label("Затвори задачата", systemImage: "checkmark")
         }
+        .tint(Palette.success)
         .disabled(store.saving)
-        .accessibilityLabel("Промени статуса")
+        .accessibilityLabel("Затвори задачата")
+        .accessibilityInputLabels(A11y.Spoken.closeTask)
+    }
+
+    /// The parcels a close's weeds are recorded on: the task's own, as
+    /// `GET /tasks/{id}/parcels` defines them — which for a field operation
+    /// are its lines' parcels, the set the weed route checks against. nil
+    /// while they are unknown: the question is still asked, and the weeds
+    /// then reach the note only.
+    private var weedParcelIDs: [String]? {
+        if let lines {
+            guard let detail = lines.state.value else { return nil }
+            var seen = Set<String>()
+            return detail.lines.map(\.parcel.id).filter { seen.insert($0).inserted }
+        }
+        return parcels?.state.value?.map(\.id)
+    }
+
+    /// The form's answers, sent. nil when the task closed — the sheet goes —
+    /// or the refusal, which the sheet shows with the answers kept.
+    private func close(with answers: TaskCloseAnswers) async -> String? {
+        guard let item = store.state.value else { return TaskCloseText.inProgress }
+        let asksWeeds = closeAsksWeeds
+        let outcome = await store.close(
+            resolution: TaskCloseRules.resolution(answers, asksWeeds: asksWeeds),
+            weeds: asksWeeds ? TaskCloseRules.weedsToRecord(answers) : [],
+            parcelIDs: weedParcelIDs ?? [],
+            note: TaskCloseRules.observationNote(item))
+        switch outcome {
+        case .refused(let message):
+            return message
+        case .closed, .closedWithoutWeeds:
+            closing = false
+            return nil
+        }
     }
 
     @ViewBuilder
@@ -152,13 +177,16 @@ struct TaskDetailView: View {
                             Text("Записване…").font(.footnote).foregroundStyle(Palette.secondaryText)
                         }
                     }
-                    if let writeError = store.writeError {
-                        // Stated on the screen, not in a dialog that
-                        // dismisses. A refused write whose message has gone
-                        // reads as a write that worked.
-                        Text(writeError)
+                    if let closeNotice = store.closeNotice {
+                        // The close landed and the weeds did not reach
+                        // every parcel (#226). On the screen, not in a
+                        // dialog that dismisses: the parcels' history is
+                        // short of what the note says, and someone may want
+                        // to add it on the web. The caveat colour — nothing
+                        // the person did failed.
+                        Text(closeNotice)
                             .font(.footnote)
-                            .foregroundStyle(Palette.error)
+                            .foregroundStyle(Palette.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     // FIRST after the header, as the web puts its panel at
@@ -319,63 +347,4 @@ struct TaskDetailView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.sentence([label, value, emphasised ? "просрочена" : nil]))
     }
-}
-
-/// The resolution a terminal status requires.
-///
-/// The server demands a non-empty resolution for RESOLVED, CLOSED and
-/// CANCELED, and checks it AFTER `sanitizePlainText` — so a body of pure
-/// markup is refused rather than stored as something that renders as
-/// nothing. The Създай button therefore stays disabled until there is text
-/// that would survive that, which turns a 400 into a button that is simply
-/// not ready yet.
-private struct ResolutionSheet: View {
-    let target: WorkItemStatus
-    let confirm: (String) -> Void
-    let cancel: () -> Void
-
-    @State private var text = ""
-
-    /// Mirrors the server's check as closely as a client can: trimmed, and
-    /// with anything tag-shaped removed, because that is what it will be
-    /// measured against.
-    private var isUsable: Bool {
-        !RichText.plainText(text)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .isEmpty
-    }
-
-    var body: some View {
-        NavigationStack {
-            PageForm {
-                Section(titled: "Решение") {
-                    TextEditor(text: $text).frame(minHeight: 140)
-                }
-                Section {
-                    Text("Изисква се, за да се завърши задачата.")
-                        .font(.footnote)
-                        .foregroundStyle(Palette.secondaryText)
-                }
-            }
-            .inlineTitle(target.label)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ", action: cancel)
-                        .accessibilityInputLabels(A11y.Spoken.cancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Запази") { confirm(text) }
-                        .disabled(!isUsable)
-                        .accessibilityInputLabels(A11y.Spoken.save)
-                }
-            }
-        }
-    }
-}
-
-/// So the sheet can be driven by `sheet(item:)`, which carries the target
-/// status with it — a separate Bool plus a stored status can disagree, and
-/// the disagreement is a write sent to the wrong state.
-extension WorkItemStatus: Identifiable {
-    public var id: String { rawValue }
 }

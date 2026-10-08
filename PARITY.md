@@ -578,6 +578,38 @@ comment»).** Every task has «Коментари» at its foot.
 - **Unverified:** no comment has been sent from this app; the first is the
   owner's.
 
+**The green tick — 2026-10-08 (#226, owner's decisions).** The status menu is
+gone. iOS offered every legal move (`WorkItemStatus.allowedNext`), and the web
+still does; the app now has one move, a green ✓ that only CLOSES. This is a
+deliberate divergence from the web: «В процес», «Блокирана» and «Отказана» are
+made on the web. The tick is there for a writer or the task's assignee
+(`setTaskStatus`'s own rule), while the task can still be closed.
+
+It opens a form:
+
+1. «Задачата изпълнена ли е успешно?» Да / Не, required. «Не» still closes.
+2. «Какви плевели срещнахте?» Asked when the task has parcels, and required
+   then. The choices are the server's 13 (agri-saas `weed-options.ts`, with
+   the Bulgarian names from `messages/bg.json`), «Друг плевел» as free text,
+   and «Няма плевели».
+3. An optional comment.
+
+Where the answers go:
+
+- **The closing note** (the resolution `CLOSED` expects) gets every answer,
+  a line each.
+- **The weeds** are also recorded on each of the task's parcels through
+  `POST /tasks/{taskId}/weed-observations`, agri-saas's task-scoped route.
+  It lets the assignee record on the task's own parcels (backend 1's PR A,
+  owner-confirmed with them directly).
+- **Order:** the close goes first. A refused observation leaves the close
+  standing and is said under the task. Nothing is retried until agri-saas's
+  idempotency PR.
+
+**Unverified:** no task has been closed from this app. The first close and the
+first weed record are the owner's. The weed route (agri-saas #1434) is live
+since 2026-10-08, 19:45 UTC: `/api/health` read a11e72163.
+
 **Not ported:** the «Необходимо: …» and «… вода» amounts (rate × area — the web's `totalLabel`,
 which also skips the ml→L promotion for Cyrillic unit symbols); the spray-job
 completion card; the reviewer's approve / request-changes on PENDING_REVIEW
