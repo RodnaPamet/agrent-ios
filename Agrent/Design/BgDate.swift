@@ -230,3 +230,30 @@ enum BgDate {
         return formatter
     }()
 }
+
+/// A response date the server may write as an instant OR as a bare day,
+/// read through `BgDate.parseInstantOrDay` and refused only when it is
+/// neither.
+///
+/// For a field whose published type is moving from `date-time` to `date`:
+/// `CostEntry.incurredOn` is day-resolution data the spec publishes as an
+/// instant, and agri-saas is re-typing it (#1443, backend 2, 2026-10-08).
+/// `APIClient`'s `Date` strategy throws on a bare day, so a `Date` property
+/// would fail the whole list the moment the wire changed. Reading both
+/// shapes first lets the server switch without a coordinated release.
+struct InstantOrDay: Decodable, Equatable, Sendable {
+    let date: Date
+
+    init(_ date: Date) { self.date = date }
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        guard let date = BgDate.parseInstantOrDay(raw) else {
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath,
+                debugDescription: "neither an instant nor a day: \(raw)"))
+        }
+        self.date = date
+    }
+}
+

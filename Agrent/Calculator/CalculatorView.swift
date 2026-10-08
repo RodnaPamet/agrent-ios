@@ -421,7 +421,7 @@ struct CostRow: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(cost.category.label).font(.subheadline.weight(.medium))
-                Text(BgDate.dayMonth(cost.incurredOn))
+                Text(BgDate.dayMonth(cost.incurredOn.date))
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
             }
@@ -437,7 +437,7 @@ struct CostRow: View {
         .accessibilityLabel(A11y.sentence([
             cost.category.label,
             "\(cost.amountText) \(cost.currency)",
-            BgDate.full(cost.incurredOn),
+            BgDate.full(cost.incurredOn.date),
             cost.supplier,
         ]))
     }

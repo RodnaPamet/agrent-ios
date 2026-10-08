@@ -30,9 +30,11 @@ struct CostEntry: Decodable, Identifiable, Equatable, Sendable {
     let amount: WireDecimal
     let currency: String
 
-    /// Full ISO on the way back, unlike the date-only string sent to
-    /// create it.
-    let incurredOn: Date
+    /// Full ISO on the way back today, unlike the date-only string sent to
+    /// create it — and read as EITHER (`InstantOrDay`), because the data is a
+    /// day and agri-saas is re-typing the field as `format: date` (#1443). A
+    /// `Date` here would fail the whole list the day the wire changed.
+    let incurredOn: InstantOrDay
 
     let supplier: String?
 
