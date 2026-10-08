@@ -37,10 +37,18 @@ final class MenuSheetCloseTests: XCTestCase {
 
     /// The menu marks what it presents. Without this line the flag is never
     /// set and every surface below passes while drawing nothing.
+    ///
+    /// And it clears the tab's surface (#194): the menu sits ON a tab, so a
+    /// sheet that kept it would push onto that tab's path in the router.
     func testTheMenuSheetSaysItIsTheMenus() throws {
         let menu = try source("Agrent/Design/AppMenu.swift")
-        XCTAssertTrue(menu.contains(
-            #".sheet(item: $presented) { $0.screen.environment(\.presentedFromMenu, true) }"#))
+        guard let start = menu.range(of: ".sheet(item: $presented) {") else {
+            return XCTFail("the menu no longer presents its surfaces by .sheet(item: $presented)")
+        }
+        let sheet = String(menu[start.lowerBound...].prefix(240))
+        XCTAssertTrue(sheet.contains(#".environment(\.presentedFromMenu, true)"#))
+        XCTAssertTrue(sheet.contains(#".environment(\.routedSurface, nil)"#),
+                      "a menu sheet would push onto the router's path for its tab")
     }
 
     /// The button itself: in the cancellation slot, named aloud, and behind

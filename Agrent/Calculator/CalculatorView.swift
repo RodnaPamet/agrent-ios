@@ -6,7 +6,7 @@ struct CalculatorView: View {
     @State private var addingCost = false
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
             // Chrome in a VStack above the scrollable — Борса's
             // arrangement, the one confirmed by use. See
             // `JournalListView` for why this is no longer a

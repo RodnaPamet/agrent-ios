@@ -18,7 +18,7 @@ struct DashboardView: View {
     @State private var editing = false
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
             List {
                 ForEach(preferences.blocks) { block in
                     content(for: block)

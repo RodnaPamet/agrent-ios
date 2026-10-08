@@ -12,7 +12,7 @@ struct TasksListView: View {
     @State private var store = TasksStore()
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
             // Chrome in a VStack above the scrollable — Борса's
             // arrangement, the one confirmed by use. See
             // `JournalListView` for why this is no longer a
@@ -61,7 +61,7 @@ struct TasksListView: View {
                 }
                 Section(titled: Plural.bg(page.items.count, "задача", "задачи")) {
                 ForEach(page.items) { item in
-                    NavigationLink { TaskDetailView(summary: item) } label: {
+                    NavigationLink(value: AppRoute.task(item)) {
                         TaskRow(item: item)
                     }
                     .pageRow()

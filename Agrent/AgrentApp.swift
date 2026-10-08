@@ -94,6 +94,9 @@ struct MainTabView: View {
     @State private var outbox = OutboxStore.shared
     @State private var unread = ExchangeUnreadStore.shared
     @State private var foreground = ForegroundReturn()
+    /// Here, not shared: `FarmGate` rebuilds this view per farm, so every
+    /// farm's tabs start at their roots (see `AppRouter`).
+    @State private var router = AppRouter(bar: BottomTabsStore.shared.bottomTabs)
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AuthClient.self) private var auth
 
@@ -108,9 +111,14 @@ struct MainTabView: View {
         // will eventually be two different numbers.
         VStack(spacing: 0) {
             OutboxBanner()
-            TabView {
+            // Selection through the router (#194): a re-tap of the selected
+            // tab arrives as a write of the same value, which pops it.
+            TabView(selection: $router.tab) {
                 ForEach(tabs.bottomTabs) { surface in
                     surface.screen
+                        // The root's `RoutedStack` keeps its path in the
+                        // router under this surface.
+                        .environment(\.routedSurface, surface)
                         .tabItem { Label(surface.label, systemImage: surface.icon) }
                         // How many conversations have something unread
                         // (PARITY GAP 7) — THREADS, not messages; 0 draws no
@@ -118,9 +126,12 @@ struct MainTabView: View {
                         // When Борса is not on the bar the app menu's row
                         // carries the count instead.
                         .badge(surface == .exchange ? unread.count : 0)
+                        .tag(surface)
                 }
             }
+            .onChange(of: tabs.bottomTabs) { _, bar in router.adoptBar(bar) }
         }
+        .environment(router)
         // Drained on launch and on every return to the foreground — which
         // is when a farmer who recorded something in a field has most
         // likely just found signal. Waiting for them to press a button

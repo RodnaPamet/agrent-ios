@@ -223,8 +223,10 @@ final class ExchangeMapOffersAreTappableTests: XCTestCase {
     }
 
     func testEveryOfferUnderTheMapIsALinkToTheDetail() throws {
+        // A value link since #194: the route, not the view, is in the row,
+        // and `AppRoute.destination` turns it into the detail (below).
         let map = try source("Agrent/Exchange/ExchangeMapView.swift")
-        XCTAssertTrue(map.contains("ListingDetailView(listing: listing)"),
+        XCTAssertTrue(map.contains("NavigationLink(value: AppRoute.listing(listing))"),
                       "an offer under the map must open the listing's detail")
         XCTAssertTrue(map.contains("ListingRow(listing: listing)"),
                       "the map's offer rows must be the list view's rows")
@@ -235,6 +237,11 @@ final class ExchangeMapOffersAreTappableTests: XCTestCase {
 
         // Positive control: the list view has the same link.
         let list = try source("Agrent/Exchange/ExchangeView.swift")
-        XCTAssertTrue(list.contains("ListingDetailView(listing: listing)"))
+        XCTAssertTrue(list.contains("NavigationLink(value: AppRoute.listing(listing))"))
+
+        // And that route IS the listing's detail.
+        let route = try source("Agrent/Tabs/AppRoute.swift")
+        XCTAssertTrue(route.contains("case .listing(let listing): ListingDetailView(listing: listing)"),
+                      "the listing route no longer opens the listing's detail")
     }
 }

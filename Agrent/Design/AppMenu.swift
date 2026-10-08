@@ -129,7 +129,14 @@ struct AppMenuButton<Extra: View>: View {
         // screens that START as tabs never needed one until the customiser
         // could move them, and the four that start here had one that did
         // nothing whenever they were moved onto the bar.
-        .sheet(item: $presented) { $0.screen.environment(\.presentedFromMenu, true) }
+        //
+        // And no `routedSurface` (#194): this menu sits on a tab, so the
+        // sheet would inherit that tab's surface and push onto ITS path.
+        .sheet(item: $presented) {
+            $0.screen
+                .environment(\.presentedFromMenu, true)
+                .environment(\.routedSurface, nil)
+        }
     }
 }
 

@@ -105,9 +105,9 @@ struct ExchangeMapView: View {
     @ViewBuilder
     private func offerLinks(_ offers: [ExchangeListing]) -> some View {
         ForEach(offers) { listing in
-            NavigationLink {
-                ListingDetailView(listing: listing)
-            } label: {
+            // Pushed onto Борса's stack, whose root registers `AppRoute`:
+            // the same detail the list opens.
+            NavigationLink(value: AppRoute.listing(listing)) {
                 ListingRow(listing: listing)
             }
         }
