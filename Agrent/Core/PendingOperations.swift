@@ -237,13 +237,14 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
         id: String = UUID().uuidString,
         _ mark: LineMark,
         ownerUserID: String,
+        farm: String? = nil,
         summary: String,
         payload: Data,
         reason: String?,
         at now: Date = Date()
     ) -> PendingOperation {
         PendingOperation(
-            id: id, locationID: nil, ownerUserID: ownerUserID,
+            id: id, locationID: nil, ownerUserID: ownerUserID, tenantSlug: farm,
             parcelSummary: summary, payload: payload, createdAt: now,
             attempts: 0, lastAttemptAt: nil, lastError: reason,
             lineMark: mark

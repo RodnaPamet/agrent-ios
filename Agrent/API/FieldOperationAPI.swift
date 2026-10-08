@@ -65,8 +65,13 @@ enum FieldOperationAPI {
         let body: Data
         /// The line's version as the screen READ it — the `If-Match`.
         let seenVersion: Int
+        /// The farm the mark was made on, taken when the request is BUILT.
+        /// A mark that fails to send is queued afterwards, from a task that
+        /// can outlive the screen — after a farm switch, or Изход — and the
+        /// queued copy has to go where the tap was, not where the app is.
+        var farm: String? = FarmPath.openSlug
 
-        var path: String { FieldOperationAPI.linePath(taskID: taskID, lineID: lineID) }
+        var path: String { FieldOperationAPI.linePath(taskID: taskID, lineID: lineID, tenant: farm) }
     }
 
     /// What a landed mark reports back, read leniently: the 200 carries

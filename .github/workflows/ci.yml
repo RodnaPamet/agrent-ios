@@ -448,17 +448,25 @@ jobs:
       # no farm was open, so a request built in that state went to a farm the
       # person never chose. It is gone: a farm path is built from the open
       # farm or from none, and `APIClient` refuses one with none. This keeps
-      # both doors shut — the old name, and a `"/api/t/` literal anywhere but
-      # the one builder. Comment lines are skipped; they may name either.
+      # the doors shut — the old name; a `"/api/t/` literal anywhere but the
+      # one builder; and the pinned farm's name outside the four files that
+      # keep it for a migration and the fixture world, since
+      # `openSlug ?? Config.pinnedFarmSlug` would bring the fallback back
+      # without either of the others noticing. Comment lines are skipped.
       - name: Farm paths come from FarmPath
         run: |
           code() { awk '{ l=$0; sub(/^[^:]*:[0-9]+:/, "", l); if (l !~ /^[ \t]*\/\//) print }'; }
           old=$(grep -rn --include='*.swift' -F 'Config.tenantSlug' Agrent/ | code || true)
           literal=$(grep -rn --include='*.swift' -F '"/api/t/' Agrent/ \
                     | grep -v '^Agrent/API/FarmPath.swift:' | code || true)
-          if [ -n "$old$literal" ]; then
+          pinned=$(grep -rn --include='*.swift' -F 'pinnedFarmSlug' Agrent/ \
+                   | grep -v -e '^Agrent/Config.swift:' -e '^Agrent/Core/ActiveFarm.swift:' \
+                             -e '^Agrent/Core/PendingOperations.swift:' \
+                             -e '^Agrent/Debug/FixtureCatalogue.swift:' | code || true)
+          if [ -n "$old$literal$pinned" ]; then
             [ -n "$old" ] && echo "$old"
             [ -n "$literal" ] && echo "$literal"
+            [ -n "$pinned" ] && echo "$pinned"
             echo "::error::Build farm paths from FarmPath.root, or FarmPath.root(for:) for a queued"
             echo "::error::record's own farm. A literal or a fallback can put another farm in a path."
             exit 1

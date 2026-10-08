@@ -747,6 +747,9 @@ actor APIClient {
         path: String, method: String, body: Data?, idempotencyKey: String?,
         ifMatch: String? = nil, contentType: String? = nil
     ) async throws -> Data {
+        // Before the tokens: a refresh is a request too, and nothing goes
+        // out for a farm path with no farm in it (`FarmPath`, #192).
+        guard !FarmPath.isUnscoped(path) else { throw APIError.noFarmOpen }
         var tokens = try currentTokens()
         if tokens.isExpired { tokens = try await refresh(tokens) }
 

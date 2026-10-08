@@ -176,19 +176,30 @@ actor ResponseCache {
     }
 }
 
-/// Whose cache entry this is: the signed-in user and the farm.
+/// Whose cache entry this is: the signed-in user, and — for a farm's data —
+/// the farm.
 ///
-/// Built only by `current()` in the app, which returns nil when nobody's
+/// Built only by `current(for:)` in the app, which returns nil when nobody's
 /// identity is known — and nil means NO CACHE, not a shared one. See
 /// `SessionIdentity` for why unknown fails closed.
 struct CacheScope: Equatable, Sendable {
     let userID: String
+    /// The farm a farm path's entry belongs to; EMPTY for the person's own
+    /// data (`/api/auth/me`), which is no farm's.
     let tenant: String
 
-    static func current(identity: SessionIdentity = .shared) -> CacheScope? {
-        // No farm open, no cache: an entry needs a farm to belong to, and
-        // keying one under the pinned farm is the guess `FarmPath` stopped.
-        guard let userID = identity.userID, let farm = FarmPath.openSlug else { return nil }
+    /// The scope for THIS path (agrent-ios#192).
+    ///
+    /// A FARM path belongs to the open farm, and with none open it has no
+    /// scope and is not cached: keying it under the pinned farm is the guess
+    /// `FarmPath` stopped making. Anything else is the PERSON's, whichever
+    /// farm is open or none: `/me` is one answer per person, so it is cached
+    /// once — and an offline launch with no farm, or the first one after a
+    /// switch, still has an identity to show and to record work under.
+    static func current(for pathAndQuery: String, identity: SessionIdentity = .shared) -> CacheScope? {
+        guard let userID = identity.userID else { return nil }
+        guard pathAndQuery.hasPrefix(FarmPath.prefix) else { return CacheScope(userID: userID, tenant: "") }
+        guard let farm = FarmPath.openSlug else { return nil }
         return CacheScope(userID: userID, tenant: farm)
     }
 }

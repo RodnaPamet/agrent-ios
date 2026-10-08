@@ -257,7 +257,7 @@ final class FieldOperationStore {
                 let mark = PendingOperation.LineMark(
                     taskID: taskID, lineID: line.id, status: target.rawValue, seenVersion: seen)
                 await outbox.enqueueMark(.mark(
-                    mark, ownerUserID: me.id,
+                    mark, ownerUserID: me.id, farm: request.farm,
                     summary: FieldOperationRules.summary(
                         taskKey: taskKey, parcel: line.parcel.name, status: target),
                     payload: body, reason: UserMessage.text(for: error)))
