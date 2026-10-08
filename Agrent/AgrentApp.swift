@@ -264,9 +264,10 @@ struct SignInView: View {
             // other configured provider. Apple through Apple's OWN button,
             // which the guidelines require as-is and which App Review
             // requires beside any third-party sign-in. It labels itself in
-            // the APP's declared language, and this app declares no Bulgarian
-            // localisation yet, so it reads "Sign in with Apple" — its Voice
-            // Control names are given in both. Until the server has an Apple
+            // the APP's declared language — Bulgarian since agrent-ios#201,
+            // so «Вход с Apple» even on a phone set to English. Its Voice
+            // Control names stay in both: Voice Control listens in its own
+            // language setting, not the app's. Until the server has an Apple
             // audience, a tap ends in «…все още не е включен», and Google and
             // Microsoft are untouched by it.
             VStack(spacing: 12) {
