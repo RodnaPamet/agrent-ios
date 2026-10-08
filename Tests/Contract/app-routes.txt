@@ -6,10 +6,13 @@
 # still calls.
 /api/account/avatar/{userId}
 /api/account/bottom-tabs
+/api/auth/accept-terms
 /api/auth/me
+/api/auth/native/apple
 /api/auth/native/exchange
 /api/auth/native/revoke
 /api/auth/native/start
+/api/auth/terms
 /api/auth/token/refresh
 /api/me/farms
 /api/public/eik-check

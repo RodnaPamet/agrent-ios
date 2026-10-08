@@ -15,20 +15,40 @@ final class AuthClient: NSObject {
         case signedOut
         case signingIn
         case signedIn
+        /// Signed in, but the account has not accepted the terms of use — a
+        /// first Sign in with Apple. Only `TermsAcceptanceView` is shown: the
+        /// server answers 403 to every farm and person route until it is
+        /// done (agrent-ios#193).
+        case termsPending
         case failed(String)
+    }
+
+    /// Who signs a person in through the system browser. Both are the
+    /// server's configured identity providers; the id is its own
+    /// (`/api/auth/native/start?provider=`, which refuses anything else).
+    enum Provider: String, Sendable {
+        case google = "google"
+        case microsoft = "microsoft-entra-id"
     }
 
     private(set) var state: State = .signedOut
     private var session: ASWebAuthenticationSession?
 
+    /// The RAW nonce of the Apple request on its way — one per attempt, and
+    /// spent whatever happens to it. The server claims a nonce before it
+    /// answers, so the same one sent twice is a replay to it (`AppleSignIn`).
+    private var appleNonce: String?
+
     override init() {
         super.init()
-        if TokenStore.load() != nil { state = .signedIn }
+        if let tokens = TokenStore.load() {
+            state = tokens.termsPending == true ? .termsPending : .signedIn
+        }
     }
 
-    func signIn() async {
+    func signIn(with provider: Provider = .google) async {
         state = .signingIn
-        Log.auth.info("sign-in started")
+        Log.auth.info("sign-in started (\(provider.rawValue, privacy: .public))")
         let pkce = PKCE()
 
         var comps = URLComponents(
@@ -39,7 +59,7 @@ final class AuthClient: NSObject {
             .init(name: "redirect_uri", value: Config.redirectURI),
             .init(name: "code_challenge", value: pkce.challenge),
             .init(name: "code_challenge_method", value: "S256"),
-            .init(name: "provider", value: "google"),
+            .init(name: "provider", value: provider.rawValue),
         ]
 
         do {
@@ -67,6 +87,108 @@ final class AuthClient: NSObject {
             state = .failed(friendly(error))
             Log.auth.error("sign-in failed: \(Log.summary(for: error), privacy: .public)")
         }
+    }
+
+    // MARK: - Sign in with Apple (agrent-ios#193)
+
+    /// Configure Apple's request: a FRESH nonce for this attempt — its hash to
+    /// Apple, the raw value kept for the exchange — and the email, which
+    /// Apple sends only on a first authorisation and the server needs to
+    /// create or find the account.
+    func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
+        let raw = AppleSignIn.makeNonce()
+        appleNonce = raw
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = AppleSignIn.hashed(raw)
+    }
+
+    /// Whether an Apple request is waiting for its answer — for tests.
+    var appleRequestInFlight: Bool { appleNonce != nil }
+
+    /// Apple's answer: trade its identity token for this app's pair.
+    func completeAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
+        // Spent now, whatever happens next: a retry is a new request.
+        let raw = appleNonce
+        appleNonce = nil
+        switch result {
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code == .canceled {
+                state = .signedOut
+                Log.auth.info("apple sign-in cancelled by user")
+            } else {
+                state = .failed(AppleSignIn.Text.unavailableHere)
+                Log.auth.error("apple authorization failed: \(Log.summary(for: error), privacy: .public)")
+            }
+        case .success(let authorization):
+            guard let raw,
+                  let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let data = credential.identityToken,
+                  let token = String(data: data, encoding: .utf8)
+            else {
+                state = .failed(AppleSignIn.Text.failed)
+                Log.auth.error("apple authorization carried no identity token")
+                return
+            }
+            state = .signingIn
+            do {
+                if try await exchangeApple(identityToken: token, nonce: raw) {
+                    state = .termsPending
+                    Log.auth.info("apple sign-in complete, terms pending")
+                } else {
+                    _ = await CurrentUserStore.shared.load()
+                    state = .signedIn
+                    Log.auth.info("apple sign-in complete")
+                }
+            } catch {
+                if case .server(let status, let code, _) = error as? AuthError {
+                    state = .failed(AppleSignIn.message(status: status, code: code))
+                } else {
+                    state = .failed(friendly(error))
+                }
+                Log.auth.error("apple sign-in failed: \(Log.summary(for: error), privacy: .public)")
+            }
+        }
+    }
+
+    /// The terms are accepted (`TermsAcceptanceView`): the session is an
+    /// ordinary one from here.
+    func termsAccepted() async {
+        if var tokens = TokenStore.load() {
+            tokens.termsPending = nil
+            TokenStore.save(tokens)
+        }
+        _ = await CurrentUserStore.shared.load()
+        state = .signedIn
+        Log.auth.info("terms accepted")
+    }
+
+    /// Returns whether the new account's terms are pending.
+    private func exchangeApple(identityToken: String, nonce: String) async throws -> Bool {
+        var req = URLRequest(url: Config.baseURL.appending(path: AppleSignIn.path))
+        ClientHeader.stamp(&req)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(AppleSignIn.Request(identityToken: identityToken, nonce: nonce))
+
+        // `NoURLCache.session`, as for the code exchange: the 200 carries the
+        // pair. The identity token is never logged.
+        let (data, response) = try await NoURLCache.session.data(for: req)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        Log.auth.info("apple exchange → \(status, privacy: .public)")
+        guard status == 200 else {
+            let env = APIClient.envelope(from: data)
+            throw AuthError.server(status: status, code: env?.code, message: env?.message)
+        }
+        let granted = try JSONDecoder().decode(AppleSignIn.Granted.self, from: data)
+        // From nothing, as every sign-in starts — see `exchange`.
+        SessionReset.beginFreshSession()
+        TokenStore.save(Tokens(
+            accessToken: granted.accessToken,
+            refreshToken: granted.refreshToken,
+            expiresAt: Date().addingTimeInterval(TimeInterval(granted.expiresIn)),
+            termsPending: granted.termsPending ? true : nil
+        ))
+        return granted.termsPending
     }
 
     func signOut() {

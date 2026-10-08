@@ -732,7 +732,7 @@ jobs:
       # the spec exists to avoid, and lets the two drift apart.
       - name: Generated files stay out of git
         run: |
-          for path in "Agrent.xcodeproj" "Agrent/Info.plist"; do
+          for path in "Agrent.xcodeproj" "Agrent/Info.plist" "Agrent/Agrent.entitlements"; do
             if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
               echo "::error::$path is tracked but is generated from project.yml."
               exit 1

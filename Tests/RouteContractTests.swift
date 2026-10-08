@@ -100,9 +100,12 @@ final class RouteContractTests: XCTestCase {
     /// snapshot serves the route, so the refresh that brings it in must also
     /// take it off this list. An entry cannot outlive its reason.
     ///
-    /// Empty since the snapshot from agri-saas main a3df5f0, which serves
-    /// `/api/auth/native/revoke` (agri-saas#1206) — its entry expired.
-    private static let pendingServerRoutes: [String: String] = [:]
+    /// Empty from agri-saas main a3df5f0, which served
+    /// `/api/auth/native/revoke` (agri-saas#1206), until P4.4 (#193):
+    private static let pendingServerRoutes: [String: String] = [
+        "/api/auth/native/apple": "Sign in with Apple's exchange — agri-saas #1404 (P4.2), in review",
+        "/api/auth/terms": "the current terms version for in-app acceptance — backend 1, building 2026-10-08",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -130,6 +133,9 @@ final class RouteContractTests: XCTestCase {
             ("CurrentUser.swift", [MeAPI.path]),
             // A person's farms, outside any one farm (#179).
             ("FarmsAPI.swift", [FarmsAPI.farmsPath, FarmsAPI.eikCheckPath]),
+            // Sign in with Apple and in-app terms acceptance (#193, P4.4).
+            ("AppleSignIn.swift", [AppleSignIn.path]),
+            ("TermsAcceptance.swift", [TermsAPI.currentPath, TermsAPI.acceptPath]),
             // The Админ account card's picture. The app no longer BUILDS this
             // path — it follows a root-relative `avatarUrl` from `/me` — but
             // it still CALLS it, so the route is held here in the shape the

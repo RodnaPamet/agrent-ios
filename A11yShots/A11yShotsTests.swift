@@ -1094,7 +1094,7 @@ final class A11yShotsTests: XCTestCase {
     ///      evidence this is the fixture world.
     private func assertSeamActive(_ app: XCUIApplication) {
         // A short wait ON PURPOSE: the thing being ruled out.
-        if app.buttons["Вход"].waitForExistence(timeout: 3) {
+        if app.buttons["Вход с Google"].waitForExistence(timeout: 3) {
             XCTFail("""
             The app is on SignInView, so the UI test seam is OFF.
 

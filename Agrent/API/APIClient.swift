@@ -1144,7 +1144,9 @@ actor APIClient {
             let fresh = Tokens(
                 accessToken: r.accessToken,
                 refreshToken: r.refreshToken,
-                expiresAt: Date().addingTimeInterval(TimeInterval(r.expiresIn))
+                expiresAt: Date().addingTimeInterval(TimeInterval(r.expiresIn)),
+                // A refresh is the same session: still pending if it was.
+                termsPending: seen.termsPending
             )
             // NOT saved if the session ended while this was in flight: that
             // would resurrect a signed-out user's tokens. The pair is still

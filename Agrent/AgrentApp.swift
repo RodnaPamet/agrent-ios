@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 @main
@@ -52,6 +53,10 @@ struct AgrentApp: App {
                 case .signedIn:
                     // Which farm, before any of it — see `FarmGate`.
                     FarmGate()
+                case .termsPending:
+                    // Nothing of a farm or a person can be read until the
+                    // terms are accepted — see `TermsAPI` (#193).
+                    TermsAcceptanceView()
                 default:
                     SignInView()
                 }
@@ -215,6 +220,7 @@ struct ForegroundReturn {
 
 struct SignInView: View {
     @Environment(AuthClient.self) private var auth
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 20) {
@@ -240,20 +246,56 @@ struct SignInView: View {
                     .padding(.horizontal)
             }
 
-            Button {
-                Task { await auth.signIn() }
-            } label: {
-                if auth.state == .signingIn {
-                    ProgressView()
-                } else {
-                    Text("Вход").frame(maxWidth: .infinity)
+            // ── Three ways in (agrent-ios#193, P4.4) ──
+            //
+            // Google first and prominent: it is how every account so far was
+            // made. Microsoft through the same browser flow — the server's
+            // other configured provider. Apple through Apple's OWN button,
+            // which the guidelines require as-is and which App Review
+            // requires beside any third-party sign-in; it labels itself in
+            // the device's language. Until the server has an Apple audience,
+            // a tap ends in «…все още не е включен», and Google and Microsoft
+            // are untouched by it.
+            VStack(spacing: 12) {
+                Button {
+                    Task { await auth.signIn(with: .google) }
+                } label: {
+                    if auth.state == .signingIn {
+                        ProgressView()
+                    } else {
+                        Text(SignInText.google).frame(maxWidth: .infinity)
+                    }
                 }
+                .prominentButton()
+                .accessibilityInputLabels(A11y.spokenNames(SignInText.google, "Sign in with Google"))
+
+                Button {
+                    Task { await auth.signIn(with: .microsoft) }
+                } label: {
+                    Text(SignInText.microsoft).frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityInputLabels(A11y.spokenNames(SignInText.microsoft, "Sign in with Microsoft"))
+
+                SignInWithAppleButton(.signIn) { request in
+                    auth.prepareAppleRequest(request)
+                } onCompletion: { result in
+                    Task { await auth.completeAppleSignIn(result) }
+                }
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                // The HIG's minimum, and the height of the large buttons
+                // above it at the default text size.
+                .frame(minHeight: 50)
             }
-            .prominentButton()
             .controlSize(.large)
             .disabled(auth.state == .signingIn)
             .padding(.horizontal, 40)
         }
         .padding()
     }
+}
+
+enum SignInText {
+    static let google = "Вход с Google"
+    static let microsoft = "Вход с Microsoft"
 }
