@@ -299,8 +299,38 @@ actor APIClient {
     /// answers a failure with an HTML page is the ordinary case, not an
     /// exceptional one.
     static func envelope(from data: Data) -> ErrorEnvelope.Err? {
-        (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error
+        (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error.map(normalised)
     }
+
+    /// Two refusals whose code is not where the spec says codes go, read as
+    /// if it were — WHITELISTED, so no other prose ever becomes a code, and
+    /// each due to go once the server moves it (agrent-ios#179).
+    ///
+    /// 1. THE TERMS GATE. `middleware.ts` answers a consent-pending caller
+    ///    403 `{"error": "Terms acceptance required"}`: the bare-string shape,
+    ///    so its "code" is that English sentence, and the generic 403 text
+    ///    would tell someone who has not accepted the terms that they lack
+    ///    permission. A coded envelope is asked of agri-saas.
+    /// 2. FARM CREATION (`POST /api/me/farms`, agri-saas#1362). Its refusals
+    ///    are thrown as `badRequest('FARM_NAME_REQUIRED')`, which puts the
+    ///    code in `message` and `BAD_REQUEST` in `code` (traced on main,
+    ///    2026-10-08; `codedBadRequest` asked of backend 1).
+    static func normalised(_ err: ErrorEnvelope.Err) -> ErrorEnvelope.Err {
+        if err.code == "Terms acceptance required" {
+            return .init(code: "TERMS_ACCEPTANCE_REQUIRED", message: nil, details: nil)
+        }
+        if err.code == "BAD_REQUEST", let message = err.message, farmCreationCodes.contains(message) {
+            return .init(code: message, message: nil, details: err.details, params: err.params)
+        }
+        return err
+    }
+
+    /// The codes `POST /api/me/farms` refuses with — the route's and its
+    /// usecase's, read from agri-saas#1362.
+    static let farmCreationCodes: Set<String> = [
+        "FARM_NAME_REQUIRED", "FARM_NAME_TOO_LONG", "FARM_NAME_NOT_SLUGGABLE", "FARM_SLUG_UNAVAILABLE",
+        "EIK_LOOKS_LIKE_EGN", "EIK_INVALID", "ACCOUNT_HAS_NO_EMAIL", "INVALID_FARM_PAYLOAD",
+    ]
 
     /// What a 409 becomes. Out of `send` so the mapping is a unit test: there
     /// is no URLProtocol seam in `Tests/`, and "the versions come from

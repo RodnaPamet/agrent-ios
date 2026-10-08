@@ -44,10 +44,28 @@ struct ProfileView: View {
     /// what separates "still asking" from "could not find out".
     @State private var identityUnavailable = false
     @State private var confirmingSignOut = false
+    @State private var flags = FeatureFlags.shared
+    @State private var addingFarm = false
 
     var body: some View {
         List {
             Section { identity }.pageRow()
+
+            // A person's farms are the person's, not one farm's — so Профил,
+            // not Админ (owner, 2026-10-08, agrent-ios#179). Offered only when
+            // the server offers it to this person: `POST /api/me/farms`
+            // follows the same flag, and an absent flag is off.
+            if flags.isOn(FarmWizardText.flag) {
+                Section {
+                    Button {
+                        addingFarm = true
+                    } label: {
+                        Label(FarmWizardText.addTitle, systemImage: "plus.circle")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames(FarmWizardText.addTitle, "Add farm"))
+                }
+                .pageRow()
+            }
 
             // Its own section, so the destructive row never reads as one more
             // fact about the account. ALWAYS drawn — a page that cannot say
@@ -68,6 +86,14 @@ struct ProfileView: View {
         }
         .pageBackground()
         .inlineTitle("Профил")
+        // Its own stack: a sheet over Профил, wherever Профил was opened.
+        // Opening the new farm rebuilds the tabs for it (`FarmGate`), which
+        // takes this sheet and the screens under it away with the old farm.
+        .sheet(isPresented: $addingFarm) {
+            NavigationStack {
+                FarmWizardView(context: .adding) { FarmStore.shared.activate($0) }
+            }
+        }
         // The launch already asked; this returns that answer without a request
         // when there is one, and asks again (cache first) when the launch got
         // nothing — the case where this page would otherwise spin forever.

@@ -414,6 +414,33 @@ enum UserMessage {
         // have drifted, and the farmer still needs a sentence they can read.
         "VALIDATION_ERROR": "Сървърът не прие данните. Проверете полетата и опитайте отново.",
 
+        // The terms gate (`middleware.ts`): every farm and person route
+        // refuses a caller who has not accepted the terms of use. Not a
+        // permission — saying "you lack the rights" would send them to the
+        // farm's owner for something only they can do. Read from the bare
+        // 403 by `APIClient.normalised` until the server codes it.
+        "TERMS_ACCEPTANCE_REQUIRED":
+            "Трябва да приемете условията за ползване. Отворете уеб приложението, "
+            + "приемете ги и опитайте отново.",
+
+        // Creating a farm (`POST /api/me/farms`, agri-saas#1362) — codes
+        // rather than prose BY DESIGN, so the words are this app's. The two
+        // ЕИК lines are the web wizard's own (`farmWizard.eikLooksLikeEgn`,
+        // `eikInvalid`): an ЕГН typed by mistake is said to be one, never
+        // called "invalid".
+        "FARM_NAME_REQUIRED": "Въведете име на стопанството.",
+        "FARM_NAME_TOO_LONG": "Името на стопанството е твърде дълго — до 120 знака.",
+        "FARM_NAME_NOT_SLUGGABLE":
+            "Името трябва да съдържа поне една буква или цифра — не само знаци.",
+        "FARM_SLUG_UNAVAILABLE":
+            "Не успяхме да създадем адрес за това име. Опитайте с малко по-различно име.",
+        "EIK_LOOKS_LIKE_EGN": "Това прилича на ЕГН — не го въвеждайте тук.",
+        "EIK_INVALID": "Това не е валиден ЕИК. Проверете цифрите.",
+        "ACCOUNT_HAS_NO_EMAIL":
+            "Профилът Ви няма имейл адрес, а без него не може да се създаде стопанство.",
+        "INVALID_FARM_PAYLOAD":
+            "Сървърът не прие данните за стопанството. Проверете полетата и опитайте отново.",
+
         // The farm-profile PUT refuses ANY body that carries `eik`, even
         // unchanged or null (agri-saas#1352, P3.9): the ЕИК is written only by
         // Agrent staff verifying the farm's identity. This client never sends

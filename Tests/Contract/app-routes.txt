@@ -11,6 +11,8 @@
 /api/auth/native/revoke
 /api/auth/native/start
 /api/auth/token/refresh
+/api/me/farms
+/api/public/eik-check
 /api/t/{tenantSlug}/admin/farm-profile
 /api/t/{tenantSlug}/admin/invites
 /api/t/{tenantSlug}/admin/members
