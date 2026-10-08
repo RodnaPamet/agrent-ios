@@ -296,12 +296,26 @@ struct ExchangeMessage: Decodable, Equatable, Sendable, Identifiable {
 
     var speaker: MessageSpeaker { MessageSpeaker(mine: mine, fromMyFarm: fromMyFarm) }
 
-    /// The name to show, or nil for none. A name of nothing but spaces is
-    /// none: the spec asks for a fallback rather than an empty bubble label,
-    /// and a blank one would be exactly that.
+    /// The name to show, or nil for none — and then the caption says what
+    /// the sender is to me instead. None, for three kinds of name:
+    ///
+    /// - nothing but spaces: the spec asks for a fallback rather than an
+    ///   empty bubble label, and a blank one would be exactly that;
+    /// - a ciphertext: `User.name` is encrypted at rest, and a decryption
+    ///   that fails has reached a screen before (`WorkItemSummary.Assignee`,
+    ///   2026-09-22) — VoiceOver would spell it out before every message;
+    /// - one of the APP'S OWN speaker words. A name is the sender's to
+    ///   choose, and the other side named «Вие» or «Колега от
+    ///   стопанството» would otherwise caption their words as mine or a
+    ///   colleague's.
     var displayName: String? {
         guard let trimmed = senderName?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty else { return nil }
+              !trimmed.isEmpty,
+              !WorkItemSummary.Assignee.isCipherEnvelope(trimmed),
+              !MessageSpeaker.allCases.contains(where: {
+                  $0.label.compare(trimmed, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+              })
+        else { return nil }
         return trimmed
     }
 

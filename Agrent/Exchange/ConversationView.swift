@@ -79,7 +79,7 @@ struct ConversationView: View {
             guard unavailable else { return }
             AccessibilityNotification.Announcement(ConversationAvailability.title).post()
         }
-        .alert("Да блокирате ли другата страна?", isPresented: $confirmingBlock) {
+        .alert(MessagingPolicy.blockTitle, isPresented: $confirmingBlock) {
             Button("Блокирай", role: .destructive) { Task { await store.setBlocked(true) } }
             Button("Отказ", role: .cancel) {}
         } message: {
@@ -447,10 +447,14 @@ struct MessageBubble: View {
             if speaker.isOurSide { Spacer(minLength: 48) }
             VStack(alignment: speaker.isOurSide ? .trailing : .leading, spacing: 4) {
                 // The sender's name when the server has one (#1399), else
-                // what they are to me; «Вие» for my own words.
+                // what they are to me; «Вие» for my own words. Aligned to its
+                // own side when it wraps — a long name does even at the
+                // default size — or a caption over my bubble would start at
+                // the other side's edge and read as theirs.
                 Text("\(speaker.caption(name: message.displayName)), \(time)")
                     .font(.caption)
                     .foregroundStyle(Palette.secondaryText)
+                    .multilineTextAlignment(speaker.isOurSide ? .trailing : .leading)
                 bubble
             }
             if !speaker.isOurSide { Spacer(minLength: 48) }
@@ -482,19 +486,19 @@ struct MessageBubble: View {
         message.isTombstone ? "Съобщението е премахнато" : (message.body ?? "")
     }
 
-    /// The VoiceOver sentence: «Мария Синтетична, колега от стопанството,
+    /// The VoiceOver sentence: «Колега от стопанството, Мария Синтетична,
     /// Може и в петък, 09:00.» A static function so a test can hold it per
     /// speaker without a view.
     ///
-    /// A NAMED colleague is still said to be one. On screen their words sit
-    /// on my farm's side in the colleague's style; VoiceOver hears neither,
-    /// and a name alone would leave a listener to work out whose side spoke.
-    /// The other side needs no such word: theirs is the only other side.
+    /// WHAT THEY ARE TO ME FIRST, in the app's own words, and then the name.
+    /// On screen a sender's side and style say whose words these are;
+    /// VoiceOver hears neither. A name is the sender's to choose — and
+    /// commas in it are joined into this sentence as any other — so led by
+    /// the name, the other side could be heard as a colleague, or as me.
+    /// My own words are «Вие» alone.
     static func spoken(speaker: MessageSpeaker, name: String? = nil, body: String, time: String) -> String {
-        var who = [speaker.caption(name: name)]
-        if speaker == .colleague, name != nil {
-            who.append(speaker.label.lowercased())
-        }
+        var who = [speaker.label]
+        if speaker != .me, let name { who.append(name) }
         return A11y.sentence(who + [body, time])
     }
 

@@ -492,8 +492,11 @@ enum UserMessage {
         "BLOCK_SELLER_ONLY": "Само собственикът на обявата може да блокира или отблокира.",
         "LISTING_NOT_FOUND": "Обявата не беше намерена.",
         "THREAD_OWN_LISTING": "Не можете да започнете разговор по обява на Вашето стопанство.",
-        // True under the person-level block of agri-saas #1397 and the
-        // farm-level one before it alike: you are refused either way.
+        // Said to whoever the server refuses: the person blocked, opening a
+        // conversation on any listing of that farm or writing in theirs. A
+        // colleague of theirs is not refused elsewhere; if the server refuses
+        // one in the blocked conversation, «от Вас» overstates it slightly,
+        // and the notice under the conversation says the exact scope.
         "THREAD_BLOCKED": "Собственикът на обявата не приема съобщения от Вас.",
         // Reached only when the server's sanitiser strips a draft the app
         // thought had text — `<ivan@abv.bg>` is a tag to it — because the

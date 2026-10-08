@@ -63,17 +63,23 @@ final class MessageSpeakerTests: XCTestCase {
         XCTAssertEqual(MessageSpeaker.counterparty.caption(name: nil), "Отсрещната страна")
     }
 
-    /// A NAMED colleague is still said to be one: VoiceOver hears neither the
-    /// side nor the bubble's style that tell a sighted reader so.
-    func testVoiceOverSaysANamedColleagueIsOne() {
+    /// What the sender is to me FIRST, in the app's own words, then their
+    /// name: VoiceOver hears neither the side nor the style that tell a
+    /// sighted reader whose words these are, and a name is the sender's to
+    /// choose. My own words are «Вие» alone.
+    func testVoiceOverSaysWhoTheyAreToMeFirst() {
         XCTAssertEqual(MessageBubble.spoken(speaker: .colleague, name: "Мария Синтетична",
                                             body: "Може и в петък", time: "08:45"),
-                       "Мария Синтетична, колега от стопанството, Може и в петък, 08:45.")
+                       "Колега от стопанството, Мария Синтетична, Може и в петък, 08:45.")
         XCTAssertEqual(MessageBubble.spoken(speaker: .counterparty, name: "Петър Примеров",
                                             body: "Здравейте", time: "08:00"),
-                       "Петър Примеров, Здравейте, 08:00.")
+                       "Отсрещната страна, Петър Примеров, Здравейте, 08:00.")
         XCTAssertEqual(MessageBubble.spoken(speaker: .me, name: "Иван Фикстуров", body: "Да", time: "08:30"),
                        "Вие, Да, 08:30.")
+        // A name with commas in it still comes AFTER the role, so it cannot
+        // stand in for one.
+        XCTAssertTrue(MessageBubble.spoken(speaker: .counterparty, name: "Вие, Иван",
+                                           body: "Да", time: "08:30").hasPrefix("Отсрещната страна, "))
     }
 
     /// Only my own message offers «Премахни» — the server compares the
@@ -207,7 +213,13 @@ final class PrivateConversationWordingTests: XCTestCase {
         // wider than this conversation, and not the other farm's colleagues.
         XCTAssertTrue(MessagingPolicy.blockedNotice(role: .seller).contains("всички обяви"))
         XCTAssertTrue(MessagingPolicy.blockConfirmation.contains("всички обяви"))
-        XCTAssertTrue(MessagingPolicy.blockConfirmation.contains("Другите хора от нейното стопанство все още могат"))
+        XCTAssertTrue(MessagingPolicy.blockConfirmation.contains("Другите хора от неговото стопанство все още могат"))
+        // WHOM: the person who started the conversation, not «другата
+        // страна» — two people can write on that side.
+        for text in [MessagingPolicy.blockTitle, MessagingPolicy.blockConfirmation,
+                     MessagingPolicy.blockedNotice(role: .seller)] {
+            XCTAssertTrue(text.contains("човека, започнал разговора"), text)
+        }
     }
 
     /// The person-level codes speak to the person; the farm-level ones still

@@ -224,6 +224,21 @@ final class ExchangeMessagingModelTests: XCTestCase {
 
         let named = try await message(name: #"" Петър Примеров ""#)
         XCTAssertEqual(named.displayName, "Петър Примеров", "positive control: a real name, trimmed")
+
+        // A ciphertext is never a name: `User.name` is encrypted at rest.
+        let sealed = try await message(name: #""v1:FTDt/c3ludGhldGljLWNpcGhlcnRleHQ=""#)
+        XCTAssertNil(sealed.displayName)
+    }
+
+    /// The other side cannot caption their words as mine or a colleague's
+    /// by choosing one of the app's own speaker words as a name.
+    func testAnAppSpeakerWordIsNoName() async throws {
+        for forged in ["Вие", "колега от стопанството", " Отсрещната страна "] {
+            let json = #"{"id":"m","senderTenantId":"x","senderUserId":"u","senderName":"\#(forged)","mine":false,"fromMyFarm":false,"body":"Да","deleted":false,"createdAt":"2026-09-28T09:15:00Z"}"#
+            let message = try await APIClient.shared.decode(Data(json.utf8), as: ExchangeMessage.self)
+            XCTAssertNil(message.displayName, forged)
+            XCTAssertEqual(message.speaker.caption(name: message.displayName), "Отсрещната страна", forged)
+        }
     }
 
     /// The two fields, present: decoded as sent.
