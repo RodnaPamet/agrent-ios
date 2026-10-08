@@ -145,6 +145,18 @@ final class ListChromeTests: XCTestCase {
     /// pushes a List the system builds, on `systemGroupedBackground`, which
     /// nothing in the app can reach to paint (#164) — a short list of
     /// options is a `MenuPicker`, a long one a `PagePicker`.
+    /// No system search field: `.searchable` hands its prompt to UIKit, drawn
+    /// at 3.12:1 in light, and nothing styles it (#164). The board's search
+    /// is the app's own `SearchField` — the positive control — whose prompt
+    /// `PaletteTokenTests` measures.
+    func testNoSearchFieldIsTheSystems() {
+        let sources = appSources()
+        let offenders = sources.filter { Self.count(#"\.searchable\("#, in: $0.1) != 0 }.map(\.0)
+        XCTAssertEqual(offenders, [], "a .searchable prompt is UIKit's, 3.12:1 in light — use SearchField")
+        XCTAssertTrue(sources.contains { $0.0 == "ExchangeView.swift" && $0.1.contains("SearchField(") },
+                      "positive control: Борса's board searches through SearchField")
+    }
+
     func testNoPickerPushesASystemPage() {
         let sources = appSources()
         let offenders = sources.filter { Self.count(Self.pushedPicker, in: $0.1) != 0 }.map(\.0)

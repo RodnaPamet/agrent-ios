@@ -365,20 +365,13 @@ enum Palette {
     /// sat on the system's grouped surfaces and were measured there too; all
     /// of them are on the page now (`FormSurfaceTests`), so those pairs went.
     ///
-    /// ONE PAIR HERE IS THE SYSTEM'S AND FAILS: Борса's search prompt.
-    /// `.searchable` hands UIKit the prompt's STRING. A `Text` prompt styled
-    /// with `foregroundStyle` or `foregroundColor`, and an appearance proxy
-    /// on the labels inside `UISearchTextField`, were each read back from a
-    /// hosted `.searchable` field unchanged (iOS 26.5 simulator; there is no
-    /// iOS 17 runtime here to repeat it on). So the prompt is
-    /// `secondaryLabel` on `tertiarySystemFill` over the page, whatever this
-    /// file says — #9aa3a7 on #203733 in the dark capture:
-    ///
-    ///     search prompt               4.94   3.12   5.09
-    ///
-    /// Light is below 4.5, and it is a platform limit rather than a choice:
-    /// no fill fixes it, because `secondaryLabel` is under 4.5 on white
-    /// itself. `PaletteTokenTests` pins it, so a change in the platform shows.
+    /// Борса's search prompt WAS the system's, and failed: `.searchable`
+    /// hands UIKit the prompt's string, drawn in `secondaryLabel` on
+    /// `tertiarySystemFill` — 4.94 / 3.12 / 5.09, under 4.5 in light — and
+    /// nothing styles it (#166 read a styled prompt and an appearance proxy
+    /// back from a hosted field). So the board's search is the app's own
+    /// `SearchField` now (#164, owner 2026-10-08): `placeholder` on
+    /// `Field.fill`, the composer's pair, 5.81 / 5.32 / 7.46.
     enum ListChrome {
         /// A section's header and footer — `SectionHeader`, `SectionFooter`,
         /// `Section(titled:)`.

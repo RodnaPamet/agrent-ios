@@ -142,6 +142,9 @@ enum A11y {
         static let sendMessage = spokenNames("Изпрати съобщението", "Send message")
         /// Close THIS conversation — an act the other farm sees.
         static let closeConversation = spokenNames("Затвори разговора", "Close conversation")
+        /// The house search field (#164) and its clear button.
+        static let search = spokenNames("Търсене", "Search")
+        static let clearSearch = spokenNames("Изчисти търсенето", "Clear search")
         static let block = spokenNames("Блокирай", "Block")
         static let unblock = spokenNames("Отблокирай", "Unblock")
         /// Retract one of the person's OWN messages (per person since agri-saas #1323).

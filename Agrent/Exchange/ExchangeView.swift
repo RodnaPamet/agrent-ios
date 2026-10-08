@@ -57,24 +57,32 @@ struct ExchangeView: View {
                 .sheet(isPresented: $posting) {
                     NewListingView { Task { await mine.load() } }
                 }
-                // On SUBMIT, not on every keystroke. A trading board is a
-                // network round trip per character otherwise, on a
-                // connection this app assumes is bad — and every one of
-                // those keystrokes is also a line in the unified log.
-                .onSubmit(of: .search) { Task { await listings.load() } }
                 .task { await loadCurrent() }
                 .onChange(of: tab) { Task { await loadCurrent() } }
         }
     }
 
-    /// Conditionally searchable, so the board gets a search field and the
-    /// other two tabs keep a plain navigation bar.
+    /// The board gets a search field; the other tabs do not.
     @ViewBuilder
     private var stack: some View {
-        let content = VStack(spacing: 0) {
+        VStack(spacing: 0) {
             ExchangeSectionPicker(selection: $tab, unread: unread.count)
                 .padding(.horizontal)
                 .padding(.bottom, 8)
+
+            if tab == .browse {
+                // The app's own field, not `.searchable`: UIKit draws that
+                // prompt at 3.12:1 in light and nothing styles it (#164).
+                // Searched on SUBMIT, not on every keystroke — a trading
+                // board is a network round trip per character otherwise, on
+                // a connection this app assumes is bad, and every keystroke
+                // would also be a line in the unified log.
+                SearchField(text: $listings.query.text, prompt: "Търсене по култура или регион") {
+                    Task { await listings.load() }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
 
             switch tab {
             case .browse: browse
@@ -90,21 +98,6 @@ struct ExchangeView: View {
         // above is the page colour too (`SolidChrome`), so the header now
         // reads as one surface from the title down.
         .background(Palette.Surface.page)
-
-        if tab == .browse {
-            // The prompt is a plain STRING on purpose. UIKit draws it, in
-            // `secondaryLabel` on `tertiarySystemFill` — 3.12:1 in light —
-            // and neither a styled `Text` prompt nor an appearance proxy on
-            // the field's labels changes that (both read back from a hosted
-            // field, #164). `Palette.ListChrome` records the pair as a
-            // platform limit and `PaletteTokenTests` pins it.
-            content.searchable(
-                text: $listings.query.text,
-                prompt: "Търсене по култура или регион"
-            )
-        } else {
-            content
-        }
     }
 
     private var currentFreshness: Freshness? {
