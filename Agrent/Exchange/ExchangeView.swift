@@ -275,37 +275,12 @@ struct ExchangeView: View {
 
         case .loaded(let rows, _):
             List(rows) { row in
-                VStack(alignment: .leading, spacing: 6) {
-                    // `AdaptiveRow` for the reason `ListingRow` has one.
-                    AdaptiveRow {
-                        Text(CommodityName.canonical(row.commodity) ?? row.commodity)
-                            .font(.headline)
-                            // The status on the trailing edge while the two
-                            // share a line, as the `Spacer` this replaces put
-                            // it — and no empty gap under the crop once they
-                            // stack, which a `Spacer` in a stack would leave.
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(row.status.label)
-                            .font(.footnote)
-                            .foregroundStyle(Palette.secondaryText)
-                    }
-                    ListingSummary(side: row.side, kind: row.kind,
-                                   quantity: row.quantityTonnes, price: row.pricePerTonne,
-                                   currency: row.priceCurrency)
-                    if row.inquiries.isEmpty {
-                        Text("Няма запитвания").font(.footnote).foregroundStyle(Palette.secondaryText)
-                    } else {
-                        ForEach(row.inquiries) { inquiry in
-                            InquiryRow(inquiry: inquiry)
-                        }
-                    }
-                }
-                .padding(.vertical, 2)
-                // The row's own background, which `pageBackground()` does
-                // not reach: without it each listing sat on the system's
-                // grouped card colour on the page — found by the per-list
-                // check in `FormSurfaceTests` (#164).
-                .pageRow()
+                MyListingRow(listing: row)
+                    // The row's own background, which `pageBackground()` does
+                    // not reach: without it each listing sat on the system's
+                    // grouped card colour on the page — found by the per-list
+                    // check in `FormSurfaceTests` (#164).
+                    .pageRow()
             }
             .refreshable { await PullToRefresh.bounded { await mine.load() } }
             .pageBackground()
@@ -534,8 +509,8 @@ struct ListingRow: View {
     /// «ново» comes early in the inbox: someone scanning the board hears it
     /// before the details.
     ///
-    /// Units as words, as the inbox and the map speak them: «тона», and
-    /// «на тон» for the slash, which a voice reads as a slash.
+    /// Figures as words, through `Exchange.spokenTonnes` and `spokenPrice`:
+    /// «250 тона», «51,13 евро на тон».
     ///
     /// `nonisolated`: a `View`'s members are the main actor's, and this is a
     /// pure function of a `Sendable` value that the tests call directly.
@@ -545,16 +520,65 @@ struct ListingRow: View {
             listing.isOwn ? "ваша" : nil,
             listing.side.label,
             listing.kind.label,
-            Exchange.tonnes(listing.quantityTonnes).map {
-                "\($0) \(listing.quantity == 1 ? "тон" : "тона")"
-            },
-            Exchange.money(listing.pricePerTonne).map { money in
-                [money, listing.priceCurrency, "на тон"]
-                    .compactMap { $0 }
-                    .filter { !$0.isEmpty }
-                    .joined(separator: " ")
-            },
+            Exchange.spokenTonnes(listing.quantityTonnes),
+            Exchange.spokenPrice(listing.pricePerTonne, currency: listing.priceCurrency),
             listing.region,
+        ])
+    }
+}
+
+/// A row of «Моите обяви»: the seller's own listing, and the inquiries on it.
+struct MyListingRow: View {
+    let listing: OwnExchangeListing
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
+                // `AdaptiveRow` for the reason `ListingRow` has one.
+                AdaptiveRow {
+                    Text(CommodityName.canonical(listing.commodity) ?? listing.commodity)
+                        .font(.headline)
+                        // The status on the trailing edge while the two
+                        // share a line, as the `Spacer` this replaced put it
+                        // — and no empty gap under the crop once they stack,
+                        // which a `Spacer` in a stack would leave.
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(listing.status.label)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                }
+                ListingSummary(side: listing.side, kind: listing.kind,
+                               quantity: listing.quantityTonnes, price: listing.pricePerTonne,
+                               currency: listing.priceCurrency)
+            }
+            // ONE stop for the listing, spoken from the values (#220). It was
+            // three — the crop, the status, and the summary read as printed,
+            // «·» and «/ т» included. The inquiries under it stay stops of
+            // their own: each is a different person's message.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Self.spoken(listing))
+
+            if listing.inquiries.isEmpty {
+                Text("Няма запитвания").font(.footnote).foregroundStyle(Palette.secondaryText)
+            } else {
+                ForEach(listing.inquiries) { inquiry in
+                    InquiryRow(inquiry: inquiry)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// The board row's wording, in this row's order: the crop, its status,
+    /// then the summary's values. No «ваша» — every row here is.
+    nonisolated static func spoken(_ listing: OwnExchangeListing) -> String {
+        A11y.sentence([
+            CommodityName.canonical(listing.commodity) ?? listing.commodity,
+            listing.status.label,
+            listing.side.label,
+            listing.kind.label,
+            Exchange.spokenTonnes(listing.quantityTonnes),
+            Exchange.spokenPrice(listing.pricePerTonne, currency: listing.priceCurrency),
         ])
     }
 }
@@ -586,6 +610,12 @@ struct InquiryRow: View {
             }
         }
         .padding(.vertical, 2)
+        // One stop per inquiry (#220), where VoiceOver stepped through its
+        // status, date, message and note one by one. `.combine` rather than
+        // a built label: every child is plain words — no `·`, no symbol —
+        // so what it reads is what a built label would say. It also reads
+        // the WHOLE message, which `lineLimit(3)` cuts on screen.
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -675,6 +705,21 @@ enum Exchange {
         return value.formatted(
             .number.precision(.fractionLength(0...3)).grouping(.automatic)
                 .locale(BgDate.locale))
+    }
+
+    /// A tonnage as a voice says it: «250 тона», «1 тон». Exactly one is
+    /// the only singular — «21 тона», «0,5 тона» — as the inbox counted.
+    static func spokenTonnes(_ raw: String?) -> String? {
+        tonnes(raw).map { "\($0) \(WireDecimal.parse(raw) == 1 ? "тон" : "тона")" }
+    }
+
+    /// A price per tonne as a voice says it: «51,13 евро на тон». The
+    /// printed «EUR / т» is read out as three letters and a slash.
+    static func spokenPrice(_ raw: String?, currency: String?) -> String? {
+        money(raw).map { money in
+            let unit = currency.flatMap { $0.isEmpty ? nil : CurrencyWords.name($0, afterNumber: true) }
+            return [money, unit, "на тон"].compactMap { $0 }.joined(separator: " ")
+        }
     }
 }
 

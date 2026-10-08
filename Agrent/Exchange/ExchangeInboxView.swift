@@ -162,7 +162,7 @@ struct InboxRow: View {
                 thread.role == .unknown ? nil : thread.role.label,
                 thread.closed ? "затворен" : nil,
                 region,
-                tonnes.map { "\($0) \(thread.quantity == 1 ? "тон" : "тона")" },
+                Exchange.spokenTonnes(thread.listingQuantityTonnes),
                 seller,
                 siblingNote,
                 time,

@@ -130,6 +130,19 @@ final class RegionAggregateTests: XCTestCase {
         }
     }
 
+    /// Spoken with the currency as a word (#220), per currency, never
+    /// blended: «евро» and «лева» where the codes were read out as letters.
+    func testTheRegionSpeaksEachCurrencyAsAWord() {
+        let region = RegionAggregate(regionCode: "BG-16", listings: [
+            listing("1", region: "BG-16", price: "200", currency: "EUR"),
+            listing("2", region: "BG-16", price: "380", currency: "BGN"),
+        ])
+        let spoken = region.accessibilityText
+        XCTAssertTrue(spoken.contains("200,00 евро на тон"), spoken)
+        XCTAssertTrue(spoken.contains("380,00 лева на тон"), spoken)
+        XCTAssertFalse(spoken.contains("EUR") || spoken.contains("BGN"), spoken)
+    }
+
     /// A lone offer in a third currency keeps its own label and takes no
     /// part in the comparison.
     func testALoneForeignOfferIsNotAbsorbed() {
