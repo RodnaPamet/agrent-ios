@@ -141,6 +141,11 @@ final class AuthClient: NSObject {
     /// The Apple requests waiting for an answer — for tests.
     var appleRequestsInFlight: Int { appleNonces.count }
 
+    /// The raw nonce kept for a request's `state` — for tests, which pin that
+    /// Apple was given ITS hash: raw and hash are both 64 hex characters, so
+    /// only the pairing tells them apart.
+    func appleNonce(forState key: String) -> String? { appleNonces[key] }
+
     /// Apple's answer: trade its identity token for this app's pair.
     func completeAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
         // An answer while a sign-in is already running belongs to a request
