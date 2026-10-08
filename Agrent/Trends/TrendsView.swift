@@ -11,7 +11,7 @@ struct TrendsView: View {
     @State private var store = TrendsStore()
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // TWO DIFFERENT AGES, and both belong on this screen.

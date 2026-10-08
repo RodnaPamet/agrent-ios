@@ -50,6 +50,9 @@ struct ParcelHistoryView: View {
     var body: some View {
         content
             .inlineTitle(ParcelHistoryCopy.screenTitle)
+            // Once, on the screen, outside the List: a destination declared
+            // inside a lazy row would come and go with the row.
+            .navigationDestination(for: DrillIn.self) { list($0) }
             // EAGERLY, HERE — and cache-first through the store, which is
             // what makes reopening this screen instant on a bad connection.
             //
@@ -143,6 +146,13 @@ struct ParcelHistoryView: View {
 
     // MARK: - The three cards
 
+    /// Which list a card opens (agrent-ios#194): a VALUE on the stack's path,
+    /// because the stack this screen is pushed onto takes values only — see
+    /// `RoutedStack`. Its own type and destination, declared on this screen
+    /// rather than as an `AppRoute`: the lists share this screen's store,
+    /// which nothing outside the screen should hold.
+    private enum DrillIn: Hashable { case seasons, operations, weeds }
+
     @ViewBuilder
     private func cards(_ archive: ParcelHistoryStore.Archive) -> some View {
         cardRow(
@@ -150,8 +160,34 @@ struct ParcelHistoryView: View {
                 title: ParcelHistoryCopy.seasons,
                 section: archive.seasons,
                 line: { $0.historyLine }
-            )
-        ) {
+            ),
+            opens: .seasons
+        )
+
+        cardRow(
+            ParcelHistoryCard(
+                title: ParcelHistoryCopy.operations,
+                section: archive.operations,
+                line: { $0.historyLine }
+            ),
+            opens: .operations
+        )
+
+        cardRow(
+            ParcelHistoryCard(
+                title: ParcelHistoryCopy.weeds,
+                section: archive.weeds,
+                line: { $0.historyLine }
+            ),
+            opens: .weeds
+        )
+    }
+
+    /// The list a card opens, over the same store the cards read.
+    @ViewBuilder
+    private func list(_ drillIn: DrillIn) -> some View {
+        switch drillIn {
+        case .seasons:
             ParcelHistorySectionList(
                 title: ParcelHistoryCopy.seasons,
                 parcelName: parcelName,
@@ -160,15 +196,7 @@ struct ParcelHistoryView: View {
                 section: { $0.seasons },
                 line: { $0.historyLine }
             )
-        }
-
-        cardRow(
-            ParcelHistoryCard(
-                title: ParcelHistoryCopy.operations,
-                section: archive.operations,
-                line: { $0.historyLine }
-            )
-        ) {
+        case .operations:
             ParcelHistorySectionList(
                 title: ParcelHistoryCopy.operations,
                 parcelName: parcelName,
@@ -177,15 +205,7 @@ struct ParcelHistoryView: View {
                 section: { $0.operations },
                 line: { $0.historyLine }
             )
-        }
-
-        cardRow(
-            ParcelHistoryCard(
-                title: ParcelHistoryCopy.weeds,
-                section: archive.weeds,
-                line: { $0.historyLine }
-            )
-        ) {
+        case .weeds:
             ParcelHistorySectionList(
                 title: ParcelHistoryCopy.weeds,
                 parcelName: parcelName,
@@ -203,12 +223,9 @@ struct ParcelHistoryView: View {
     /// chevron, no highlight, nothing that reads as a promise. Pushing to an
     /// empty list is the same broken promise as a disabled button.
     @ViewBuilder
-    private func cardRow<Destination: View>(
-        _ card: ParcelHistoryCard,
-        @ViewBuilder destination: () -> Destination
-    ) -> some View {
+    private func cardRow(_ card: ParcelHistoryCard, opens drillIn: DrillIn) -> some View {
         if card.isTappable {
-            NavigationLink { destination() } label: { cardBody(card) }
+            NavigationLink(value: drillIn) { cardBody(card) }
                 .pageRow()
         } else {
             cardBody(card)

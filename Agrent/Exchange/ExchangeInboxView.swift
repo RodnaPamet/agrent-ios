@@ -58,9 +58,8 @@ struct ExchangeInboxView: View {
             List {
                 Section {
                     ForEach(rows) { thread in
-                        NavigationLink {
-                            ConversationView(threadID: thread.id, commodity: thread.commodity)
-                        } label: {
+                        NavigationLink(value: AppRoute.conversation(threadID: thread.id,
+                                                                    commodity: thread.commodity)) {
                             InboxRow(thread: thread, siblings: siblings[thread.id])
                         }
                     }

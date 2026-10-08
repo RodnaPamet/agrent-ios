@@ -4,7 +4,7 @@ struct LocationsView: View {
     @State private var store = LocationsStore()
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
             // `.safeAreaInset`, NOT a VStack.
             //
             // Wrapped in a VStack the List is no longer the scroll view the
@@ -49,9 +49,7 @@ struct LocationsView: View {
 
         case .loaded(let locations, _):
             List(locations) { location in
-                NavigationLink {
-                    ParcelMapView(location: location)
-                } label: {
+                NavigationLink(value: AppRoute.location(location)) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(location.name).font(.headline)
                         // `kind` is nil when the server omitted it or sent

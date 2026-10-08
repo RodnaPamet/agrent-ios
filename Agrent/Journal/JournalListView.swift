@@ -5,7 +5,7 @@ struct JournalListView: View {
     @State private var composing = false
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
             // БОРСА'S SHAPE, which the owner made canonical: the list is
             // the only thing in the stack, and the title is a real
             // navigation title rather than a block drawn inside the page.
@@ -90,9 +90,7 @@ struct JournalListView: View {
                         ? "Показани " + Plural.bg(entries.count, "запис", "записа")
                         : Plural.bg(entries.count, "запис", "записа")) {
                 ForEach(entries) { entry in
-                    NavigationLink {
-                        JournalDetailView(entry: entry)
-                    } label: {
+                    NavigationLink(value: AppRoute.journalEntry(entry)) {
                         JournalRow(entry: entry)
                     }
                     .pageRow()

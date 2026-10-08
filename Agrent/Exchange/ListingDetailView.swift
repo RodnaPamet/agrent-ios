@@ -3,7 +3,15 @@ import SwiftUI
 struct ListingDetailView: View {
     let listing: ExchangeListing
     @State private var opener = ListingThreadOpener()
-    @State private var openedThread: ConversationRoute?
+    /// The conversation goes onto Борса's stack as a value once the server
+    /// answers with its id (#194) — a push no tap starts directly.
+    @Environment(\.pushRoute) private var pushRoute
+    /// Whether this listing is still on screen when that answer comes. A
+    /// conversation opening after the person has gone back must not land on
+    /// whatever they went back to. `navigationDestination(item:)` gave this
+    /// for free — its destination left with the listing; a push onto the
+    /// stack doesn't.
+    @State private var isShown = false
     @State private var user = CurrentUserStore.shared
 
     var body: some View {
@@ -73,9 +81,8 @@ struct ListingDetailView: View {
         }
         .pageBackground()
         .inlineTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
-        .navigationDestination(item: $openedThread) { route in
-            ConversationView(threadID: route.threadID, commodity: listing.commodity)
-        }
+        .onAppear { isShown = true }
+        .onDisappear { isShown = false }
     }
 
     /// PARITY GAP 7. «Message the other party» — the ONLY action on another
@@ -99,8 +106,8 @@ struct ListingDetailView: View {
         return Section {
             Button {
                 Task {
-                    if let id = await opener.open(listingID: listing.id) {
-                        openedThread = ConversationRoute(threadID: id)
+                    if let id = await opener.open(listingID: listing.id), isShown {
+                        pushRoute(.conversation(threadID: id, commodity: listing.commodity))
                     }
                 }
             } label: {

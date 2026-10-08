@@ -29,7 +29,7 @@ struct ExchangeView: View {
     @AppStorage("exchange.showMap") private var showMap = false
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
             stack
                 .navigationTitle("Борса")
                 .appMenu()
@@ -172,9 +172,7 @@ struct ExchangeView: View {
                 // which would be a factual lie about what is on screen.
                 Section {
                     ForEach(listings.rows) { listing in
-                        NavigationLink {
-                            ListingDetailView(listing: listing)
-                        } label: {
+                        NavigationLink(value: AppRoute.listing(listing)) {
                             ListingRow(listing: listing)
                         }
                     }

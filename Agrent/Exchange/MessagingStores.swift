@@ -688,9 +688,3 @@ final class ListingThreadOpener {
         }
     }
 }
-
-/// Where `.navigationDestination(item:)` goes once a thread is open.
-struct ConversationRoute: Hashable, Identifiable {
-    let threadID: String
-    var id: String { threadID }
-}

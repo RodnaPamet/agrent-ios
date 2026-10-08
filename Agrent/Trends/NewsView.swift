@@ -12,7 +12,7 @@ struct NewsView: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
         VStack(spacing: 0) {
             categories
             content

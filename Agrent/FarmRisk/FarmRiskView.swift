@@ -31,7 +31,7 @@ struct FarmRiskView: View {
     /// the lead cannot be revised once it is sent.
     @State private var requesting: RequestTarget?
 
-    /// The parcel whose archive is being pushed, or nil.
+    /// Pushes a parcel's archive onto this screen's stack.
     ///
     /// A PROGRAMMATIC PUSH RATHER THAN A `NavigationLink`, and the reason is
     /// the row it lives in: `parcelRow` already contains a Button — the
@@ -41,13 +41,14 @@ struct FarmRiskView: View {
     /// ask writes something that cannot be withdrawn, so an ambiguous tap
     /// there is not a cosmetic problem.
     ///
-    /// A Button that sets this, plus one `navigationDestination`, keeps each
-    /// control's hit area its own.
-    @State private var history: Parcel?
+    /// A Button that pushes the route keeps each control's hit area its own.
+    /// It pushes a VALUE (#194), as everything in a routed stack does; it was
+    /// a `navigationDestination(item:)` until the stack started taking values.
+    @Environment(\.pushRoute) private var pushRoute
 
 
     var body: some View {
-        NavigationStack {
+        RoutedStack {
             content
                 .safeAreaInset(edge: .top, spacing: 0) {
                     VStack(spacing: 0) {
@@ -73,12 +74,6 @@ struct FarmRiskView: View {
                     requesting = RequestTarget(parcel: nil)
                 }
                 .inlineTitle("Риск по парцели")
-                // Declared ONCE for the whole list rather than per row: a
-                // destination inside a row is scoped to that row's lifetime,
-                // and rows here are rebuilt every time a reading arrives.
-                .navigationDestination(item: $history) { parcel in
-                    ParcelHistoryView(parcelID: parcel.id, parcelName: parcel.name)
-                }
                 // «Затвори» only when the app menu presented this — see
                 // `closeWhenPresentedFromMenu`. As a tab root it had one that did nothing.
                 .closeWhenPresentedFromMenu()
@@ -351,7 +346,7 @@ struct FarmRiskView: View {
     /// someone swiping between elements one at a time.
     private func historyControl(_ row: RiskRow) -> some View {
         Button {
-            history = row.parcel
+            pushRoute(.parcelHistory(parcelID: row.parcel.id, parcelName: row.parcel.name))
         } label: {
             HStack(spacing: 4) {
                 Text("История")
