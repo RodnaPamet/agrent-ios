@@ -16,9 +16,22 @@ struct FarmWizardView: View {
     /// Opens the farm once it exists — `FarmStore.activate`.
     let open: (Farm) -> Void
 
-    @State private var model = FarmWizardModel()
-    @State private var eikText = ""
+    @State private var model: FarmWizardModel
+    @State private var eikText: String
     @Environment(\.dismiss) private var dismiss
+
+    /// The model keeps its draft on this phone for the signed-in person, so
+    /// the wizard resumes where they left it if the app is killed (#197) —
+    /// and the ЕИК field starts with whatever the draft kept.
+    init(context: Context, open: @escaping (Farm) -> Void) {
+        self.context = context
+        self.open = open
+        let model = FarmWizardModel(
+            drafts: FarmWizardDrafts(defaults: .standard),
+            owner: CurrentUserStore.shared.user?.id)
+        _model = State(initialValue: model)
+        _eikText = State(initialValue: model.eik)
+    }
 
     var body: some View {
         ScrollView {
@@ -56,7 +69,11 @@ struct FarmWizardView: View {
         .toolbar {
             if context == .adding, model.step != .done {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отказ") { dismiss() }
+                    // Chosen, not interrupted: nothing to resume (#197).
+                    Button("Отказ") {
+                        model.discard()
+                        dismiss()
+                    }
                         .accessibilityInputLabels(A11y.Spoken.cancel)
                 }
             }

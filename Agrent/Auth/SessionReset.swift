@@ -154,6 +154,9 @@ enum SessionReset {
         FeatureFlags.shared.reset()
         AccountAvatarStore.shared.reset()
         FarmStore.shared.reset()
+        // A half-made farm's name does not stay on a shared phone after its
+        // person has gone (#197).
+        FarmWizardDrafts(defaults: .standard).clear()
     }
 }
 
