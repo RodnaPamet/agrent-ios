@@ -276,18 +276,22 @@ struct ExchangeView: View {
         case .loaded(let rows, _):
             List(rows) { row in
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(CommodityName.canonical(row.commodity) ?? row.commodity).font(.headline)
-                        Spacer()
+                    // `AdaptiveRow` for the reason `ListingRow` has one.
+                    AdaptiveRow {
+                        Text(CommodityName.canonical(row.commodity) ?? row.commodity)
+                            .font(.headline)
+                            // The status on the trailing edge while the two
+                            // share a line, as the `Spacer` this replaces put
+                            // it — and no empty gap under the crop once they
+                            // stack, which a `Spacer` in a stack would leave.
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         Text(row.status.label)
                             .font(.footnote)
                             .foregroundStyle(Palette.secondaryText)
                     }
-                    Text(summary(side: row.side, kind: row.kind,
-                                 quantity: row.quantityTonnes, price: row.pricePerTonne,
-                                 currency: row.priceCurrency))
-                        .font(.footnote)
-                        .foregroundStyle(Palette.secondaryText)
+                    ListingSummary(side: row.side, kind: row.kind,
+                                   quantity: row.quantityTonnes, price: row.pricePerTonne,
+                                   currency: row.priceCurrency)
                     if row.inquiries.isEmpty {
                         Text("Няма запитвания").font(.footnote).foregroundStyle(Palette.secondaryText)
                     } else {
@@ -486,7 +490,10 @@ struct ListingRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            // `AdaptiveRow`, as the inbox's row has. A plain `HStack` gave the
+            // chip its width first and broke the crop to fit beside it: «Пшен
+            // / ица» at AX5 (A11yShots, 2026-10-08).
+            AdaptiveRow {
                 Text(CommodityName.canonical(listing.commodity) ?? listing.commodity).font(.headline)
                 // The only thing distinguishing your rows in a global table.
                 if listing.isOwn {
@@ -497,12 +504,10 @@ struct ListingRow: View {
                     )
                 }
             }
-            Text(summary(side: listing.side, kind: listing.kind,
-                         quantity: listing.quantityTonnes, price: listing.pricePerTonne,
-                         currency: listing.priceCurrency))
-                .font(.footnote)
-                .foregroundStyle(Palette.secondaryText)
-            if let region = listing.regionName {
+            ListingSummary(side: listing.side, kind: listing.kind,
+                           quantity: listing.quantityTonnes, price: listing.pricePerTonne,
+                           currency: listing.priceCurrency)
+            if let region = listing.region {
                 Text(region).font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         }
@@ -512,15 +517,42 @@ struct ListingRow: View {
         // sentence, so saying the crop matched nothing. The crop is what is
         // printed largest and what a person would actually say.
         .accessibleRow(
-            spoken: A11y.sentence([
-                CommodityName.canonical(listing.commodity) ?? listing.commodity,
-                listing.side.label,
-                listing.regionName,
-            ]),
+            spoken: Self.spoken(listing),
             // The server's slug is the English word, so the English name
             // costs nothing to offer — see `A11y.spokenNames`.
             saying: A11y.spokenNames(
                 CommodityName.canonical(listing.commodity), listing.commodity))
+    }
+
+    /// ONE stop, spoken from the values: everything the row prints, in the
+    /// order it prints it, as the inbox's row is.
+    ///
+    /// It said the crop, the side and the region, so «ваша», the quantity
+    /// and the price were on the screen and nowhere in the audio — the one
+    /// marker of your own listing, and the two figures a trader reads
+    /// first. «ваша» comes second, where it is printed, for the reason
+    /// «ново» comes early in the inbox: someone scanning the board hears it
+    /// before the details.
+    ///
+    /// Units as words, as the inbox and the map speak them: «тона», and
+    /// «на тон» for the slash, which a voice reads as a slash.
+    static func spoken(_ listing: ExchangeListing) -> String {
+        A11y.sentence([
+            CommodityName.canonical(listing.commodity) ?? listing.commodity,
+            listing.isOwn ? "ваша" : nil,
+            listing.side.label,
+            listing.kind.label,
+            Exchange.tonnes(listing.quantityTonnes).map {
+                "\($0) \(listing.quantity == 1 ? "тон" : "тона")"
+            },
+            Exchange.money(listing.pricePerTonne).map { money in
+                [money, listing.priceCurrency, "на тон"]
+                    .compactMap { $0 }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+            },
+            listing.region,
+        ])
     }
 }
 
@@ -554,7 +586,7 @@ struct InquiryRow: View {
     }
 }
 
-/// "Продава · Култура · 250 т · 51,13 EUR/т"
+/// "Продава · Култура · 250 т · 51,13 EUR / т"
 ///
 /// ── The old comment was half right, and the half that was wrong shipped ──
 ///
@@ -573,14 +605,54 @@ struct InquiryRow: View {
 /// and takes its currency's two places, so `51.13` reads `51,13`. A tonnage
 /// is a measurement and keeps up to three without padding, so `250` stays
 /// `250` rather than becoming `250,000`.
+///
+/// ── Where a line may end ──
+///
+/// Never between a number and its unit. With plain spaces, AX5 drew «250 /
+/// т» and a line reading «т · 51,13 EUR /» (A11yShots, 2026-10-08), so the
+/// spaces inside «250 т», «51,13 EUR» and «/ т» are no-break. The one
+/// before the slash stays breakable: a 4-digit price with its currency and
+/// «/ т» all bound would be wider than an SE's line at AX5, and a run that
+/// cannot fit is cut wherever it runs out — «EU / R». The dot is bound to
+/// the value before it, so a wrapped line ends on one and never starts
+/// with one.
+///
+/// `stacked`, at the accessibility sizes: a value per line and no dots,
+/// as `MetaRow` and `MetaSeparator` do. Still one `Text` rather than a
+/// `MetaRow` because of the sizes below those: four values overrun a line
+/// from xLarge up, and a `MetaRow`'s `HStack` would squeeze them into
+/// columns where one `Text` wraps.
 func summary(side: ExchangeSide, kind: ExchangeKind,
-             quantity: String?, price: String?, currency: String?) -> String {
+             quantity: String?, price: String?, currency: String?,
+             stacked: Bool) -> String {
+    let bound = "\u{00A0}"
     var parts = [side.label, kind.label]
-    if let tonnes = Exchange.tonnes(quantity) { parts.append("\(tonnes) т") }
+    if let tonnes = Exchange.tonnes(quantity) { parts.append("\(tonnes)\(bound)т") }
     if let money = Exchange.money(price) {
-        parts.append("\(money) \(currency ?? "") / т".trimmingCharacters(in: .whitespaces))
+        let amount = [money, currency ?? ""].filter { !$0.isEmpty }.joined(separator: bound)
+        parts.append("\(amount) /\(bound)т")
     }
-    return parts.joined(separator: " · ")
+    return parts.joined(separator: stacked ? "\n" : "\(bound)· ")
+}
+
+/// `summary` as a row draws it, deciding `stacked` from the text size the
+/// way `MetaRow` does — so the board's rows and «Моите обяви» cannot
+/// disagree about it.
+struct ListingSummary: View {
+    let side: ExchangeSide
+    let kind: ExchangeKind
+    let quantity: String?
+    let price: String?
+    let currency: String?
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        Text(summary(side: side, kind: kind, quantity: quantity, price: price,
+                     currency: currency, stacked: typeSize.isAccessibilitySize))
+            .font(.footnote)
+            .foregroundStyle(Palette.secondaryText)
+    }
 }
 
 /// Formatting for the exchange's wire decimals, which are STRINGS here —
