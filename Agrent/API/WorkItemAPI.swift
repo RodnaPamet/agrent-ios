@@ -242,17 +242,26 @@ extension WorkItemAPI {
     /// with the task and is refreshed by re-reading it.
     static func commentsPath(_ id: String) -> String { "\(detailPath(id))/comments" }
 
-    /// The comment as RICH TEXT — `RichText.html(fromPlainText:)`, as the
-    /// journal's notes go — because the route sanitises it as rich text and
-    /// the web renders it as such: a plain newline would be eaten there.
+    /// The comment as PLAIN TEXT, as typed — trimmed, newlines kept.
     ///
-    /// The key is sent although the route reads none yet (agri-saas is
-    /// adding it, 2026-10-08). Minted once per text by the caller, so the
-    /// day it is honoured a resend of the same comment cannot make two.
+    /// The route is plain text («Epic C.5 — comments today are plain text»):
+    /// `addTaskComment` runs `sanitizePlainText`, which is `sanitize-html`
+    /// with NO allowed tags, then decodes `&lt;`, `&amp;` and the rest back to
+    /// characters. #225 first sent rich text — `<p>…<br>…</p>` — on the
+    /// strength of the spec's description, which said the body was sanitised
+    /// as rich text; every tag would have been stripped and the line breaks
+    /// with them, so «Готово.» and «Остава SYNTH-3» on two lines would have
+    /// been stored as «Готово.Остава SYNTH-3». Read off the usecase and
+    /// `src/lib/security/sanitize.ts`, 2026-10-08; backend 1 corrected the
+    /// spec the same day (agri-saas PR B). A newline in plain text survives.
+    ///
+    /// The key is sent although the route reads none yet (agri-saas PR B
+    /// adds it, scoped to the task). Minted once per text by the caller, so
+    /// once it is honoured a resend of the same comment cannot make two.
     /// Until then nothing retries this on its own.
-    static func addComment(_ id: String, html: String, idempotencyKey: String) async throws {
+    static func addComment(_ id: String, text: String, idempotencyKey: String) async throws {
         _ = try await APIClient.shared.postReturningData(
-            commentsPath(id), body: CommentBody(body: html), idempotencyKey: idempotencyKey)
+            commentsPath(id), body: CommentBody(body: text), idempotencyKey: idempotencyKey)
     }
 
     private struct CommentBody: Encodable, Sendable {

@@ -15,7 +15,7 @@ struct TaskCommentsSection: View {
     @Binding var draft: String
     let sending: Bool
     let failure: String?
-    /// Sends the comment as rich text; the caller clears the draft when it lands.
+    /// Sends the comment's text; the caller clears the draft when it lands.
     let send: (String) async -> Void
 
     var body: some View {
@@ -69,8 +69,8 @@ struct TaskCommentsSection: View {
     /// The composer's arrow, as Борса's: the spoken name says what is sent.
     private var sendButton: some View {
         Button {
-            guard case .sendable(let html) = verdict else { return }
-            Task { await send(html) }
+            guard case .sendable(let text) = verdict else { return }
+            Task { await send(text) }
         } label: {
             Group {
                 if sending {
@@ -121,10 +121,10 @@ private struct CommentRow: View {
 
 /// What a comment may be before it is sent, and who may send one (#225).
 enum TaskCommentRules {
-    /// The route's `maxLength` for `body` — checked on the RICH TEXT that is
-    /// sent, in UTF-16 units (a JavaScript string's `length`), since the
-    /// escaping in `RichText.html(fromPlainText:)` makes it longer than what
-    /// was typed.
+    /// The route's `maxLength` for `body`, in UTF-16 units (a JavaScript
+    /// string's `length`), checked on the trimmed text that is sent — an
+    /// upper bound on what is stored, since the server's sanitiser only ever
+    /// removes (tags) or shortens (entities).
     static let maxLength = 10_000
 
     /// Anyone but a READER (`assertCanCommentOnTasks`). Nobody before `/me`
@@ -138,7 +138,7 @@ enum TaskCommentRules {
     enum Verdict: Equatable {
         case empty
         case tooLong
-        /// Send this: the trimmed text as rich text.
+        /// Send this: the trimmed text.
         case sendable(String)
 
         var isSendable: Bool {
@@ -148,7 +148,8 @@ enum TaskCommentRules {
     }
 
     static func validate(_ draft: String) -> Verdict {
-        guard let html = RichText.html(fromPlainText: draft) else { return .empty }
-        return html.utf16.count > maxLength ? .tooLong : .sendable(html)
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return .empty }
+        return text.utf16.count > maxLength ? .tooLong : .sendable(text)
     }
 }

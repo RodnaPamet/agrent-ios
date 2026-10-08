@@ -13,13 +13,14 @@ final class TaskCommentsTests: XCTestCase {
     // MARK: - Reading
 
     /// The detail carries them oldest first, with their authors — and the
-    /// rich text reads as text: a `<br>` a line break, `&lt;` a `<`.
+    /// stored plain text is shown as stored: a newline a line break, a `<`
+    /// a `<`, as the web shows it.
     func testTheDetailCarriesItsCommentsAsText() async throws {
         let task = try await WorkItemAPI.decodeDetail(from: try fixture("task-detail-task"))
         XCTAssertEqual(task.comments.map(\.id), ["cmt_synthetic_1", "cmt_synthetic_2"])
         XCTAssertEqual(task.comments[0].createdBy?.displayName, "Петър Механизаторов")
         XCTAssertEqual(task.comments[0].text, "Пробите от SYNTH-1 и SYNTH-2 са взети.\nSYNTH-3 остава за утре.")
-        XCTAssertEqual(task.comments[1].text, "Добре. Резултатите трябват <до петък>.")
+        XCTAssertEqual(task.comments[1].text, "Добре. Резултатите трябват до петък — и при < 5 проби.")
         XCTAssertNotNil(task.comments[1].createdAt)
     }
 
@@ -41,25 +42,24 @@ final class TaskCommentsTests: XCTestCase {
 
     // MARK: - Writing
 
-    /// Whitespace is nothing to send; text goes as rich text, its line
-    /// breaks kept and its markup characters escaped.
-    func testADraftIsSentAsRichText() {
+    /// Whitespace is nothing to send; text goes as typed, trimmed — PLAIN
+    /// text, which is what the route is. Rich text would lose its line
+    /// breaks there: `sanitizePlainText` strips every tag, `<br>` included.
+    func testADraftIsSentAsPlainText() {
         XCTAssertEqual(TaskCommentRules.validate("  \n "), .empty)
         XCTAssertEqual(TaskCommentRules.validate(" Готово.\nОстава SYNTH-3 "),
-                       .sendable("<p>Готово.<br>Остава SYNTH-3</p>"))
-        XCTAssertEqual(TaskCommentRules.validate("a < b"), .sendable("<p>a &lt; b</p>"))
+                       .sendable("Готово.\nОстава SYNTH-3"))
+        XCTAssertEqual(TaskCommentRules.validate("a < b"), .sendable("a < b"), "nothing escaped")
     }
 
-    /// The limit is the route's, on what is SENT: escaping makes the rich
-    /// text longer than what was typed, so 2500 typed `<` are 10000 sent
-    /// units of `&lt;` plus the paragraph — over.
+    /// The route's limit, in UTF-16 units of what is sent: 10000 Cyrillic
+    /// letters fit, one more does not, and an emoji counts as two.
     func testTheLimitIsMeasuredOnWhatIsSent() {
-        let typed = String(repeating: "<", count: 2500)
-        XCTAssertEqual(typed.utf16.count, 2500)
-        XCTAssertEqual(TaskCommentRules.validate(typed), .tooLong)
-        let fits = String(repeating: "а", count: TaskCommentRules.maxLength - "<p></p>".utf16.count)
+        let fits = String(repeating: "а", count: TaskCommentRules.maxLength)
         XCTAssertTrue(TaskCommentRules.validate(fits).isSendable)
         XCTAssertEqual(TaskCommentRules.validate(fits + "а"), .tooLong)
+        let emoji = String(repeating: "🌾", count: TaskCommentRules.maxLength / 2 + 1)
+        XCTAssertEqual(TaskCommentRules.validate(emoji), .tooLong)
     }
 
     // MARK: - Who
