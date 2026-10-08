@@ -188,7 +188,10 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
 
     let dueAt: Date?
     let completedAt: Date?
-    let createdByUserId: String
+    /// Nullable in the spec (`Task.createdByUserId: string | null`), and
+    /// nothing here reads it, so a null must not cost the screen
+    /// (agrent-ios#182).
+    let createdByUserId: String?
     let assigneeUserId: String?
     let reviewerUserId: String?
     let operationType: FieldOperationType?

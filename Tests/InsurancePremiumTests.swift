@@ -327,7 +327,7 @@ final class InsuranceCorrectionNoticeTests: XCTestCase {
 
     private func server(_ cents: Int) -> CreatedLead.ServerQuote {
         CreatedLead.ServerQuote(premiumCents: cents, instalmentsCents: [cents],
-                                tariffBp: 1000, engineVersion: "1")
+                                tariffBp: 1000, engineVersion: 1)
     }
 
     /// SILENCE WHEN THEY AGREE. The estimate was right, it was shown, and

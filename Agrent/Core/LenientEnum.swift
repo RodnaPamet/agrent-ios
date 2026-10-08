@@ -15,10 +15,9 @@ import Foundation
 /// server has been observed mixing conventions — one earlier claim to that
 /// effect turned out to be a defect in a test fixture, and was retracted.
 ///
-/// `LogEntryType` itself deliberately does NOT adopt this. Its strictness is
-/// asserted by a test that documents the consequence, and loosening it would
-/// silently change what a journal list does when the server adds a type. That
-/// is a decision to take on purpose, not as a side effect of a refactor.
+/// `LogEntryType` adopts it too now, with an `.unknown` that is read and never
+/// written; `LogEntryStatus` followed (agrent-ios#182), since the spec types
+/// `LogEntry.status` as a free string.
 protocol LenientDecodable: RawRepresentable, CaseIterable, Decodable
 where RawValue == String {
     /// Returned for any value this build does not recognise.
@@ -26,8 +25,22 @@ where RawValue == String {
 }
 
 extension LenientDecodable {
+    /// An unrecognised value — AND A JSON `null` — is `unknownCase`.
+    ///
+    /// Null too, since agrent-ios#182: the spec makes `Task.severity` and
+    /// `Task.priority` nullable, and a non-optional enum that threw on null
+    /// failed the whole task detail for one empty column. A field that can
+    /// genuinely be absent is still declared optional — `decodeIfPresent`
+    /// answers nil before this runs — so this changes only what a NON-optional
+    /// field does with a null: it degrades, as it does for a value it does
+    /// not know.
     init(from decoder: Decoder) throws {
-        let raw = try decoder.singleValueContainer().decode(String.self)
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = Self.unknownCase
+            return
+        }
+        let raw = try container.decode(String.self)
         let folded = raw.lowercased()
         self = Self.allCases.first { $0.rawValue.lowercased() == folded } ?? Self.unknownCase
     }

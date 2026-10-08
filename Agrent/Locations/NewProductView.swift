@@ -222,7 +222,7 @@ struct NewProductView: View {
             pppRegistrationNo: blankToNil(pppNo),
             quarantinePeriodDays: quarantine
         )
-        if let created = await store.save(draft) {
+        if let created = await store.save(draft, unit: unit) {
             onCreated(created)
             dismiss()
         }
@@ -245,6 +245,28 @@ final class NewProductStore {
     private(set) var isSaving = false
     private(set) var failure: String?
 
+    @ObservationIgnored private let create: @MainActor (CreateItem) async throws -> CreatedItem
+    @ObservationIgnored private let reread: @MainActor () async -> [InputItem]?
+
+    /// The network as two closures, so what a save hands back is a unit test
+    /// — and nothing in the suite creates a real product.
+    init(
+        create: @escaping @MainActor (CreateItem) async throws -> CreatedItem = { try await LocationsAPI.createItem($0) },
+        reread: @escaping @MainActor () async -> [InputItem]? = { await NewProductStore.rereadCatalogue() }
+    ) {
+        self.create = create
+        self.reread = reread
+    }
+
+    /// The catalogue, read afresh — and written through the cache, so the
+    /// picker that reopens finds the new product without a pull. nil when
+    /// it cannot be read.
+    static func rereadCatalogue() async -> [InputItem]? {
+        await CachedResource.load(LocationsAPI.itemsPath) {
+            try await LocationsAPI.decodeItems(from: $0)
+        }.value
+    }
+
     /// ALL units, not the RATE four. A dose is л/дка; a product is stocked
     /// in litres or kilograms.
     func loadUnits() async {
@@ -254,20 +276,41 @@ final class NewProductStore {
         } publish: { [weak self] in self?.units = $0 }
     }
 
-    /// Never retried automatically. A replay creates a SECOND product with
-    /// the same name — no unique constraint, no existence check server-side
-    /// — and two identical-looking rows on a register is worse than a save
-    /// the person knows failed.
-    func save(_ draft: CreateItem) async -> InputItem? {
+    /// Creates the product and hands back the WHOLE row (agrent-ios#182).
+    ///
+    /// The create answers with three fields, so the row is read back, as the
+    /// spec says to. If that read fails — the signal went between the two
+    /// requests — the row is built from what the farmer just entered, and is
+    /// theirs: never a sample, whatever the inference from a missing creator
+    /// would say. The next catalogue read replaces it with the server's.
+    ///
+    /// Never retried automatically: a duplicate name is a 409, an answer.
+    func save(_ draft: CreateItem, unit: Unit?) async -> InputItem? {
         isSaving = true
         defer { isSaving = false }
+        let created: CreatedItem
         do {
-            return try await LocationsAPI.createItem(draft)
+            created = try await create(draft)
         } catch {
-            failure = UserMessage.text(for: error)
+            failure = Self.failureText(error)
             return nil
         }
+        if let row = await reread()?.first(where: { $0.id == created.id }) {
+            return row
+        }
+        return InputItem(id: created.id, name: created.name, category: created.category,
+                         defaultUnit: unit, createdByUserId: SessionIdentity.shared.userID,
+                         serverIsArchetype: false)
     }
+
+    /// A 409 here is a NAME already taken — the index on `lower(name)` — not
+    /// the stale-edit conflict every other 409 in the app is.
+    static func failureText(_ error: Error) -> String {
+        if case APIClient.APIError.conflict = error { return duplicateName }
+        return UserMessage.text(for: error)
+    }
+
+    static let duplicateName = "Вече има продукт с това име. Изберете го от списъка."
 
     func clearFailure() { failure = nil }
 }

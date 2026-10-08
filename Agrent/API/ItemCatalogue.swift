@@ -95,18 +95,30 @@ struct CreateItem: Encodable, Sendable {
     let quarantinePeriodDays: Int?
 }
 
+/// What `POST /items` answers: `CatalogItemWriteAck`, the id, name and
+/// category ONLY — the route's `select` is narrow, and the spec says so: "A
+/// client needing the whole item must re-read it" (`NewProductStore.save`).
+///
+/// It was decoded as a whole `InputItem` and adopted as the row. With no
+/// `createdByUserId` in it, the farmer's own new product read as a seeded
+/// sample — the sample warning on it and no default unit, until the
+/// catalogue reloaded (agrent-ios#182).
+struct CreatedItem: Decodable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let category: String
+}
+
 extension LocationsAPI {
-    static func createItem(_ draft: CreateItem) async throws -> InputItem {
-        // No `Idempotency-Key`: the route does not read one, and `Item` has
-        // an INDEX on (tenantId, name) rather than a unique constraint —
-        // `createItem` does no existence check either. So a replay silently
-        // creates a SECOND product with the same name, and sprays then
-        // split across two rows that look identical on the register.
-        //
-        // Which is why the form searches before it submits, and why this
-        // is never retried automatically.
+    static func createItem(_ draft: CreateItem) async throws -> CreatedItem {
+        // Names are unique per farm, case-insensitively — a partial unique
+        // index on `lower(name)` — so a duplicate, a replay included, is a
+        // 409 rather than a second row (the spec, since this was first
+        // written against a route with no constraint). The form still
+        // searches before it submits, and this is never retried
+        // automatically: a 409 is an answer, not a failure to retry.
         try await APIClient.shared.post(
-            itemsPath, body: draft, as: InputItem.self, idempotencyKey: UUID().uuidString
+            itemsPath, body: draft, as: CreatedItem.self, idempotencyKey: UUID().uuidString
         )
     }
 }

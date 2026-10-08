@@ -165,7 +165,7 @@ struct JournalRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(entry.title)
+            Text(entry.displayTitle)
                 .font(.headline)
                 .foregroundStyle(.primary)
 
@@ -183,9 +183,9 @@ struct JournalRow: View {
         // be named only when it is worth naming.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.sentence([
-            entry.title,
+            entry.displayTitle,
             entry.type.label,
-            BgDate.full(entry.occurredAt),
+            entry.occurredAt.map(BgDate.full) ?? LogEntry.noDate,
             entry.status == .planned ? entry.status.label : nil,
         ]))
     }
@@ -202,7 +202,7 @@ struct JournalRow: View {
         // fixedSize on the vertical axis lets the date take the height it
         // needs rather than being compressed into a mid-word break.
         MetaRow {
-            Text(BgDate.dayMonth(entry.occurredAt))
+            Text(entry.occurredAt.map(BgDate.dayMonth) ?? LogEntry.noDate)
             if entry.status == .planned {
                 MetaSeparator()
                 Text(entry.status.label)

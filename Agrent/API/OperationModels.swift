@@ -53,7 +53,18 @@ struct InputItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
     /// If the key ever vanishes from the payload this flags EVERYTHING as
     /// an archetype, which is the safer direction to fail in: a warning on
     /// every product is noticed and fixed, a warning on none is not.
-    var isArchetype: Bool { createdByUserId == nil }
+    var isArchetype: Bool { serverIsArchetype ?? (createdByUserId == nil) }
+
+    /// The server's own answer — `CatalogItemListRow.isArchetype`, required
+    /// in the spec since it was documented — which wins over the inference
+    /// above whenever it is sent (agrent-ios#182). nil only from a server
+    /// from before the column: then `createdByUserId` decides, as it did.
+    var serverIsArchetype: Bool? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, category, defaultUnit, createdByUserId
+        case serverIsArchetype = "isArchetype"
+    }
 }
 
 /// A unit of measure.

@@ -57,7 +57,7 @@ struct JournalDetailView: View {
     /// The operator's own words, at the size of a thing being read rather
     /// than a thing being scanned.
     private var header: some View {
-        Text(entry.title)
+        Text(entry.displayTitle)
             .font(.title2.weight(.semibold))
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
@@ -81,7 +81,7 @@ struct JournalDetailView: View {
                 // shares an HStack with the chip and breaks mid-word once
                 // Dynamic Type is turned up; here nothing competes for the
                 // width, and `fixedSize` stops the stack squeezing it.
-                Text(BgDate.full(entry.occurredAt))
+                Text(entry.occurredAt.map(BgDate.full) ?? LogEntry.noDate)
                     .font(.body)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
