@@ -221,8 +221,17 @@ struct ForegroundReturn {
 struct SignInView: View {
     @Environment(AuthClient.self) private var auth
     @Environment(\.colorScheme) private var colorScheme
+    /// Apple's button takes ANY height it is offered — with only a minimum it
+    /// filled the screen below the other two. So it gets one: the HIG's 50 at
+    /// the default text size, growing with it like the buttons above, capped
+    /// where a taller black bar stops helping anyone read it.
+    @ScaledMetric(relativeTo: .body) private var appleButtonHeight: CGFloat = 50
 
     var body: some View {
+        // Scrollable when it has to be: with three buttons, AX5 runs past the
+        // screen, and a VStack that cannot scroll truncates instead —
+        // «Земеделския…» — or pushes a way in off the bottom.
+        ScrollableState {
         VStack(spacing: 20) {
             Image(systemName: "leaf.circle.fill")
                 .font(.system(size: 64))
@@ -236,7 +245,9 @@ struct SignInView: View {
                 // exemption in the CI file.
                 .foregroundStyle(Color(hex: 0x34C759))
             Text("Agrent").font(.largeTitle.bold())
-            Text("Земеделският агент").foregroundStyle(Palette.secondaryText)
+            Text("Земеделският агент")
+                .foregroundStyle(Palette.secondaryText)
+                .multilineTextAlignment(.center)
 
             if case .failed(let message) = auth.state {
                 Text(message)
@@ -263,7 +274,12 @@ struct SignInView: View {
                     if auth.state == .signingIn {
                         ProgressView()
                     } else {
-                        Text(SignInText.google).frame(maxWidth: .infinity)
+                        // Wraps rather than truncating: at AX5 the prominent
+                        // style cut it to «Вход с…».
+                        Text(SignInText.google)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity)
                     }
                 }
                 .prominentButton()
@@ -272,7 +288,10 @@ struct SignInView: View {
                 Button {
                     Task { await auth.signIn(with: .microsoft) }
                 } label: {
-                    Text(SignInText.microsoft).frame(maxWidth: .infinity)
+                    Text(SignInText.microsoft)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .accessibilityInputLabels(A11y.spokenNames(SignInText.microsoft, "Sign in with Microsoft"))
@@ -283,15 +302,14 @@ struct SignInView: View {
                     Task { await auth.completeAppleSignIn(result) }
                 }
                 .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                // The HIG's minimum, and the height of the large buttons
-                // above it at the default text size.
-                .frame(minHeight: 50)
+                .frame(height: min(appleButtonHeight, 88))
             }
             .controlSize(.large)
             .disabled(auth.state == .signingIn)
             .padding(.horizontal, 40)
         }
         .padding()
+        }
     }
 }
 
