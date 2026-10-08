@@ -344,6 +344,53 @@ final class FarmStoreTests: XCTestCase {
                        "A's choice was rewritten after Изход")
     }
 
+    /// A farm the list closed is not reopened from `/me`, whose tenant still
+    /// names it until it is re-read. Before the gate's modifiers moved off a
+    /// `Group`, every change of state ran `resolve()` again, and this was a
+    /// loop: reopened from `/me`, closed by the list, reopened…
+    func testAClosedFarmIsNotReopenedFromMe() async {
+        defaults.set(true, forKey: FarmMemory.seededKey)
+        FarmMemory(defaults: defaults).remember(Farm(slug: "ferma-2", name: "Ферма 2", role: "OWNER"),
+                                                for: "usr_a")
+        var asks = 0
+        let farms = store(identity: identity("usr_a"), answer: me("usr_a", tenant: ("ferma-2", "Ферма 2")),
+                          asked: { asks += 1 }, list: FarmList([[]]))
+        await farms.refreshFarms()
+        XCTAssertEqual(farms.state, .none, "positive control: the list closed it")
+
+        await farms.resolve()
+        XCTAssertEqual(farms.state, .none, "/me reopened the farm the list had just closed")
+        XCTAssertEqual(asks, 0, "/me was asked although the list had answered")
+        XCTAssertNil(FarmMemory(defaults: defaults).farm(for: "usr_a"), "the closed farm was remembered again")
+    }
+
+    /// Invited on the web while this phone said «Нямате стопанство»: the next
+    /// list lets them in, rather than leaving the wizard to make a second farm.
+    func testAFarmGivenWhileThereWasNoneOpens() async {
+        defaults.set(true, forKey: FarmMemory.seededKey)
+        let farms = store(identity: identity(nil), answer: me("usr_c", tenant: nil),
+                          list: FarmList([[member("ferma-1", "Ферма 1", "EDITOR")]]))
+        await farms.resolve()
+        XCTAssertEqual(farms.state, .none, "positive control: no farm yet")
+
+        await farms.refreshFarms()
+        XCTAssertEqual(farms.activeFarm, Farm(slug: "ferma-1", name: "Ферма 1", role: "EDITOR"))
+        XCTAssertNil(farms.lostAccess, "nothing was lost")
+    }
+
+    /// A first sign-in that could not reach `/me` gets its farm from the list
+    /// when the list can be read.
+    func testAFirstSignInThatFailedOpensFromTheList() async {
+        defaults.set(true, forKey: FarmMemory.seededKey)
+        let farms = store(identity: identity(nil), answer: nil,
+                          list: FarmList([[member("ferma-1", "Ферма 1", "OWNER")]]))
+        await farms.resolve()
+        XCTAssertEqual(farms.state, .failed, "positive control")
+
+        await farms.refreshFarms()
+        XCTAssertEqual(farms.activeFarm?.slug, "ferma-1")
+    }
+
     /// Изход forgets the list and the role with the farm.
     func testSignOutForgetsTheListAndTheRole() async {
         var roles: [String?] = []

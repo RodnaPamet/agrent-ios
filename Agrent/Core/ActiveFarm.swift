@@ -226,6 +226,7 @@ final class FarmStore {
         state = .resolving
         restoreRemembered()
         if case .active = state { return }
+        if openFromList() { return }
 
         guard let me = await loadMe() else {
             state = .failed
@@ -236,6 +237,7 @@ final class FarmStore {
         // oldest membership, which is only where a first sign-in starts.
         restoreRemembered()
         if case .active = state { return }
+        if openFromList() { return }
         if let tenant = me.tenant {
             // `/me`'s role is the role on that SAME membership — one row,
             // `take: 1`, read for both — so the first farm opens with the
@@ -244,6 +246,17 @@ final class FarmStore {
         } else {
             state = .none
         }
+    }
+
+    /// THE LIST OVER `/me`, once the list has answered this session. `/me`
+    /// in memory can still name a farm the list has since closed — it is
+    /// re-read only on a return to the app — and opening that farm here
+    /// would undo the close the list just made. The list's first is the
+    /// oldest membership, the farm `/me` names when it is current.
+    private func openFromList() -> Bool {
+        guard let farms else { return false }
+        if let first = farms.first { activate(first) } else { state = .none }
+        return true
     }
 
     /// Open `farm`, and remember it as this person's choice.
@@ -322,10 +335,24 @@ final class FarmStore {
     }
 
     /// The list as the server has it NOW. The one place a farm is closed for
-    /// no longer being this person's.
+    /// no longer being this person's — and where a person with none, or
+    /// whose first sign-in could not reach `/me`, is given the one they now
+    /// have: invited on the web while this phone said «Нямате стопанство»,
+    /// they would otherwise have to relaunch to be let in — or, with the
+    /// wizard on that screen, create a second farm instead.
     private func adopt(_ list: [Farm]) {
         farms = list
-        guard case .active(let open) = state else { return }
+        let open: Farm
+        switch state {
+        case .active(let farm):
+            open = farm
+        case .none, .failed:
+            if let first = list.first { activate(first) }
+            return
+        case .resolving:
+            // `resolve()` is on its way, and reads this list when it lands.
+            return
+        }
         if let listed = list.first(where: { $0.slug == open.slug }) {
             // Still theirs: the server's name for it, and their role there.
             // The same slug, so nothing is rebuilt.

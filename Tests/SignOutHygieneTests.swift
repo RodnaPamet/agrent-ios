@@ -125,7 +125,8 @@ final class SignOutHygieneTests: XCTestCase {
             CurrentUser(id: userA, name: "А", email: "a@example.invalid", role: "MECHANISATOR",
                         bottomTabOrder: ["/tasks"]))
         BottomTabsStore.shared.adopt(["/tasks", "/locations"], isOperator: true)
-        ExchangeUnreadStore.shared.apply([thread("t1"), thread("t2")], asOf: SessionEpoch.current)
+        ExchangeUnreadStore.shared.apply([thread("t1"), thread("t2")],
+                                         asOf: SessionEpoch.current, farm: Config.tenantSlug)
         RateLimitPause.messages.absorb(tooMany)
         OutboxStore.shared.pause.absorb(tooMany)
         DashboardPreferences.shared.select(.sunflower)
@@ -318,11 +319,11 @@ final class SignOutHygieneTests: XCTestCase {
     func testAnUnreadPageFromTheOldSessionIsDropped() {
         let store = ExchangeUnreadStore()
         let stale = SessionEpoch.current
-        store.apply([thread("x")], asOf: stale)
+        store.apply([thread("x")], asOf: stale, farm: Config.tenantSlug)
         XCTAssertEqual(store.count, 1, "positive control: a current page applies")
         store.reset()
         SessionEpoch.advance()
-        store.apply([thread("x"), thread("y")], asOf: stale)
+        store.apply([thread("x"), thread("y")], asOf: stale, farm: Config.tenantSlug)
         XCTAssertEqual(store.count, 0, "A's inbox page landed in B's badge")
     }
 

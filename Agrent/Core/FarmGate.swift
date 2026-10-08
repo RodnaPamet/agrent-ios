@@ -22,8 +22,17 @@ struct FarmGate: View {
     @State private var tellingLostAccess = false
     @State private var lostAccessNote = ""
 
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var foreground = ForegroundReturn()
+
     var body: some View {
-        Group {
+        // A CONTAINER, not a `Group`. A `Group` hands each modifier below to
+        // whichever child the `switch` resolves to (see `PageForm`), so the
+        // launch `.task` started again on every change of state — and once
+        // the farm list could close a person's last farm, that restart
+        // reopened it from `/me` and the list closed it again, round and
+        // round. On the container, each modifier is attached once.
+        ZStack {
             switch farms.state {
             case .active(let farm):
                 // A NEW IDENTITY PER FARM. Every screen builds its own store
@@ -75,6 +84,19 @@ struct FarmGate: View {
         }
         // The menu names the farm; `/me` can name the one seeded by slug.
         .onChange(of: me.user?.tenant) { _, tenant in farms.adoptName(from: tenant) }
+        // The farm list on every RETURN to the app — here, in every state,
+        // rather than in the tabs, which only a person with a farm has:
+        // «Нямате стопанство» learns of an invitation accepted on the web,
+        // and a first sign-in that failed offline gets its farm. A role
+        // changed or a membership removed on the web reaches an app that is
+        // already open the next time it is opened, as `/me`'s flags do.
+        .onChange(of: scenePhase) { _, phase in
+            guard foreground.isReturn(to: phase) else { return }
+            Task {
+                if case .failed = farms.state { await farms.resolve() }
+                await farms.refreshFarms()
+            }
+        }
         // ── A switch is SAID, not only seen ──
         //
         // Choosing a farm in Профил rebuilds every tab and takes the sheet

@@ -207,9 +207,25 @@ final class PersonalUnreadTests: XCTestCase {
     /// conversations, and each can be unread on its own.
     func testTwoThreadsOnOneListingCountTwice() {
         let store = ExchangeUnreadStore()
-        store.apply([row("a", unread: true), row("b", unread: true)], asOf: SessionEpoch.current)
+        store.apply([row("a", unread: true), row("b", unread: true)],
+                    asOf: SessionEpoch.current, farm: Config.tenantSlug)
         XCTAssertEqual(store.count, 2)
         store.markedRead("a")
         XCTAssertEqual(store.count, 1, "reading one leaves the other")
+    }
+
+    /// A page fetched for the farm open a moment ago, landing after a switch,
+    /// is not this farm's badge (agrent-ios#179).
+    func testAPageFromTheFarmOpenBeforeIsDropped() {
+        let saved = ActiveFarm.shared.farm
+        defer { ActiveFarm.shared.set(saved) }
+        ActiveFarm.shared.set(Farm(slug: "ferma-2", name: nil))
+        let store = ExchangeUnreadStore()
+        store.apply([row("a", unread: true)], asOf: SessionEpoch.current, farm: "ferma-2")
+        XCTAssertEqual(store.count, 1, "positive control: this farm's page applies")
+        store.reset()
+        store.apply([row("a", unread: true), row("b", unread: true)],
+                    asOf: SessionEpoch.current, farm: "ferma-1")
+        XCTAssertEqual(store.count, 0, "the farm open a moment ago lent this one its badge")
     }
 }
