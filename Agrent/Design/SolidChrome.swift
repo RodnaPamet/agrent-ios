@@ -1,3 +1,4 @@
+import CoreText
 import SwiftUI
 import UIKit
 
@@ -59,6 +60,20 @@ enum SolidChrome {
 
     private(set) static var isInstalled = false
 
+    /// The text language of every bar title (#205): CoreText picks SF Pro's
+    /// Bulgarian shapes from it. `BulgarianLetterforms` already makes them
+    /// the default; this is the explicit layer for the bars, which are
+    /// UIKit's and drew the standard shapes on a phone that lists no
+    /// Bulgarian.
+    static let titleLanguageKey = NSAttributedString.Key(kCTLanguageAttributeName as String)
+    static let titleLanguage = "bg"
+
+    /// Every navigation title, inline and large, in `titleLanguage`.
+    private static func setTitleLanguage(_ appearance: UINavigationBarAppearance) {
+        appearance.titleTextAttributes[titleLanguageKey] = titleLanguage
+        appearance.largeTitleTextAttributes[titleLanguageKey] = titleLanguage
+    }
+
     /// Once content scrolls under the bar: the page colour, opaque, with an
     /// `edge` hairline — so a title sits on the colour of the list it heads,
     /// and the rows passing beneath it cannot show through.
@@ -67,6 +82,7 @@ enum SolidChrome {
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(Palette.Surface.page)
         appearance.shadowColor = UIColor(Palette.Surface.edge)
+        setTitleLanguage(appearance)
         return appearance
     }
 
@@ -75,6 +91,7 @@ enum SolidChrome {
     static func scrollEdgeAppearance() -> UINavigationBarAppearance {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
+        setTitleLanguage(appearance)
         return appearance
     }
 
@@ -97,9 +114,9 @@ enum SolidChrome {
                      appearance.inlineLayoutAppearance,
                      appearance.compactInlineLayoutAppearance] {
             item.normal.iconColor = normal
-            item.normal.titleTextAttributes = [.foregroundColor: normal]
+            item.normal.titleTextAttributes = [.foregroundColor: normal, titleLanguageKey: titleLanguage]
             item.selected.iconColor = selected
-            item.selected.titleTextAttributes = [.foregroundColor: selected]
+            item.selected.titleTextAttributes = [.foregroundColor: selected, titleLanguageKey: titleLanguage]
         }
         return appearance
     }

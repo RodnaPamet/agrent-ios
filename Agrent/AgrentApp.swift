@@ -10,6 +10,11 @@ struct AgrentApp: App {
     /// the confirmation button on a write with no undo. See
     /// `BulgarianLayout`.
     init() {
+        // FIRST, before any text is laid out: Bulgarian at the head of the
+        // app's language list, so every piece of text this app draws is
+        // set in Bulgarian letterforms on any phone (#205). Ahead of
+        // `BulgarianLayout`, so its priming measures those shapes.
+        BulgarianLetterforms.install()
         BulgarianLayout.install()
         // Before any scene too: the appearance proxy styles only the bars
         // created after it is set. See `SolidChrome`.
@@ -77,6 +82,19 @@ struct AgrentApp: App {
             // Set once at the root rather than per call site: a formatter
             // somebody forgets is exactly how this came back a second time.
             .environment(\.locale, Locale(identifier: "bg_BG"))
+            // BULGARIAN LETTERFORMS ON EVERY PHONE (#205; owner, 2026-10-08).
+            //
+            // Since #201 the bundle's only language is `bg`, so text that
+            // goes through localisation — every literal `Text("…")` — set in
+            // SF Pro's Bulgarian shapes (д like a g, т like an m), while text
+            // from a `String` followed the PHONE's language list. On a phone
+            // that lists no Bulgarian, one screen carried both.
+            //
+            // `BulgarianLetterforms` (in `init`) is what fixes that everywhere,
+            // sheets and alerts included. This is the explicit layer for
+            // SwiftUI's text on the main screens, which holds even if the
+            // system ever stops honouring the app's own language list.
+            .typesettingLanguage(Locale.Language(identifier: "bg"))
         }
     }
 }
