@@ -27,9 +27,12 @@ struct FarmWizardView: View {
                     Text(FarmWizardText.stepOf(model.position.current, model.position.total))
                         .font(.footnote)
                         .foregroundStyle(Palette.secondaryText)
-                    Text(title)
+                    // Soft hyphens shown, the plain words spoken (#210):
+                    // at AX5 «стопанството» outgrew the line and broke mid-word.
+                    Text(SoftHyphens.display(title))
                         .font(.title2.weight(.semibold))
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel(title)
                         .accessibilityAddTraits(.isHeader)
                 }
                 if let error = model.error {
@@ -266,7 +269,8 @@ private struct KindChoice: View {
 
     private var words: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.headline)
+            // «Стопан- / ство с ЕИК» at AX5, not «Стопанств / о» (#210).
+            Text(SoftHyphens.display(title)).font(.headline).accessibilityLabel(title)
             Text(help).font(.subheadline).foregroundStyle(Palette.secondaryText)
         }
         .fixedSize(horizontal: false, vertical: true)
