@@ -547,6 +547,7 @@ final class SignOutHygieneTests: XCTestCase {
         "ResponseCache.shared": "purged by endSession and keyed on CacheScope",
         "PendingOperations.shared": "parked by owner, never cleared",
         "SessionIdentity.shared": "cleared by endSession and TokenStore.clear",
+        "ActiveFarm.shared": "a mirror only FarmStore writes, and FarmStore.reset() clears it",
     ]
 
     /// A type's instance of ITSELF held in a static — `static let messages =

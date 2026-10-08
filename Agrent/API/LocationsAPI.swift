@@ -63,9 +63,11 @@ enum LocationsAPI {
     /// key per attempt defeats the dedupe entirely, which is the same rule
     /// `JournalAPI.create` records.
     /// Where a field operation is posted. Named so the outbox can replay
-    /// to the same place without reconstructing it from a literal.
-    static func operationsPath(_ locationID: String) -> String {
-        "\(base)/\(URLEscape.segment(locationID))/operations"
+    /// to the same place without reconstructing it from a literal — and
+    /// given the farm, because a queued row goes to the farm it was made on,
+    /// not the one open when it is replayed (#179).
+    static func operationsPath(_ locationID: String, tenant: String = Config.tenantSlug) -> String {
+        "/api/t/\(tenant)/locations/\(URLEscape.segment(locationID))/operations"
     }
 
     static func createOperation(

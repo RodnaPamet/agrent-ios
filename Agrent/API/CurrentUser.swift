@@ -14,18 +14,18 @@ import Foundation
 /// this codebase has been bitten by repeatedly. `GET /api/auth/me` makes
 /// the guess unnecessary.
 ///
-/// ── `tenant` IS DELIBERATELY NOT MODELLED ──
+/// ── `tenant` is WHERE A FIRST SIGN-IN STARTS, and nothing more ──
 ///
 /// The response carries `{ user, tenant }` and the tenant block is a trap:
 /// it comes from `tenantMemberships` ordered `createdAt asc, take 1` — the
 /// user's OLDEST membership, not the one they are currently looking at.
-/// For a single-tenant user those coincide; for anyone else they do not,
-/// and code that reached for `me.tenant.slug` to decide which farm it was
-/// in would be right until the first person joined a second one.
+/// For a single-tenant user those coincide; for anyone else they do not.
 ///
-/// Leaving it out is stronger than a comment saying not to use it. The
-/// field this app needs is `user.id`, which is always correct. The tenant
-/// comes from `Config.tenantSlug`, as it always has.
+/// It was left out for that reason until farms stopped being pinned
+/// (agrent-ios#179). It is read in ONE place: `FarmStore.resolve`, for a
+/// person with no farm remembered on this phone — where the oldest
+/// membership is a fair place to start and nil means "no farm yet". Which
+/// farm is open is `FarmStore`'s answer, never this field's.
 ///
 /// ── The path carries no tenant slug ──
 ///
@@ -85,7 +85,17 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// `DecoderToleranceTests` holds `CurrentUser` to requiring `user` only.
     let featureFlags: [String: Bool]?
 
-    private enum Outer: String, CodingKey { case user, featureFlags }
+    /// The person's OLDEST membership, or nil for a person with no farm —
+    /// see the header for the one place it is read.
+    let tenant: Tenant?
+
+    struct Tenant: Decodable, Equatable, Sendable {
+        let id: String
+        let name: String
+        let slug: String
+    }
+
+    private enum Outer: String, CodingKey { case user, featureFlags, tenant }
     private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder, avatarUrl }
 
     init(from decoder: Decoder) throws {
@@ -98,6 +108,10 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.bottomTabOrder = try user.decodeIfPresent([String].self, forKey: .bottomTabOrder)
         self.avatarUrl = (try? user.decodeIfPresent(String.self, forKey: .avatarUrl)) ?? nil
         self.featureFlags = (try? outer.decodeIfPresent([String: Bool].self, forKey: .featureFlags)) ?? nil
+        // Lenient like the flags: a tenant block that will not decode costs a
+        // first sign-in its starting farm (it is asked to choose), never the
+        // identity every other screen needs.
+        self.tenant = (try? outer.decodeIfPresent(Tenant.self, forKey: .tenant)) ?? nil
     }
 
     /// May this person create a field operation?
@@ -157,7 +171,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
 
     init(id: String, name: String?, email: String?, role: String?,
          bottomTabOrder: [String]? = nil, featureFlags: [String: Bool]? = nil,
-         avatarUrl: String? = nil) {
+         avatarUrl: String? = nil, tenant: Tenant? = nil) {
         self.id = id
         self.name = name
         self.email = email
@@ -165,6 +179,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.bottomTabOrder = bottomTabOrder
         self.featureFlags = featureFlags
         self.avatarUrl = avatarUrl
+        self.tenant = tenant
     }
 }
 

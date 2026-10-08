@@ -46,6 +46,7 @@ struct AppMenuButton<Extra: View>: View {
     @State private var tabs = BottomTabsStore.shared
     @State private var unread = ExchangeUnreadStore.shared
     @State private var showingAdmin = false
+    @State private var farms = FarmStore.shared
 
     /// Which overflow screen is open, if any. One piece of state rather
     /// than a Bool per surface — the set is now derived from what is NOT
@@ -63,7 +64,10 @@ struct AppMenuButton<Extra: View>: View {
                 Section { extra }
             }
 
-            Section(titled: Config.tenantSlug) {
+            // The open farm by NAME (#179) — a person can hold several now,
+            // and the slug is a URL fragment rather than what anyone calls
+            // their farm. The slug stands in until the name is known.
+            Section(titled: farms.activeFarm?.name ?? Config.tenantSlug) {
                 // EVERY surface not in the bottom row, always.
                 //
                 // This is what makes the tab customiser safe rather than a

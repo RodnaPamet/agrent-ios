@@ -50,7 +50,8 @@ struct AgrentApp: App {
             Group {
                 switch openingState {
                 case .signedIn:
-                    MainTabView()
+                    // Which farm, before any of it — see `FarmGate`.
+                    FarmGate()
                 default:
                     SignInView()
                 }

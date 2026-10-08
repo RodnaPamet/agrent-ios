@@ -142,12 +142,16 @@ final class OutboxStore {
         case mark(path: String, seenVersion: Int)
     }
 
+    /// To the FARM THE ROW WAS MADE ON, not the one open now — see
+    /// `PendingOperation.tenantSlug`.
     nonisolated static func replay(for item: PendingOperation) -> Replay? {
         switch item.target {
         case .create(let locationID):
-            return .create(path: LocationsAPI.operationsPath(locationID), idempotencyKey: item.id)
+            return .create(path: LocationsAPI.operationsPath(locationID, tenant: item.tenant),
+                           idempotencyKey: item.id)
         case .mark(let mark):
-            return .mark(path: FieldOperationAPI.linePath(taskID: mark.taskID, lineID: mark.lineID),
+            return .mark(path: FieldOperationAPI.linePath(taskID: mark.taskID, lineID: mark.lineID,
+                                                          tenant: item.tenant),
                          seenVersion: mark.seenVersion)
         case nil:
             return nil
@@ -210,8 +214,17 @@ final class OutboxStore {
     }
 
     func enqueue(_ operation: PendingOperation) async {
-        await queue.enqueue(operation)
+        await queue.enqueue(Self.stamped(operation))
         await refresh()
+    }
+
+    /// The farm open NOW is the farm the record was made on: a record is
+    /// queued by the screen that just failed to send it, inside that farm.
+    /// A row that already carries a farm keeps it.
+    nonisolated static func stamped(_ operation: PendingOperation) -> PendingOperation {
+        var row = operation
+        if row.tenantSlug == nil { row.tenantSlug = Config.tenantSlug }
+        return row
     }
 
     // MARK: - Parcel-line marks (#138)
@@ -229,7 +242,7 @@ final class OutboxStore {
     /// The new row is written FIRST and the old removed after: a crash
     /// between the two leaves a duplicate of one state, never a hole.
     func enqueueMark(_ operation: PendingOperation) async {
-        await queue.enqueue(operation)
+        await queue.enqueue(Self.stamped(operation))
         if let mark = operation.lineMark {
             await supersedeMarks(taskID: mark.taskID, lineID: mark.lineID, keeping: operation.id)
         } else {
