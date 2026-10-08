@@ -249,11 +249,15 @@ actor APIClient {
             /// The refusal's own values, for building a sentence about
             /// THIS failure rather than about its category.
             ///
-            /// Decoded as strings only. The server sends them as strings
-            /// (`params.max` is `"12"`, not `12`), and a loose `[String: Any]`
-            /// would put decoding of an arbitrary JSON value on the error
-            /// path — which is how a 404 became a blank screen once
-            /// already.
+            /// Each a string OR A NUMBER, read as text: the spec's
+            /// `ErrorResponse.error.params` is `string | number` since
+            /// agri-saas #1388, and `FARM_NAME_TOO_LONG` sends `max: 120`, a
+            /// number, where `INVALID_TAB_ORDER` sends `"12"`. Read as strings
+            /// only, that number failed the WHOLE envelope — the code with it
+            /// — and a too-long farm name met the generic 400. Anything else
+            /// costs that one value, never the code: decoding an arbitrary
+            /// JSON value on the error path is how a 404 became a blank
+            /// screen once already.
             let params: [String: String]?
 
             init(code: String?, message: String?, details: Details?,
@@ -286,11 +290,52 @@ actor APIClient {
                     let code: String?
                     let message: String?
                     let details: Details?
-                    let params: [String: String]?
+                    let params: Params?
+
+                    private enum CodingKeys: String, CodingKey { case code, message, details, params }
+
+                    init(from decoder: Decoder) throws {
+                        let c = try decoder.container(keyedBy: CodingKeys.self)
+                        code = try c.decodeIfPresent(String.self, forKey: .code)
+                        message = try c.decodeIfPresent(String.self, forKey: .message)
+                        // Neither of these may cost the code: `details` or
+                        // `params` this build cannot read cost themselves.
+                        details = (try? c.decodeIfPresent(Details.self, forKey: .details)) ?? nil
+                        params = (try? c.decodeIfPresent(Params.self, forKey: .params)) ?? nil
+                    }
                 }
                 let object = try container.decode(Object.self)
                 self.init(code: object.code, message: object.message,
-                          details: object.details, params: object.params)
+                          details: object.details, params: object.params?.values)
+            }
+
+            /// `params`, each value a string or a number, as text. `120`
+            /// reads as "120", `1.5` as "1.5"; a value that is neither is
+            /// left out.
+            struct Params: Decodable {
+                let values: [String: String]
+
+                private struct Key: CodingKey {
+                    let stringValue: String
+                    var intValue: Int? { nil }
+                    init(stringValue: String) { self.stringValue = stringValue }
+                    init?(intValue: Int) { nil }
+                }
+
+                init(from decoder: Decoder) throws {
+                    let c = try decoder.container(keyedBy: Key.self)
+                    var values: [String: String] = [:]
+                    for key in c.allKeys {
+                        if let text = try? c.decode(String.self, forKey: key) {
+                            values[key.stringValue] = text
+                        } else if let whole = try? c.decode(Int.self, forKey: key) {
+                            values[key.stringValue] = String(whole)
+                        } else if let number = try? c.decode(Double.self, forKey: key) {
+                            values[key.stringValue] = String(number)
+                        }
+                    }
+                    self.values = values
+                }
             }
         }
         let error: Err?
@@ -307,39 +352,15 @@ actor APIClient {
     /// is how a 404 became a blank screen once already. A server that
     /// answers a failure with an HTML page is the ordinary case, not an
     /// exceptional one.
-    static func envelope(from data: Data) -> ErrorEnvelope.Err? {
-        (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error.map(normalised)
-    }
-
-    /// Two refusals whose code is not where the spec says codes go, read as
-    /// if it were — WHITELISTED, so no other prose ever becomes a code, and
-    /// each due to go once the server moves it (agrent-ios#179).
     ///
-    /// 1. THE TERMS GATE. `middleware.ts` answers a consent-pending caller
-    ///    403 `{"error": "Terms acceptance required"}`: the bare-string shape,
-    ///    so its "code" is that English sentence, and the generic 403 text
-    ///    would tell someone who has not accepted the terms that they lack
-    ///    permission. A coded envelope is asked of agri-saas.
-    /// 2. FARM CREATION (`POST /api/me/farms`, agri-saas#1362). Its refusals
-    ///    are thrown as `badRequest('FARM_NAME_REQUIRED')`, which puts the
-    ///    code in `message` and `BAD_REQUEST` in `code` (traced on main,
-    ///    2026-10-08; `codedBadRequest` asked of backend 1).
-    static func normalised(_ err: ErrorEnvelope.Err) -> ErrorEnvelope.Err {
-        if err.code == "Terms acceptance required" {
-            return .init(code: "TERMS_ACCEPTANCE_REQUIRED", message: nil, details: nil)
-        }
-        if err.code == "BAD_REQUEST", let message = err.message, farmCreationCodes.contains(message) {
-            return .init(code: message, message: nil, details: err.details, params: err.params)
-        }
-        return err
+    /// Taken AS SENT. Until 2026-10-08 two refusals were translated here: the
+    /// terms gate's bare-string 403 and the farm-creation codes the server put
+    /// in `message`. agri-saas #1405 (the middleware's coded 403s) and #1388
+    /// (`codedBadRequest` for farm creation) are live, read in the deployed
+    /// code, so both arrive coded and the translation went.
+    static func envelope(from data: Data) -> ErrorEnvelope.Err? {
+        (try? JSONDecoder().decode(ErrorEnvelope.self, from: data))?.error
     }
-
-    /// The codes `POST /api/me/farms` refuses with — the route's and its
-    /// usecase's, read from agri-saas#1362.
-    static let farmCreationCodes: Set<String> = [
-        "FARM_NAME_REQUIRED", "FARM_NAME_TOO_LONG", "FARM_NAME_NOT_SLUGGABLE", "FARM_SLUG_UNAVAILABLE",
-        "EIK_LOOKS_LIKE_EGN", "EIK_INVALID", "ACCOUNT_HAS_NO_EMAIL", "INVALID_FARM_PAYLOAD",
-    ]
 
     /// What a 409 becomes. Out of `send` so the mapping is a unit test: there
     /// is no URLProtocol seam in `Tests/`, and "the versions come from

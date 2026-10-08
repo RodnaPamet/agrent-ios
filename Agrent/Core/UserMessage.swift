@@ -255,6 +255,13 @@ enum UserMessage {
     /// means.
     static func interpolated(code: String, params: [String: String]?) -> String? {
         switch code {
+        case "FARM_NAME_TOO_LONG":
+            // The bound is the server's (`params.max`, agri-saas #1388) — it
+            // was a hardcoded 120 here, which would have gone on saying 120
+            // whatever the server's limit became. Only a whole number is
+            // quoted: anything else is not a length.
+            guard let max = params?["max"], Int(max) != nil else { return nil }
+            return "Името на стопанството е твърде дълго — до \(max) знака."
         case "PRODUCT_IS_SAMPLE_ARCHETYPE":
             guard let product = params?["product"], !product.isEmpty else {
                 return "Операцията използва образцов продукт, а не регистриран. "
@@ -417,8 +424,8 @@ enum UserMessage {
         // The terms gate (`middleware.ts`): every farm and person route
         // refuses a caller who has not accepted the terms of use. Not a
         // permission — saying "you lack the rights" would send them to the
-        // farm's owner for something only they can do. Read from the bare
-        // 403 by `APIClient.normalised` until the server codes it.
+        // farm's owner for something only they can do. Coded by the server
+        // since agri-saas #1405.
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "
             + "приемете ги и опитайте отново.",
@@ -429,7 +436,9 @@ enum UserMessage {
         // `eikInvalid`): an ЕГН typed by mistake is said to be one, never
         // called "invalid".
         "FARM_NAME_REQUIRED": "Въведете име на стопанството.",
-        "FARM_NAME_TOO_LONG": "Името на стопанството е твърде дълго — до 120 знака.",
+        // The limit itself comes from `params.max` (`interpolated`); this is
+        // for a refusal that does not carry it.
+        "FARM_NAME_TOO_LONG": "Името на стопанството е твърде дълго.",
         "FARM_NAME_NOT_SLUGGABLE":
             "Името трябва да съдържа поне една буква или цифра — не само знаци.",
         "FARM_SLUG_UNAVAILABLE":

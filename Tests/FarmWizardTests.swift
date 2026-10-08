@@ -204,39 +204,73 @@ final class FarmWizardModelTests: XCTestCase {
     }
 }
 
-/// The two refusals whose code is not where the spec puts codes.
+/// The farm-creation refusals and the terms gate, as the server sends them
+/// since agri-saas #1388 and #1405 (live 2026-10-08): coded, and read AS
+/// SENT — the translations that stood in for them are gone.
 final class FarmErrorShapeTests: XCTestCase {
 
     private func envelope(_ json: String) -> APIClient.ErrorEnvelope.Err? {
         APIClient.envelope(from: Data(json.utf8))
     }
 
-    /// #1362 ships its codes in `message`, under `BAD_REQUEST`.
-    func testAFarmCodeInTheMessageIsReadAsTheCode() {
-        let err = envelope(#"{"error":{"code":"BAD_REQUEST","message":"EIK_LOOKS_LIKE_EGN","requestId":"r"}}"#)
-        XCTAssertEqual(err?.code, "EIK_LOOKS_LIKE_EGN")
+    /// The codes `POST /api/me/farms` refuses with — its route's and its
+    /// usecase's, read at the deployed agri-saas c08c2be3.
+    private let farmCreationCodes = [
+        "FARM_NAME_REQUIRED", "FARM_NAME_TOO_LONG", "FARM_NAME_NOT_SLUGGABLE", "FARM_SLUG_UNAVAILABLE",
+        "EIK_LOOKS_LIKE_EGN", "EIK_INVALID", "ACCOUNT_HAS_NO_EMAIL", "INVALID_FARM_PAYLOAD",
+    ]
+
+    /// `FARM_NAME_TOO_LONG` carries its bound as a NUMBER. Read as strings
+    /// only, that failed the whole envelope and the code went with it.
+    func testANumberInParamsKeepsTheCodeAndIsQuoted() {
+        let err = envelope(#"{"error":{"code":"FARM_NAME_TOO_LONG","message":"That farm name is too long.","requestId":"r","params":{"max":120}}}"#)
+        XCTAssertEqual(err?.code, "FARM_NAME_TOO_LONG", "a numeric param cost the code")
+        XCTAssertEqual(err?.params?["max"], "120")
+        XCTAssertEqual(UserMessage.httpText(status: 400, code: err?.code, message: err?.message, params: err?.params),
+                       "Името на стопанството е твърде дълго — до 120 знака.")
+        // Without the bound, no number is invented.
+        XCTAssertEqual(UserMessage.httpText(status: 400, code: "FARM_NAME_TOO_LONG", message: nil),
+                       "Името на стопанството е твърде дълго.")
+        // A string still reads as before (`INVALID_TAB_ORDER` sends "12").
+        XCTAssertEqual(envelope(#"{"error":{"code":"X","params":{"max":"12"}}}"#)?.params?["max"], "12")
     }
 
-    /// Whitelisted: any other message under `BAD_REQUEST` stays prose.
-    func testOtherProseStaysProse() {
-        let err = envelope(#"{"error":{"code":"BAD_REQUEST","message":"Something else entirely"}}"#)
-        XCTAssertEqual(err?.code, "BAD_REQUEST")
-        XCTAssertEqual(err?.message, "Something else entirely")
-        // And a real code is never touched.
-        XCTAssertEqual(envelope(#"{"error":{"code":"FORBIDDEN","message":"FARM_NAME_REQUIRED"}}"#)?.code,
-                       "FORBIDDEN")
+    /// A value that is neither costs that value; params that are not an
+    /// object cost the params — never the code.
+    func testUnreadableParamsNeverCostTheCode() {
+        let odd = envelope(#"{"error":{"code":"FARM_NAME_TOO_LONG","params":{"max":120,"list":[1,2],"flag":true}}}"#)
+        XCTAssertEqual(odd?.code, "FARM_NAME_TOO_LONG")
+        XCTAssertEqual(odd?.params, ["max": "120"])
+        let notAnObject = envelope(#"{"error":{"code":"EIK_INVALID","params":[1,2]}}"#)
+        XCTAssertEqual(notAnObject?.code, "EIK_INVALID")
+        XCTAssertNil(notAnObject?.params)
+        // Nor odd `details`.
+        let oddDetails = envelope(#"{"error":{"code":"STALE_DATA","details":{"currentVersion":"seven"}}}"#)
+        XCTAssertEqual(oddDetails?.code, "STALE_DATA")
+        XCTAssertNil(oddDetails?.details)
+        // Positive control: readable details are read.
+        XCTAssertEqual(envelope(#"{"error":{"code":"STALE_DATA","details":{"currentVersion":7}}}"#)?
+            .details?.currentVersion, 7)
     }
 
-    /// The terms gate's bare-string 403.
-    func testTheTermsGateIsCoded() {
-        XCTAssertEqual(envelope(#"{"error":"Terms acceptance required"}"#)?.code, "TERMS_ACCEPTANCE_REQUIRED")
-        // Positive control: the bare-string shape still reads as before.
+    /// The terms gate's 403 is a coded envelope now.
+    func testTheTermsGateArrivesCoded() {
+        let err = envelope(#"{"error":{"code":"TERMS_ACCEPTANCE_REQUIRED","message":"Terms acceptance required"}}"#)
+        XCTAssertEqual(err?.code, "TERMS_ACCEPTANCE_REQUIRED")
+        // The bare-string shape still reads as itself (`/api/auth/*`'s 401s).
         XCTAssertEqual(envelope(#"{"error":"invalid_grant"}"#)?.code, "invalid_grant")
+    }
+
+    /// Nothing is translated any more: a code in `message` stays prose.
+    func testNoCodeIsReadOutOfAMessage() {
+        let err = envelope(#"{"error":{"code":"BAD_REQUEST","message":"EIK_LOOKS_LIKE_EGN"}}"#)
+        XCTAssertEqual(err?.code, "BAD_REQUEST")
+        XCTAssertEqual(err?.message, "EIK_LOOKS_LIKE_EGN")
     }
 
     /// Every one of them reads in Bulgarian, as a sentence.
     func testEveryFarmRefusalHasBulgarianWords() {
-        for code in APIClient.farmCreationCodes.sorted() + ["TERMS_ACCEPTANCE_REQUIRED"] {
+        for code in farmCreationCodes + ["TERMS_ACCEPTANCE_REQUIRED"] {
             let text = UserMessage.httpText(status: 400, code: code, message: nil)
             XCTAssertNotEqual(text, UserMessage.statusText(400), "\(code) has no words of its own")
             XCTAssertTrue(text.hasSuffix("."), "not a sentence: \(text)")
