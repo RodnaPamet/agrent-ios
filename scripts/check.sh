@@ -29,8 +29,9 @@
 # script disagreeing with CI on the same branch, which is loud rather than
 # silent.
 #
-# `ALLOWED` is 2 for the two known ISO8601DateFormatter Sendable captures in
-# APIClient. If CI's allowance changes, change it here too.
+# `ALLOWED` is 0. It was 2 — the two ISO8601DateFormatter Sendable captures
+# in APIClient — until Swift 6 (P4.6, #195) turned those into errors and they
+# were fixed. If CI's allowance changes, change it here too.
 #
 set -u
 
@@ -42,7 +43,7 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 
 TMP_BASE="${TMPDIR:-/tmp}"; TMP_BASE="${TMP_BASE%/}"
 LOG="${LOG:-$TMP_BASE/agrent-check.log}"
-ALLOWED=2
+ALLOWED=0
 
 echo "building and testing — log: $LOG"
 xcodebuild test \

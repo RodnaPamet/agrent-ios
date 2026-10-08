@@ -5,7 +5,7 @@ import XCTest
 /// (`fbb25ab29`) rather than against a description of them.
 final class DashboardTests: XCTestCase {
 
-    private func decode<T: Decodable>(_ json: String, as type: T.Type) async throws -> T {
+    private func decode<T: Decodable & Sendable>(_ json: String, as type: T.Type) async throws -> T {
         try await APIClient.shared.decode(Data(json.utf8), as: type)
     }
 

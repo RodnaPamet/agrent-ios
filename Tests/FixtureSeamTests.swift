@@ -375,7 +375,7 @@ final class FixtureSeamTests: XCTestCase {
 
     /// One entry per fixture the catalogue can serve, calling the decode the
     /// app calls on that route.
-    private static let decoders: [(String, (Data) async throws -> Void)] = [
+    private static let decoders: [(String, @Sendable (Data) async throws -> Void)] = [
         ("auth-me", { _ = try await MeAPI.decode(from: $0) }),
         ("journal-list", { _ = try await JournalAPI.decodeList(from: $0) }),
         ("locations-list", { _ = try await LocationsAPI.decodeList(from: $0) }),

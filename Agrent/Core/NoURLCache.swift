@@ -116,11 +116,12 @@ enum NoURLCache {
     /// Apple's own base imagery is NOT affected and is out of scope: MapKit
     /// fetches it out of process (geod) into its own cache, and it is Apple's
     /// public satellite imagery, not anything of this farm's.
+    ///
+    /// The ASYNC form of `loadTile` (#195): MapKit calls the same selector
+    /// either way. The completion form handed MapKit's non-`Sendable` `result`
+    /// block to `URLSession`'s `@Sendable` callback, which Swift 6 refuses.
     final class TileOverlay: MKTileOverlay {
-        override func loadTile(
-            at path: MKTileOverlayPath,
-            result: @escaping (Data?, Error?) -> Void
-        ) {
+        override func loadTile(at path: MKTileOverlayPath) async throws -> Data {
             // Stamped like every request the app builds, a third-party one
             // included — the account card's provider photo is too. This one
             // went out unstamped from the day `ClientHeader` arrived (#144)
@@ -135,17 +136,15 @@ enum NoURLCache {
                 timeoutInterval: 15
             )
             ClientHeader.stamp(&request)
-            NoURLCache.session.dataTask(with: request) { data, response, error in
-                // A non-2xx body is an error envelope, not a PNG. Handing it
-                // to the renderer draws nothing either way; handing it back
-                // as an error at least says why.
-                if let http = response as? HTTPURLResponse,
-                   !(200..<300).contains(http.statusCode) {
-                    result(nil, URLError(.badServerResponse))
-                } else {
-                    result(data, error)
-                }
-            }.resume()
+            let (data, response) = try await NoURLCache.session.data(for: request)
+            // A non-2xx body is an error envelope, not a PNG. Handing it to
+            // the renderer draws nothing either way; handing it back as an
+            // error at least says why.
+            if let http = response as? HTTPURLResponse,
+               !(200..<300).contains(http.statusCode) {
+                throw URLError(.badServerResponse)
+            }
+            return data
         }
     }
 }

@@ -196,26 +196,30 @@ enum BgDate {
     /// beside the parsed value for the case where neither matches.
     static func parseInstantOrDay(_ string: String?) -> Date? {
         guard let string, !string.isEmpty else { return nil }
-        return instantWithFraction.date(from: string)
-            ?? instant.date(from: string)
-            ?? parseISODay(string)
+        return parseInstant(string) ?? parseISODay(string)
     }
 
-    /// Two formatters, because `ISO8601DateFormatter` does not make
-    /// fractional seconds optional — `.withFractionalSeconds` REQUIRES them
-    /// and its absence REFUSES them. The same pair exists in `APIClient`'s
-    /// decoder for the same reason; this is that lesson, not a new one.
-    private static let instantWithFraction: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    /// An instant as the server writes it — `2026-09-18T07:12:00.000Z` — with
+    /// or without the fraction, and with an offset in place of the `Z`.
+    /// `APIClient`'s decoder reads every `Date` through this, so there is one
+    /// spelling of "an instant" in the app.
+    ///
+    /// `Date.ISO8601FormatStyle`, not `ISO8601DateFormatter` (P4.6, #195): a
+    /// format style is a `Sendable` value, so the decoder's `@Sendable`
+    /// strategy can hold it, and so can a `static let`; the formatter class
+    /// could be neither under Swift 6. `InstantParsingTests` pins it to the
+    /// old formatter's answers on the server's spellings and the edge cases.
+    static func parseInstant(_ string: String) -> Date? {
+        (try? instantWithFraction.parse(string)) ?? (try? instant.parse(string))
+    }
 
-    private static let instant: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
+    /// Two styles, because fractional seconds are all-or-nothing in either
+    /// API: one REQUIRES them, the other REFUSES them. `.colon` because an
+    /// offset is written `+03:00`; the `Z` the server sends parses either way.
+    private static let instantWithFraction =
+        Date.ISO8601FormatStyle(timeZoneSeparator: .colon, includingFractionalSeconds: true)
+
+    private static let instant = Date.ISO8601FormatStyle(timeZoneSeparator: .colon)
 
     private static let isoDay: DateFormatter = {
         let formatter = DateFormatter()

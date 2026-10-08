@@ -25,11 +25,14 @@ import UIKit
 /// WHAT THIS DOES NOT REACH: on iOS 26 the system draws its own glass
 /// capsule behind bar BUTTONS (the menu button, «Затвори»). Turning that
 /// off needs iOS 26 API, and this app targets iOS 17.
+///
+/// On the main actor as a whole (#195): every member builds or installs
+/// UIKit appearance, which is main-actor API.
+@MainActor
 enum SolidChrome {
 
     /// Idempotent. Called from `AgrentApp.init()`, before any bar exists —
     /// the proxy only styles bars created after it is set.
-    @MainActor
     static func install() {
         guard !isInstalled else { return }
         isInstalled = true
@@ -54,7 +57,6 @@ enum SolidChrome {
         tabs.scrollEdgeAppearance = tabAppearance()
     }
 
-    @MainActor
     private(set) static var isInstalled = false
 
     /// Once content scrolls under the bar: the page colour, opaque, with an

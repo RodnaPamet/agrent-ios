@@ -104,6 +104,9 @@ final class FarmProfileHoldingTests: XCTestCase {
 }
 
 /// `XCTAssertThrowsError` has no async form.
+/// On the main actor, with its only caller, so the expression it is handed
+/// never crosses an isolation boundary (#195).
+@MainActor
 func XCTAssertThrowsErrorAsync<T>(
     _ expression: @autoclosure () async throws -> T,
     file: StaticString = #filePath, line: UInt = #line

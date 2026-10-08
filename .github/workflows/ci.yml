@@ -893,7 +893,7 @@ jobs:
             echo ""
             echo "| | |"
             echo "|---|---|"
-            echo "| Source (gated) | **$SOURCE_COUNT** / 2 allowed |"
+            echo "| Source (gated) | **$SOURCE_COUNT** / 0 allowed |"
             echo ""
             [ -n "$SOURCE" ] && printf '%s\n' "$SOURCE" | sed 's/^/- /'
             if [ -n "$TOOLING" ]; then
@@ -903,8 +903,10 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "$SOURCE_COUNT" -gt 2 ]; then
-            echo "::error::$SOURCE_COUNT source warnings; 2 are known (ISO8601DateFormatter Sendable)."
+          # ZERO since Swift 6 (P4.6, #195): the two ISO8601DateFormatter
+          # captures that were allowed became errors and were fixed.
+          if [ "$SOURCE_COUNT" -gt 0 ]; then
+            echo "::error::$SOURCE_COUNT source warnings; none are allowed."
             exit 1
           fi
 

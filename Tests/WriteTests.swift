@@ -10,6 +10,7 @@ import XCTest
 ///     listing   no idempotency, no natural key          → never retry
 ///     deactivate  filters status ACTIVE, so a replay    → never retry,
 ///                 404s on a write that SUCCEEDED           re-read instead
+@MainActor
 final class ExchangeListingWriteTests: XCTestCase {
 
     private func draft(

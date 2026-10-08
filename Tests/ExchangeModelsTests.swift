@@ -86,10 +86,13 @@ final class ExchangeModelsTests: XCTestCase {
             fixture("exchange-listings"), as: ExchangeListingPage.self
         )
         let row = try XCTUnwrap(page.rows.first)
-        XCTAssertEqual(
-            row.createdAt,
-            ISO8601DateFormatter.testParse("2026-07-04T13:38:19.222Z")
-        )
+        // To the millisecond, not bit for bit (#195): the app's parser now
+        // gives the nearest Double to the instant, and `ISO8601DateFormatter`
+        // — this reference — lands 2^-23 s off it on about half of all
+        // millisecond values. Both are 13:38:19.222, and both re-encode as such.
+        let expected = try XCTUnwrap(ISO8601DateFormatter.testParse("2026-07-04T13:38:19.222Z"))
+        XCTAssertEqual(row.createdAt.timeIntervalSince1970, expected.timeIntervalSince1970,
+                       accuracy: 0.0005)
         XCTAssertNil(row.expiresAt, "null expiry must stay nil, not become a date")
 
         let mine = try await APIClient.shared.decode(

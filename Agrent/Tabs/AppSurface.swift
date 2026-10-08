@@ -133,7 +133,8 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     /// which buries features behind an extra tap and reads as a bug.
     static let capacity = 5
 
-    @ViewBuilder
+    /// On the main actor, where views are built (#195).
+    @MainActor @ViewBuilder
     var screen: some View {
         switch self {
         case .journal: JournalListView()

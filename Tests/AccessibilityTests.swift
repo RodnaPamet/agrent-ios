@@ -96,6 +96,7 @@ final class A11yCompassTests: XCTestCase {
 /// The map's accessibility tree is computed from the same `layout` the drawing
 /// pass uses, because a tree computed separately drifts — and drifts silently,
 /// since the person who can see the screen never notices.
+@MainActor
 final class SchematicAccessibilityTests: XCTestCase {
 
     private func parcel(

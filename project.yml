@@ -32,14 +32,16 @@ options:
 
 settings:
   base:
-    SWIFT_VERSION: "5.9"
+    # SWIFT 6 LANGUAGE MODE (P4.6, agrent-ios#195): complete strict
+    # concurrency checking, and its findings are errors. It used to be 5.9 with
+    # `SWIFT_STRICT_CONCURRENCY: minimal`, held back over `presentationAnchor`
+    # (nonisolated, calling MainActor.assumeIsolated, in AuthClient) — which
+    # compiles under 6 as it is. Default actor isolation stays NONISOLATED on
+    # purpose: `APIClient` decodes off the main actor, and a main-actor
+    # default would move that work onto it.
+    SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    # Swift 5 language mode on purpose. `presentationAnchor` is declared
-    # nonisolated and calls MainActor.assumeIsolated (AuthClient.swift:132);
-    # Swift 6 strict concurrency may reject that shape. Move to 6 once the
-    # thing compiles and runs, not before.
-    SWIFT_STRICT_CONCURRENCY: minimal
 
 targets:
   Agrent:
