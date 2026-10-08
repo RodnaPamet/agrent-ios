@@ -34,20 +34,48 @@ final class AuthClient: NSObject {
     private(set) var state: State = .signedOut
     private var session: ASWebAuthenticationSession?
 
-    /// The RAW nonce of the Apple request on its way — one per attempt, and
-    /// spent whatever happens to it. The server claims a nonce before it
-    /// answers, so the same one sent twice is a replay to it (`AppleSignIn`).
-    private var appleNonce: String?
+    /// Which way a sign-in in progress went, so the busy indicator is on
+    /// THAT button — and VoiceOver hears it named — rather than always on
+    /// Google's.
+    enum Route: Equatable, Sendable { case google, microsoft, apple }
+    private(set) var signingInVia: Route?
+
+    /// The RAW nonce of each Apple request on its way, by the `state` string
+    /// the request carries and Apple echoes on the credential. One per
+    /// attempt and used once: the server claims a nonce before it answers, so
+    /// the same one sent twice is a replay to it (`AppleSignIn`). Keyed, not
+    /// one slot: two requests that overlap — a double tap before Apple's sheet
+    /// is up — must not overwrite each other's nonce.
+    private var appleNonces: [String: String] = [:]
+
+    private var termsObserver: NSObjectProtocol?
 
     override init() {
         super.init()
         if let tokens = TokenStore.load() {
             state = tokens.termsPending == true ? .termsPending : .signedIn
         }
+        // A route answered the terms gate's 403 (`APIClient`): this session
+        // goes to the terms screen, whichever provider it came from.
+        termsObserver = NotificationCenter.default.addObserver(
+            forName: APIClient.termsPendingNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.termsRefused() }
+        }
+    }
+
+    /// Only a signed-in session moves; one signing in, out or already on the
+    /// terms screen is left as it is.
+    func termsRefused() {
+        guard state == .signedIn else { return }
+        state = .termsPending
+        Log.auth.info("terms gate refused a request; showing the terms")
     }
 
     func signIn(with provider: Provider = .google) async {
         state = .signingIn
+        signingInVia = provider == .google ? .google : .microsoft
+        defer { signingInVia = nil }
         Log.auth.info("sign-in started (\(provider.rawValue, privacy: .public))")
         let pkce = PKCE()
 
@@ -95,21 +123,36 @@ final class AuthClient: NSObject {
     /// Apple, the raw value kept for the exchange — and the email, which
     /// Apple sends only on a first authorisation and the server needs to
     /// create or find the account.
+    ///
+    /// The email only: the server reads nothing else, and Apple gives a name
+    /// once, on the first authorisation — asked for and not sent, it would be
+    /// collected and lost.
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
         let raw = AppleSignIn.makeNonce()
-        appleNonce = raw
-        request.requestedScopes = [.fullName, .email]
+        let key = UUID().uuidString
+        // Bounded: a request Apple never answers leaves its entry behind.
+        if appleNonces.count >= 8 { appleNonces.removeAll() }
+        appleNonces[key] = raw
+        request.state = key
+        request.requestedScopes = [.email]
         request.nonce = AppleSignIn.hashed(raw)
     }
 
-    /// Whether an Apple request is waiting for its answer — for tests.
-    var appleRequestInFlight: Bool { appleNonce != nil }
+    /// The Apple requests waiting for an answer — for tests.
+    var appleRequestsInFlight: Int { appleNonces.count }
 
     /// Apple's answer: trade its identity token for this app's pair.
     func completeAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
-        // Spent now, whatever happens next: a retry is a new request.
-        let raw = appleNonce
-        appleNonce = nil
+        // An answer while a sign-in is already running belongs to a request
+        // that overlapped it: it neither cancels that sign-in nor races it.
+        guard state != .signingIn else {
+            if case .success(let authorization) = result,
+               let key = (authorization.credential as? ASAuthorizationAppleIDCredential)?.state {
+                appleNonces[key] = nil
+            }
+            Log.auth.info("apple answer ignored: a sign-in is already running")
+            return
+        }
         switch result {
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code == .canceled {
@@ -120,16 +163,21 @@ final class AuthClient: NSObject {
                 Log.auth.error("apple authorization failed: \(Log.summary(for: error), privacy: .public)")
             }
         case .success(let authorization):
-            guard let raw,
-                  let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let key = credential.state,
+                  // Used up here, whatever happens next: a retry is a new
+                  // request with a new nonce.
+                  let raw = appleNonces.removeValue(forKey: key),
                   let data = credential.identityToken,
                   let token = String(data: data, encoding: .utf8)
             else {
                 state = .failed(AppleSignIn.Text.failed)
-                Log.auth.error("apple authorization carried no identity token")
+                Log.auth.error("apple credential unusable: no identity token, or no nonce for its request")
                 return
             }
             state = .signingIn
+            signingInVia = .apple
+            defer { signingInVia = nil }
             do {
                 if try await exchangeApple(identityToken: token, nonce: raw) {
                     state = .termsPending
@@ -142,22 +190,31 @@ final class AuthClient: NSObject {
             } catch {
                 if case .server(let status, let code, _) = error as? AuthError {
                     state = .failed(AppleSignIn.message(status: status, code: code))
+                    // The server's code is not secret, and it is the only
+                    // thing that tells `email_required` from `invalid_grant`.
+                    Log.auth.error("apple exchange refused: \(status, privacy: .public) \(code ?? "no code", privacy: .public)")
                 } else {
                     state = .failed(friendly(error))
+                    Log.auth.error("apple sign-in failed: \(Log.summary(for: error), privacy: .public)")
                 }
-                Log.auth.error("apple sign-in failed: \(Log.summary(for: error), privacy: .public)")
             }
         }
     }
 
     /// The terms are accepted (`TermsAcceptanceView`): the session is an
     /// ordinary one from here.
+    ///
+    /// The flag off and the access token expired in one step on `APIClient`
+    /// (see `APIClient.termsAccepted`), so `/me` — the next request — first
+    /// refreshes into a token minted after the acceptance. And only for the
+    /// session that accepted: an Изход, or another sign-in, while this was
+    /// out is not overruled by its answer.
     func termsAccepted() async {
-        if var tokens = TokenStore.load() {
-            tokens.termsPending = nil
-            TokenStore.save(tokens)
-        }
+        guard state == .termsPending else { return }
+        let epoch = SessionEpoch.current
+        await APIClient.shared.termsAccepted()
         _ = await CurrentUserStore.shared.load()
+        guard SessionEpoch.isCurrent(epoch), state == .termsPending else { return }
         state = .signedIn
         Log.auth.info("terms accepted")
     }

@@ -108,28 +108,36 @@ final class TermsStore {
         if case .ready = state {} else { state = .loading }
         do {
             state = .ready(try await fetch())
+        } catch let APIClient.APIError.http(status, _, _, _, _) where status == 404 {
+            // The route is not on this server yet — not the person's network.
+            state = .failed(TermsText.notYet)
         } catch {
             state = .failed(TermsText.unavailable)
         }
     }
 
     /// Accept the version on screen. Returns whether it landed.
+    ///
+    /// `accepting` stays true on success: the screen is handing over to the
+    /// signed-in app (`AuthClient.termsAccepted`), and a button that came
+    /// back meanwhile would send the acceptance again.
     @discardableResult
     func accept() async -> Bool {
         guard case .ready(let shown) = state, !accepting else { return false }
         accepting = true
         acceptFailure = nil
-        defer { accepting = false }
         do {
             _ = try await send(TermsAPI.Accept(shown: shown.version))
             return true
         } catch where TermsAPI.isStale(error) {
+            accepting = false
             // The terms changed under the open screen: show the new version
             // and ask again. Never the server's `currentVersion` — see header.
             acceptFailure = TermsText.changed
             await load()
             return false
         } catch {
+            accepting = false
             acceptFailure = UserMessage.text(for: error)
             return false
         }
@@ -143,4 +151,8 @@ enum TermsText {
     static let accept = "Приемам условията"
     static let changed = "Условията се промениха, докато ги четяхте. Прочетете новата версия и ги приемете отново."
     static let unavailable = "Условията не могат да бъдат заредени в момента. Проверете връзката и опитайте отново."
+    /// The server does not serve the terms to the app yet (`GET
+    /// /api/auth/terms` not deployed).
+    static let notYet = "Условията все още не могат да бъдат показани в приложението. Опитайте отново по-късно."
+    static let accepting = "Приемане на условията"
 }

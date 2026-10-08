@@ -24,23 +24,24 @@ final class AppleSignInTests: XCTestCase {
                        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
     }
 
-    /// Apple gets the HASH; each request gets its own; and the nonce is
-    /// spent by the answer, whatever it was — a retry is a new request.
-    func testEachAppleRequestHasItsOwnNonceAndSpendsIt() async {
+    /// Apple gets the HASH; each request gets its OWN nonce, filed under the
+    /// `state` Apple echoes back — so two that overlap (a double tap) cannot
+    /// overwrite each other's — and only the email is asked for.
+    func testEachAppleRequestHasItsOwnNonce() async {
         let auth = AuthClient()
         let first = ASAuthorizationAppleIDProvider().createRequest()
         auth.prepareAppleRequest(first)
-        XCTAssertTrue(auth.appleRequestInFlight)
-        XCTAssertEqual(first.requestedScopes, [.fullName, .email], "the email is how the account is found")
-        let firstNonce = try? XCTUnwrap(first.nonce)
-        XCTAssertEqual(firstNonce?.count, 64, "Apple was given something other than the hash")
+        XCTAssertEqual(first.requestedScopes, [.email], "asked for what the server never reads")
+        XCTAssertEqual(first.nonce?.count, 64, "Apple was given something other than the hash")
+        XCTAssertNotNil(first.state, "no key for Apple to echo the nonce back under")
 
         let second = ASAuthorizationAppleIDProvider().createRequest()
         auth.prepareAppleRequest(second)
         XCTAssertNotEqual(second.nonce, first.nonce, "a retry reused the nonce — the server reads that as a replay")
+        XCTAssertNotEqual(second.state, first.state)
+        XCTAssertEqual(auth.appleRequestsInFlight, 2, "the second request overwrote the first's nonce")
 
         await auth.completeAppleSignIn(.failure(ASAuthorizationError(.canceled)))
-        XCTAssertFalse(auth.appleRequestInFlight, "a nonce outlived its answer")
         XCTAssertEqual(auth.state, .signedOut, "a cancel is not a failure")
     }
 
@@ -50,7 +51,6 @@ final class AppleSignInTests: XCTestCase {
         auth.prepareAppleRequest(ASAuthorizationAppleIDProvider().createRequest())
         await auth.completeAppleSignIn(.failure(ASAuthorizationError(.failed)))
         XCTAssertEqual(auth.state, .failed(AppleSignIn.Text.unavailableHere))
-        XCTAssertFalse(auth.appleRequestInFlight)
     }
 
     // MARK: - The wire
@@ -85,6 +85,11 @@ final class AppleSignInTests: XCTestCase {
         // Every token failure is one code, and one sentence: try again.
         XCTAssertEqual(AppleSignIn.message(status: 400, code: code(#"{"error":"invalid_grant"}"#)),
                        AppleSignIn.Text.failed)
+        // Not about the token: the house words for the status, not "try again".
+        XCTAssertEqual(AppleSignIn.message(status: 429, code: nil),
+                       UserMessage.httpText(status: 429, code: nil, message: nil))
+        XCTAssertNotEqual(AppleSignIn.message(status: 426, code: nil), AppleSignIn.Text.failed,
+                          "an old build was told to try again")
         for text in [AppleSignIn.Text.notAvailable, AppleSignIn.Text.failed,
                      AppleSignIn.Text.emailRequired, AppleSignIn.Text.unavailableHere] {
             XCTAssertTrue(text.hasSuffix("."), text)
@@ -94,6 +99,24 @@ final class AppleSignInTests: XCTestCase {
     func testTheProvidersAreTheServersIds() {
         XCTAssertEqual(AuthClient.Provider.google.rawValue, "google")
         XCTAssertEqual(AuthClient.Provider.microsoft.rawValue, "microsoft-entra-id")
+    }
+
+    /// The terms gate's 403 from ANY route marks the session and is said to
+    /// `AuthClient`, which shows the terms screen — the one way out for a
+    /// Google or Microsoft account the server holds at the gate. No runtime
+    /// seam reaches `APIClient.send`'s error branch, so the wiring is read.
+    func testTheTermsGateFromAnyRouteOpensTheTermsScreen() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        func read(_ path: String) throws -> String {
+            try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        }
+        let api = try read("Agrent/API/APIClient.swift")
+        XCTAssertTrue(api.contains("private func send("), "positive control: the send function moved")
+        XCTAssertTrue(api.contains(#"if http.statusCode == 403, env?.code == "TERMS_ACCEPTANCE_REQUIRED" {"#)
+                      && api.contains("markTermsPending(for: tokens)"), "a terms refusal is only one screen's error")
+        let auth = try read("Agrent/Auth/AuthClient.swift")
+        XCTAssertTrue(auth.contains("forName: APIClient.termsPendingNotification"),
+                      "nothing turns the refusal into the terms screen")
     }
 
     // MARK: - Pending terms live with the session
@@ -170,6 +193,26 @@ final class TermsAcceptanceTests: XCTestCase {
         XCTAssertEqual(server.sent.map(\.termsVersion), ["v1", "v2"])
     }
 
+    /// The acceptance landed: the button stays busy through the hand-off, so
+    /// it cannot be pressed into sending it twice.
+    func testALandedAcceptanceStaysBusy() async {
+        let terms = store(Server(["v1"]))
+        await terms.load()
+        let landed = await terms.accept()
+        XCTAssertTrue(landed)
+        XCTAssertTrue(terms.accepting, "the button came back while the app was still handing over")
+    }
+
+    /// A server without the route says it is not there yet, not «check the
+    /// connection».
+    func testTermsNotServedYetSaySo() async {
+        let terms = TermsStore(fetch: {
+            throw APIClient.APIError.http(status: 404, code: "NOT_FOUND", message: nil)
+        }, send: { _ in TermsAPI.Accepted(ok: true, version: "x") })
+        await terms.load()
+        XCTAssertEqual(terms.state, .failed(TermsText.notYet))
+    }
+
     func testTermsThatCannotBeReadSaySo() async {
         let terms = TermsStore(fetch: { throw URLError(.notConnectedToInternet) }, send: { _ in
             XCTFail("sent consent with no terms on screen")
@@ -191,7 +234,7 @@ final class TermsAcceptanceTests: XCTestCase {
 
     /// Bulgarian sentences; the one Latin word allowed is the product's name.
     func testTheWordsAreBulgarianSentences() {
-        for text in [TermsText.lead, TermsText.changed, TermsText.unavailable] {
+        for text in [TermsText.lead, TermsText.changed, TermsText.unavailable, TermsText.notYet] {
             XCTAssertTrue(text.hasSuffix("."), text)
             let rest = text.replacingOccurrences(of: "Agrent", with: "")
             XCTAssertNil(rest.range(of: "[A-Za-z]", options: .regularExpression), "Latin in: \(text)")

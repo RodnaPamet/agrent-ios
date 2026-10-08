@@ -79,7 +79,10 @@ enum AppleSignIn {
         switch (status, code) {
         case (503, _), (404, _): Text.notAvailable
         case (400, "email_required"): Text.emailRequired
-        default: Text.failed
+        case (400, _): Text.failed
+        // Anything else is not about the token — a 429, a 426 for an old
+        // build, a 5xx — and the house words already say what each means.
+        default: UserMessage.httpText(status: status, code: code, message: nil)
         }
     }
 

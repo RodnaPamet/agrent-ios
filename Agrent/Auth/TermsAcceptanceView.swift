@@ -44,7 +44,11 @@ struct TermsAcceptanceView: View {
                             Task { if await store.accept() { await auth.termsAccepted() } }
                         } label: {
                             if store.accepting {
-                                ProgressView().frame(maxWidth: .infinity)
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    // A spinner alone would leave the button
+                                    // nameless to VoiceOver.
+                                    .accessibilityLabel(TermsText.accepting)
                             } else {
                                 Label(TermsText.accept, systemImage: "checkmark.seal")
                             }
@@ -73,6 +77,11 @@ struct TermsAcceptanceView: View {
             .pageBackground()
             .inlineTitle(TermsText.title)
             .task { await store.load() }
+            // Said, not only shown: the line appears under a button that a
+            // VoiceOver user's focus has already left.
+            .onChange(of: store.acceptFailure) { _, failure in
+                if let failure { AccessibilityNotification.Announcement(failure).post() }
+            }
         }
     }
 }

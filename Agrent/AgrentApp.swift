@@ -263,16 +263,18 @@ struct SignInView: View {
             // made. Microsoft through the same browser flow — the server's
             // other configured provider. Apple through Apple's OWN button,
             // which the guidelines require as-is and which App Review
-            // requires beside any third-party sign-in; it labels itself in
-            // the device's language. Until the server has an Apple audience,
-            // a tap ends in «…все още не е включен», and Google and Microsoft
-            // are untouched by it.
+            // requires beside any third-party sign-in. It labels itself in
+            // the APP's declared language, and this app declares no Bulgarian
+            // localisation yet, so it reads "Sign in with Apple" — its Voice
+            // Control names are given in both. Until the server has an Apple
+            // audience, a tap ends in «…все още не е включен», and Google and
+            // Microsoft are untouched by it.
             VStack(spacing: 12) {
                 Button {
                     Task { await auth.signIn(with: .google) }
                 } label: {
-                    if auth.state == .signingIn {
-                        ProgressView()
+                    if auth.signingInVia == .google {
+                        ProgressView().accessibilityLabel(SignInText.signingIn)
                     } else {
                         // Wraps rather than truncating: at AX5 the prominent
                         // style cut it to «Вход с…».
@@ -288,10 +290,14 @@ struct SignInView: View {
                 Button {
                     Task { await auth.signIn(with: .microsoft) }
                 } label: {
-                    Text(SignInText.microsoft)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity)
+                    if auth.signingInVia == .microsoft {
+                        ProgressView().accessibilityLabel(SignInText.signingIn)
+                    } else {
+                        Text(SignInText.microsoft)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .buttonStyle(.bordered)
                 .accessibilityInputLabels(A11y.spokenNames(SignInText.microsoft, "Sign in with Microsoft"))
@@ -303,6 +309,12 @@ struct SignInView: View {
                 }
                 .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                 .frame(height: min(appleButtonHeight, 88))
+                .accessibilityInputLabels(A11y.spokenNames(SignInText.apple, "Sign in with Apple"))
+
+                // Apple's button cannot show a spinner of its own.
+                if auth.signingInVia == .apple {
+                    ProgressView().accessibilityLabel(SignInText.signingIn)
+                }
             }
             .controlSize(.large)
             .disabled(auth.state == .signingIn)
@@ -310,10 +322,20 @@ struct SignInView: View {
         }
         .padding()
         }
+        // A refusal is said, not only shown: the words appear above buttons a
+        // VoiceOver user's focus is on — and `email_required` tells them what
+        // to do in Settings.
+        .onChange(of: auth.state) { _, state in
+            if case .failed(let message) = state {
+                AccessibilityNotification.Announcement(message).post()
+            }
+        }
     }
 }
 
 enum SignInText {
     static let google = "Вход с Google"
     static let microsoft = "Вход с Microsoft"
+    static let apple = "Вход с Apple"
+    static let signingIn = "Влизане"
 }
