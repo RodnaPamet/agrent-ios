@@ -12,7 +12,7 @@ import XCTest
 /// wrong in both directions.
 final class ParcelHistoryTests: XCTestCase {
 
-    private func decode<T: Decodable>(_ json: String, as type: T.Type) async throws -> T {
+    private func decode<T: Decodable & Sendable>(_ json: String, as type: T.Type) async throws -> T {
         try await APIClient.shared.decode(Data(json.utf8), as: type)
     }
 
@@ -427,7 +427,7 @@ final class ParcelHistoryTests: XCTestCase {
     /// Encoded through THIS client's encoder, not a fresh one — the date
     /// strategy is the client's and a local `JSONEncoder` would be testing a
     /// different payload from the one that gets sent.
-    private func encoded<B: Encodable>(_ body: B) async throws -> String {
+    private func encoded<B: Encodable & Sendable>(_ body: B) async throws -> String {
         String(decoding: try await APIClient.shared.encodeBody(body), as: UTF8.self)
     }
 

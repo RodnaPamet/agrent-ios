@@ -7,6 +7,7 @@ import XCTest
 /// app RESOLVES them — through `Color(token:)`'s dynamic provider and the
 /// same trait collections the system hands it — rather than from the hex
 /// values in a comment. A comment can go stale; this cannot.
+@MainActor
 final class PaletteTokenTests: XCTestCase {
     /// The four settings combinations, and the arm each one must land on.
     private static let dark = UITraitCollection { $0.userInterfaceStyle = .dark }

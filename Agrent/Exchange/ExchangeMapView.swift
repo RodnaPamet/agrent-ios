@@ -121,7 +121,9 @@ struct ExchangeMapView: View {
     /// parcel map extracted its `layout`: the accessibility proxies have to
     /// land exactly where the drawing puts the markers, and two copies of
     /// this arithmetic drift the moment one of them is edited.
-    private static func place(_ p: CGPoint, in size: CGSize, map: BulgariaMap) -> CGPoint {
+    /// `nonisolated`: pure geometry, called from `Canvas`'s renderer
+    /// closure, which is not the main actor's (#195).
+    private nonisolated static func place(_ p: CGPoint, in size: CGSize, map: BulgariaMap) -> CGPoint {
         let scale = min(size.width / map.width, size.height / map.height)
         let dx = (size.width - map.width * scale) / 2
         let dy = (size.height - map.height * scale) / 2

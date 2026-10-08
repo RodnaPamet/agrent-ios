@@ -10,15 +10,17 @@ final class FarmStoreTests: XCTestCase {
     private var suite: String!
     private var defaults: UserDefaults!
 
-    override func setUp() {
-        super.setUp()
+    /// The ASYNC overrides (#195): they take this class's main-actor
+    /// isolation, which XCTest's synchronous `setUp`/`tearDown` can't.
+    override func setUp() async throws {
+        try await super.setUp()
         suite = "test.farms.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         defaults.removePersistentDomain(forName: suite)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func identity(_ userID: String?) -> SessionIdentity {

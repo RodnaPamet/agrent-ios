@@ -30,16 +30,15 @@ actor APIClient {
     /// outright, so every entry fails to decode and the list comes back empty
     /// with a decoding error rather than anything that names the cause. Accept
     /// both spellings.
+    ///
+    /// Through `BgDate.parseInstant`, a `Sendable` format style: the strategy
+    /// is a `@Sendable` closure, and the two `ISO8601DateFormatter`s it used to
+    /// capture were this app's only standing concurrency warnings (#195).
     private let decoder: JSONDecoder = {
-        let withFraction = ISO8601DateFormatter()
-        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let plain = ISO8601DateFormatter()
-        plain.formatOptions = [.withInternetDateTime]
-
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let text = try decoder.singleValueContainer().decode(String.self)
-            if let date = withFraction.date(from: text) ?? plain.date(from: text) {
+            if let date = BgDate.parseInstant(text) {
                 return date
             }
             throw DecodingError.dataCorrupted(.init(
@@ -505,7 +504,11 @@ actor APIClient {
     /// Decode with THIS client's decoder — the one that accepts ISO 8601 both
     /// with and without fractional seconds. A caller reaching for a fresh
     /// `JSONDecoder()` reintroduces the bug documented above it.
-    func decode<T: Decodable>(_ data: Data, as _: T.Type) throws -> T {
+    ///
+    /// On the actor, so a large payload — a farm's parcel geometry — is
+    /// decoded off the main actor; and therefore `Sendable`, because the
+    /// value crosses back to the caller (Swift 6, #195).
+    func decode<T: Decodable & Sendable>(_ data: Data, as _: T.Type) throws -> T {
         try decoder.decode(T.self, from: data)
     }
 

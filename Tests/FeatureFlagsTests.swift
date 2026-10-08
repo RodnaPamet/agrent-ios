@@ -10,9 +10,11 @@ import XCTest
 @MainActor
 final class FeatureFlagsTests: XCTestCase {
 
-    override func tearDown() {
+    /// The ASYNC overrides (#195): they take this class's main-actor
+    /// isolation, which XCTest's synchronous `setUp`/`tearDown` can't.
+    override func tearDown() async throws {
         FeatureFlags.shared.reset()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - isOn

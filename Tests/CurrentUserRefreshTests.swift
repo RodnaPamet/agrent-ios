@@ -53,8 +53,10 @@ final class CurrentUserRefreshTests: XCTestCase {
     private var adoptedTabs: [CurrentUser] = []
     private var store: CurrentUserStore!
 
-    override func setUp() {
-        super.setUp()
+    /// The ASYNC overrides (#195): they take this class's main-actor
+    /// isolation, which XCTest's synchronous `setUp`/`tearDown` can't.
+    override func setUp() async throws {
+        try await super.setUp()
         me = FakeMe()
         flags = FeatureFlags()
         identity = SessionIdentity(load: { nil }, save: { _ in })

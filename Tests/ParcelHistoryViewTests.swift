@@ -34,7 +34,7 @@ final class ParcelHistoryViewTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private func decode<T: Decodable>(_ json: String, as type: T.Type) async throws -> T {
+    private func decode<T: Decodable & Sendable>(_ json: String, as type: T.Type) async throws -> T {
         try await APIClient.shared.decode(Data(json.utf8), as: type)
     }
 

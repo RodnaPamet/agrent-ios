@@ -10,9 +10,11 @@ final class BottomTabsTests: XCTestCase {
         return store
     }
 
-    override func tearDown() {
+    /// The ASYNC overrides (#195): they take this class's main-actor
+    /// isolation, which XCTest's synchronous `setUp`/`tearDown` can't.
+    override func tearDown() async throws {
         BottomTabsStore.shared.adopt(nil, isOperator: false)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     /// The raw values ARE the web's route suffixes, because the stored
@@ -185,9 +187,11 @@ final class CurrentUserTabOrderTests: XCTestCase {
 @MainActor
 final class OperatorTabsTests: XCTestCase {
 
-    override func tearDown() {
+    /// The ASYNC overrides (#195): they take this class's main-actor
+    /// isolation, which XCTest's synchronous `setUp`/`tearDown` can't.
+    override func tearDown() async throws {
         BottomTabsStore.shared.adopt(nil, isOperator: false)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func store(_ order: [String]?, isOperator: Bool) -> BottomTabsStore {

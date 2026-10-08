@@ -9,6 +9,7 @@ import XCTest
 /// hosting the menu, a sheet and `AuthClient` to look for a row would test the
 /// Keychain more than the wiring. Each probe has a positive control, so a
 /// moved file fails rather than passes.
+@MainActor
 final class ProfileTests: XCTestCase {
 
     private func source(_ path: String) throws -> String {

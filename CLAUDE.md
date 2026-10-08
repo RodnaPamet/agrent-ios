@@ -1,6 +1,6 @@
 # CLAUDE.md — agrent-ios
 
-Native SwiftUI client for Agrent (Bulgarian farm-operations SaaS); server is `RodnaPamet/agri-saas`. This repo is public. iOS 17, Swift 5.9 mode, XcodeGen: `project.yml` is the source of truth; never commit the generated `Agrent.xcodeproj` or `Agrent/Info.plist`.
+Native SwiftUI client for Agrent (Bulgarian farm-operations SaaS); server is `RodnaPamet/agri-saas`. This repo is public. iOS 17, Swift 6 language mode (complete strict concurrency), XcodeGen: `project.yml` is the source of truth; never commit the generated `Agrent.xcodeproj` or `Agrent/Info.plist`.
 
 ## Build and test
 
@@ -13,7 +13,7 @@ scripts/check.sh            # build + XCTest + CI warnings gate
 DESTINATION="platform=iOS Simulator,name=iPhone 17 Pro" scripts/check.sh
 ```
 
-- Pass = `0 failures` + `source warnings: 2 / 2 allowed` (the two known `ISO8601DateFormatter` captures in `APIClient`). Incremental builds may print `0 / 2`; only a clean build proves the count.
+- Pass = `0 failures` + `source warnings: 0 / 0 allowed`. Swift 6 turns concurrency findings into errors, so a warning today is something else — fix it, don't allow it.
 - XCTest only. Source-reading tests (`#filePath`) are fine where no runtime hook exists — give each a positive control.
 - `check.sh` skips the Guards job: run the guard steps from `.github/workflows/ci.yml` yourself before pushing.
 - Limited memory → one `xcodebuild` at a time.

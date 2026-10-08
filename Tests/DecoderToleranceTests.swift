@@ -49,13 +49,13 @@ final class DecoderToleranceTests: XCTestCase {
     ///
     /// The closure captures the type, so the list can hold models with nothing
     /// in common. It returns nothing: only whether it threw is interesting.
-    struct Probe {
+    struct Probe: Sendable {
         let model: String
         let json: String
-        let decode: (Data) async throws -> Void
+        let decode: @Sendable (Data) async throws -> Void
 
         init(_ model: String, _ json: String,
-             _ decode: @escaping (Data) async throws -> Void) {
+             _ decode: @escaping @Sendable (Data) async throws -> Void) {
             self.model = model
             self.json = json
             self.decode = decode

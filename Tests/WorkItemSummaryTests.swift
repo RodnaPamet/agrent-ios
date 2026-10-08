@@ -171,14 +171,10 @@ final class WorkItemSummaryTests: XCTestCase {
 /// formatter the app does not use.
 enum APIClientTestDecoder {
     static func decode<T: Decodable>(_ type: T.Type, from json: String) throws -> T {
-        let withFraction = ISO8601DateFormatter()
-        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let plain = ISO8601DateFormatter()
-        plain.formatOptions = [.withInternetDateTime]
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let text = try decoder.singleValueContainer().decode(String.self)
-            guard let date = withFraction.date(from: text) ?? plain.date(from: text) else {
+            guard let date = BgDate.parseInstant(text) else {
                 throw DecodingError.dataCorrupted(.init(
                     codingPath: decoder.codingPath, debugDescription: "not ISO 8601: \(text)"))
             }

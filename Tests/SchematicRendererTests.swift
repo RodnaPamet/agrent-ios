@@ -15,6 +15,7 @@ import XCTest
 /// normalises whatever it is handed to fill the view — so a transposed or
 /// mirrored farm still produces a plausible arrangement of polygons with
 /// nothing to check it against. These assertions are what is left.
+@MainActor
 final class SchematicRendererTests: XCTestCase {
 
     private let bounds = BoundingBoxFixture.pleven

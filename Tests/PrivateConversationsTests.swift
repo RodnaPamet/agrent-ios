@@ -11,6 +11,7 @@ import XCTest
 
 // MARK: - Three speakers
 
+@MainActor
 final class MessageSpeakerTests: XCTestCase {
 
     /// Every combination of the two flags, against the spec's description:
@@ -239,15 +240,17 @@ final class PersonalUnreadTests: XCTestCase {
     /// A badge belongs to a farm, so these run with one open (#192).
     private var saved: Farm?
 
-    override func setUp() {
-        super.setUp()
+    /// The ASYNC overrides (#195): they take this class's main-actor
+    /// isolation, which XCTest's synchronous `setUp`/`tearDown` can't.
+    override func setUp() async throws {
+        try await super.setUp()
         saved = ActiveFarm.shared.farm
         ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         ActiveFarm.shared.set(saved)
-        super.tearDown()
+        try await super.tearDown()
     }
 
 

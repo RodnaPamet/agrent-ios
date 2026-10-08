@@ -233,7 +233,7 @@ extension PricesResponse {
 }
 
 enum Staleness {
-    private static var utc: Calendar = {
+    private static let utc: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
         return calendar

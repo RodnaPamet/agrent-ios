@@ -21,7 +21,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and every push to `master`:
 | Generate | `xcodegen generate` — the project is derived, so CI builds it the way a developer does |
 | Verify | `CFBundleURLSchemes` contains `bg.agrent.app` — the silent failure that only shows at sign-in |
 | Test | full suite on a simulator resolved at runtime, not pinned |
-| Warnings | fails if more than the 2 known `ISO8601DateFormatter` ones appear |
+| Warnings | fails on any source warning — 0 allowed since Swift 6 language mode (P4.6, #195) |
 
 The credential guard is not hypothetical: a GitHub PAT was pasted into this
 file during development. It was caught before it was committed, but only
