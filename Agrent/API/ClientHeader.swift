@@ -64,8 +64,16 @@ enum ClientHeader {
     static let contractVersionHeader = "x-agrent-client-version"
 
     /// THE API CONTRACT THIS BUILD WAS WRITTEN AGAINST: agri-saas's
-    /// `x-api-version` (`API_CONTRACT_VERSION`), which was 1 at main 261463d
-    /// on 2026-10-07, with `x-minimum-client-version` at 1 too.
+    /// `x-api-version` (`API_CONTRACT_VERSION`) — 2 since agri-saas #1390,
+    /// live 2026-10-08 (`/api/health` at its merge commit 8d3e5a4c, and the
+    /// spec's top-level `x-api-version` read there), with
+    /// `x-minimum-client-version` still 1. It was 1 at main 261463d.
+    ///
+    /// Contract 2 split `Task` into `TaskListItem` (`GET /tasks`,
+    /// `/farm-tasks`) and `TaskDetail`, documenting what the server always
+    /// sent. This build decodes them as `WorkItemSummary` and `WorkItem`, and
+    /// requires no field either schema leaves out of `required` — which is
+    /// what makes the claim below true (agrent-ios#185).
     ///
     /// ── Why it is declared (#169, owner 2026-10-07) ──
     ///
@@ -108,7 +116,7 @@ enum ClientHeader {
     /// non-number is "unparseable" there and served like no header at all —
     /// a build that could never be retired, with nothing to say so. Hence an
     /// `Int`, above zero, rather than a string someone might format.
-    static let contractVersion = 1
+    static let contractVersion = 2
 
     /// `0.1.0` → `ios/0.1`; nil when the version does not fit the grammar.
     /// Pure, so the grammar is testable without a bundle.

@@ -70,8 +70,13 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
 
     let assignee: Assignee?
     let assigneeUserId: String?
-    let createdAt: Date
-    let updatedAt: Date
+    /// OPTIONAL since contract 2 (agri-saas #1390): `TaskListItem` lists
+    /// both and requires neither. The server always sends them —
+    /// `taskListSelect` selects both, and neither column is nullable — but
+    /// nothing here reads them, and a required key the schema does not
+    /// promise would cost the whole Задачи tab over a value nobody shows.
+    let createdAt: Date?
+    let updatedAt: Date?
 
     /// Spelled out because `severityRaw` is renamed, and a synthesised
     /// `CodingKeys` would have looked for a `severityRaw` key that no server
@@ -177,8 +182,15 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     /// rich-text HTML and needs `RichText`.
     let description: String?
 
-    let severity: WorkItemSeverity
-    let priority: WorkItemPriority
+    /// ABSENT as well as null lands on `.unknown`. `TaskDetail` lists both
+    /// as `["string","null"]` and requires neither (contract 2, agri-saas
+    /// #1390); `LenientDecodable` reads a null since #182 but cannot be asked
+    /// for a key that is not there, so the raw value is optional — as on
+    /// `WorkItemSummary` — and the screen reads the folded one.
+    var severity: WorkItemSeverity { severityRaw ?? .unknown }
+    var priority: WorkItemPriority { priorityRaw ?? .unknown }
+    private let severityRaw: WorkItemSeverity?
+    private let priorityRaw: WorkItemPriority?
     let status: WorkItemStatus
     let source: WorkItemSource?
     let key: String?
@@ -201,8 +213,10 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     /// back; the app sends it as `Idempotency-Key`, not in the body.
     let clientMutationId: String?
 
-    let createdAt: Date
-    let updatedAt: Date
+    /// Optional for the reason `WorkItemSummary`'s are: `TaskDetail`
+    /// requires neither. «Създадена» shows only when there is a date.
+    let createdAt: Date?
+    let updatedAt: Date?
 
     /// Three people, all optional, all personal data. Same rule as
     /// `WorkItemSummary.Assignee`: displayable, never logged, never in a
@@ -246,7 +260,8 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, tenantId, type, title, description, severity, priority
+        case id, tenantId, type, title, description
+        case severityRaw = "severity", priorityRaw = "priority"
         case status, source, key, resolution, dueAt, completedAt
         case createdByUserId, assigneeUserId, reviewerUserId
         case operationType, applicationTechnique, clientMutationId

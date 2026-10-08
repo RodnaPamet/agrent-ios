@@ -89,6 +89,17 @@ final class DecoderToleranceTests: XCTestCase {
          "createdAt":"2026-09-01T10:00:00.000Z","updatedAt":"2026-09-01T10:00:00.000Z"}
         """#) { _ = try await APIClient.shared.decode($0, as: WorkItemSummary.self) },
 
+        // The task DETAIL, through the route's own decode (contract 2's
+        // `TaskDetail`, agri-saas #1390). Its first probe.
+        Probe("WorkItem", #"""
+        {"id":"t1","tenantId":"ten","type":"FIELD_OPERATION","title":"Пръскане",
+         "description":null,"severity":"HIGH","priority":"P2","status":"OPEN",
+         "source":null,"key":"AGT-1","resolution":null,"dueAt":null,"completedAt":null,
+         "createdByUserId":null,"assigneeUserId":null,"reviewerUserId":null,
+         "operationType":null,"applicationTechnique":null,"clientMutationId":null,
+         "createdAt":"2026-09-01T10:00:00.000Z","updatedAt":"2026-09-01T10:00:00.000Z"}
+        """#) { _ = try await WorkItemAPI.decodeDetail(from: $0) },
+
         Probe("Location", #"""
         {"id":"loc","tenantId":"t","name":"Долен блок","status":"ACTIVE",
          "kind":"FIELD","description":null,"capacityTonnes":null,
@@ -383,7 +394,14 @@ final class DecoderToleranceTests: XCTestCase {
         "CropSeason": ["cropType", "id", "year"],
         "ParcelHistoryOperation": ["doseUnit", "id", "productName", "taskId", "title"],
         "WeedObservation": ["id", "observedAt", "otherWeeds", "weedKeys"],
-        "WorkItemSummary": ["createdAt", "id", "status", "title", "type", "updatedAt"],
+        // ── Contract 2, checked 2026-10-08 at the deployed agri-saas 8d3e5a4c ──
+        //
+        // EQUAL to the schemas' `required`: `TaskListItem` requires id,
+        // status, title and type; `TaskDetail` adds tenantId. createdAt and
+        // updatedAt went optional when the split showed neither schema
+        // requires them (#185) — always sent today, never promised.
+        "WorkItemSummary": ["id", "status", "title", "type"],
+        "WorkItem": ["id", "status", "tenantId", "title", "type"],
         "Location": ["id", "name", "status"],
         "CostSlice": ["id", "labelKey", "value"],
         "AgDashboard.JournalItem": ["id", "title", "type"],
