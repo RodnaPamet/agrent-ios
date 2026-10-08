@@ -1047,9 +1047,16 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 10),
                       "Админ's account card did not push Профил")
 
+        // REVEALED, not waited for (#204). Профил opens at its top, and at
+        // AX5 the row is below the fold — a lazy List keeps it out of the
+        // accessibility tree until scrolled to, so a wait alone failed the
+        // whole variant. At a non-accessibility size a miss still fails.
         let add = app.buttons["Добави стопанство"]
-        XCTAssertTrue(add.waitForExistence(timeout: 10),
-                      "no «Добави стопанство» on Профил — is the fixture flag on?")
+        guard reveal(add, in: app, what: "«Добави стопанство» on Профил — is the fixture flag on?") else {
+            goBack(app, to: "Админ")
+            dismissSheet(app, named: "Админ")
+            return
+        }
         add.tap()
         XCTAssertTrue(app.staticTexts["Какво е стопанството Ви?"].waitForExistence(timeout: 10),
                       "the wizard did not open on its first step")
