@@ -651,10 +651,13 @@ What the client must get right, read from the route and usecase:
   it free of accusatory words, as the spec demands. Decoded leniently:
   absent, null or an unknown value shows nothing. NONE without a number
   shows nothing; PENDING/DISPUTED show with or without one, since `eik` is
-  written only at verification. **Server gap:** the PUT answers
-  `project(row)` without the derived status, so its response always says
-  `NONE`; the store keeps the status it held before the save (a save cannot
-  move it) — agri-saas#1358.
+  written only at verification. ~~**Server gap:** the PUT answered
+  `project(row)` without the derived status, so its response always said
+  `NONE`, and the store kept the status it held before the save —
+  agri-saas#1358.~~ **Closed** by agri-saas #1375 (live 2026-10-08): the
+  PUT derives the status as the GET does, and the store shows it as sent
+  (agrent-ios#172). Checked in the deployed code and the server's own
+  test, not by a live save — that would be a production write.
 - **`admin.manage` on GET and PUT** — OWNER and ADMIN. The edit action shows
   only over a profile the GET returned.
 - **The response can differ from the request** (trim, `sanitizePlainText`,

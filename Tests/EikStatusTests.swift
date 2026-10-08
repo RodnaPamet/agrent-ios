@@ -158,12 +158,12 @@ final class EikStatusTests: XCTestCase {
                        "ЕИК 2 0 3 9 1 2 3 4 5.")
     }
 
-    // MARK: - The save does not reset it
+    // MARK: - The save reports it
 
-    /// agri-saas `upsertFarmProfile` answers the PUT with `project(row)` and
-    /// no derived status, so the response says NONE whatever the claims
-    /// hold. The store keeps the status it had: a save cannot move it.
-    func testASaveKeepsTheStatusThePutDoesNotCompute() async throws {
+    /// Since agri-saas #1375 the PUT derives the status as the GET does, so
+    /// the store shows the PUT's — the freshest there is. A verification that
+    /// landed while the page was open shows on the save, not one GET later.
+    func testASaveShowsTheStatusThePutReports() async throws {
         func profile(_ state: EikVerification?, municipality: String? = nil) -> FarmProfile {
             FarmProfile(producerName: nil, eik: "000000000", egn: nil, address: nil,
                         settlement: nil, municipality: municipality,
@@ -173,9 +173,9 @@ final class EikStatusTests: XCTestCase {
                         version: 3, eikVerification: state)
         }
         let store = AdminStore(
-            sendProfile: { body in profile(.unclaimed, municipality: body.text[.municipality] ?? nil) },
+            sendProfile: { body in profile(.verified, municipality: body.text[.municipality] ?? nil) },
             fetchProfile: { throw URLError(.notConnectedToInternet) })
-        store.setProfileForTesting(profile(.verified), editable: true)
+        store.setProfileForTesting(profile(.pending), editable: true)
 
         let original = try XCTUnwrap(store.profile.value)
         var draft = FarmProfileDraft(original)
@@ -186,6 +186,7 @@ final class EikStatusTests: XCTestCase {
         try await store.saveProfile(body, typed: draft)
 
         XCTAssertEqual(store.profile.value?.municipality, "Ловеч", "the response did replace the profile")
-        XCTAssertEqual(store.profile.value?.eikState, .verified)
+        XCTAssertEqual(store.profile.value?.eikState, .verified,
+                       "the status held before the save was kept over the PUT's")
     }
 }

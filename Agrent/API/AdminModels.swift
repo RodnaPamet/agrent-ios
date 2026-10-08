@@ -260,8 +260,9 @@ struct FarmProfile: Decodable, Equatable, Sendable {
 
     /// Whether Agrent staff have verified this farm's ЕИК (agri-saas#1355,
     /// P3.9). READ-ONLY and DERIVED: the server computes it from the farm's
-    /// own identity claims on every GET, there is no column behind it, and
-    /// the PUT body has no key for it.
+    /// own identity claims on every GET — and on every PUT since agri-saas
+    /// #1375 — there is no column behind it, and the PUT body has no key for
+    /// it.
     ///
     /// OPTIONAL although the spec puts it in `required`, for the same reason
     /// `version` is: a server from before #1355 omits it, and a non-optional
