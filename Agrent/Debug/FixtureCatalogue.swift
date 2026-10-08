@@ -153,6 +153,10 @@ enum FixtureCatalogue {
         // agrent-ios#138: one field-operation task, its detail and its lines.
         (WorkItemAPI.detailPath(fixtureFieldOperationTaskID), "task-detail-fieldop"),
         (FieldOperationAPI.detailPath(fixtureFieldOperationTaskID), "field-operation-detail"),
+        // agrent-ios#179 stage 3: the person's farms, for Профил's list. A GET
+        // only — the POST on the same path is a write, answered 501 as every
+        // write is.
+        (FarmsAPI.farmsPath, "me-farms"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 

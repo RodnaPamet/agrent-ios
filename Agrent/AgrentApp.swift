@@ -139,6 +139,10 @@ struct MainTabView: View {
             // about. `foreground` decides which `.active` is a return.
             if foreground.isReturn(to: phase), auth.state == .signedIn {
                 Task { await CurrentUserStore.shared.refresh() }
+                // The farm list with it, for the same reason: a role changed
+                // or a membership removed on the web reaches an app that is
+                // already open the next time it is opened (#179 stage 3).
+                Task { await FarmStore.shared.refreshFarms() }
             }
         }
         .task {

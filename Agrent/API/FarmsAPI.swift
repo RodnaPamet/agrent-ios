@@ -1,12 +1,57 @@
 import Foundation
 
-/// A person's farms, outside any one farm (agrent-ios#179): creating one, and
-/// checking an ЕИК on the way.
+/// A person's farms, outside any one farm (agrent-ios#179): listing them,
+/// creating one, and checking an ЕИК on the way.
 ///
-/// NO TENANT SLUG in either path. A person with no farm has no tenant to put
+/// NO TENANT SLUG in any path. A person with no farm has no tenant to put
 /// there, and adding a farm is something a person does, not a farm.
 enum FarmsAPI {
+    /// `GET` lists the caller's farms (agri-saas#1396); `POST` creates one.
+    ///
+    /// ── The GET is UNGATED, unlike the POST ──
+    ///
+    /// `social.farm-registration` decides whether a person may ADD a farm,
+    /// never whether they can reach the ones they already belong to — asked
+    /// for by this app and agreed, and the spec says it in as many words. So
+    /// the list is read whatever the flag says.
     static let farmsPath = "/api/me/farms"
+
+    /// One row of `GET /api/me/farms`: a farm the caller is an ACTIVE member
+    /// of. The spec also sends the farm's `id`, which nothing here reads.
+    ///
+    /// ── No row is ever dropped, unlike most lists here ──
+    ///
+    /// Elsewhere one bad row costs that row (a lossy array). Here a dropped
+    /// row would read as "no longer yours", and `FarmStore` CLOSES a farm
+    /// that is absent from this list. So a row this build cannot read fails
+    /// the whole list — a plain array — and a list that fails changes nothing.
+    struct Membership: Decodable, Equatable, Sendable {
+        /// "Use this for navigation. Server-generated and stable."
+        let slug: String
+        let name: String
+        /// The caller's role IN THAT FARM. A growing union, so a string.
+        let role: String
+    }
+
+    /// The envelope. `farms[0]` is the OLDEST membership — the same farm
+    /// `/api/auth/me` names — and the spec calls that order a contract. An
+    /// empty array, never a 404, for a person with no farm.
+    struct Farms: Decodable, Equatable, Sendable {
+        let farms: [Membership]
+    }
+
+    static func decodeFarms(from data: Data) async throws -> [Membership] {
+        try await APIClient.shared.decode(data, as: Farms.self).farms
+    }
+
+    /// NETWORK ONLY, never `ResponseCache`. What the list decides — which
+    /// farm stays open, the role each screen gates on — must come from the
+    /// server as it is NOW: a cached copy from before a farm was created
+    /// would close it, and one from before a removal would keep a dead farm
+    /// open. Offline, the open farm and its remembered role carry on.
+    static func farms() async throws -> [Membership] {
+        try await decodeFarms(from: APIClient.shared.data(for: farmsPath))
+    }
 
     /// POST, never GET with a query. Anything typed here may be an ЕГН —
     /// spotting one is what the route is for — and a query string is logged

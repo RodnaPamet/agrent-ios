@@ -18,7 +18,8 @@ final class BottomTabsStore {
     private(set) var stored: [String]?
 
     /// Refreshed from `/api/auth/me` on every launch, alongside the
-    /// order itself.
+    /// order itself — and from the open farm's role, which is a farm's and
+    /// not the person's (`adoptOperator`).
     private(set) var isOperator = false
 
     private(set) var isSaving = false
@@ -86,6 +87,13 @@ final class BottomTabsStore {
 
     func adopt(_ order: [String]?, isOperator: Bool = false) {
         stored = order
+        self.isOperator = isOperator
+    }
+
+    /// The open farm's role changed under the same `/me` — a farm switch, or
+    /// the farm list saying (agrent-ios#179). The flag only: `stored` may hold
+    /// an order saved since `/me` answered.
+    func adoptOperator(_ isOperator: Bool) {
         self.isOperator = isOperator
     }
 

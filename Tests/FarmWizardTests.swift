@@ -163,7 +163,10 @@ final class FarmWizardModelTests: XCTestCase {
         wizard.name = "Синтетично стопанство"
         await wizard.submit()
         XCTAssertEqual(wizard.step, .done)
-        XCTAssertEqual(wizard.farm, Farm(slug: "sintetichno-eood-x7", name: "Синтетично стопанство"))
+        // Its creator is its OWNER (the spec, on the POST): it opens on that
+        // role, not on the oldest membership's.
+        XCTAssertEqual(wizard.farm, Farm(slug: "sintetichno-eood-x7", name: "Синтетично стопанство",
+                                         role: "OWNER"))
         XCTAssertEqual(wizard.created?.identityVerification, .pendingReview)
     }
 

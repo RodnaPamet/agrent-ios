@@ -176,8 +176,10 @@ final class FarmWizardModel {
         return code == "TERMS_ACCEPTANCE_REQUIRED"
     }
 
-    /// The farm to open once it exists.
+    /// The farm to open once it exists. Its creator is its OWNER — the spec's
+    /// own words for the POST — so it opens with that role rather than the
+    /// OLDEST membership's, before any list has been read.
     var farm: Farm? {
-        created.map { Farm(slug: $0.farm.slug, name: $0.farm.name) }
+        created.map { Farm(slug: $0.farm.slug, name: $0.farm.name, role: "OWNER") }
     }
 }

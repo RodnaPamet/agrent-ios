@@ -956,9 +956,17 @@ final class A11yShotsTests: XCTestCase {
         dismissSheet(app, named: "Админ")
     }
 
-    /// Профил (agri-saas#1193 P2.8): the shared account card and the «Изход»
-    /// row — reached the one way there is since 2026-10-07, the menu's
-    /// «Админ» and then the account card at its top.
+    /// Профил (agri-saas#1193 P2.8): the shared account card, the person's
+    /// farms (agrent-ios#179) and the «Изход» row — reached the one way there
+    /// is since 2026-10-07, the menu's «Админ» and then the account card at
+    /// its top.
+    ///
+    /// ── The farms are FOUND, never tapped ──
+    ///
+    /// `me-farms.json` lists the fixture farm and an invented second one. The
+    /// second has no fixtures; a tap would rebuild every tab for a farm whose
+    /// every path is `NO_FIXTURE`, and the rest of the run would photograph
+    /// error states.
     ///
     /// ── «Изход» is FOUND, never tapped ──
     ///
@@ -986,9 +994,31 @@ final class A11yShotsTests: XCTestCase {
                       "Админ's account card did not push Профил")
 
         XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Профил")
-        XCTAssertTrue(app.buttons["Изход"].waitForExistence(timeout: 5), "no «Изход» on Профил")
+        // The page as it opens, then the rows below it. At AX5 the farms and
+        // «Изход» are below the fold and SwiftUI's `List` has not built them
+        // yet, so each is REVEALED rather than expected — and photographed
+        // from the top, as every other capture is.
         Thread.sleep(forTimeInterval: 2)
         capture("16-profile", app: app)
+        let openFarm = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Синтетично стопанство"))
+            .firstMatch
+        if reveal(openFarm, in: app, what: "the open farm on Профил") {
+            XCTAssertTrue(openFarm.isSelected, "the open farm is not marked as the open one")
+        }
+        let secondFarm = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Второ синтетично стопанство"))
+            .firstMatch
+        // At an accessibility size the farms were below the first capture's
+        // fold, so they get one of their own — the rows' own layout, where a
+        // long one-word role or name is what breaks first. At the other
+        // sizes the first capture already shows them.
+        if reveal(secondFarm, in: app, what: "the second fixture farm on Профил"),
+           UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory {
+            Thread.sleep(forTimeInterval: 1)
+            capture("16b-profile-farms", app: app)
+        }
+        _ = reveal(app.buttons["Изход"], in: app, what: "«Изход» on Профил")
         goBack(app, to: "Админ")
         dismissSheet(app, named: "Админ")
     }

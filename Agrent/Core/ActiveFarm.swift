@@ -2,12 +2,32 @@ import Foundation
 import Observation
 
 /// One of the signed-in person's farms, as far as the app needs to know it:
-/// the slug every path is built with, and the name a person reads.
+/// the slug every path is built with, the name a person reads, and what this
+/// person may do there.
 struct Farm: Codable, Equatable, Hashable, Sendable {
     let slug: String
     /// nil when the farm is known only by its slug — the legacy farm seeded
     /// for people signed in before #179 — until `/me` or the farm list says.
     let name: String?
+    /// This person's role IN THIS FARM (`OWNER`, `MECHANISATOR`, …), or nil
+    /// until the farm list or `/me` has said. A string, as the spec has it: a
+    /// growing union.
+    ///
+    /// Remembered with the farm, so a launch with no signal gates each screen
+    /// on the role it had last time rather than on the OLDEST membership's;
+    /// the next list read corrects it. A farm remembered before stage 3 has
+    /// no `role` key and decodes as nil.
+    let role: String?
+
+    init(slug: String, name: String?, role: String? = nil) {
+        self.slug = slug
+        self.name = name
+        self.role = role
+    }
+
+    init(_ membership: FarmsAPI.Membership) {
+        self.init(slug: membership.slug, name: membership.name, role: membership.role)
+    }
 }
 
 /// The ACTIVE farm, readable from any thread (agrent-ios#179).
@@ -51,6 +71,12 @@ struct FarmMemory {
         defaults.set(data, forKey: Self.key(userID))
     }
 
+    /// The remembered farm is no longer this person's, and there is none to
+    /// remember instead.
+    func forget(for userID: String) {
+        defaults.removeObject(forKey: Self.key(userID))
+    }
+
     /// ONCE PER INSTALL: whoever is signed in when this build first runs
     /// keeps the farm the app was pinned to.
     ///
@@ -79,6 +105,15 @@ struct FarmMemory {
 ///    have just been online to sign in.
 /// 3. Otherwise no farm: `FarmGate` says so and offers the way on.
 ///
+/// ── Then the farm list squares it with the server (stage 3) ──
+///
+/// `GET /api/me/farms` is read once a farm is settled, on every return to
+/// the app, and when Профил opens. It is what Профил lists, it says this
+/// person's role in the open farm, and it is the one thing that CLOSES a
+/// farm: the spec says a farm absent from it is "unreachable, not merely
+/// unlisted", and a remembered farm the person was removed from would
+/// otherwise open on every launch into 403s on every screen.
+///
 /// ── A change of farm is a change of everything shown ──
 ///
 /// `FarmGate` gives the tab view a new identity per farm, so every screen's
@@ -94,7 +129,8 @@ final class FarmStore {
         /// Nothing remembered for this person, and `/me` has not answered.
         case resolving
         case active(Farm)
-        /// `/me` says this person belongs to no farm.
+        /// `/me` says this person belongs to no farm — or the farm list no
+        /// longer has the one that was open, and has no other.
         case none
         /// Nothing remembered and `/me` could not be read — offline on a
         /// first sign-in.
@@ -102,6 +138,21 @@ final class FarmStore {
     }
 
     private(set) var state: State = .resolving
+
+    /// Every farm this person belongs to, oldest first, as the server listed
+    /// them THIS SESSION — Профил's list. nil until a list has been read, and
+    /// never on disk: see `FarmsAPI.farms`.
+    private(set) var farms: [Farm]?
+
+    /// The last attempt to read the list failed. Профил says so under the
+    /// farm it can still show, the open one.
+    private(set) var listUnavailable = false
+
+    /// A farm this store CLOSED because the list no longer has it — the
+    /// person was removed from it, or the farm was removed. `FarmGate` says
+    /// so, once: without a word the app would just open another farm, which
+    /// reads as this one's records vanishing.
+    private(set) var lostAccess: Farm?
 
     /// The open farm, when there is one.
     var activeFarm: Farm? {
@@ -113,24 +164,45 @@ final class FarmStore {
     @ObservationIgnored private let memory: FarmMemory
     @ObservationIgnored private let mirror: ActiveFarm
     @ObservationIgnored private let loadMe: @MainActor () async -> CurrentUser?
+    @ObservationIgnored private let loadFarms: @MainActor () async throws -> [FarmsAPI.Membership]
     @ObservationIgnored private let onFarmChange: @MainActor () -> Void
+    @ObservationIgnored private let adoptRole: @MainActor (String?) -> Void
+
+    /// False under the UI-test seam, which never writes a person's memory.
+    @ObservationIgnored private var remembers = true
+
+    /// ONE list request at a time: a second caller awaits the first rather
+    /// than racing it to `farms`.
+    @ObservationIgnored private var listing: Task<Void, Never>?
+
+    /// Counts the farms the PERSON has opened — from Профил, or one they have
+    /// just created. A list asked for before such a choice may predate it: a
+    /// list from before a farm was created does not have that farm, and must
+    /// not close it. So an answer is only acted on if no choice was made
+    /// while it was on its way; otherwise the list is asked for again.
+    @ObservationIgnored private var choices = 0
 
     init(
         identity: SessionIdentity = .shared,
         memory: FarmMemory = FarmMemory(defaults: .standard),
         mirror: ActiveFarm = .shared,
         loadMe: @escaping @MainActor () async -> CurrentUser? = { await CurrentUserStore.shared.load() },
-        onFarmChange: @escaping @MainActor () -> Void = { FarmStore.resetFarmState() }
+        loadFarms: @escaping @MainActor () async throws -> [FarmsAPI.Membership] = { try await FarmsAPI.farms() },
+        onFarmChange: @escaping @MainActor () -> Void = { FarmStore.resetFarmState() },
+        adoptRole: @escaping @MainActor (String?) -> Void = { CurrentUserStore.shared.adoptRoleHere($0) }
     ) {
         self.identity = identity
         self.memory = memory
         self.mirror = mirror
         self.loadMe = loadMe
+        self.loadFarms = loadFarms
         self.onFarmChange = onFarmChange
+        self.adoptRole = adoptRole
         #if DEBUG
         // The fixture world is one farm, the one every fixture path was
         // recorded under; the seam never reads or writes a person's memory.
         if UITestSeam.isActive {
+            remembers = false
             activate(Farm(slug: Config.legacyTenantSlug, name: nil), remember: false)
             return
         }
@@ -165,7 +237,10 @@ final class FarmStore {
         restoreRemembered()
         if case .active = state { return }
         if let tenant = me.tenant {
-            activate(Farm(slug: tenant.slug, name: tenant.name))
+            // `/me`'s role is the role on that SAME membership — one row,
+            // `take: 1`, read for both — so the first farm opens with the
+            // right one before any list has been read.
+            activate(Farm(slug: tenant.slug, name: tenant.name, role: me.role))
         } else {
             state = .none
         }
@@ -175,13 +250,29 @@ final class FarmStore {
     func activate(_ farm: Farm, remember: Bool = true) {
         let previous = mirror.farm
         mirror.set(farm)
-        if remember, let userID = identity.userID {
+        if remember, remembers, let userID = identity.userID {
             memory.remember(farm, for: userID)
         }
         if let previous, previous.slug != farm.slug {
             onFarmChange()
         }
+        // Before the state moves, so the tabs `FarmGate` builds for this farm
+        // are built on this farm's role.
+        adoptRole(farm.role)
         state = .active(farm)
+    }
+
+    /// The person opens one of their farms — from Профил's list.
+    func open(_ farm: Farm) {
+        choices += 1
+        activate(farm)
+    }
+
+    /// A farm this person has just CREATED: open it, and read the list again
+    /// so Профил has it.
+    func openCreated(_ farm: Farm) {
+        open(farm)
+        Task { await refreshFarms() }
     }
 
     /// The open farm's NAME, when `/me` reports the same farm with one.
@@ -192,14 +283,87 @@ final class FarmStore {
     func adoptName(from tenant: CurrentUser.Tenant?) {
         guard let tenant, let farm = activeFarm, farm.slug == tenant.slug,
               farm.name != tenant.name else { return }
-        activate(Farm(slug: farm.slug, name: tenant.name))
+        activate(Farm(slug: farm.slug, name: tenant.name, role: farm.role))
+    }
+
+    /// Read this person's farms, and square the open farm with them.
+    ///
+    /// A list that cannot be read changes NOTHING but `listUnavailable`:
+    /// offline, the open farm and its remembered role carry on, which is what
+    /// a farmer in a field needs from it.
+    func refreshFarms() async {
+        if let listing { return await listing.value }
+        let epoch = SessionEpoch.current
+        let task = Task<Void, Never> {
+            var answer: [FarmsAPI.Membership]?
+            var choice: Int
+            repeat {
+                choice = choices
+                do {
+                    answer = try await loadFarms()
+                } catch {
+                    Log.auth.info("farm list unavailable; keeping the open farm")
+                    answer = nil
+                }
+                // `reset()` already let go of this task; touching `listing`
+                // now could release a NEWER session's request instead.
+                guard SessionEpoch.isCurrent(epoch) else { return }
+            } while answer != nil && choice != choices
+            listing = nil
+            guard let answer else {
+                listUnavailable = true
+                return
+            }
+            listUnavailable = false
+            adopt(answer.map { Farm($0) })
+        }
+        listing = task
+        await task.value
+    }
+
+    /// The list as the server has it NOW. The one place a farm is closed for
+    /// no longer being this person's.
+    private func adopt(_ list: [Farm]) {
+        farms = list
+        guard case .active(let open) = state else { return }
+        if let listed = list.first(where: { $0.slug == open.slug }) {
+            // Still theirs: the server's name for it, and their role there.
+            // The same slug, so nothing is rebuilt.
+            if listed != open { activate(listed) }
+            return
+        }
+        lostAccess = open
+        if let next = list.first {
+            // The oldest membership, which is where a first sign-in starts.
+            activate(next)
+        } else {
+            if remembers, let userID = identity.userID {
+                memory.forget(for: userID)
+            }
+            mirror.set(nil)
+            onFarmChange()
+            adoptRole(nil)
+            state = .none
+        }
+    }
+
+    /// `FarmGate` has said that a farm was closed.
+    func acknowledgeLostAccess() {
+        lostAccess = nil
     }
 
     /// Изход: no farm is open for whoever signs in next. The remembered
     /// choice stays with its person, for when they come back.
     func reset() {
         mirror.set(nil)
+        adoptRole(nil)
         state = .resolving
+        farms = nil
+        listUnavailable = false
+        lostAccess = nil
+        // Let go rather than cancelled, as `/me`'s is: the epoch guard
+        // discards whatever it answers.
+        listing = nil
     }
 
     /// The shared stores that hold a FARM's data, rather than a person's.

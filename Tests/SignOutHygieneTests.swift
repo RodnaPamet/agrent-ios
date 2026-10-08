@@ -355,7 +355,7 @@ final class SignOutHygieneTests: XCTestCase {
         let me = read("Agrent/API/CurrentUser.swift")
         guard let capture = me.range(of: "let epoch = SessionEpoch.current"),
               let guardLine = me.range(of: "guard SessionEpoch.isCurrent(epoch) else { return nil }"),
-              let assign = me.range(of: "user = resolved") else {
+              let assign = me.range(of: "answered = resolved") else {
             return XCTFail("positive control: CurrentUserStore.load captures and checks the epoch")
         }
         XCTAssertLessThan(capture.lowerBound, guardLine.lowerBound)
