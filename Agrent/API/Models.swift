@@ -98,23 +98,55 @@ enum LogEntryType: String, Codable, CaseIterable, Identifiable, Sendable, Lenien
     }
 }
 
-enum LogEntryStatus: String, Codable, Sendable {
+enum LogEntryStatus: String, Codable, CaseIterable, Sendable, LenientDecodable {
     case planned = "PLANNED"
     case done = "DONE"
+    /// A status this build does not know. The spec types `LogEntry.status`
+    /// as a free string, not an enum, so a new value must cost one label —
+    /// not, as it did, the whole ДНЕВНИК, which a single undecodable row
+    /// fails (agrent-ios#182). Read, never written: like `LogEntryType
+    /// .unknown`, the raw value is one the server would refuse, and nothing
+    /// offers it — a new entry is `.done`.
+    case unknown = "__UNKNOWN__"
 
-    var label: String { self == .planned ? "Планирано" : "Готово" }
+    static var unknownCase: LogEntryStatus { .unknown }
+
+    var label: String {
+        switch self {
+        case .planned: "Планирано"
+        case .done: "Готово"
+        case .unknown: "Друг статус"
+        }
+    }
 }
 
+/// One ДНЕВНИК entry as the server sends it.
+///
+/// ── `title` AND `occurredAt` ARE NULLABLE, as the spec has them ──
+///
+/// Both were non-optional here while the spec has them `string | null` and
+/// neither required — the create request's `occurredAt` may be null too. One
+/// such row, from the web or an import, failed the decode of the WHOLE list:
+/// the register would show nothing at all rather than one entry without a
+/// title (agrent-ios#182). The screens say what is missing instead —
+/// `displayTitle`, `noDate`.
 struct LogEntry: Codable, Identifiable, Equatable, Sendable {
     let id: String
     var type: LogEntryType
     var status: LogEntryStatus
-    var title: String
+    var title: String?
     var notes: String?
-    var occurredAt: Date
+    var occurredAt: Date?
     /// Optimistic-concurrency counter. The server bumps it on every write and
     /// a replayed edit must send the version it SAW — see README, "Writes".
     var version: Int?
+
+    /// The entry's title, or a word saying it has none — never a blank line
+    /// where a farmer looks for what the record is.
+    var displayTitle: String { title?.recorded ?? Self.untitled }
+
+    static let untitled = "Без заглавие"
+    static let noDate = "Без дата"
 }
 
 struct CreateLogEntry: Encodable, Sendable {

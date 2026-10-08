@@ -206,7 +206,13 @@ struct CreatedLead: Decodable, Equatable, Sendable {
         /// Which engine priced it. Not shown; recorded because a figure a
         /// farmer disputes three weeks later is answerable only if the
         /// version that produced it is known.
-        let engineVersion: String?
+        ///
+        /// An INTEGER, as the spec has it (required) — and as the catalogue
+        /// already reads it (`InsuranceCatalogue`). It was `String?`, so a
+        /// real answer would have failed to decode AFTER the lead was made:
+        /// the farmer told it failed, and each retry — same key, so a replay
+        /// rather than a second lead — failing the same way (agrent-ios#182).
+        let engineVersion: Int?
     }
 }
 
