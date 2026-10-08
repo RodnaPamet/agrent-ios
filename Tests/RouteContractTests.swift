@@ -109,6 +109,8 @@ final class RouteContractTests: XCTestCase {
         let loc = "{locationId}", parcel = "{parcelId}", id = "{id}"
         var all: [(String, [String])] = [
             ("CurrentUser.swift", [MeAPI.path]),
+            // A person's farms, outside any one farm (#179).
+            ("FarmsAPI.swift", [FarmsAPI.farmsPath, FarmsAPI.eikCheckPath]),
             // The Админ account card's picture. The app no longer BUILDS this
             // path — it follows a root-relative `avatarUrl` from `/me` — but
             // it still CALLS it, so the route is held here in the shape the

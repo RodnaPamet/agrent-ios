@@ -255,3 +255,16 @@ the route sends and the spec's schema does not list.
 The parcels are the three `locations-parcels.json` holds, by id and name; the
 product is the dashboard's «Примерен хербицид». The line ids (`opl_synthetic_*`)
 follow no real format.
+
+## `auth-me.json`: the fixture person's farm and flags (agrent-ios#179)
+
+**Synthetic.** `tenant` is the fixture world's one farm («Синтетично
+стопанство», slug `agrent`, the slug every fixture path was recorded under).
+It is there because `/me` always carries the block, nullable but present, and
+`FarmStore` reads it for a first sign-in. Under the seam the farm is opened
+directly and never remembered, so this only names it.
+
+`featureFlags` turns `social.farm-registration` on, so A11yShots can
+photograph «Добави стопанство» and the wizard's first steps
+(`ONLY=17-farm-wizard`). It never taps «Готово»: that would create a real
+farm. Under the seam it would get a 501, but the suite doesn't rely on that.

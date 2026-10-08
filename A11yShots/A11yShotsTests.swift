@@ -113,6 +113,7 @@ final class A11yShotsTests: XCTestCase {
             switch only {
             case "08b-task-parcel-lines": captureFieldOperationTask(app)
             case "16-profile": captureProfile(app)
+            case "17-farm-wizard": captureFarmWizard(app)
             default: XCTFail("A11Y_ONLY=\(only) names no capture this suite can run alone")
             }
             return
@@ -145,6 +146,7 @@ final class A11yShotsTests: XCTestCase {
         captureFromMenu("07-dashboard", label: "Табло", app: app)
         captureAdmin(app)
         captureProfile(app)
+        captureFarmWizard(app)
 
         // Задачи and Борса ARE in the default bar — but the bar is whatever the
         // server sent, so this asks the tab bar first and falls back to the
@@ -987,6 +989,58 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.buttons["Изход"].waitForExistence(timeout: 5), "no «Изход» on Профил")
         Thread.sleep(forTimeInterval: 2)
         capture("16-profile", app: app)
+        goBack(app, to: "Админ")
+        dismissSheet(app, named: "Админ")
+    }
+
+    /// «Добави стопанство» (agrent-ios#179): the wizard's first step and the
+    /// физическо лице path's name step, reached as a person reaches them —
+    /// Меню → Админ → the account card → Профил. The row shows because the
+    /// fixture `/me` turns `social.farm-registration` on.
+    ///
+    /// ── «Готово» is NEVER tapped ──
+    ///
+    /// It creates a REAL farm. Under the seam the POST is a 501 that never
+    /// leaves the process; the suite does not rely on that, as the header
+    /// says. «Отказ» closes the sheet without a write.
+    private func captureFarmWizard(_ app: XCUIApplication) {
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for the farm wizard")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        XCTAssertTrue(app.navigationBars["Админ"].waitForExistence(timeout: 20),
+                      "Админ did not present a sheet")
+        let card = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@",
+                                  "Вписан като Иван Фикстуров, owner@example.invalid"))
+            .firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Админ")
+        card.tap()
+        XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 10),
+                      "Админ's account card did not push Профил")
+
+        let add = app.buttons["Добави стопанство"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10),
+                      "no «Добави стопанство» on Профил — is the fixture flag on?")
+        add.tap()
+        XCTAssertTrue(app.staticTexts["Какво е стопанството Ви?"].waitForExistence(timeout: 10),
+                      "the wizard did not open on its first step")
+        Thread.sleep(forTimeInterval: 1)
+        capture("17-farm-wizard", app: app)
+
+        let individual = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Земеделски стопанин"))
+            .firstMatch
+        XCTAssertTrue(individual.waitForExistence(timeout: 5), "no физическо лице choice")
+        individual.tap()
+        XCTAssertTrue(app.staticTexts["Име на стопанството"].waitForExistence(timeout: 10),
+                      "the физическо лице path did not go straight to the name")
+        Thread.sleep(forTimeInterval: 1)
+        capture("17b-farm-wizard-name", app: app)
+
+        let cancel = app.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the wizard sheet has no «Отказ»")
+        cancel.tap()
+        XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 10),
+                      "«Отказ» did not close the wizard")
         goBack(app, to: "Админ")
         dismissSheet(app, named: "Админ")
     }

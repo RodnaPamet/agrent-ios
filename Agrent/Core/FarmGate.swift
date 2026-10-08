@@ -10,6 +10,7 @@ import SwiftUI
 struct FarmGate: View {
     @State private var farms = FarmStore.shared
     @State private var me = CurrentUserStore.shared
+    @State private var flags = FeatureFlags.shared
 
     var body: some View {
         Group {
@@ -28,11 +29,19 @@ struct FarmGate: View {
                     .background(Palette.Surface.page)
             case .none:
                 OutsideAFarm {
-                    EmptyState(
-                        Self.noFarmTitle,
-                        icon: "building.2",
-                        message: Self.noFarmMessage
-                    )
+                    // Creating one, when the server offers it to this person —
+                    // `/me` has just been read, so the flags are this
+                    // person's. Absent means off, and then only the way an
+                    // existing farm can let them in.
+                    if flags.isOn(FarmWizardText.flag) {
+                        FarmWizardView(context: .onboarding) { farms.activate($0) }
+                    } else {
+                        EmptyState(
+                            Self.noFarmTitle,
+                            icon: "building.2",
+                            message: Self.noFarmMessage
+                        )
+                    }
                 }
             case .failed:
                 OutsideAFarm {
@@ -46,9 +55,10 @@ struct FarmGate: View {
     }
 
     static let noFarmTitle = "Нямате стопанство"
+    /// Only while creating a farm is switched off for this person — with it
+    /// on, the wizard is this screen.
     static let noFarmMessage = "Профилът Ви все още не е свързан със стопанство. "
-        + "Помолете собственика на стопанството да Ви покани или създайте стопанство "
-        + "в уеб приложението."
+        + "Помолете собственика на стопанството да Ви покани."
     static let unavailable = "Стопанството не може да бъде заредено. Проверете връзката и опитайте пак."
 }
 
