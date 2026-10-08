@@ -398,10 +398,13 @@ final class ListingThreadOpener {
 
     /// The thread's id, or nil with `failure` set.
     ///
-    /// One retry on a 409: two first opens racing — a double tap on two
-    /// devices — can collide on the unique (listing, inquirer PERSON) row
-    /// (per farm until #1323), and the second attempt finds the thread the
-    /// first one made. A colleague's thread on the same listing is not that
+    /// No retry. Two first opens racing — a double tap on two devices —
+    /// collided on the unique (listing, inquirer PERSON) row (per farm until
+    /// #1323) and answered 409, and this retried once. Since agri-saas #1418
+    /// (live 2026-10-08) the second open is handed the first one's thread,
+    /// 200 `created: false`, and the route has no 409 left to answer — read
+    /// off `openExchangeThread`: 404, 400, 403 and 500 only. The retry could
+    /// no longer run. A colleague's thread on the same listing is not that
     /// row: since #1323 each person who writes gets their own conversation.
     func open(listingID: String) async -> String? {
         guard !opening else { return nil }
@@ -409,11 +412,7 @@ final class ListingThreadOpener {
         failure = nil
         defer { opening = false }
         do {
-            do {
-                return try await ExchangeAPI.openThread(listingID: listingID).id
-            } catch APIClient.APIError.conflict {
-                return try await ExchangeAPI.openThread(listingID: listingID).id
-            }
+            return try await ExchangeAPI.openThread(listingID: listingID).id
         } catch {
             failure = ChatPolicy.failure("Разговорът не може да бъде отворен.", error)
             return nil
