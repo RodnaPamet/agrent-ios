@@ -112,7 +112,7 @@ final class RouteContractTests: XCTestCase {
     /// the refresh that brought it in.
     ///
     /// Empty again from agri-saas main, refreshed once `/api/health` carried
-    /// #1523 (e5d20ea30, 2026-10-09): «Режийни»'s defaults
+    /// #1523 (e5d20ea30, 2026-10-09): «Общи»'s defaults
     /// (`/grain/costs/defaults`, #245) were built and merged against it here
     /// before it was served.
     private static let pendingServerRoutes: [String: String] = [:]

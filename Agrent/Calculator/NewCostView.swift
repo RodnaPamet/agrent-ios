@@ -50,7 +50,9 @@ struct NewCostView: View {
     ///     second legitimate cost is deduped away and never written.
     @State private var nonce = UUID().uuidString
 
-    /// «Култура» or «Режийни», chosen first (owner, 2026-10-09, #245).
+    /// «Култура» or «Общи», chosen first (owner, 2026-10-09, #245). «Общи»
+    /// is the owner's word for the farm's overheads, renamed the same day
+    /// from «Режийни» — the accounting term, which read as jargon.
     @State private var scope: Scope = .crop
 
     enum Scope: Hashable {
@@ -63,7 +65,7 @@ struct NewCostView: View {
         case overhead
     }
 
-    /// The «Режийни» sheet, its prefill sources, and what became of each line.
+    /// The «Общи» sheet, its prefill sources, and what became of each line.
     @State private var overhead = OverheadSheet()
     @State private var overheadResults: [CostCategory: OverheadLineResult] = [:]
     @State private var machinery: MachineryDepreciation?
@@ -155,7 +157,7 @@ struct NewCostView: View {
     }
 
     /// The crop side's categories: what a crop's decares carry — the
-    /// overheads are «Режийни»'s.
+    /// overheads are «Общи»'s.
     private static let cropCategories: [CostCategory] = [.rent, .seed, .fuel, .pesticide, .fertilizer, .service]
 
     var body: some View {
@@ -164,7 +166,7 @@ struct NewCostView: View {
                 Section {
                     Picker("Вид разход", selection: $scope) {
                         Text("Култура").tag(Scope.crop)
-                        Text("Режийни").tag(Scope.overhead)
+                        Text("Общи").tag(Scope.overhead)
                     }
                     .pickerStyle(.segmented)
                     .disabled(saving || !overheadResults.isEmpty)
@@ -324,7 +326,7 @@ struct NewCostView: View {
     }
 
     /// The farm's last overhead values and the machine register, once, when
-    /// «Режийни» is first chosen. Either failing costs only the prefill: the
+    /// «Общи» is first chosen. Either failing costs only the prefill: the
     /// sheet is still a sheet, and a farm with no history gets empty fields
     /// rather than an error (an empty `overheads` is the first run).
     private func prefillOverheads() async {

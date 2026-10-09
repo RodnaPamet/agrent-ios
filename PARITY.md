@@ -62,7 +62,10 @@ in agri-saas, served to the app by `GET /api/t/:slug/grain/calculator`.
 That makes parity here measurable exactly: which payload fields does each
 side render?
 
-### «Нов разход»: «Култура» or «Режийни» first (#245, owner 2026-10-09)
+### «Нов разход»: «Култура» or «Общи» first (#245, owner 2026-10-09)
+
+«Общи», the farm's overheads, was «Режийни» until the owner renamed it the
+same day.
 
 The owner's design: choose crop or overhead first. The crop side becomes
 per-decare lines (rent, seed, fuel, ПРЗ, fertilisers) with the farm's last
@@ -70,7 +73,7 @@ values as defaults. Overheads are yearly, salaries can be people × salary, and
 everything spreads over the WHOLE farm. The web is to work the same way
 (agri-saas).
 
-**iOS now — the «Режийни» half** (`OverheadSheet`, `OverheadFields`):
+**iOS now — the «Общи» half** (`OverheadSheet`, `OverheadFields`):
 - **The lines.** Заплати (a total, or «По хора»: people × yearly salary, with
   the total editable), Кредитни разходи, Амортизация and Друго. Each is sent as
   its own cost with `allocationBasis: HOLDING`, «Цялото стопанство» on the web.

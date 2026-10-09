@@ -85,7 +85,7 @@ enum CostCategory: String, LenientDecodable, Sendable {
     case pesticide = "PESTICIDE"
     case service = "SERVICE"
     /// Interest and fees on the farm's credit, and the machines' amortisation —
-    /// the two overheads the owner's «Режийни» sheet added (#245, agri-saas
+    /// the two overheads the owner's «Общи» sheet added (#245, agri-saas
     /// #1511), in the web's words (`grainEnums.costCategory`).
     case credit = "CREDIT"
     case depreciation = "DEPRECIATION"
@@ -154,7 +154,7 @@ struct CreateCostEntry: Encodable, Sendable {
     let description: String?
 
     /// WHICH land the cost spreads over. Absent is the server's `TARGET` — the
-    /// one-line form's behaviour, unchanged. The «Режийни» sheet sends
+    /// one-line form's behaviour, unchanged. The «Общи» sheet sends
     /// `HOLDING`: the whole farm, by area (owner, 2026-10-09: salaries «per
     /// dca of the whole farm, not only over a given crop decares»).
     var allocationBasis: CostAllocationBasis? = nil
