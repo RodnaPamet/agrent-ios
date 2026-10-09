@@ -136,12 +136,24 @@ struct ParcelOperationSheet: View {
         }
     }
 
+    private var choices: [InputItem] { Self.offered(store.items.value ?? [], for: kind) }
+
+    /// What the picker offers for `kind`.
+    ///
     /// The split is a NEGATION. 24 items on this tenant: 13 PESTICIDE, 8
     /// FERTILIZER, 3 AMENDMENT — so `!= FERTILIZER` gives 16 products and
     /// `== PESTICIDE` would hide three the farm owns.
-    private var choices: [InputItem] {
-        let all = store.items.value ?? []
-        return all.filter { kind == .fertilize ? $0.isFertilizer : !$0.isFertilizer }
+    ///
+    /// And NO SAMPLES (owner, 2026-10-09: «remove all sample products»,
+    /// #237). The seeded «Generic …» archetypes are left out: a job planned
+    /// with one is accepted and then can NEVER be completed — agri-saas
+    /// refuses a DONE line on an archetype (#1078), deliberately, since the
+    /// ДНЕВНИК needs a real trade name. Offering them offered a task nobody
+    /// could finish, and 22 of the farm's 24 products were them. What is left
+    /// is the farm's own; «Нов продукт» adds one. The typed field that
+    /// replaces this picker waits for the server (#237).
+    nonisolated static func offered(_ items: [InputItem], for kind: Kind) -> [InputItem] {
+        items.filter { !$0.isArchetype && (kind == .fertilize ? $0.isFertilizer : !$0.isFertilizer) }
             .sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
     }
 
@@ -224,8 +236,11 @@ struct ParcelOperationSheet: View {
                         }
                     case .loaded:
                     if choices.isEmpty {
-                        Text("Няма въведени артикули от този вид.")
+                        // The common case while the samples were most of the
+                        // catalogue (see `offered`), so it says what to do.
+                        Text("Няма въведени продукти от този вид. Добавете продукта с „Нов продукт“.")
                             .font(.footnote).foregroundStyle(Palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
                         // `MenuPicker` here and below: a product name is the
                         // longest value in this form, and the system menu
@@ -245,25 +260,10 @@ struct ParcelOperationSheet: View {
                         }
                     }
 
-                    // The archetype warning, at the moment of choosing.
-                    //
-                    // 22 of this tenant's 24 products are `Generic …` with
-                    // no active ingredient and no PPP number. They are
-                    // seeded placeholders meant to be replaced, and this
-                    // is the screen where an unreplaced one becomes a row
-                    // in a regulated column of a filed register. Said here
-                    // rather than on the entry afterwards, because here is
-                    // where it can still be changed.
-                    if let chosen = product, chosen.isArchetype {
-                        Label(
-                            "Това е образцов продукт без търговско наименование и без "
-                          + "рег. № по ЗЗР. Дневникът ще се подаде с празни колони.",
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .font(.footnote)
-                        .foregroundStyle(Palette.warning)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
+                    // No archetype warning any more: an archetype cannot be
+                    // chosen (`offered`), where it used to be warned about
+                    // here — with words about the register's empty columns
+                    // that predated the server refusing to complete it.
 
                     }
 
