@@ -24,7 +24,7 @@ enum CostsAPI {
     /// list itself.
     static var listPath: String { base }
 
-    /// The farm's last overhead figures, for the «Режийни» sheet's prefill
+    /// The farm's last overhead figures, for the «Общи» sheet's prefill
     /// (#245, agri-saas #1523). See `OverheadDefaults`.
     static var defaultsPath: String { "\(base)/defaults" }
 

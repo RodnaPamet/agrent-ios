@@ -369,9 +369,9 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(open.waitForExistence(timeout: 10), "«Отказ» did not put Дневник back")
     }
 
-    // MARK: - «Режийни» (agrent-ios#245)
+    // MARK: - «Общи» (agrent-ios#245)
 
-    /// Калкулатор → «Нов разход» → «Режийни»: the year's overheads, prefilled
+    /// Калкулатор → «Нов разход» → «Общи»: the year's overheads, prefilled
     /// from `costs-defaults.json` (3 people × 12 000, and «Друго») and the
     /// machine register's figure from `costs-machinery.json`, with its
     /// «сумата е занижена» caveat. Opened, photographed and cancelled —
@@ -383,10 +383,10 @@ final class A11yShotsTests: XCTestCase {
         let add = app.buttons["Нов разход"]
         XCTAssertTrue(add.waitForExistence(timeout: 20), "the calculator has no «Нов разход»")
         add.tap()
-        let overheads = app.buttons["Режийни"]
-        XCTAssertTrue(overheads.waitForExistence(timeout: 10), "«Нов разход» has no «Режийни»")
+        let overheads = app.buttons["Общи"]
+        XCTAssertTrue(overheads.waitForExistence(timeout: 10), "«Нов разход» has no «Общи»")
         overheads.tap()
-        XCTAssertTrue(app.staticTexts["Заплати"].waitForExistence(timeout: 10), "«Режийни» drew no «Заплати»")
+        XCTAssertTrue(app.staticTexts["Заплати"].waitForExistence(timeout: 10), "«Общи» drew no «Заплати»")
         Thread.sleep(forTimeInterval: 2)
         capture("09-overhead-costs", app: app)
         let cancel = app.navigationBars.buttons["Отказ"]

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The «Режийни» half of «Нов разход» (#245): a year's overheads — salaries,
+/// The «Общи» half of «Нов разход» (#245): a year's overheads — salaries,
 /// credit, amortisation, other — each spread over the WHOLE farm by area.
 ///
 /// Owner, 2026-10-09: «salaries … per annum, with optional number of persons

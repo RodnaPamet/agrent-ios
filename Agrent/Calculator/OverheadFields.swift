@@ -12,7 +12,7 @@ enum OverheadLineResult: Equatable {
     case unknown(String)
 }
 
-/// The «Режийни» fields of «Нов разход» (#245): salaries, credit,
+/// The «Общи» fields of «Нов разход» (#245): salaries, credit,
 /// amortisation and other, each yearly, each spread over the whole farm.
 /// The rules are `OverheadSheet`'s; this draws them, a section per line.
 struct OverheadFields: View {

@@ -1,7 +1,7 @@
 import XCTest
 @testable import Agrent
 
-/// «Режийни» (#245): a year's overheads, each spread over the whole farm.
+/// «Общи» (#245): a year's overheads, each spread over the whole farm.
 /// NOTHING HERE SAVES A COST — the sheet's rules are decided above the wire.
 final class OverheadSheetTests: XCTestCase {
 
