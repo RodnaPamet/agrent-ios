@@ -77,6 +77,9 @@ final class NewsTopicsTests: XCTestCase {
         XCTAssertEqual(NewsTopics.labels([], in: known), [])
         XCTAssertEqual(NewsTopics.labels(["wheat"], in: nil), [])
         XCTAssertEqual(known.tag("inputs")?.labelEn, "Fertilisers and sprays")
+        // «Пазар» is `trade`, not `market` — an old category value (agri-saas #1480).
+        XCTAssertEqual(known.tag("trade")?.label, "Пазар")
+        XCTAssertNil(known.tag("market"))
     }
 
     // MARK: - The payloads

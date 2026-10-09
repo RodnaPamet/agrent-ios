@@ -66,6 +66,11 @@
           "key": "livestock",
           "label": "Животновъдство",
           "labelEn": "Livestock"
+        },
+        {
+          "key": "trade",
+          "label": "Пазар",
+          "labelEn": "Market"
         }
       ]
     }
