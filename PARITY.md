@@ -573,8 +573,10 @@ comment»).** Every task has «Коментари» at its foot.
   keeps its draft.
 - **Shown as stored:** the server keeps literal text («a < b» stays so), and
   the app shows it verbatim, as the web does.
-- **Not retried:** the route reads no `Idempotency-Key` until agri-saas's
-  idempotency PR, so a lost answer must not become two comments.
+- **Retried, safely:** since agri-saas #1441 (live 2026-10-08) the route
+  honours `Idempotency-Key`, so a comment that hits no signal or a 5xx is
+  tried twice more with the same key (#232), and a lost answer can't post
+  it twice.
 - **Unverified:** no comment has been sent from this app; the first is the
   owner's.
 
@@ -603,8 +605,8 @@ Where the answers go:
   It lets the assignee record on the task's own parcels (backend 1's PR A,
   owner-confirmed with them directly).
 - **Order:** the close goes first. A refused observation leaves the close
-  standing and is said under the task. Nothing is retried until agri-saas's
-  idempotency PR.
+  standing and is said under the task. Each observation is retried twice
+  more with its own key on no signal or a 5xx (#232, agri-saas #1441).
 
 **Unverified:** no task has been closed from this app. The first close and the
 first weed record are the owner's. The weed route (agri-saas #1434) is live

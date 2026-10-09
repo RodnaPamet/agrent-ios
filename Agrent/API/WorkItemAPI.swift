@@ -255,10 +255,10 @@ extension WorkItemAPI {
     /// `src/lib/security/sanitize.ts`, 2026-10-08; backend 1 corrected the
     /// spec the same day (agri-saas PR B). A newline in plain text survives.
     ///
-    /// The key is sent although the route reads none yet (agri-saas PR B
-    /// adds it, scoped to the task). Minted once per text by the caller, so
-    /// once it is honoured a resend of the same comment cannot make two.
-    /// Until then nothing retries this on its own.
+    /// The key is honoured since agri-saas #1441 (live 2026-10-08), scoped
+    /// to the task: a replay answers 201 with the comment that already
+    /// landed. Minted once per text by the caller and reused across every
+    /// attempt, so `IdempotentRetry` can try again without posting twice.
     static func addComment(_ id: String, text: String, idempotencyKey: String) async throws {
         _ = try await APIClient.shared.postReturningData(
             commentsPath(id), body: CommentBody(body: text), idempotencyKey: idempotencyKey)
@@ -290,11 +290,11 @@ extension WorkItemAPI {
     /// One observation on one parcel. `weeds` mixes catalogue binomials and
     /// free text; the SERVER sorts them into `weedKeys` and `otherWeeds`.
     ///
-    /// The key is sent although the route reads none yet — idempotency
-    /// needs a column and a migration there (backend 1's PR B). Minted once
-    /// per submission and parcel by the caller; nothing retries this on its
-    /// own until PR B is live, because a retry after a lost answer would
-    /// record the same weeds twice.
+    /// The key is honoured since agri-saas #1441 (live 2026-10-08), scoped to
+    /// the parcel, and shared with the parcel route's handle: a replay
+    /// through either path answers 201 with the observation that landed.
+    /// Minted once per parcel per close by the caller and reused across its
+    /// attempts — never shared between parcels, which the server refuses.
     static func recordWeeds(
         taskID: String, parcelID: String, observedAt: Date, weeds: [String], notes: String?,
         idempotencyKey: String
