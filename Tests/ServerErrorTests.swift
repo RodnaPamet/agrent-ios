@@ -217,3 +217,30 @@ final class AuthEnvelopeShapeTests: XCTestCase {
         XCTAssertEqual(text, "Сесията е изтекла. Влезте отново.")
     }
 }
+
+/// The farm's subscription, refused in words that say which (agrent-ios#241).
+/// Both are 403s; neither is a missing right, and neither may send anyone to
+/// pay outside the app (App Store guideline 3.1.1) — so both are statements.
+final class SubscriptionRefusalTests: XCTestCase {
+
+    func testAPastDueFarmIsToldWhyNotThatItLacksRights() {
+        let text = UserMessage.httpText(status: 403, code: "PAST_DUE_RESTRICTED",
+                                        message: "Your subscription payment is past due.")
+        XCTAssertEqual(text, "Тази функция е спряна, защото плащането за абонамента на стопанството не е преминало.")
+    }
+
+    /// Uncoded on the server: FORBIDDEN, told apart only by the message's
+    /// prefix — and FORBIDDEN alone says «Нямате права».
+    func testAPlanLimitIsNotCalledAMissingRight() {
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: "FORBIDDEN",
+                                            message: "plan_limit_exceeded: Your plan allows 1 location."),
+                       "Достигнат е лимитът на абонаментния план на стопанството.")
+        // Positive control: any other FORBIDDEN is still a missing right.
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: "FORBIDDEN", message: "Forbidden"),
+                       "Нямате права за това действие.")
+        // The marker leads the message; mentioned anywhere else, it is not one.
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: "FORBIDDEN",
+                                            message: "Forbidden (see plan_limit_exceeded docs)"),
+                       "Нямате права за това действие.")
+    }
+}
