@@ -34,6 +34,13 @@ struct NewsItem: Decodable, Identifiable, Equatable, Sendable {
     /// A real instant here, unlike the price dates.
     let publishedAt: Date
 
+    /// The article's tags (#231): stable ASCII keys from the server's keyword
+    /// rules, possibly none, order not significant (agri-saas news contract,
+    /// §4). Optional because a server older than the contract sends none.
+    /// Shown through the catalogue's labels; a key the catalogue lacks is
+    /// left out rather than shown as code.
+    let tags: [String]?
+
     var link: URL? { URL(string: url) }
 
     var categoryLabel: String? {
@@ -84,9 +91,51 @@ struct NewsItem: Decodable, Identifiable, Equatable, Sendable {
     }
 }
 
+/// `TrendNewsResponse`. `category` stays required — the installed build
+/// decoded it, and the contract keeps it (agri-saas #1446 §4). The rest is
+/// the contract's echo of what was ACTUALLY applied, and the page cursor;
+/// all optional, for a server that predates them.
 struct NewsResponse: Decodable, Equatable, Sendable {
     let category: String
     let items: [NewsItem]
+    /// The tags the server applied — an unknown key it dropped is missing
+    /// here, which is how a stale preference shows (`NewsTopics.isStale`).
+    let tags: [String]?
+    let q: String?
+    let nextCursor: String?
+}
+
+/// `GET /trends/news/tags` — the tags, grouped, with their labels (#231).
+/// The server owns the vocabulary: neither client hard-codes it.
+struct NewsTagCatalogue: Decodable, Equatable, Sendable {
+    struct Tag: Decodable, Equatable, Sendable, Identifiable {
+        let key: String
+        /// Bulgarian, and authoritative.
+        let label: String
+        /// For Voice Control's English recogniser (asked of agri-saas for
+        /// this). Optional all the same: a missing one costs a spoken name.
+        let labelEn: String?
+        var id: String { key }
+    }
+
+    struct Group: Decodable, Equatable, Sendable, Identifiable {
+        let key: String
+        let label: String
+        let labelEn: String?
+        let tags: [Tag]
+        var id: String { key }
+    }
+
+    let groups: [Group]
+
+    func tag(_ key: String) -> Tag? {
+        for group in groups {
+            if let tag = group.tags.first(where: { $0.key == key }) { return tag }
+        }
+        return nil
+    }
+
+    var keys: Set<String> { Set(groups.flatMap { $0.tags.map(\.key) }) }
 }
 
 enum TrendsAPI {
@@ -101,6 +150,53 @@ enum TrendsAPI {
         var path = "\(FarmPath.root)/trends/news?limit=\(min(max(limit, 1), 100))"
         if category != .all { path += "&category=\(category.rawValue)" }
         return path
+    }
+
+    /// The feed with the contract's filters (#231, agri-saas #1446 §4).
+    ///
+    /// - `tags`: ANY-OF, SORTED — the server keys its cache on the sorted set,
+    ///   so `wheat,barley` and `barley,wheat` are one entry.
+    /// - `q`: the search, in the query string. Low-sensitivity by agreement
+    ///   (CFNetwork logs URLs with their query; the trade-off is recorded in
+    ///   §6 of the contract), as Борса's board search already is.
+    /// - `cursor`: opaque, passed back verbatim.
+    ///
+    /// No `category`: the screen filters on tags now (owner, 2026-10-08), and
+    /// the server's default is «all».
+    static func newsPath(tags: [String], query: String?, cursor: String?, limit: Int = 50) -> String {
+        var path = "\(FarmPath.root)/trends/news?limit=\(min(max(limit, 1), 100))"
+        let keys = tags.sorted().compactMap(ExchangeQuery.escape)
+        if !keys.isEmpty { path += "&tags=\(keys.joined(separator: ","))" }
+        if let q = ExchangeQuery.escape(query) { path += "&q=\(q)" }
+        if let cursor = ExchangeQuery.escape(cursor) { path += "&cursor=\(cursor)" }
+        return path
+    }
+
+    /// The tag catalogue — static, cached hard by the server (24 h).
+    static var newsTagsPath: String { "\(FarmPath.root)/trends/news/tags" }
+}
+
+/// A person's news topics (#231), under `/api/me/`: a property of the
+/// person, not of a farm — the same feed from either farm (contract §4).
+enum NewsPreferencesAPI {
+    static let path = "/api/me/news-preferences"
+
+    /// `{ tags: string[] | null }` — null is «never chose», `[]` «chose
+    /// nothing»; both show every article. Unknown tags are dropped by the
+    /// server on read.
+    struct Body: Codable, Equatable, Sendable {
+        let tags: [String]?
+    }
+
+    static func load() async throws -> [String]? {
+        let data = try await APIClient.shared.data(for: path)
+        return try await APIClient.shared.decode(data, as: Body.self).tags
+    }
+
+    /// The whole list, written whole. The server 400s an unknown tag here —
+    /// a person choosing a typo is a client bug worth hearing about.
+    static func save(_ tags: [String]) async throws -> [String] {
+        try await APIClient.shared.put(path, body: Body(tags: tags.sorted()), as: Body.self).tags ?? []
     }
 }
 

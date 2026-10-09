@@ -1,0 +1,73 @@
+{
+  "groups": [
+    {
+      "key": "crops",
+      "label": "Култури",
+      "labelEn": "Crops",
+      "tags": [
+        {
+          "key": "wheat",
+          "label": "Пшеница",
+          "labelEn": "Wheat"
+        },
+        {
+          "key": "maize",
+          "label": "Царевица",
+          "labelEn": "Maize"
+        },
+        {
+          "key": "sunflower",
+          "label": "Слънчоглед",
+          "labelEn": "Sunflower"
+        },
+        {
+          "key": "rapeseed",
+          "label": "Рапица",
+          "labelEn": "Rapeseed"
+        },
+        {
+          "key": "barley",
+          "label": "Ечемик",
+          "labelEn": "Barley"
+        }
+      ]
+    },
+    {
+      "key": "topics",
+      "label": "Теми",
+      "labelEn": "Topics",
+      "tags": [
+        {
+          "key": "subsidies",
+          "label": "Субсидии",
+          "labelEn": "Subsidies"
+        },
+        {
+          "key": "prices",
+          "label": "Цени",
+          "labelEn": "Prices"
+        },
+        {
+          "key": "weather",
+          "label": "Време",
+          "labelEn": "Weather"
+        },
+        {
+          "key": "inputs",
+          "label": "Торове и препарати",
+          "labelEn": "Fertilisers and sprays"
+        },
+        {
+          "key": "machinery",
+          "label": "Техника",
+          "labelEn": "Machinery"
+        },
+        {
+          "key": "livestock",
+          "label": "Животновъдство",
+          "labelEn": "Livestock"
+        }
+      ]
+    }
+  ]
+}

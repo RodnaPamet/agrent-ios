@@ -111,11 +111,18 @@ final class RouteContractTests: XCTestCase {
     /// `/api/health` carried it (a11e72163, 2026-10-08) and was taken off by
     /// the refresh that brought it in.
     ///
-    /// Empty again from agri-saas main, refreshed once `/api/health` carried
-    /// #1523 (e5d20ea30, 2026-10-09): «Общи»'s defaults
-    /// (`/grain/costs/defaults`, #245) were built and merged against it here
-    /// before it was served.
-    private static let pendingServerRoutes: [String: String] = [:]
+    /// From 2026-10-08: Новини's two new routes (#231), built against
+    /// agri-saas's written contract (#1446, merged as docs) before the server
+    /// serves them. Until it does, the catalogue and the person's topics are
+    /// a 404 and the feed shows everything, unfiltered — the state of a
+    /// person who chose nothing. #231 merges only once `/api/health` carries
+    /// both.
+    private static let pendingServerRoutes: [String: String] = [
+        "/api/t/{tenantSlug}/trends/news/tags":
+            "agri-saas news contract #1446 §4: the tag catalogue for #231",
+        "/api/me/news-preferences":
+            "agri-saas news contract #1446 §4: a person's news topics for #231",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -223,7 +230,11 @@ final class RouteContractTests: XCTestCase {
             ("InsuranceCatalogue.swift", [InsuranceCatalogueAPI.path]),
             ("NewsModels.swift",
              PriceRange.allCases.map { TrendsAPI.pricesPath(.wheat, range: $0) }
-                + NewsCategory.allCases.map { TrendsAPI.newsPath($0) }),
+                + NewsCategory.allCases.map { TrendsAPI.newsPath($0) }
+                // agrent-ios#231: the feed's filters, the catalogue, the
+                // person's topics.
+                + [TrendsAPI.newsPath(tags: ["wheat"], query: "q", cursor: "c"),
+                   TrendsAPI.newsTagsPath, NewsPreferencesAPI.path]),
         ]
         // Every index, because the index is a LITERAL segment (`ndvi-tiles`),
         // not a parameter: a server that dropped one would 404 that one only.

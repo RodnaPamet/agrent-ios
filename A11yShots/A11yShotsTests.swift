@@ -121,6 +121,7 @@ final class A11yShotsTests: XCTestCase {
                 captureOperationSheet(app)
             case "08b-task-parcel-lines": captureFieldOperationTask(app)
             case "08d-task-parcels": captureTaskParcels(app)
+            case "06-news": captureNews(app)
             case "16-profile": captureProfile(app)
             case "17-farm-wizard": captureFarmWizard(app)
             default: XCTFail("A11Y_ONLY=\(only) names no capture this suite can run alone")
@@ -153,7 +154,7 @@ final class A11yShotsTests: XCTestCase {
         // route to them — moving a surface into the bar goes through
         // `BottomTabsStore.save()`, which is a PUT against the live tenant.
         captureFromMenu("05-risk", label: "Риск", app: app)
-        captureFromMenu("06-news", label: "Новини", app: app)
+        captureNews(app)
         captureFromMenu("07-dashboard", label: "Табло", app: app)
         captureAdmin(app)
         captureProfile(app)
@@ -521,6 +522,33 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 4)
         capture(name, app: app)
         dismissSheet(app, named: label)
+    }
+
+    /// Новини with the fixture person's topics (agrent-ios#231): the feed on
+    /// «Моите теми», then «Предпочитания» over it. The switches are only
+    /// looked at — a flip is a PUT, and the first real one is the owner's.
+    private func captureNews(_ app: XCUIApplication) {
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Новини")
+        XCTAssertTrue(tapMenuRow("Новини", in: app), "«Новини» is not in the menu — it may be in the bottom bar")
+        // The scope chips appear only once the topics are read, so they are
+        // the signal that the catalogue and the choices both arrived.
+        let mine = app.buttons["Моите теми"]
+        XCTAssertTrue(mine.waitForExistence(timeout: 20), "Новини opened without the person's topics")
+        Thread.sleep(forTimeInterval: 2)
+        capture("06-news", app: app)
+
+        let preferences = app.navigationBars.buttons["Предпочитания"]
+        XCTAssertTrue(preferences.waitForExistence(timeout: 5), "Новини has no «Предпочитания»")
+        preferences.tap()
+        XCTAssertTrue(app.switches["Пшеница"].waitForExistence(timeout: 10),
+                      "«Предпочитания» opened without the catalogue's topics")
+        Thread.sleep(forTimeInterval: 1)
+        capture("06b-news-preferences", app: app)
+        let done = app.navigationBars.buttons["Готово"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5), "«Предпочитания» has no «Готово»")
+        done.tap()
+        XCTAssertTrue(preferences.waitForExistence(timeout: 10), "«Готово» did not put Новини back")
+        dismissSheet(app, named: "Новини")
     }
 
     /// A surface that is normally a tab, but need not be.

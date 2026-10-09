@@ -119,6 +119,9 @@ enum FixtureCatalogue {
         (LocationsAPI.rateUnitsPath, "units-rate"),
         (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
         (TrendsAPI.newsPath(.all), "trends-news"),
+        // agrent-ios#231: the feed for the fixture person's topics, exactly
+        // as `NewsStore` asks for it — sorted, no search, first page.
+        (TrendsAPI.newsPath(tags: ["subsidies", "wheat"], query: nil, cursor: nil), "trends-news-mine"),
     ]) { $0 }
 
     /// Routes matched on the path alone.
@@ -165,6 +168,10 @@ enum FixtureCatalogue {
         // only — the POST on the same path is a write, answered 501 as every
         // write is.
         (FarmsAPI.farmsPath, "me-farms"),
+        // agrent-ios#231: Новини's tag catalogue and the person's topics.
+        // GETs only — choosing a topic is a PUT, answered 501 as every write.
+        (TrendsAPI.newsTagsPath, "trends-news-tags"),
+        (NewsPreferencesAPI.path, "news-preferences"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 
