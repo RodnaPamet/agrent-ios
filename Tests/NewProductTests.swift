@@ -99,6 +99,25 @@ final class NewProductTests: XCTestCase {
         XCTAssertFalse(try item("Generic Glyphosate 360", createdBy: "u1").isArchetype)
     }
 
+    /// The operation sheet offers NO samples (owner, 2026-10-09, #237): a job
+    /// planned with one is accepted and can never be completed (agri-saas
+    /// #1078). The farm's own products stay, split by the negation — the
+    /// amendment is offered for a spray, as before.
+    func testThePickerOffersNoSamples() throws {
+        let items = [
+            try item("Generic Chlorothalonil 720 SC"),
+            try item("Generic MAP 11-52-0", category: "FERTILIZER"),
+            try item("Karate Zeon 5 CS", createdBy: "u1"),
+            try item("Амониева селитра", createdBy: "u1", category: "FERTILIZER"),
+            try item("Компост", createdBy: "u1", category: "AMENDMENT"),
+        ]
+        XCTAssertEqual(Set(ParcelOperationSheet.offered(items, for: .spray).map(\.name)),
+                       ["Karate Zeon 5 CS", "Компост"])
+        XCTAssertEqual(ParcelOperationSheet.offered(items, for: .fertilize).map(\.name), ["Амониева селитра"])
+        // Positive control: the samples were there to leave out.
+        XCTAssertEqual(items.filter(\.isArchetype).count, 2)
+    }
+
     /// …and the converse: a seeded row that does NOT start with "Generic"
     /// is still an archetype.
     func testASeededRowWithAnUnexpectedNameIsStillAnArchetype() throws {

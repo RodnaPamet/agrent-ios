@@ -433,6 +433,26 @@ Unchanged: a parcel line's tap on a 426 still queues nothing, as on the web
 **Unverified**: no 426 has been met, because the server's floor is 1 too,
 and the sheet's 426 line has never rendered (ROADMAP, the #112 entry).
 
+### Divergence — the spray sheet offers no sample products (#237, owner 2026-10-09)
+
+**The problem.** 22 of the farm's 24 catalogue products are the seeded
+«Generic …» archetypes. agri-saas accepts one on a plan, then refuses the
+line's DONE (#1078), deliberately: completion is when the row becomes
+evidence. So a job planned with a sample product could never be completed.
+The sheet used to warn about the register's empty columns instead.
+
+**iOS, now.** The owner asked for all sample products removed and the product
+typed as free text. The phone half that needs no server ships first: the
+picker leaves archetypes out (`ParcelOperationSheet.offered`, by the server's
+`isArchetype`). The farm's own products stay, and «Нов продукт» adds one.
+
+**Still to come, on agri-saas's side:**
+- the samples hidden from the catalogue and no longer seeded;
+- the route taking a typed product name.
+
+The web keeps offering the samples until then. The typed field (#237)
+replaces this picker once that contract is live.
+
 ---
 
 ## Journal
