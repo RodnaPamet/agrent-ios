@@ -32,6 +32,7 @@
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/history
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations/{observationId}
+/api/t/{tenantSlug}/costs/machinery
 /api/t/{tenantSlug}/dashboard/ag
 /api/t/{tenantSlug}/dashboard/task-trend
 /api/t/{tenantSlug}/exchange/inquiries
@@ -50,6 +51,7 @@
 /api/t/{tenantSlug}/field-operations/{taskId}/parcels/{lineId}
 /api/t/{tenantSlug}/grain/calculator
 /api/t/{tenantSlug}/grain/costs
+/api/t/{tenantSlug}/grain/costs/defaults
 /api/t/{tenantSlug}/insurance/leads
 /api/t/{tenantSlug}/insurance/products
 /api/t/{tenantSlug}/items

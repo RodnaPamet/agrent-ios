@@ -112,6 +112,7 @@ final class A11yShotsTests: XCTestCase {
             assertFixtureWorld(app)
             switch only {
             case "08-tasks": captureTabOrMenu("08-tasks", label: "Задачи", app: app)
+            case "09-overhead-costs": captureOverheadCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "18-operation-typed-product":
                 openTheLocation(app)
@@ -161,6 +162,7 @@ final class A11yShotsTests: XCTestCase {
         // "no Задачи button" for a farm that simply arranged its bar
         // differently.
         captureTabOrMenu("08-tasks", label: "Задачи", app: app)
+        captureOverheadCosts(app)
         captureFieldOperationTask(app)
         captureTaskParcels(app)
 
@@ -365,6 +367,32 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
         cancel.tap()
         XCTAssertTrue(open.waitForExistence(timeout: 10), "«Отказ» did not put Дневник back")
+    }
+
+    // MARK: - «Режийни» (agrent-ios#245)
+
+    /// Калкулатор → «Нов разход» → «Режийни»: the year's overheads, prefilled
+    /// from `costs-defaults.json` (3 people × 12 000, and «Друго») and the
+    /// machine register's figure from `costs-machinery.json`, with its
+    /// «сумата е занижена» caveat. Opened, photographed and cancelled —
+    /// «Запази» would be a write. Starts on any tab; ends on Дневник.
+    private func captureOverheadCosts(_ app: XCUIApplication) {
+        let tab = labelled("Калкулатор", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        tab.tap()
+        let add = app.buttons["Нов разход"]
+        XCTAssertTrue(add.waitForExistence(timeout: 20), "the calculator has no «Нов разход»")
+        add.tap()
+        let overheads = app.buttons["Режийни"]
+        XCTAssertTrue(overheads.waitForExistence(timeout: 10), "«Нов разход» has no «Режийни»")
+        overheads.tap()
+        XCTAssertTrue(app.staticTexts["Заплати"].waitForExistence(timeout: 10), "«Режийни» drew no «Заплати»")
+        Thread.sleep(forTimeInterval: 2)
+        capture("09-overhead-costs", app: app)
+        let cancel = app.navigationBars.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
+        cancel.tap()
+        app.tabBars.buttons["Дневник"].tap()
     }
 
     // MARK: - reaching the screens that are not tabs

@@ -50,6 +50,26 @@ struct NewCostView: View {
     ///     second legitimate cost is deduped away and never written.
     @State private var nonce = UUID().uuidString
 
+    /// «Култура» or «Режийни», chosen first (owner, 2026-10-09, #245).
+    @State private var scope: Scope = .crop
+
+    enum Scope: Hashable {
+        /// One cost for the crops' side of the books. The per-decare lines by
+        /// crop replace this once agri-saas settles how a crop's area is
+        /// counted (#1512); until then it is the one-line form, limited to
+        /// the crop categories so the two halves do not overlap.
+        case crop
+        /// The year's overheads, each spread over the whole farm.
+        case overhead
+    }
+
+    /// The «Режийни» sheet, its prefill sources, and what became of each line.
+    @State private var overhead = OverheadSheet()
+    @State private var overheadResults: [CostCategory: OverheadLineResult] = [:]
+    @State private var machinery: MachineryDepreciation?
+    @State private var overheadPrefilled = false
+    @State private var currencyEdited = false
+
     @State private var category: CostCategory = .fuel
     @State private var amountText = ""
     @State private var currency = "BGN"
@@ -113,47 +133,58 @@ struct NewCostView: View {
     }
 
     private var canSave: Bool {
-        guard !saving, let draft else { return false }
-        return draft.problems.isEmpty
+        guard !saving else { return false }
+        switch scope {
+        case .crop:
+            guard let draft else { return false }
+            return draft.problems.isEmpty
+        case .overhead:
+            return overhead.problems.isEmpty && !pendingOverheads.isEmpty
+        }
     }
+
+    /// The overhead lines still to send: entered, and neither saved nor lost
+    /// in transit (`OverheadLineResult`).
+    private var pendingOverheads: [CostCategory] {
+        overhead.entered.filter {
+            switch overheadResults[$0] {
+            case .saved?, .unknown?: false
+            case .refused?, nil: true
+            }
+        }
+    }
+
+    /// The crop side's categories: what a crop's decares carry — the
+    /// overheads are «Режийни»'s.
+    private static let cropCategories: [CostCategory] = [.rent, .seed, .fuel, .pesticide, .fertilizer, .service]
 
     var body: some View {
         NavigationStack {
             PageForm {
                 Section {
-                    // `MenuPicker`: the system menu picker cuts a Bulgarian
-                    // value short in the row (#160).
-                    MenuPicker("Категория", selection: $category, value: category.label) {
-                        ForEach(CostCategory.selectable, id: \.self) {
-                            Text($0.label).tag($0)
-                        }
+                    Picker("Вид разход", selection: $scope) {
+                        Text("Култура").tag(Scope.crop)
+                        Text("Режийни").tag(Scope.overhead)
                     }
-                    // `.decimalPad` has no minus sign, which is right: the
-                    // server requires amount > 0 and a negative cost is a
-                    // different concept the books do not have here.
-                    TextField("Сума", text: $amountText, prompt: .fieldPrompt("Сума"))
-                        .keyboardType(.decimalPad)
-                    TextField("Валута", text: $currency, prompt: .fieldPrompt("Валута"))
-                        .textInputAutocapitalization(.characters)
-                    DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
-                        // The date while its calendar is open — see
-                        // `Palette.DatePill` (#164).
-                        .tint(Palette.DatePill.tint)
+                    .pickerStyle(.segmented)
+                    .disabled(saving || !overheadResults.isEmpty)
+                } footer: {
+                    SectionFooter {
+                        Text(scope == .crop
+                             ? "Един разход за култура. Разходите на декар по култура предстоят."
+                             : "Годишни суми. Всяка се разпределя по площ върху цялото стопанство — "
+                               + "земята без култура запазва своя дял.")
+                    }
                 }
 
-                Section(titled: "Доставчик") {
-                    TextField("по избор", text: $supplier, prompt: .fieldPrompt("по избор"), axis: .vertical)
-                }
-                Section(titled: "Бележки") {
-                    TextEditor(text: $notes).frame(minHeight: 100)
-                }
-
-                if let problem = firstProblemText {
-                    Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
-                }
-
-                if let failure {
-                    Section { failureView(failure) }
+                switch scope {
+                case .crop: cropFields
+                case .overhead:
+                    OverheadFields(sheet: $overhead, results: overheadResults, machinery: machinery)
+                    commonFields
+                    if let problem = overheadProblemText {
+                        Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
+                    }
                 }
             }
             .inlineTitle("Нов разход")
@@ -167,13 +198,79 @@ struct NewCostView: View {
                     if saving {
                         ProgressView()
                     } else {
-                        Button("Запази") { Task { await save() } }
-                            .disabled(!canSave)
-                            .accessibilityInputLabels(A11y.Spoken.save)
+                        Button("Запази") {
+                            Task { scope == .crop ? await save() : await saveOverheads() }
+                        }
+                        .disabled(!canSave)
+                        .accessibilityInputLabels(A11y.Spoken.save)
                     }
                 }
             }
             .interactiveDismissDisabled(saving)
+            .task(id: scope) { if scope == .overhead { await prefillOverheads() } }
+            .onChange(of: currency) { currencyEdited = true }
+        }
+    }
+
+    /// The one-line form, as it always was — for the crop categories only.
+    @ViewBuilder
+    private var cropFields: some View {
+        Section {
+            // `MenuPicker`: the system menu picker cuts a Bulgarian
+            // value short in the row (#160).
+            MenuPicker("Категория", selection: $category, value: category.label) {
+                ForEach(Self.cropCategories, id: \.self) {
+                    Text($0.label).tag($0)
+                }
+            }
+            // `.decimalPad` has no minus sign, which is right: the
+            // server requires amount > 0 and a negative cost is a
+            // different concept the books do not have here.
+            TextField("Сума", text: $amountText, prompt: .fieldPrompt("Сума"))
+                .keyboardType(.decimalPad)
+            TextField("Валута", text: $currency, prompt: .fieldPrompt("Валута"))
+                .textInputAutocapitalization(.characters)
+            DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
+                // The date while its calendar is open — see
+                // `Palette.DatePill` (#164).
+                .tint(Palette.DatePill.tint)
+        }
+
+        Section(titled: "Доставчик") {
+            TextField("по избор", text: $supplier, prompt: .fieldPrompt("по избор"), axis: .vertical)
+        }
+        Section(titled: "Бележки") {
+            TextEditor(text: $notes).frame(minHeight: 100)
+        }
+
+        if let problem = firstProblemText {
+            Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
+        }
+
+        if let failure {
+            Section { failureView(failure) }
+        }
+    }
+
+    /// The overhead sheet's currency and date: one each, for every line.
+    @ViewBuilder
+    private var commonFields: some View {
+        Section {
+            TextField("Валута", text: $currency, prompt: .fieldPrompt("Валута"))
+                .textInputAutocapitalization(.characters)
+            DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
+                .tint(Palette.DatePill.tint)
+        }
+        .disabled(saving || !overheadResults.isEmpty)
+    }
+
+    private var overheadProblemText: String? {
+        switch overhead.problems.first {
+        case .nothingEntered?, nil: nil
+        case .unreadable(let category)?: "\(category.label): сумата не е разчетена."
+        case .notPositive(let category)?: "\(category.label): сумата трябва да е по-голяма от нула."
+        case .tooLarge(let category)?: "\(category.label): сумата е прекалено голяма."
+        case .peopleIncomplete?: "Заплати: въведете и броя хора, и годишната заплата на човек — или изберете „Общо“."
         }
     }
 
@@ -223,6 +320,55 @@ struct NewCostView: View {
         case .currencyMissing: return "Валутата е задължителна."
         case .dateMissing: return "Датата е задължителна."
         case nil: return nil
+        }
+    }
+
+    /// The farm's last overhead values and the machine register, once, when
+    /// «Режийни» is first chosen. Either failing costs only the prefill: the
+    /// sheet is still a sheet, and a farm with no history gets empty fields
+    /// rather than an error (an empty `overheads` is the first run).
+    private func prefillOverheads() async {
+        guard !overheadPrefilled else { return }
+        overheadPrefilled = true
+        if let defaults = try? await CostsAPI.loadDefaults() {
+            overhead.prefill(from: defaults)
+            // The farm's last currency, unless the farmer already chose one.
+            if !currencyEdited, let last = OverheadSheet.lastCurrency(defaults) { currency = last }
+        }
+        machinery = try? await CostsAPI.loadMachinery()
+        // The register's figure, where the farm has no amortisation of its own
+        // on record; «Използвай» puts it over one that is.
+        overhead.useRegister(machinery?.offered, onlyIfEmpty: true)
+    }
+
+    /// Each line its own cost — one POST each, each under its own key
+    /// (`CostIdempotencyKey`: this sheet's nonce, that line's content), so a
+    /// replay of any one of them cannot book it twice. A line that landed, or
+    /// whose answer was lost, is not sent again: the first is done, and the
+    /// second is the one-line form's rule — look at the list before entering
+    /// it again. A refused one stays editable and goes again on «Запази».
+    /// The sheet closes only when every line it holds has landed.
+    private func saveOverheads() async {
+        guard canSave else { return }
+        saving = true
+        defer { saving = false }
+        let drafts = overhead.drafts(
+            currency: currency.trimmingCharacters(in: .whitespaces).uppercased(),
+            incurredOn: BgDate.isoDay(incurredOn))
+        for draft in drafts where pendingOverheads.contains(draft.category) {
+            do {
+                _ = try await CostsAPI.create(
+                    draft, idempotencyKey: CostIdempotencyKey.mint(nonce: nonce, draft: draft))
+                overheadResults[draft.category] = .saved
+            } catch let error as URLError {
+                overheadResults[draft.category] = .unknown(UserMessage.text(for: error))
+            } catch {
+                overheadResults[draft.category] = .refused(UserMessage.text(for: error))
+            }
+        }
+        if overhead.entered.allSatisfy({ overheadResults[$0] == .saved }) {
+            onSaved()
+            dismiss()
         }
     }
 

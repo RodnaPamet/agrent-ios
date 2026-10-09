@@ -62,6 +62,35 @@ in agri-saas, served to the app by `GET /api/t/:slug/grain/calculator`.
 That makes parity here measurable exactly: which payload fields does each
 side render?
 
+### «Нов разход»: «Култура» or «Режийни» first (#245, owner 2026-10-09)
+
+The owner's design: choose crop or overhead first. The crop side becomes
+per-decare lines (rent, seed, fuel, ПРЗ, fertilisers) with the farm's last
+values as defaults. Overheads are yearly, salaries can be people × salary, and
+everything spreads over the WHOLE farm. The web is to work the same way
+(agri-saas).
+
+**iOS now — the «Режийни» half** (`OverheadSheet`, `OverheadFields`):
+- **The lines.** Заплати (a total, or «По хора»: people × yearly salary, with
+  the total editable), Кредитни разходи, Амортизация and Друго. Each is sent as
+  its own cost with `allocationBasis: HOLDING`, «Цялото стопанство» on the web.
+- **Defaults.** Lines are prefilled from the farm's last values (agri-saas
+  #1523, `GET /grain/costs/defaults`), with the date each was entered. A line
+  with no history stays empty, never zero.
+- **Amortisation** is offered from the machine register (`GET /costs/machinery`,
+  documented #1506). Its caveats are said: «not computed» is not zero, machines
+  without a useful life understate the total, and a truncated register is
+  partial.
+- **Saving.** One POST per line, each under its own idempotency key. A line that
+  landed, or whose answer was lost, is not sent again; a refused one is.
+
+**The «Култура» half waits** on how a crop's area is counted (agri-saas #1512).
+Until then «Култура» is the one-line form, limited to the crop categories.
+
+**Unverified:** no overhead has been saved from the app. Defaults (#1523) were
+not live when this merged: the sheet works without them and prefills once they
+are.
+
 ### Gap 1 — refusal text renders in English
 
 `CalculatorModels.swift` decodes `netWorthUnavailableReason` but **not**

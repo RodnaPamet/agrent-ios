@@ -1,0 +1,29 @@
+{
+  "method": "STRAIGHT_LINE",
+  "charges": [
+    {
+      "assetId": "ast_fixture_1",
+      "assetKey": null,
+      "assetName": "Синтетичен трактор",
+      "purchaseCost": 180000,
+      "purchaseDate": "2022-03-01",
+      "usefulLifeYears": 12,
+      "annualCharge": 15000,
+      "yearsElapsed": 4.6,
+      "remainingValue": 111000,
+      "fullyDepreciated": false
+    }
+  ],
+  "totalAnnualCharge": 15000,
+  "unallocated": [
+    {
+      "assetId": "ast_fixture_2",
+      "assetKey": null,
+      "assetName": "Синтетична сеялка",
+      "purchaseCost": 40000,
+      "reason": "NO_USEFUL_LIFE"
+    }
+  ],
+  "unallocatedCost": 40000,
+  "truncated": false
+}

@@ -110,7 +110,12 @@ final class RouteContractTests: XCTestCase {
     /// (`/tasks/{taskId}/weed-observations`, agri-saas #1434) sat here until
     /// `/api/health` carried it (a11e72163, 2026-10-08) and was taken off by
     /// the refresh that brought it in.
-    private static let pendingServerRoutes: [String: String] = [:]
+    private static let pendingServerRoutes: [String: String] = [
+        // The farm's last overhead values for «Режийни» (#245), agri-saas
+        // #1523 — off this list by the refresh that brings it in.
+        "/api/t/{tenantSlug}/grain/costs/defaults":
+            "agri-saas #1523: the farm's last overhead values for #245",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -200,7 +205,8 @@ final class RouteContractTests: XCTestCase {
                 DashboardAPI.agPath, DashboardAPI.taskTrendPath(),
                 DashboardAPI.taskTrendPath(days: 14), DashboardAPI.fieldBriefingPath,
             ]),
-            ("CalculatorAPI.swift", [CalculatorAPI.path, CostsAPI.listPath]),
+            ("CalculatorAPI.swift", [CalculatorAPI.path, CostsAPI.listPath, CostsAPI.defaultsPath,
+                                     CostsAPI.machineryPath]),
             ("ParcelHistoryAPI.swift", [
                 ParcelHistoryAPI.cropSeasonsPath(parcel),
                 ParcelHistoryAPI.weedObservationsPath(parcel),
