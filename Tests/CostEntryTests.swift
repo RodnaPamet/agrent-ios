@@ -92,16 +92,17 @@ final class CreateCostEntryTests: XCTestCase {
 
 final class CostCategoryTests: XCTestCase {
 
-    /// Eight, plus this client's own `unknown` sentinel.
-    func testEightCategoriesAreSelectable() {
-        XCTAssertEqual(CostCategory.selectable.count, 8)
+    /// Ten, plus this client's own `unknown` sentinel.
+    func testTenCategoriesAreSelectable() {
+        // Ten since CREDIT and DEPRECIATION (agri-saas #1511, #245).
+        XCTAssertEqual(CostCategory.selectable.count, 10)
         XCTAssertFalse(CostCategory.selectable.contains(.unknown))
-        XCTAssertEqual(CostCategory.allCases.count, 9)
+        XCTAssertEqual(CostCategory.allCases.count, 11)
     }
 
     func testEveryServerValueDecodes() throws {
         for raw in ["PAYROLL", "RENT", "FERTILIZER", "FUEL",
-                    "SEED", "PESTICIDE", "SERVICE", "OTHER"] {
+                    "SEED", "PESTICIDE", "SERVICE", "CREDIT", "DEPRECIATION", "OTHER"] {
             let c = try JSONDecoder().decode(
                 CostCategory.self, from: Data("\"\(raw)\"".utf8))
             XCTAssertEqual(c.rawValue, raw)
@@ -116,6 +117,9 @@ final class CostCategoryTests: XCTestCase {
     func testTheGrainVocabularyIsUsedNotTheInventoryOne() {
         XCTAssertEqual(CostCategory.fertilizer.label, "Торове")
         XCTAssertNotEqual(CostCategory.fertilizer.label, "Тор")
+        // The web's `grainEnums.costCategory` for the two overheads.
+        XCTAssertEqual(CostCategory.credit.label, "Кредитни разходи")
+        XCTAssertEqual(CostCategory.depreciation.label, "Амортизация")
     }
 
     func testEverySelectableCategoryHasABulgarianLabel() {

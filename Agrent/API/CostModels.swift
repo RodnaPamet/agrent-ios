@@ -84,12 +84,17 @@ enum CostCategory: String, LenientDecodable, Sendable {
     case seed = "SEED"
     case pesticide = "PESTICIDE"
     case service = "SERVICE"
+    /// Interest and fees on the farm's credit, and the machines' amortisation —
+    /// the two overheads the owner's «Режийни» sheet added (#245, agri-saas
+    /// #1511), in the web's words (`grainEnums.costCategory`).
+    case credit = "CREDIT"
+    case depreciation = "DEPRECIATION"
     case other = "OTHER"
     case unknown = "UNKNOWN"
 
     static var unknownCase: Self { .unknown }
 
-    /// The eight a person may CHOOSE. `unknown` is this client's own
+    /// The ten a person may CHOOSE. `unknown` is this client's own
     /// sentinel for a category the server added and this build has not
     /// heard of — it can arrive, but it must never be offered.
     static var selectable: [CostCategory] {
@@ -105,10 +110,20 @@ enum CostCategory: String, LenientDecodable, Sendable {
         case .seed: "Семена"
         case .pesticide: "Препарати"
         case .service: "Услуги"
+        case .credit: "Кредитни разходи"
+        case .depreciation: "Амортизация"
         case .other: "Друго"
         case .unknown: "—"
         }
     }
+}
+
+/// WHICH land a cost spreads over (agri-saas `COST_ALLOCATION_BASES`). Only
+/// what this app sends is modelled: `HOLDING`, the whole farm by area — «Цялото
+/// стопанство» on the web, «включително собствените» имоти, with land carrying
+/// no crop keeping its share and reported apart.
+enum CostAllocationBasis: String, Sendable {
+    case holding = "HOLDING"
 }
 
 /// What the app SENDS to create one.
@@ -138,8 +153,26 @@ struct CreateCostEntry: Encodable, Sendable {
     let supplier: String?
     let description: String?
 
+    /// WHICH land the cost spreads over. Absent is the server's `TARGET` — the
+    /// one-line form's behaviour, unchanged. The «Режийни» sheet sends
+    /// `HOLDING`: the whole farm, by area (owner, 2026-10-09: salaries «per
+    /// dca of the whole farm, not only over a given crop decares»).
+    var allocationBasis: CostAllocationBasis? = nil
+
+    /// A salary entered as people × a yearly salary each — BOTH or NEITHER,
+    /// and only on PAYROLL (agri-saas #1518). An input aid, not a constraint:
+    /// `amount` stays authoritative and is not checked against the product,
+    /// since a hire who started in May makes a true total that does not match.
+    /// Absent — never zero — for a total typed as a total.
+    var payrollHeadcount: Int? = nil
+    var payrollAnnualPerPerson: Decimal? = nil
+
+    /// Optional, so every existing call site builds the same one-line draft —
+    /// and, being omitted when nil, mints the same idempotency key it always
+    /// did (`CostIdempotencyKey` hashes the encoded body).
     enum CodingKeys: String, CodingKey {
         case category, amount, currency, incurredOn, supplier, description
+        case allocationBasis, payrollHeadcount, payrollAnnualPerPerson
     }
 
     func encode(to encoder: Encoder) throws {
@@ -154,6 +187,9 @@ struct CreateCostEntry: Encodable, Sendable {
         try c.encode(incurredOn, forKey: .incurredOn)
         try c.encodeIfPresent(supplier, forKey: .supplier)
         try c.encodeIfPresent(description, forKey: .description)
+        try c.encodeIfPresent(allocationBasis?.rawValue, forKey: .allocationBasis)
+        try c.encodeIfPresent(payrollHeadcount, forKey: .payrollHeadcount)
+        try c.encodeIfPresent(payrollAnnualPerPerson, forKey: .payrollAnnualPerPerson)
     }
 
     /// The server's bounds, mirrored so the operator learns before the

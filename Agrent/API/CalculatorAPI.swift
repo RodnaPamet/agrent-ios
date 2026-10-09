@@ -24,6 +24,26 @@ enum CostsAPI {
     /// list itself.
     static var listPath: String { base }
 
+    /// The farm's last overhead figures, for the «Режийни» sheet's prefill
+    /// (#245, agri-saas #1523). See `OverheadDefaults`.
+    static var defaultsPath: String { "\(base)/defaults" }
+
+    static func loadDefaults() async throws -> OverheadDefaults {
+        let data = try await APIClient.shared.data(for: defaultsPath)
+        return try await APIClient.shared.decode(data, as: OverheadDefaults.self)
+    }
+
+    /// The machine register's straight-line depreciation (agri-saas
+    /// `GET /costs/machinery`, documented in #1506) — the figure «Амортизация»
+    /// is offered. Not under `/grain`: the register is the farm's, not the
+    /// calculator's.
+    static var machineryPath: String { "\(FarmPath.root)/costs/machinery" }
+
+    static func loadMachinery() async throws -> MachineryDepreciation {
+        let data = try await APIClient.shared.data(for: machineryPath)
+        return try await APIClient.shared.decode(data, as: MachineryDepreciation.self)
+    }
+
     static func decodeList(from data: Data) async throws -> CostPage {
         struct Envelope: Decodable {
             let rows: [CostEntry]

@@ -130,6 +130,8 @@ enum FixtureCatalogue {
         (LocationsAPI.itemsPath, "items"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
+        (CostsAPI.defaultsPath, "costs-defaults"),
+        (CostsAPI.machineryPath, "costs-machinery"),
         (ExchangeAPI.listingsPath, "exchange-listings"),
         (ExchangeAPI.myListingsPath, "exchange-my-listings"),
         (ExchangeAPI.threadsPath, "exchange-threads"),

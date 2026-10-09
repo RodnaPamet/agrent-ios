@@ -1,0 +1,20 @@
+{
+  "overheads": [
+    {
+      "category": "PAYROLL",
+      "amount": 36000,
+      "currency": "BGN",
+      "incurredOn": "2026-01-15T00:00:00.000Z",
+      "payrollHeadcount": 3,
+      "payrollAnnualPerPerson": 12000
+    },
+    {
+      "category": "OTHER",
+      "amount": 4200,
+      "currency": "BGN",
+      "incurredOn": "2026-02-01T00:00:00.000Z",
+      "payrollHeadcount": null,
+      "payrollAnnualPerPerson": null
+    }
+  ]
+}
