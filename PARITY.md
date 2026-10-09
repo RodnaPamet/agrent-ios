@@ -415,8 +415,8 @@ meets one: it ships with the server and sends no `x-agrent-client-version`,
 and the gate serves an absent header as compatible.
 
 **iOS, deliberately different.** The app declares its contract on every
-request (`x-agrent-client-version: 2` since #185, after agri-saas #1390 went
-live; 1 before it; ROADMAP, «Decisions locked» 7). So
+request (`x-agrent-client-version: 3` since 2026-10-09; 2 since #185, after
+agri-saas #1390 went live; 1 before it; ROADMAP, «Decisions locked» 7). So
 once the server's floor passes that number, the spray sheet's save meets a
 426. The sheet then offers «Запази за по-късно», as it does with no signal,
 under the line «Записът остава на устройството и се изпраща след обновяване

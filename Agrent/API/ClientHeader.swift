@@ -116,7 +116,13 @@ enum ClientHeader {
     /// non-number is "unparseable" there and served like no header at all —
     /// a build that could never be retired, with nothing to say so. Hence an
     /// `Int`, above zero, rather than a string someone might format.
-    static let contractVersion = 2
+    ///
+    /// 3 since agri-saas's 2 → 3 (2026-10-09, `contract-version.ts`), whose
+    /// one break narrowed `Parcel.geometry.type` / `ParcelGeo.geometry.type`
+    /// to `MultiPolygon` — the only geometry this app has ever decoded
+    /// (`ParcelGeometry`). So the claim was already true of the code, and
+    /// this release makes it; nothing else moved in 3.
+    static let contractVersion = 3
 
     /// `0.1.0` → `ios/0.1`; nil when the version does not fit the grammar.
     /// Pure, so the grammar is testable without a bundle.

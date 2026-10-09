@@ -106,8 +106,9 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   saw. A drain now stops on `notSignedIn` and touches nothing, which also
   covers the older case of a session that dies mid-drain. A 426 gets the same
   stop since #168, and nothing asks again until a relaunch; never met — this
-  app has declared `x-agrent-client-version` since #169 — 1, and 2 since #185
-  (contract 2 went live with agri-saas #1390) — and the server's floor is 1 —
+  app has declared `x-agrent-client-version` since #169 — 1, 2 since #185
+  (contract 2 went live with agri-saas #1390), and 3 since agri-saas's
+  MultiPolygon narrowing (2026-10-09) — and the server's floor is 1 —
   so the banner's «…остаряла…» line, and the spray sheet's
   «Запази за по-късно» on a 426 (#169), have never rendered. No seam answers a
   429 or carries `Retry-After` — the unit suite runs with no seam at all,
