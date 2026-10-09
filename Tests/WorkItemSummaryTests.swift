@@ -24,9 +24,9 @@ final class WorkItemSummaryTests: XCTestCase {
         try APIClientTestDecoder.decode(WorkItemSummary.self, from: json)
     }
 
-    /// THE regression. `WorkItem` requires `tenantId` and `priority`; the
-    /// list sends neither, so decoding the list as `WorkItem` lost all eight
-    /// rows to `keyNotFound` on the first one.
+    /// THE regression. `WorkItem` required `tenantId` and `priority` (it still
+    /// requires `tenantId`); the list sent neither, so decoding the list as
+    /// `WorkItem` lost all eight rows to `keyNotFound` on the first one.
     func testTheMeasuredRowDecodes() throws {
         let row = try decode(measuredRow)
         XCTAssertEqual(row.id, "wi_1")

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The green tick's form (#226): three questions, then the task is closed.
+/// The green tick's form (#226): three questions, then the task is
+/// complete — CLOSED on the wire, «Завършена» on screen (#236).
 /// The rules live in `TaskCloseRules`; this draws them.
 ///
 /// The sheet stays up until the close lands, and a refused close is said
@@ -53,9 +54,9 @@ struct CloseTaskSheet: View {
                     }
                 }
             }
-            // One word: between «Отказ» and «Затвори» a longer title was cut
+            // One word: between «Отказ» and the button a longer title was cut
             // to «Затваряне на з…» at the default size (A11yShots 08f).
-            .inlineTitle("Затваряне")
+            .inlineTitle("Завършване")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ", action: cancel)
@@ -66,11 +67,11 @@ struct CloseTaskSheet: View {
                     Button {
                         Task { await send() }
                     } label: {
-                        if sending { ProgressView() } else { Text("Затвори") }
+                        if sending { ProgressView() } else { Text("Завърши") }
                     }
                     .disabled(!ready || sending)
-                    .accessibilityLabel("Затвори")
-                    .accessibilityInputLabels(A11y.Spoken.close)
+                    .accessibilityLabel("Завърши")
+                    .accessibilityInputLabels(A11y.Spoken.complete)
                 }
             }
             // A swipe down mid-send would leave a close in flight with no

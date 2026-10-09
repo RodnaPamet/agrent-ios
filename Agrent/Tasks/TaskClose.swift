@@ -100,13 +100,13 @@ enum TaskCloseRules {
 
 /// What the close says, in Bulgarian, ending with a full stop as `UserMessage` does.
 enum TaskCloseText {
-    static let inProgress = "Задачата вече се затваря."
+    static let inProgress = "Задачата вече се завършва."
 
     /// The close landed, the weeds did not reach every parcel — said under
     /// the task, with the server's reason, because the note has them and
     /// the parcel's history does not.
     static func weedsNotRecorded(parcels: Int, reason: String) -> String {
-        "Задачата е затворена и плевелите са в бележката към нея, но не са записани в "
+        "Задачата е завършена и плевелите са в бележката към нея, но не са записани в "
             + "\(Plural.bg(parcels, "парцел", "парцела")): \(reason)"
     }
 }

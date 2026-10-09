@@ -88,6 +88,16 @@ struct TaskRow: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             AdaptiveRow { statusChip; meta }
+
+            // When it was opened, or completed (owner, 2026-10-09, #236): a
+            // line of its own under the chip, worded in full, so it never
+            // reads as the due date beside it.
+            if let dated = item.rowDate() {
+                Text(dated)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.vertical, 6)
         // One stop, spoken from the values — never from the rendered text,
@@ -100,6 +110,7 @@ struct TaskRow: View {
             item.assignee?.displayName.map { "възложена на \($0)" },
             dueText,
             item.isOverdue ? "просрочена" : nil,
+            item.rowDate(),
         ]))
     }
 
@@ -111,10 +122,10 @@ struct TaskRow: View {
         )
     }
 
-    /// `priority` is NOT in the list projection, so severity is the only
-    /// urgency signal a row has. Shown only when it is one an operator
-    /// should act on — MEDIUM on every row would be noise, and noise in the
-    /// urgency channel is worse than an empty one.
+    /// Severity is the only urgency signal a row has — priority overlapped
+    /// it and is gone from the app (#236). Shown only when it is one an
+    /// operator should act on — MEDIUM on every row would be noise, and
+    /// noise in the urgency channel is worse than an empty one.
     private var severityText: String? {
         switch item.severity {
         case .critical, .high: item.severity.label
@@ -122,8 +133,11 @@ struct TaskRow: View {
         }
     }
 
+    /// Named, now the row carries a second date (#236): a bare «1 октомври»
+    /// beside «Отворена на 20 септември» would leave a reader to guess which
+    /// is the deadline.
     private var dueText: String? {
-        item.dueAt.map(BgDate.dayMonth)
+        item.dueAt.map { "Срок \(BgDate.rowDay($0))" }
     }
 
     @ViewBuilder
@@ -156,6 +170,23 @@ struct TaskRow: View {
         }
         .font(.footnote)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+extension WorkItemSummary {
+    /// The date a row carries (owner, 2026-10-09, #236): when the task was
+    /// completed, once it is and the list says when; otherwise when it was
+    /// opened. In the web's words — «Завършена на» is its detail label.
+    ///
+    /// The list does not send `completedAt` yet (see it), so a completed row
+    /// says when it was OPENED, and says that — never `updatedAt` passed off
+    /// as the completion. A CANCELED task was not completed and gets the
+    /// date it was opened, too.
+    func rowDate(now: Date = Date()) -> String? {
+        if status == .resolved || status == .closed, let completedAt {
+            return "Завършена на \(BgDate.rowDay(completedAt, now: now))"
+        }
+        return createdAt.map { "Отворена на \(BgDate.rowDay($0, now: now))" }
     }
 }
 

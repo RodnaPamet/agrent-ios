@@ -111,6 +111,7 @@ final class A11yShotsTests: XCTestCase {
         if let only = Self.only {
             assertFixtureWorld(app)
             switch only {
+            case "08-tasks": captureTabOrMenu("08-tasks", label: "Задачи", app: app)
             case "08b-task-parcel-lines": captureFieldOperationTask(app)
             case "08d-task-parcels": captureTaskParcels(app)
             case "16-profile": captureProfile(app)
@@ -498,10 +499,10 @@ final class A11yShotsTests: XCTestCase {
 
         // ── The green tick's form (agrent-ios#226) ──
         //
-        // Opened and photographed, then «Отказ»: «Затвори» would close the
-        // task, which is a write — the first real one is the owner's. The
+        // Opened and photographed, then «Отказ»: «Завърши» would complete
+        // the task, which is a write — the first real one is the owner's. The
         // fixture person is the farm's OWNER, so the tick is there.
-        let tick = app.navigationBars.buttons["Затвори задачата"]
+        let tick = app.navigationBars.buttons["Завърши задачата"]
         XCTAssertTrue(tick.waitForExistence(timeout: 10), "the task has no green tick")
         tick.tap()
         XCTAssertTrue(app.staticTexts["Задачата изпълнена ли е успешно?"].waitForExistence(timeout: 10),

@@ -9,9 +9,11 @@ import Foundation
 ///     id · key · title · type · status · severity · dueAt
 ///     assignee · assigneeUserId · createdAt · updatedAt
 ///
-/// **`priority` is NOT among them.** Nor `tenantId`, `description`,
-/// `source`, `resolution`, `completedAt`, `createdByUserId`,
-/// `reviewerUserId`, `operationType` or `applicationTechnique`. A model built
+/// **`priority` is NOT among them** — and since 2026-10-09 the app reads it
+/// nowhere (#236). Nor `tenantId`, `description`, `source`, `resolution`,
+/// `completedAt` (asked of agri-saas for the row's date, #236),
+/// `createdByUserId`, `reviewerUserId`, `operationType` or
+/// `applicationTechnique`. A model built
 /// from the full field list fails the whole list decode on `tenantId` — which
 /// is precisely what it did, on the first run, on the device.
 ///
@@ -72,18 +74,26 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let assigneeUserId: String?
     /// OPTIONAL since contract 2 (agri-saas #1390): `TaskListItem` lists
     /// both and requires neither. The server always sends them —
-    /// `taskListSelect` selects both, and neither column is nullable — but
-    /// nothing here reads them, and a required key the schema does not
-    /// promise would cost the whole Задачи tab over a value nobody shows.
+    /// `taskListSelect` selects both, and neither column is nullable — and a
+    /// required key the schema does not promise would cost the whole Задачи
+    /// tab over one value. `createdAt` is the row's «Отворена на» (#236).
     let createdAt: Date?
     let updatedAt: Date?
+
+    /// When the task was finished — the row's «Завършена на» (#236). NOT in
+    /// the list projection today (`FarmTaskListItem` has `createdAt` and
+    /// `updatedAt` only); asked of agri-saas, and optional so the row works
+    /// before and after. Until it arrives a done row says when it was
+    /// OPENED, and says so — `updatedAt` is never passed off as this: any
+    /// later change to a closed task moves it.
+    let completedAt: Date?
 
     /// Spelled out because `severityRaw` is renamed, and a synthesised
     /// `CodingKeys` would have looked for a `severityRaw` key that no server
     /// sends. Every other name is its own.
     private enum CodingKeys: String, CodingKey {
         case id, key, title, type, status, dueAt
-        case assignee, assigneeUserId, createdAt, updatedAt
+        case assignee, assigneeUserId, createdAt, updatedAt, completedAt
         case severityRaw = "severity"
     }
 
@@ -182,15 +192,17 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     /// rich-text HTML and needs `RichText`.
     let description: String?
 
-    /// ABSENT as well as null lands on `.unknown`. `TaskDetail` lists both
-    /// as `["string","null"]` and requires neither (contract 2, agri-saas
+    /// ABSENT as well as null lands on `.unknown`. `TaskDetail` lists it as
+    /// `["string","null"]` and does not require it (contract 2, agri-saas
     /// #1390); `LenientDecodable` reads a null since #182 but cannot be asked
     /// for a key that is not there, so the raw value is optional — as on
     /// `WorkItemSummary` — and the screen reads the folded one.
+    ///
+    /// Severity is the task's ONE urgency field here: `priority` overlapped
+    /// it, and the owner removed it (2026-10-09, #236) — so it is not
+    /// modelled, and the extra key is ignored like any other.
     var severity: WorkItemSeverity { severityRaw ?? .unknown }
-    var priority: WorkItemPriority { priorityRaw ?? .unknown }
     private let severityRaw: WorkItemSeverity?
-    private let priorityRaw: WorkItemPriority?
     let status: WorkItemStatus
     let source: WorkItemSource?
     let key: String?
@@ -269,7 +281,7 @@ struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, tenantId, type, title, description
-        case severityRaw = "severity", priorityRaw = "priority"
+        case severityRaw = "severity"
         case status, source, key, resolution, dueAt, completedAt
         case createdByUserId, assigneeUserId, reviewerUserId
         case operationType, applicationTechnique, clientMutationId
@@ -349,26 +361,6 @@ enum WorkItemSeverity: String, LenientDecodable, Sendable {
     }
 }
 
-enum WorkItemPriority: String, LenientDecodable, Sendable {
-    case p0 = "P0"
-    case p1 = "P1"
-    case p2 = "P2"
-    case p3 = "P3"
-    case unknown = "UNKNOWN"
-
-    static var unknownCase: Self { .unknown }
-
-    var label: String {
-        switch self {
-        case .p0: "Спешен"
-        case .p1: "Висок"
-        case .p2: "Нормален"
-        case .p3: "Нисък"
-        case .unknown: "—"
-        }
-    }
-}
-
 /// Eight, and the wording is `taskEnums.status` — NOT `agStatus.operation`.
 ///
 /// The server carries TWO Bulgarian vocabularies for these same codes. The
@@ -382,6 +374,11 @@ enum WorkItemPriority: String, LenientDecodable, Sendable {
 /// list, so it takes the task vocabulary. If a FIELD_OPERATION screen later
 /// wants the operations wording that is a deliberate choice for that screen,
 /// not a default that leaked.
+///
+/// ONE WORD DEPARTS, on the owner's word (2026-10-09, #236): CLOSED is
+/// «Завършена», not the vocabulary's «Затворена» — the task is complete,
+/// not shut. The web is asked to follow; until it does, that one word
+/// differs between the two.
 enum WorkItemStatus: String, LenientDecodable, Sendable {
     case open = "OPEN"
     case triaged = "TRIAGED"
@@ -403,7 +400,7 @@ enum WorkItemStatus: String, LenientDecodable, Sendable {
         case .blocked: "Блокирана"
         case .pendingReview: "Очаква преглед"
         case .resolved: "Готова"
-        case .closed: "Затворена"
+        case .closed: "Завършена"
         case .canceled: "Отказана"
         case .unknown: "—"
         }
@@ -426,7 +423,7 @@ enum WorkItemStatus: String, LenientDecodable, Sendable {
     /// absent here rather than offered and refused.
     ///
     /// Offering only legal moves rather than showing a button that fails is
-    /// the point: an operator who taps "Затворена" on a CANCELED task and
+    /// the point: an operator who taps "Завършена" on a CANCELED task and
     /// gets an error has been told the app is broken, when in fact they
     /// asked for something that was never possible.
     ///

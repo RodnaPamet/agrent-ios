@@ -111,7 +111,7 @@ final class TaskDetailStore {
     private(set) var closeNotice: String?
 
     /// The key for the close being sent, kept while its note is the same,
-    /// so a second tap on «Затвори» after a lost answer is the same request
+    /// so a second tap on «Завърши» after a lost answer is the same request
     /// — which the status route recognises as already applied.
     @ObservationIgnored private var closeKey: (resolution: String, key: String)?
 

@@ -47,6 +47,8 @@ final class DecodeToSpecTests: XCTestCase {
     // MARK: - A task's detail
 
     /// `severity`, `priority` and `createdByUserId` are nullable in the spec.
+    /// The app no longer reads `priority` (#236), and a null one must still
+    /// cost nothing.
     func testATaskWithNullSeverityPriorityAndCreatorOpens() async throws {
         var task = try XCTUnwrap(try fixture("task-detail-fieldop") as? [String: Any])
         XCTAssertEqual(task["severity"] as? String, "MEDIUM", "positive control: the fields were there")
@@ -56,7 +58,6 @@ final class DecodeToSpecTests: XCTestCase {
 
         let item = try await WorkItemAPI.decodeDetail(from: data(task))
         XCTAssertEqual(item.severity, .unknown)
-        XCTAssertEqual(item.priority, .unknown)
         XCTAssertNil(item.createdByUserId)
     }
 

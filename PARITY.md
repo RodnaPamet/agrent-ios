@@ -612,6 +612,23 @@ Where the answers go:
 first weed record are the owner's. The weed route (agri-saas #1434) is live
 since 2026-10-08, 19:45 UTC: `/api/health` read a11e72163.
 
+**Wording, dates and one urgency field — 2026-10-09 (#236, owner's
+decisions).**
+
+- **«Завършена», not «Затворена».** CLOSED reads «Завършена». The tick and
+  the form's button say «Завърши», and the form is titled «Завършване». The
+  web's `taskEnums.status.CLOSED` still says «Затворена»; the owner asked
+  for the web to follow, on agri-saas's side. Until it does, that one word
+  differs.
+- **No «Приоритет».** Priority overlapped importance («Важност», which the
+  web calls «Сериозност»), so the detail screen dropped it and the model no
+  longer reads it. The web still shows it, until agri-saas removes it.
+- **A date on every row.** «Отворена на <createdAt>», or «Завършена на
+  <completedAt>» once the task is complete; the web's detail label is
+  «Завършена на». The list projection has no `completedAt`. agri-saas is
+  asked to add it, and until then a completed row shows its opened date,
+  labelled as such. The due date on the row is now named, «Срок …».
+
 **Not ported:** the «Необходимо: …» and «… вода» amounts (rate × area — the web's `totalLabel`,
 which also skips the ml→L promotion for Cyrillic unit symbols); the spray-job
 completion card; the reviewer's approve / request-changes on PENDING_REVIEW
