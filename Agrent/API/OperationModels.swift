@@ -180,6 +180,13 @@ enum ApplicationTechnique: String, CaseIterable, Identifiable, Sendable {
 /// with `PRODUCT_DOSE_REQUIRED` and `FERTILIZER_DOSE_REQUIRED` beside it.
 /// Mirrored here so an operator learns before the request.
 ///
+/// ── BY NAME, NOT BY ID (#237) ──
+///
+/// `productName` / `fertilizerName`, typed, and never the ids: the server
+/// finds the farm's product of that name or creates it (`TypedProduct`).
+/// The ids still work on the wire, but within a kind it is one or the
+/// other — both is `OPERATION_INPUT_AMBIGUOUS` — and the sheet sends names.
+///
 /// ── AND THIS ONE IS GENUINELY IDEMPOTENT ──
 ///
 /// `field-operation` honours `Idempotency-Key`, so a retry here is SAFE
@@ -198,19 +205,68 @@ struct CreateFieldOperation: Encodable, Sendable {
     let parcelIds: [String]
     let assigneeUserId: String?
 
-    let productItemId: String?
+    let productName: String?
     let doseValue: Decimal?
     let doseUnitId: String?
     let waterRateValue: Decimal?
     let waterRateUnitId: String?
 
-    let fertilizerItemId: String?
+    let fertilizerName: String?
     let fertilizerDoseValue: Decimal?
     let fertilizerDoseUnitId: String?
+
+    /// What a NEW name on the PRODUCT path becomes. The server's default is a
+    /// PESTICIDE; a fertiliser can be sprayed too — liquid nitrogen through a
+    /// sprayer — and created as one it needs no registration and files where
+    /// it belongs. Ignored on a match, and never sent on the fertiliser path,
+    /// which always creates a FERTILIZER (agri-saas #1499).
+    let newProductCategory: NewProductCategory?
+
+    /// A NEW PESTICIDE's ПРЗ № and quarantine period. Required by the server
+    /// only then, and IGNORED on a match, so an operation never rewrites a
+    /// stored registration. A new fertiliser needs neither.
+    let newProductRegistration: NewProductRegistration?
 
     /// The SLUG. See `ApplicationTechnique`.
     let applicationTechnique: String?
     let targetNote: String?
+
+    struct NewProductRegistration: Encodable, Equatable, Sendable {
+        let pppRegistrationNo: String
+        let quarantinePeriodDays: Int
+    }
+
+    enum NewProductCategory: String, Encodable, CaseIterable, Identifiable, Sendable {
+        case pesticide = "PESTICIDE"
+        case fertilizer = "FERTILIZER"
+
+        var id: String { rawValue }
+
+        /// The grain vocabulary's words, as the cost categories use them.
+        var label: String {
+            switch self {
+            case .pesticide: "Препарат за РЗ"
+            case .fertilizer: "Тор"
+            }
+        }
+    }
+
+    /// What a refused create says — in the sheet and, for one sent later,
+    /// in the outbox alike.
+    ///
+    /// A 409 on this route is ONE thing: the typed name collides with a
+    /// product the server's lookup will not use. The lookup skips archetypes
+    /// and the unique index does not, so a sample the owner's removal kept
+    /// for a past record answers `ITEM_NAME_ALREADY_EXISTS` on create — even
+    /// for a name the sheet's catalogue does not show, if the removal hid it
+    /// from `/items` (agri-saas, 2026-10-09). The app-wide 409 sentence is
+    /// about a stale edit, which this is not (#240).
+    static func failureText(_ error: Error) -> String {
+        if case APIClient.APIError.conflict = error {
+            return "Това наименование е заето от образцов продукт. Въведете истинското търговско наименование."
+        }
+        return UserMessage.text(for: error)
+    }
 
     enum Invalid: Equatable {
         case noParcel
@@ -224,8 +280,8 @@ struct CreateFieldOperation: Encodable, Sendable {
         var found: [Invalid] = []
         if parcelIds.isEmpty { found.append(.noParcel) }
 
-        let hasProduct = productItemId != nil
-        let hasFertilizer = fertilizerItemId != nil
+        let hasProduct = !(productName ?? "").isEmpty
+        let hasFertilizer = !(fertilizerName ?? "").isEmpty
         if hasProduct && hasFertilizer { found.append(.inputAmbiguous) }
         if !hasProduct && !hasFertilizer { found.append(.inputMissing) }
 

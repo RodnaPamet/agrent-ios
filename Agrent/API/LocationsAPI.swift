@@ -37,14 +37,6 @@ enum LocationsAPI {
     /// the ordinary `CachedResource` path.
     static var rateUnitsPath: String { "\(FarmPath.root)/units?measure=RATE" }
 
-    /// ALL units, for a product's `defaultUnitId`.
-    ///
-    /// Not the RATE four. A dose is measured in л/дка; a product is STOCKED
-    /// in litres or kilograms, and `createItem` rejects a `defaultUnitId`
-    /// that does not resolve — so filtering to rate units here would offer
-    /// four choices, none of which is what a product is counted in.
-    static var allUnitsPath: String { "\(FarmPath.root)/units" }
-
     static func decodeItems(from data: Data) async throws -> [InputItem] {
         try await APIClient.shared.decode(data, as: [InputItem].self)
     }

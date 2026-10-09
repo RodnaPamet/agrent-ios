@@ -22,8 +22,8 @@ import XCTest
 ///
 /// ── Provenance of the fixtures this adds ──
 ///
-/// `auth-me`, `journal-list`, `tasks-list`, `items`, `units-all` and
-/// `units-rate` are SYNTHETIC, written for this seam, and deliberately so —
+/// `auth-me`, `journal-list`, `tasks-list`, `items` and `units-rate` are
+/// SYNTHETIC, written for this seam, and deliberately so —
 /// the same reason `Tests/Fixtures/README.md` gives for the locations pair.
 /// The real payloads are one farm's operators, their names and their
 /// catalogue, and this repo is public. What is NOT invented is the SHAPE:
@@ -106,7 +106,6 @@ final class FixtureSeamTests: XCTestCase {
             (LocationsAPI.listPath, "locations-list"),
             (LocationsAPI.parcelsPath(FixtureCatalogue.fixtureLocationID), "locations-parcels"),
             (LocationsAPI.itemsPath, "items"),
-            (LocationsAPI.allUnitsPath, "units-all"),
             (LocationsAPI.rateUnitsPath, "units-rate"),
             (WorkItemAPI.listPath, "tasks-list"),
             (CalculatorAPI.path, "calculator-sample"),
@@ -151,15 +150,14 @@ final class FixtureSeamTests: XCTestCase {
     /// `/units` is every unit and `/units?measure=RATE` is the four dose
     /// rates. Serving the first for the second would put `kg`, `ha`, `t` and
     /// `%` in a dose picker, which is a screenshot that looks fine and is
-    /// wrong.
+    /// wrong. The app asks only for the rates since the product form that
+    /// wanted every unit went (#237), so the bare path is served NOTHING —
+    /// never the rates by a path match that ignored the query.
     func testTheUnitsRouteIsAnsweredByItsQuery() {
-        let all = FixtureCatalogue.split(LocationsAPI.allUnitsPath)
         let rate = FixtureCatalogue.split(LocationsAPI.rateUnitsPath)
-        XCTAssertEqual(all.path, rate.path, "the premise of this test is that the paths are equal")
-        XCTAssertNil(all.query)
         XCTAssertEqual(rate.query, "measure=RATE")
-        XCTAssertEqual(FixtureCatalogue.fixtureName(path: all.path, query: all.query), "units-all")
         XCTAssertEqual(FixtureCatalogue.fixtureName(path: rate.path, query: rate.query), "units-rate")
+        XCTAssertNil(FixtureCatalogue.fixtureName(path: rate.path, query: nil))
     }
 
     /// A second page of the journal is the SAME recorded page.
@@ -405,7 +403,6 @@ final class FixtureSeamTests: XCTestCase {
         ("locations-list", { _ = try await LocationsAPI.decodeList(from: $0) }),
         ("locations-parcels", { _ = try await LocationsAPI.decodeParcels(from: $0) }),
         ("items", { _ = try await LocationsAPI.decodeItems(from: $0) }),
-        ("units-all", { _ = try await LocationsAPI.decodeUnits(from: $0) }),
         ("units-rate", { _ = try await LocationsAPI.decodeUnits(from: $0) }),
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),

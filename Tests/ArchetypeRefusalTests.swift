@@ -51,15 +51,41 @@ final class ArchetypeRefusalTests: XCTestCase {
         XCTAssertTrue(text.contains("образцов"), text)
     }
 
-    /// The app blocks this before sending, so reaching it means the client
-    /// and server rules have drifted. It still has to read as Bulgarian.
+    /// The spray sheet asks for both whenever a typed product is new (#237),
+    /// so reaching this means its match and the server's drifted. It still
+    /// reads as Bulgarian: the WIRE names in `params.missing` are named in
+    /// the sheet's words — this test used to pin them quoted raw.
     func testTheRegulatoryFieldsRefusalIsTranslated() {
         let text = UserMessage.httpText(
             status: 400, code: "PESTICIDE_REGULATORY_FIELDS_REQUIRED",
             message: "pppRegistrationNo and quarantinePeriodDays are required",
             params: ["missing": "pppRegistrationNo, quarantinePeriodDays"])
-        XCTAssertTrue(text.contains("пppRegistrationNo") || text.contains("pppRegistrationNo"))
-        XCTAssertTrue(text.contains("препарат за РЗ"), text)
+        XCTAssertEqual(text, "Липсва за нов препарат: рег. № по ЗЗР и карантинен срок.")
+        XCTAssertFalse(text.contains("ppp"), text)
+        // The shape the server actually sends (`catalog.ts`): joined with a
+        // bare comma, wire names, in that order.
+        XCTAssertEqual(UserMessage.httpText(status: 400, code: "PESTICIDE_REGULATORY_FIELDS_REQUIRED",
+                                            message: nil,
+                                            params: ["missing": "pppRegistrationNo,quarantinePeriodDays"]),
+                       "Липсва за нов препарат: рег. № по ЗЗР и карантинен срок.")
+        XCTAssertEqual(UserMessage.httpText(status: 400, code: "PESTICIDE_REGULATORY_FIELDS_REQUIRED",
+                                            message: nil, params: ["missing": "quarantinePeriodDays"]),
+                       "Липсва за нов препарат: карантинен срок.")
+        // A name this build does not know: the general sentence, never the code.
+        XCTAssertEqual(UserMessage.httpText(status: 400, code: "PESTICIDE_REGULATORY_FIELDS_REQUIRED",
+                                            message: nil, params: ["missing": "activeIngredient"]),
+                       "За нов препарат са задължителни рег. № по ЗЗР и карантинен срок.")
+    }
+
+    /// The typed product's other refusals (agri-saas #1499) read as Bulgarian.
+    func testTheTypedProductRefusalsAreTranslated() {
+        for code in ["PRODUCT_NAME_REQUIRED", "DOSE_UNIT_HAS_NO_BASE", "FERTILIZER_EXPECTED",
+                     "OPERATION_INPUT_AMBIGUOUS"] {
+            let text = UserMessage.httpText(status: 400, code: code, message: "English sentence here.")
+            XCTAssertNotEqual(text, "English sentence here.", code)
+            XCTAssertTrue(text.unicodeScalars.contains { $0.value >= 0x0400 && $0.value <= 0x04FF }, code)
+        }
+        XCTAssertNil(UserMessage.bulgarian["PRODUCT_EXPECTED"], "the server dropped it; so do we")
     }
 
     /// NOT every param gets quoted. `INVALID_TAB_ORDER` carries

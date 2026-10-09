@@ -786,8 +786,8 @@ that write *and no other*, resting on a claim about the cost row that had
 stopped being true. `README.md`'s overclaim predates all of this and is
 untouched.
 
-`ItemCatalogue.create` and `FarmRiskAPI.createLead` both send a FRESH
-UUID per call. Against a route that ignores the header that is merely
+`FarmRiskAPI.createLead` sends a FRESH UUID per call (`ItemCatalogue.create`
+did too, until #237 removed the product create in favour of a typed name). Against a route that ignores the header that is merely
 inert; against one that honoured it, a new key per attempt would defeat
 the mechanism entirely, because the key IS the identity of the attempt.
 A header that looks like protection and is not is worse than no header,
