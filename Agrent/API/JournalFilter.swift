@@ -198,6 +198,10 @@ extension JournalFilter.Crop {
     /// part over 200 characters (`csvIdField`). So `Grass, ley`, ` Wheat`, or a
     /// 201-character name could never match, and sending one would ask for
     /// something else.
+    static func options(from parcels: [Parcel]) -> [JournalFilter.Crop] {
+        options(from: parcels.map(\.cropType))
+    }
+
     static func options(from cropTypes: [String?]) -> [JournalFilter.Crop] {
         var spellings: [String: [String]] = [:]
         for case let raw? in cropTypes where isSendable(raw) {

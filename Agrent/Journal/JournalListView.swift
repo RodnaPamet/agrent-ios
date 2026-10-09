@@ -121,7 +121,7 @@ struct JournalListView: View {
                 icon: "line.3.horizontal.decrease.circle",
                 message: "Опитайте да разширите търсенето или да изчистите някой от активните филтри."
             ) {
-                Button("Изчисти филтрите") { Task { await store.apply(JournalFilter()) } }
+                Button("Изчисти филтрите") { Task { await store.clearFilters() } }
             }
 
         case .loaded(let entries, _) where entries.isEmpty:
@@ -147,7 +147,7 @@ struct JournalListView: View {
                         : Plural.bg(entries.count, "запис", "записа")) {
                 if store.filter.isActive {
                     JournalFilterSummary(filter: store.filter) {
-                        Task { await store.apply(JournalFilter()) }
+                        Task { await store.clearFilters() }
                     }
                     .pageRow()
                 }

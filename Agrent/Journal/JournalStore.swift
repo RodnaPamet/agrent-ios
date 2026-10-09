@@ -24,6 +24,11 @@ final class JournalStore {
     /// which asks the server again.
     private(set) var filter = JournalFilter()
 
+    /// «Изчисти филтрите», from the summary row and the filtered empty state.
+    func clearFilters() async {
+        await apply(JournalFilter())
+    }
+
     /// A new filter is a new question. The rows on screen answered the old
     /// one, so they go and the spinner shows. A filtered summary above the
     /// previous answer's rows would describe rows it never chose.

@@ -114,6 +114,7 @@ final class A11yShotsTests: XCTestCase {
             case "08-tasks": captureTabOrMenu("08-tasks", label: "Задачи", app: app)
             case "09-overhead-costs": captureOverheadCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
+            case "01c-journal-filter": captureJournalFilter(app)
             case "18-operation-typed-product":
                 openTheLocation(app)
                 captureOperationSheet(app)
@@ -133,6 +134,7 @@ final class A11yShotsTests: XCTestCase {
         capture("01-journal", app: app)
         assertFixtureWorld(app)
         captureFarmRecordSheet(app)
+        captureJournalFilter(app)
         captureNewEntryForm(app)
 
         // ── The screens reached from the menu, done BEFORE Локации ──
@@ -367,6 +369,57 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
         cancel.tap()
         XCTAssertTrue(open.waitForExistence(timeout: 10), "«Отказ» did not put Дневник back")
+    }
+
+    // MARK: - The Дневник's filter (agrent-ios#252)
+
+    /// Дневник → «Филтри»: the sheet, with «Synthetic Land» as the one block
+    /// and the fixture parcels' crops. Then «Тип» is set to «Дейност» and
+    /// shown, so the summary row above the entries is photographed too, and
+    /// the filter is cleared. Reads only. The fixture answers a filtered page
+    /// with `journal-list.json` (paths match without their query), so the
+    /// rows are the same and the summary is what this captures. Starts and
+    /// ends on Дневник.
+    private func captureJournalFilter(_ app: XCUIApplication) {
+        let open = app.navigationBars.buttons["Филтри"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10), "Дневник has no «Филтри»")
+        open.tap()
+        // `MenuPicker` names its menu by its title, so a loaded block list is
+        // a «Блок» button; while it loads, «Блок» is a row with a spinner.
+        let block = app.buttons["Блок"]
+        XCTAssertTrue(block.waitForExistence(timeout: 15),
+                      "the sheet offered no blocks — locations-list.json did not load")
+        XCTAssertTrue(app.buttons["Култура"].waitForExistence(timeout: 15),
+                      "the sheet offered no crops — locations-parcels.json did not load")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01c-journal-filter", app: app)
+
+        // The menu's own button, inside the row `MenuPicker` names. At AX5
+        // the title stacks above it, and a tap at the row's centre landed on
+        // the title, two points above the menu, so it opened nothing. XCUITest
+        // calls the inner button not hittable, because the row is the
+        // accessibility element, so it is tapped by its coordinate.
+        let typeRow = app.buttons["Тип"]
+        let typeMenu = typeRow.buttons.firstMatch
+        (typeMenu.exists ? typeMenu : typeRow)
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        // The first type, so it is on screen without scrolling the menu at AX5.
+        let activity = app.buttons["Дейност"]
+        XCTAssertTrue(activity.waitForExistence(timeout: 5), "«Тип» did not offer «Дейност»")
+        activity.tap()
+        app.navigationBars.buttons["Покажи"].tap()
+
+        let summary = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Филтри, Тип: Дейност"))
+            .firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 15), "the filtered list has no summary row")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01d-journal-filtered", app: app)
+
+        let clear = app.buttons["Изчисти филтрите"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 5), "the summary row has no «Изчисти филтрите»")
+        clear.tap()
+        XCTAssertTrue(summary.waitForNonExistence(timeout: 15), "«Изчисти филтрите» left the filter on")
     }
 
     // MARK: - «Общи» (agrent-ios#245)

@@ -114,8 +114,10 @@ struct JournalFilterSheet: View {
         }
     }
 
+    /// Words, not a dash: VoiceOver reads «—» as punctuation, and «Култура,
+    /// тире» says nothing about why there is no choice.
     private var cropsMissing: String {
-        if case .failed = options.blocks { return "—" }
+        if case .failed = options.blocks { return "Не са заредени" }
         return "Няма записани"
     }
 

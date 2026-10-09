@@ -13,7 +13,7 @@ struct JournalFilterSummary: View {
 
     var body: some View {
         let facts = filter.facts()
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 2) {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(facts, id: \.self) { Text($0) }
             }
@@ -24,12 +24,21 @@ struct JournalFilterSummary: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(A11y.sentence(["Филтри"] + facts))
 
-            Button("Изчисти филтрите", action: clear)
-                .font(.subheadline)
-                // Borderless, so only the words clear the filter. In a list
-                // row a plain button takes the whole row, and a tap on the
-                // facts would throw the filter away.
-                .buttonStyle(.borderless)
+            Button(action: clear) {
+                Text("Изчисти филтрите")
+                    // Wrapped at AX sizes, a button's label centres its
+                    // lines, and «Изчисти» sat indented above «филтрите».
+                    .multilineTextAlignment(.leading)
+                    // 44 points tall, the smallest target Apple allows. The
+                    // words alone are a line of `.subheadline`.
+                    .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(.rect)
+            }
+            .font(.subheadline)
+            // Borderless, so only the words clear the filter. In a list row a
+            // plain button takes the whole row, and a tap on the facts would
+            // throw the filter away.
+            .buttonStyle(.borderless)
         }
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
