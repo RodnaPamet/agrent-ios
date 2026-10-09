@@ -249,9 +249,10 @@ final class JournalFilterTests: XCTestCase {
         XCTAssertEqual(filter.periodText(now: now, calendar: sofia), "1 октомври – 9 октомври")
         filter.customFrom = day("2026-10-09")
         XCTAssertEqual(filter.periodText(now: now, calendar: sofia), "9 октомври")
-        // Another year's day carries its year.
+        // Another year's day carries its year. ICU joins the year and «г.»
+        // with U+202F, a narrow no-break space (see `BgDateTests`).
         filter.customFrom = day("2025-11-03")
-        XCTAssertEqual(filter.periodText(now: now, calendar: sofia), "3 ноември 2025 г. – 9 октомври")
+        XCTAssertEqual(filter.periodText(now: now, calendar: sofia), "3 ноември 2025\u{202F}г. – 9 октомври")
     }
 
     // MARK: - The store
