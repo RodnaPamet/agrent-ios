@@ -68,8 +68,10 @@ final class TaskDetailStore {
     /// True when it landed: the screen clears its draft only then, so a
     /// refused comment is still there to send again.
     ///
-    /// Never retried here. The route reads no `Idempotency-Key` yet, and a
-    /// retry after a lost answer would post the comment twice.
+    /// Retried a couple of times on a failure worth retrying, with the SAME
+    /// key (`IdempotentRetry`): since agri-saas #1441 a replay of a comment
+    /// that already landed answers with that comment, so a lost answer can
+    /// no longer post it twice.
     func addComment(_ text: String) async -> Bool {
         guard !commenting else { return false }
         commenting = true
@@ -79,7 +81,9 @@ final class TaskDetailStore {
         let key = commentKey.flatMap { $0.text == text ? $0.key : nil } ?? UUID().uuidString
         commentKey = (text, key)
         do {
-            try await WorkItemAPI.addComment(id, text: text, idempotencyKey: key)
+            try await IdempotentRetry.run {
+                try await WorkItemAPI.addComment(id, text: text, idempotencyKey: key)
+            }
             commentKey = nil
             writeFeedback.saved()
             await load()
@@ -113,12 +117,12 @@ final class TaskDetailStore {
 
     /// Close the task with the form's answers, then record its weeds.
     ///
-    /// CLOSE FIRST. The close is the one thing the form exists for, and the
-    /// status route is replay-safe; the weed route is not yet (agri-saas's
-    /// idempotency is per model and lands later), so it goes second and is
-    /// never retried here. A refused observation leaves the close standing —
-    /// the weeds are in the note either way — and is said under the task.
-    /// One observation per parcel, all with the same moment.
+    /// CLOSE FIRST. The close is the one thing the form exists for, so it is
+    /// never held behind the weeds. Then one observation per parcel, all with
+    /// the same moment, each retried a couple of times with its own key
+    /// (`IdempotentRetry`; the route replays since agri-saas #1441). One that
+    /// is still refused leaves the close standing — the weeds are in the
+    /// note either way — and is said under the task.
     ///
     /// Then RELOAD rather than trusting the response: the status route
     /// answers in two shapes depending on whether it changed anything.
@@ -144,10 +148,16 @@ final class TaskDetailStore {
         if !weeds.isEmpty {
             let observedAt = Date()
             for parcelID in parcelIDs {
+                // One key per parcel per close, kept across its retries —
+                // and never shared between parcels: the server scopes the
+                // replay to the parcel, so a shared key is an error there.
+                let key = UUID().uuidString
                 do {
-                    try await WorkItemAPI.recordWeeds(
-                        taskID: id, parcelID: parcelID, observedAt: observedAt, weeds: weeds,
-                        notes: note, idempotencyKey: UUID().uuidString)
+                    try await IdempotentRetry.run {
+                        try await WorkItemAPI.recordWeeds(
+                            taskID: id, parcelID: parcelID, observedAt: observedAt, weeds: weeds,
+                            notes: note, idempotencyKey: key)
+                    }
                 } catch {
                     failed += 1
                     reason = reason ?? UserMessage.text(for: error)
