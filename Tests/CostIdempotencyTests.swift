@@ -244,9 +244,10 @@ final class CostIdempotencyTests: XCTestCase {
     /// and every test above still passes while the feature is silently
     /// inverted: a fresh key per attempt is deduped against nothing, and the
     /// 401 replay that `CalculatorAPI` documents starts writing a second row
-    /// again. That is not hypothetical — `ItemCatalogue.create` and
-    /// `FarmRiskAPI.createLead` ship exactly that mistake today, and the
-    /// comment above `CostsAPI.create` warns against it by name.
+    /// again. That is not hypothetical — `FarmRiskAPI.createLead` ships
+    /// exactly that mistake today (the product create did too, until #237
+    /// removed it), and the comment above `CostsAPI.create` warns against it
+    /// by name.
     ///
     /// There is no `URLProtocol` seam in this suite, so the outgoing header
     /// cannot be observed. `OutboxTests.testOnlyFieldOperationsCanBeQueued`

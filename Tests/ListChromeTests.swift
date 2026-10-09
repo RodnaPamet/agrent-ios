@@ -137,8 +137,10 @@ final class ListChromeTests: XCTestCase {
         XCTAssertEqual(offenders, [],
                        "a Picker with no style is a menu picker in a Form, whose UIKit-drawn value "
                      + "cut «Дейност» to «Де…ст» (#160) — use MenuPicker or name a style")
-        XCTAssertGreaterThanOrEqual(sources.map { Self.count(#"MenuPicker\("#, in: $0.1) }.reduce(0, +), 13,
-                                    "the menu pickers of #160, its siblings, and the four of #164")
+        // Ten since the typed product (#237) took the spray sheet's product
+        // picker and the product form's two with it.
+        XCTAssertGreaterThanOrEqual(sources.map { Self.count(#"MenuPicker\("#, in: $0.1) }.reduce(0, +), 10,
+                                    "the menu pickers of #160, its siblings, and the four of #164, less #237's")
     }
 
     /// No picker pushes the system's page. `.pickerStyle(.navigationLink)`

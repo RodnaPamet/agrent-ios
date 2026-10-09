@@ -49,11 +49,17 @@ struct ParcelOperationSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var store = OperationReferenceStore()
-    @State private var creatingProduct = false
     @State private var me: CurrentUser?
 
     @State private var kind: Kind = .spray
-    @State private var product: InputItem?
+    /// The product's trade name, typed (#237) — see `TypedProduct`.
+    @State private var productText = ""
+    /// A new product's ПРЗ № and quarantine period, asked only when the
+    /// typed name is new on the spray path (`asksRegistration`).
+    @State private var pppText = ""
+    @State private var quarantineText = ""
+    /// What a NEW name under «Пръскане» becomes — a fertiliser can be sprayed.
+    @State private var newCategory: CreateFieldOperation.NewProductCategory = .pesticide
     @State private var doseText = ""
     @State private var doseUnit: Unit?
     @State private var waterText = ""
@@ -136,25 +142,71 @@ struct ParcelOperationSheet: View {
         }
     }
 
-    private var choices: [InputItem] { Self.offered(store.items.value ?? [], for: kind) }
+    /// The typed name against the farm's catalogue — see `TypedProduct`.
+    ///
+    /// The picker this replaces (owner, 2026-10-09: «remove all sample
+    /// products and leave the product as free text only») offered 22 seeded
+    /// «Generic …» archetypes among the farm's 24 products, and a job planned
+    /// with one could never be completed (agri-saas #1078).
+    ///
+    /// While the catalogue is not in hand nothing can be matched, so a name
+    /// counts as NEW: the two registration fields are asked for, and the
+    /// server ignores them should it find the product after all. The other
+    /// way round would be a refusal in a field.
+    private var typed: TypedProduct {
+        guard let catalogue = store.items.value else {
+            return TypedProduct.cleaned(productText).isEmpty ? .empty : .new
+        }
+        return TypedProduct.classify(productText, spraying: kind == .spray, catalogue: catalogue)
+    }
 
-    /// What the picker offers for `kind`.
-    ///
-    /// The split is a NEGATION. 24 items on this tenant: 13 PESTICIDE, 8
-    /// FERTILIZER, 3 AMENDMENT — so `!= FERTILIZER` gives 16 products and
-    /// `== PESTICIDE` would hide three the farm owns.
-    ///
-    /// And NO SAMPLES (owner, 2026-10-09: «remove all sample products»,
-    /// #237). The seeded «Generic …» archetypes are left out: a job planned
-    /// with one is accepted and then can NEVER be completed — agri-saas
-    /// refuses a DONE line on an archetype (#1078), deliberately, since the
-    /// ДНЕВНИК needs a real trade name. Offering them offered a task nobody
-    /// could finish, and 22 of the farm's 24 products were them. What is left
-    /// is the farm's own; «Нов продукт» adds one. The typed field that
-    /// replaces this picker waits for the server (#237).
-    nonisolated static func offered(_ items: [InputItem], for kind: Kind) -> [InputItem] {
-        items.filter { !$0.isArchetype && (kind == .fertilize ? $0.isFertilizer : !$0.isFertilizer) }
-            .sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
+    private var suggestions: [InputItem] {
+        TypedProduct.suggestions(for: productText, spraying: kind == .spray, in: store.items.value ?? [])
+    }
+
+    /// The name that goes out: the STORED one on a match, so the server meets
+    /// exactly the row matched here; otherwise the typed one, trimmed.
+    private var sentName: String? {
+        if case .existing(let item) = typed { return item.name }
+        let name = TypedProduct.cleaned(productText)
+        return name.isEmpty ? nil : name
+    }
+
+    /// A new name under «Пръскане» asks what it is — a fertiliser can be
+    /// sprayed — and only a new PESTICIDE needs its registration; a new
+    /// fertiliser, on either path, needs neither.
+    private var isNewSprayProduct: Bool { kind == .spray && typed == .new }
+    private var asksRegistration: Bool { isNewSprayProduct && newCategory == .pesticide }
+
+    private var quarantineDays: Int? {
+        guard let days = Int(quarantineText.trimmingCharacters(in: .whitespacesAndNewlines)),
+              days >= 0 else { return nil }
+        return days
+    }
+
+    private var registration: CreateFieldOperation.NewProductRegistration? {
+        let number = pppText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard asksRegistration, !number.isEmpty, let days = quarantineDays else { return nil }
+        return .init(pppRegistrationNo: number, quarantinePeriodDays: days)
+    }
+
+    /// Why the typed name cannot go yet — said before the request, as the
+    /// draft's own problems are, and first among them: a plant protection
+    /// product on the fertiliser path is the thing to fix before its dose.
+    /// (Only that way round — a fertiliser may be sprayed; `TypedProduct`.)
+    private var typedProblem: String? {
+        switch typed {
+        case .wrongKind(let item):
+            return "«\(item.name)» не е тор. Запишете го като „Пръскане“."
+        case .sample(let item):
+            return "«\(item.name)» е образцов продукт. Въведете истинското търговско наименование."
+        case .new where asksRegistration && registration == nil:
+            return "За нов препарат въведете рег. № по ЗЗР и карантинния срок в дни."
+        case .new where TypedProduct.isTooLong(productText):
+            return "Наименованието е твърде дълго — до \(TypedProduct.maxLength) знака."
+        case .empty, .existing, .new:
+            return nil
+        }
     }
 
     private var units: [Unit] { store.units.value ?? [] }
@@ -185,21 +237,23 @@ struct ParcelOperationSheet: View {
             // colleague emails, which is a reason not to fetch it until
             // something renders it.
             assigneeUserId: me?.id,
-            productItemId: spraying ? product?.id : nil,
+            productName: spraying ? sentName : nil,
             doseValue: spraying ? dose : nil,
             doseUnitId: spraying ? doseUnit?.id : nil,
             waterRateValue: spraying ? decimal(waterText) : nil,
             waterRateUnitId: spraying ? waterUnit?.id : nil,
-            fertilizerItemId: spraying ? nil : product?.id,
+            fertilizerName: spraying ? nil : sentName,
             fertilizerDoseValue: spraying ? nil : dose,
             fertilizerDoseUnitId: spraying ? nil : doseUnit?.id,
+            newProductCategory: isNewSprayProduct ? newCategory : nil,
+            newProductRegistration: registration,
             // THE SLUG, never the label — it prints raw onto the ДНЕВНИК.
             applicationTechnique: technique.rawValue,
             targetNote: note.isEmpty ? nil : note
         )
     }
 
-    private var canSave: Bool { !saving && draft.problems.isEmpty && me != nil }
+    private var canSave: Bool { !saving && draft.problems.isEmpty && typedProblem == nil && me != nil }
 
     var body: some View {
         NavigationStack {
@@ -209,23 +263,35 @@ struct ParcelOperationSheet: View {
                         ForEach(Kind.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: kind) {
-                        // The two lists are disjoint, so a selection made
-                        // for one kind is never valid for the other.
-                        product = nil
-                    }
                 }
 
                 Section(titled: kind == .spray ? "Препарат" : "Тор") {
+                    // Kept across a switch of kind: the name may be right and
+                    // the kind wrong, and `typed` reads it again either way.
+                    TextField("Търговско наименование", text: $productText,
+                              prompt: .fieldPrompt("Търговско наименование"))
+                        .autocorrectionDisabled()
+
+                    // The farm's own products the typed text is part of — a
+                    // tap takes the stored name rather than a near-copy.
+                    ForEach(suggestions) { item in
+                        Button(item.name) { productText = item.name }
+                            .accessibilityHint("Попълва това наименование")
+                    }
+
+                    switch typed {
+                    case .existing:
+                        productNote("Продуктът е в каталога на стопанството.")
+                    case .new where kind == .fertilize:
+                        productNote("Нов тор — ще бъде добавен в каталога на стопанството.")
+                    case .empty, .new, .wrongKind, .sample:
+                        EmptyView()
+                    }
+
                     // `.value == nil` is TRUE FOR A FAILURE as well as for
-                    // a load in progress, so this spun forever when the
-                    // items decode broke — a screen that had nothing to
-                    // say and said it indefinitely. Matched on the state,
-                    // not on the absence of a value.
-                    switch store.items {
-                    case .loading:
-                        ProgressView()
-                    case .failed(let message):
+                    // a load in progress, so this is matched on the state.
+                    // Without the catalogue a name counts as new (`typed`).
+                    if case .failed(let message) = store.items {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(message)
                                 .font(.footnote)
@@ -234,43 +300,29 @@ struct ParcelOperationSheet: View {
                             Button("Опитайте отново") { Task { await store.load() } }
                                 .font(.footnote)
                         }
-                    case .loaded:
-                    if choices.isEmpty {
-                        // The common case while the samples were most of the
-                        // catalogue (see `offered`), so it says what to do.
-                        Text("Няма въведени продукти от този вид. Добавете продукта с „Нов продукт“.")
-                            .font(.footnote).foregroundStyle(Palette.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    } else {
-                        // `MenuPicker` here and below: a product name is the
-                        // longest value in this form, and the system menu
-                        // picker cuts a Bulgarian value short in the row (#160).
-                        MenuPicker("Избор", selection: $product, value: product?.name ?? "— изберете —") {
-                            Text("— изберете —").tag(InputItem?.none)
-                            ForEach(choices) { Text($0.name).tag(InputItem?.some($0)) }
-                        }
-                        .onChange(of: product) {
-                            // The item's own default unit, when it has one
-                            // and it is a rate. Saves a tap on the common
-                            // case without preventing a different choice.
-                            if let unit = product?.defaultUnit,
-                               units.contains(where: { $0.id == unit.id }) {
-                                doseUnit = unit
-                            }
-                        }
                     }
+                }
 
-                    // No archetype warning any more: an archetype cannot be
-                    // chosen (`offered`), where it used to be warned about
-                    // here — with words about the register's empty columns
-                    // that predated the server refusing to complete it.
-
-                    }
-
-                    Button {
-                        creatingProduct = true
-                    } label: {
-                        Label("Нов продукт", systemImage: "plus.circle")
+                if isNewSprayProduct {
+                    Section {
+                        Picker("Вид", selection: $newCategory) {
+                            ForEach(CreateFieldOperation.NewProductCategory.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        if asksRegistration { registrationFields }
+                    } header: {
+                        SectionHeader("Нов продукт")
+                    } footer: {
+                        SectionFooter {
+                            // Said because it is asked only once: the product
+                            // keeps them, and the next spray of it does not.
+                            Text(newCategory == .pesticide
+                                 ? "Продуктът не е в каталога на стопанството. ДНЕВНИКЪТ изисква "
+                                   + "регистрационния му номер и карантинния срок в дни — записват се "
+                                   + "веднъж, с него."
+                                 : "Продуктът не е в каталога на стопанството и ще бъде добавен като "
+                                   + "тор — без рег. № и карантинен срок.")
+                        }
                     }
                 }
 
@@ -362,19 +414,15 @@ struct ParcelOperationSheet: View {
             }
             .interactiveDismissDisabled(saving)
             .writeFeedback(feedback)
-            .sheet(isPresented: $creatingProduct) {
-            NewProductView(
-                onCreated: { created in
-                    // Adopted locally rather than refetched: the list is
-                    // cached, and a round trip here would either show a
-                    // stale picker or spend a spinner on data already in
-                    // hand. The server just returned the row.
-                    store.adopt(created)
-                    product = created
-                },
-                existing: store.items.value ?? []
-            )
-        }
+            .onChange(of: typed) { _, now in
+                // The product's own default unit, once the name is one the
+                // farm has and no unit is chosen yet — the picker's old
+                // courtesy, kept.
+                if case .existing(let item) = now, doseUnit == nil,
+                   let unit = item.defaultUnit, units.contains(where: { $0.id == unit.id }) {
+                    doseUnit = unit
+                }
+            }
         .task {
                 await store.load()
                 me = await CurrentUserStore.shared.load()
@@ -382,10 +430,36 @@ struct ParcelOperationSheet: View {
         }
     }
 
+    /// A new PESTICIDE's ПРЗ № and quarantine period (`asksRegistration`).
+    @ViewBuilder
+    private var registrationFields: some View {
+        FieldRow("Рег. № по ЗЗР") {
+            TextField("Номер", text: $pppText, prompt: .fieldPrompt("Номер"))
+                .autocorrectionDisabled()
+                .multilineTextAlignment(.trailing)
+        }
+        // The unit in the prompt, not the title: «Карантинен срок, дни» was
+        // cut to «Карантинен срок,…» at the DEFAULT size beside its field
+        // (A11yShots 18).
+        FieldRow("Карантинен срок") {
+            TextField("дни", text: $quarantineText, prompt: .fieldPrompt("дни"))
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private func productNote(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(Palette.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private var problemText: String? {
+        if let typedProblem { return typedProblem }
         switch draft.problems.first {
         case .inputMissing: return kind == .spray
-            ? "Изберете препарат." : "Изберете тор."
+            ? "Въведете препарат." : "Въведете тор."
         case .doseMissing: return "Дозата и мерната единица са задължителни."
         case .doseNotPositive: return "Дозата трябва да е по-голяма от нула."
         case .inputAmbiguous: return "Изберете само едно от двете."
@@ -410,7 +484,7 @@ struct ParcelOperationSheet: View {
             onSaved()
             dismiss()
         } catch {
-            failure = UserMessage.text(for: error)
+            failure = CreateFieldOperation.failureText(error)
             queueOffer = QueueOffer.after(error)
             failureError = error
             feedback.refused()
@@ -497,17 +571,6 @@ struct ParcelOperationSheet: View {
 final class OperationReferenceStore {
     private(set) var items: LoadState<[InputItem]> = .loading
     private(set) var units: LoadState<[Unit]> = .loading
-
-    /// Add a just-created product to the loaded list, in place.
-    ///
-    /// The cached payload on disk is now one row short of the truth, which
-    /// is correct rather than a bug: the next network-first load replaces
-    /// it wholesale. What must not happen is the picker disagreeing with
-    /// what the person just created, in the same breath.
-    func adopt(_ item: InputItem) {
-        guard case .loaded(let items, let freshness) = items else { return }
-        self.items = .loaded(items + [item], freshness)
-    }
 
     func load() async {
         if items.value == nil {

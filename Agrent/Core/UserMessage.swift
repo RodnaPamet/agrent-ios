@@ -314,20 +314,32 @@ enum UserMessage {
             }
 
         case "PESTICIDE_REGULATORY_FIELDS_REQUIRED":
-            // The app already blocks this before sending, so reaching it
-            // means the two rules have drifted. The sentence still has to
-            // work: a farmer must not be shown a refusal only a developer
-            // could read.
-            guard let missing = params?["missing"], !missing.isEmpty else {
-                return "За препарат за РЗ са задължителни рег. № по ЗЗР и "
-                     + "карантинен срок."
+            // The spray sheet asks for both whenever a typed product is new
+            // (#237), so reaching this means its match and the server's have
+            // drifted — or a record queued before the catalogue arrived. The
+            // sentence still has to work: `params.missing` holds WIRE names,
+            // and «pppRegistrationNo» quoted into a Bulgarian sentence is a
+            // refusal only a developer could read. Named in Bulgarian, or
+            // not named at all.
+            let generic = "За нов препарат са задължителни рег. № по ЗЗР и карантинен срок."
+            guard let missing = params?["missing"], !missing.isEmpty else { return generic }
+            let named = missing.split(separator: ",").map {
+                regulatoryFieldNames[$0.trimmingCharacters(in: .whitespaces)]
             }
-            return "Липсват задължителни данни за препарат за РЗ: \(missing)."
+            guard !named.isEmpty, named.allSatisfy({ $0 != nil }) else { return generic }
+            return "Липсва за нов препарат: \(named.compactMap { $0 }.joined(separator: " и "))."
 
         default:
             return nil
         }
     }
+
+    /// `PESTICIDE_REGULATORY_FIELDS_REQUIRED`'s `params.missing`, wire name →
+    /// what the sheet calls the field.
+    static let regulatoryFieldNames = [
+        "pppRegistrationNo": "рег. № по ЗЗР",
+        "quarantinePeriodDays": "карантинен срок",
+    ]
 
     static let bulgarian: [String: String] = [
         // The session could not be renewed and the tokens were KEPT, because
@@ -448,6 +460,21 @@ enum UserMessage {
         // permission — saying "you lack the rights" would send them to the
         // farm's owner for something only they can do. Coded by the server
         // since agri-saas #1405.
+        // The spray sheet's typed product (#237). The server's category rule
+        // is ONE-SIDED — only a FERTILIZER on the fertiliser path; the product
+        // path takes anything — and the sheet applies it before the request
+        // too (`TypedProduct.wrongKind`); this is for a record queued before
+        // the catalogue arrived. There is no `PRODUCT_EXPECTED`: the server
+        // shipped one briefly and dropped it (a fertiliser can be a spray).
+        "FERTILIZER_EXPECTED": "Това не е тор. Запишете операцията като „Пръскане“.",
+        "OPERATION_INPUT_AMBIGUOUS": "Операцията трябва да има или препарат, или тор — не и двете.",
+        // A name the sheet sends trimmed and non-empty can still be nothing
+        // once the server strips markup from it (agri-saas #1499).
+        "PRODUCT_NAME_REQUIRED": "Въведете търговското наименование на продукта.",
+        // The dose picker offers only rate units (`?measure=RATE`); this is
+        // the server's backstop should one not be a quantity per area.
+        "DOSE_UNIT_HAS_NO_BASE": "Мерната единица на дозата трябва да е количество на площ — например л/дка или кг/дка.",
+
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "
             + "приемете ги и опитайте отново.",

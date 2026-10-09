@@ -433,25 +433,34 @@ Unchanged: a parcel line's tap on a 426 still queues nothing, as on the web
 **Unverified**: no 426 has been met, because the server's floor is 1 too,
 and the sheet's 426 line has never rendered (ROADMAP, the #112 entry).
 
-### Divergence — the spray sheet offers no sample products (#237, owner 2026-10-09)
+### The spray sheet takes the product as typed text (#237, owner 2026-10-09)
 
-**The problem.** 22 of the farm's 24 catalogue products are the seeded
+**The problem.** 22 of the farm's 24 catalogue products were the seeded
 «Generic …» archetypes. agri-saas accepts one on a plan, then refuses the
 line's DONE (#1078), deliberately: completion is when the row becomes
 evidence. So a job planned with a sample product could never be completed.
-The sheet used to warn about the register's empty columns instead.
 
-**iOS, now.** The owner asked for all sample products removed and the product
-typed as free text. The phone half that needs no server ships first: the
-picker leaves archetypes out (`ParcelOperationSheet.offered`, by the server's
-`isArchetype`). The farm's own products stay, and «Нов продукт» adds one.
+**Now, on the web and here alike.** The owner asked for all sample products
+removed and the product as free text only. The web dropped its dropdowns, and
+the sheet here dropped its picker and «Нов продукт» form.
+- **The name.** It travels as `productName` / `fertilizerName`. The server
+  finds the farm's product of that name, case-insensitively, or creates it. A
+  record made with no signal still queues and is resolved when it is sent.
+- **Registration.** A new name on the spray path asks what it is,
+  «Препарат за РЗ» or «Тор» (`newProductCategory`, agri-saas #1499), since a
+  fertiliser can be sprayed. Only a new PESTICIDE needs its ПРЗ № and
+  quarantine period, so they are asked for then, and only then.
+- **Matching.** It is the server's unique index, `lower(name)`, with no
+  diacritic folding.
+- **Refused before sending.** A non-fertiliser on the fertiliser path, or a
+  sample's name, is refused before the request (`TypedProduct`). A fertiliser
+  on the spray path is NOT refused: liquid nitrogen goes through a sprayer,
+  and the server's rule is one-sided (`FERTILIZER_EXPECTED` only).
+- **Suggestions.** The farm's own products that contain the typed text are
+  offered, so a near-copy is not created by a typo.
 
-**Still to come, on agri-saas's side:**
-- the samples hidden from the catalogue and no longer seeded;
-- the route taking a typed product name.
-
-The web keeps offering the samples until then. The typed field (#237)
-replaces this picker once that contract is live.
+**Unverified**: no operation has been sent with a typed name. The first is
+the owner's (agri-saas's typed-name contract, merged after this was built).
 
 ---
 

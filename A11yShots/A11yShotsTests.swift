@@ -113,6 +113,9 @@ final class A11yShotsTests: XCTestCase {
             switch only {
             case "08-tasks": captureTabOrMenu("08-tasks", label: "Задачи", app: app)
             case "01b-farm-record": captureFarmRecordSheet(app)
+            case "18-operation-typed-product":
+                openTheLocation(app)
+                captureOperationSheet(app)
             case "08b-task-parcel-lines": captureFieldOperationTask(app)
             case "08d-task-parcels": captureTaskParcels(app)
             case "16-profile": captureProfile(app)
@@ -202,6 +205,71 @@ final class A11yShotsTests: XCTestCase {
         capture("03-parcel-map-precise", app: app)
 
         captureSchematicMap(app)
+        captureOperationSheet(app)
+    }
+
+    /// Локации → the fixture world's one location, for a capture run alone
+    /// (`ONLY=18-operation-typed-product`); the full walk is already there.
+    private func openTheLocation(_ app: XCUIApplication) {
+        XCTAssertTrue(app.tabBars.buttons["Локации"].waitForExistence(timeout: 10),
+                      "no «Локации» button in the tab bar")
+        app.tabBars.buttons["Локации"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20),
+                      "Локации showed no rows within 20s — locations-list.json did not load")
+        app.cells.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 20),
+                      "the location did not push a screen")
+    }
+
+    // MARK: - The spray sheet's typed product (agrent-ios#237)
+
+    /// A parcel row's operation sheet with a NEW product typed: the farm's own
+    /// products offered under the field, and the «Нов продукт» section the
+    /// server needs for a name it will create. Opened, typed into,
+    /// photographed and cancelled — «Запиши» would be a write, and the first
+    /// real one is the owner's (the seam would answer it 501 regardless).
+    ///
+    /// «синтетичен» is part of both of `items.json`'s own products and the
+    /// whole of neither, so one capture holds the suggestions AND the
+    /// registration fields. Starts on a location's map.
+    private func captureOperationSheet(_ app: XCUIApplication) {
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "SYNTH-1")).firstMatch
+        // Dragged from near the bottom, on the list: a swipe from the middle
+        // would land on the map and pan it instead of scrolling the page.
+        for _ in 0..<4 where !(row.exists && row.isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 10),
+                      "no parcel row for SYNTH-1 — may the fixture person not record operations?")
+        row.tap()
+
+        let name = app.textFields["Търговско наименование"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10), "the parcel row opened no operation sheet")
+        name.tap()
+        // The newline submits, which puts the keyboard away so the section
+        // under the field is in the picture.
+        name.typeText("синтетичен\n")
+        XCTAssertTrue(app.buttons["Почвен подобрител, синтетичен запис"].waitForExistence(timeout: 10),
+                      "the typed text offered none of the farm's own products")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18-operation-typed-product", app: app)
+
+        // The «Нов продукт» section, under the suggestions — below the fold
+        // at the accessibility sizes, where a Form builds no row it has not
+        // shown, so it is scrolled to rather than waited for.
+        let registration = app.staticTexts["Нов продукт"]
+        for _ in 0..<5 where !registration.exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        }
+        XCTAssertTrue(registration.waitForExistence(timeout: 5), "a new name asked for no registration")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18b-operation-new-product", app: app)
+
+        let cancel = app.navigationBars.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
+        cancel.tap()
     }
 
     /// The schematic map, which is up to two taps away and is the one #97

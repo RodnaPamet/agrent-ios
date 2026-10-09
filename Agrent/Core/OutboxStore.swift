@@ -455,7 +455,13 @@ final class OutboxStore {
 
                 item.attempts += 1
                 item.lastAttemptAt = Date()
-                item.lastError = UserMessage.text(for: error)
+                // A create's refusal in the sheet's own words: its 409 is the
+                // typed name colliding with a kept sample, not a stale edit.
+                if case .create = item.target {
+                    item.lastError = CreateFieldOperation.failureText(error)
+                } else {
+                    item.lastError = UserMessage.text(for: error)
+                }
                 if let conflict = PendingOperation.Conflict(replayOf: item, failedWith: error) {
                     // ── A STALE MARK IS A CONFLICT, NOT A REFUSAL (#138) ──
                     //

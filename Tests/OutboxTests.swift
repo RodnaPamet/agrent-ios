@@ -636,6 +636,24 @@ final class OutboxLineMarkTests: XCTestCase {
 
     // MARK: - 3. The 409
 
+    /// A CREATE's 409 is refused, not parked — and said in the sheet's words.
+    /// Since the typed product (#237) it is the name colliding with a sample
+    /// the server kept, not somebody else's edit, and the app-wide 409
+    /// sentence («Записът е променен…») would send the farmer looking for one.
+    func testACreatesConflictIsRefusedInTheSheetsWords() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        wire.answer = { _ in throw self.stale }
+        let item = create()
+        await outbox.enqueue(item)
+        await outbox.flush()
+
+        let refused = await queue.all().first
+        XCTAssertEqual(refused?.isRefused, true)
+        XCTAssertNil(refused?.conflict, "a create has no line to keep or drop")
+        XCTAssertEqual(refused?.lastError, CreateFieldOperation.failureText(stale))
+        XCTAssertFalse(refused?.lastError?.contains("променен") ?? true, refused?.lastError ?? "nil")
+    }
+
     /// THE REQUIREMENT (#138): a stale replay is surfaced as a conflict, not
     /// parked as refused — and a pass never sends it again.
     func testAStaleReplayIsParkedAsAConflictNeverAsRefused() async {

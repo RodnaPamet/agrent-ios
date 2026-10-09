@@ -173,7 +173,6 @@ final class RouteContractTests: XCTestCase {
                 LocationsAPI.parcelsPath(loc),
                 LocationsAPI.itemsPath,
                 LocationsAPI.rateUnitsPath,
-                LocationsAPI.allUnitsPath,
                 LocationsAPI.operationsPath(loc),
                 LocationsAPI.parcelPath(locationID: loc, parcelID: parcel),
             ]),

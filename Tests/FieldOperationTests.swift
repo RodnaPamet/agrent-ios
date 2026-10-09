@@ -14,10 +14,10 @@ final class CreateFieldOperationTests: XCTestCase {
         CreateFieldOperation(
             operationType: product != nil ? "SPRAY" : "FERTILIZE",
             parcelIds: parcels, assigneeUserId: "u1",
-            productItemId: product, doseValue: dose, doseUnitId: doseUnit,
+            productName: product, doseValue: dose, doseUnitId: doseUnit,
             waterRateValue: nil, waterRateUnitId: nil,
-            fertilizerItemId: fertilizer, fertilizerDoseValue: fDose,
-            fertilizerDoseUnitId: fUnit,
+            fertilizerName: fertilizer, fertilizerDoseValue: fDose,
+            fertilizerDoseUnitId: fUnit, newProductCategory: nil, newProductRegistration: nil,
             applicationTechnique: "boom", targetNote: nil
         )
     }

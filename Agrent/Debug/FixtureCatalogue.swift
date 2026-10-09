@@ -128,7 +128,6 @@ enum FixtureCatalogue {
         (LocationsAPI.listPath, "locations-list"),
         (LocationsAPI.parcelsPath(fixtureLocationID), "locations-parcels"),
         (LocationsAPI.itemsPath, "items"),
-        (LocationsAPI.allUnitsPath, "units-all"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
         (ExchangeAPI.listingsPath, "exchange-listings"),

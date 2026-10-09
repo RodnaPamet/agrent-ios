@@ -47,7 +47,8 @@ final class FormSurfaceTests: XCTestCase {
         XCTAssertEqual(offenders, ["PageBackground.swift"],
                        "a bare Form draws the system's grouped grey — use PageForm")
         let pageForms = sources.map { $0.1.components(separatedBy: "PageForm {").count - 1 }.reduce(0, +)
-        XCTAssertGreaterThanOrEqual(pageForms, 10, "the ten forms of #156")
+        // Nine since the product form went with the typed product (#237).
+        XCTAssertGreaterThanOrEqual(pageForms, 9, "the ten forms of #156, less the product form")
     }
 
     /// Positive control for the matcher itself.
