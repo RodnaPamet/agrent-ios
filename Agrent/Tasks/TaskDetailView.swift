@@ -9,8 +9,8 @@ import SwiftUI
 /// screen shows is already in hand when a row is tapped.
 ///
 /// Tasks are the opposite. The list sends a projection of eleven keys; the
-/// detail sends thirty-three. Description, resolution, priority, source, the
-/// people and the SLA exist ONLY here. Reusing the row would mean a screen
+/// detail sends thirty-three. Description, resolution, source, the people
+/// and the SLA exist ONLY here. Reusing the row would mean a screen
 /// whose entire purpose is the fields the row does not carry.
 ///
 /// That costs a spinner and a failure state, which is the honest price of
@@ -92,7 +92,9 @@ struct TaskDetailView: View {
     }
 
     /// THE GREEN TICK (#226): the one status action on this screen, and it
-    /// only closes. Owner, 2026-10-08 — the menu of every legal move it
+    /// only completes the task — CLOSED, which it calls «Завърши» since the
+    /// owner's 2026-10-09 wording (#236), as the status reads «Завършена».
+    /// Owner, 2026-10-08 — the menu of every legal move it
     /// replaces is gone from the app; «В процес», «Блокирана» and «Отказана»
     /// are made on the web.
     ///
@@ -106,12 +108,12 @@ struct TaskDetailView: View {
             closeAsksWeeds = weedParcelIDs != []
             closing = true
         } label: {
-            Label("Затвори задачата", systemImage: "checkmark")
+            Label("Завърши задачата", systemImage: "checkmark")
         }
         .tint(Palette.success)
         .disabled(store.saving)
-        .accessibilityLabel("Затвори задачата")
-        .accessibilityInputLabels(A11y.Spoken.closeTask)
+        .accessibilityLabel("Завърши задачата")
+        .accessibilityInputLabels(A11y.Spoken.completeTask)
     }
 
     /// The parcels a close's weeds are recorded on: the task's own, as
@@ -248,7 +250,7 @@ struct TaskDetailView: View {
     private func facts(_ item: WorkItem) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             fact("Вид", item.type.label)
-            fact("Приоритет", item.priority.label)
+            // Importance only: priority overlapped it (owner, 2026-10-09, #236).
             fact("Важност", item.severity.label)
             if let op = item.operationType { fact("Операция", op.label) }
             if let due = item.dueAt {

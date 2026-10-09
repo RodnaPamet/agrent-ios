@@ -47,6 +47,16 @@ enum BgDate {
         date.formatted(.dateTime.day().month(.wide).locale(locale))
     }
 
+    /// 21 септември this year, 21 септември 2025 г. any other — for a row's
+    /// date that can be old. A task opened last autumn and still on the list
+    /// would otherwise read as this year's (#236). The year rule is
+    /// `messageTime`'s, and `now` and `calendar` are parameters for the same
+    /// reason: a test holds them, the app takes the defaults.
+    static func rowDay(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        calendar.component(.year, from: date) == calendar.component(.year, from: now)
+            ? dayMonth(date) : full(date)
+    }
+
     /// 14:32 — a clock time, for a promise about later today.
     ///
     /// Twenty-four hour because the LOCALE is: measured, bg_BG gives "14:32"

@@ -11,7 +11,6 @@ final class WorkItemEnumTests: XCTestCase {
     func testEveryEnumHasTheCountTheServerDeclares() {
         XCTAssertEqual(WorkItemType.allCases.count, 4 + 1)
         XCTAssertEqual(WorkItemSeverity.allCases.count, 5 + 1)
-        XCTAssertEqual(WorkItemPriority.allCases.count, 4 + 1)
         XCTAssertEqual(WorkItemStatus.allCases.count, 8 + 1)
         XCTAssertEqual(WorkItemSource.allCases.count, 5 + 1)
         XCTAssertEqual(FieldOperationType.allCases.count, 4 + 1)
@@ -27,7 +26,6 @@ final class WorkItemEnumTests: XCTestCase {
         }
         try check(["IMPROVEMENT", "TASK", "FIELD_OPERATION", "FARM_TASK"], WorkItemType.self)
         try check(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"], WorkItemSeverity.self)
-        try check(["P0", "P1", "P2", "P3"], WorkItemPriority.self)
         try check(
             ["OPEN", "TRIAGED", "IN_PROGRESS", "BLOCKED", "PENDING_REVIEW",
              "RESOLVED", "CLOSED", "CANCELED"], WorkItemStatus.self)
@@ -51,6 +49,9 @@ final class WorkItemEnumTests: XCTestCase {
     /// either being wrong — the operator cannot tell it is the same record.
     func testStatusUsesTheTaskVocabularyNotTheOperationsOne() {
         XCTAssertEqual(WorkItemStatus.resolved.label, "Готова")
+        // The one deliberate departure (owner, 2026-10-09, #236): complete,
+        // not shut.
+        XCTAssertEqual(WorkItemStatus.closed.label, "Завършена")
         XCTAssertEqual(WorkItemStatus.triaged.label, "Планирана")
         XCTAssertEqual(WorkItemStatus.canceled.label, "Отказана")
         for wrong in ["Разрешена", "Приоритизирана", "Отменена"] {
@@ -66,7 +67,6 @@ final class WorkItemEnumTests: XCTestCase {
     func testEveryVisibleLabelIsBulgarian() {
         let labels = WorkItemType.allCases.map(\.label)
             + WorkItemSeverity.allCases.map(\.label)
-            + WorkItemPriority.allCases.map(\.label)
             + WorkItemStatus.allCases.map(\.label)
             + FieldOperationType.allCases.map(\.label)
         for label in labels {

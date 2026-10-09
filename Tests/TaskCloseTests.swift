@@ -102,7 +102,7 @@ final class TaskCloseTests: XCTestCase {
         XCTAssertEqual(TaskCloseRules.observationNote(keyed), "Задача FT-103: Заявка за анализ на почвата")
         XCTAssertEqual(TaskCloseRules.observationNote(unkeyed), "Задача Заявка за анализ на почвата")
         XCTAssertEqual(TaskCloseText.weedsNotRecorded(parcels: 2, reason: "Нямате права."),
-                       "Задачата е затворена и плевелите са в бележката към нея, но не са записани в 2 парцела: Нямате права.")
+                       "Задачата е завършена и плевелите са в бележката към нея, но не са записани в 2 парцела: Нямате права.")
     }
 
     // MARK: - The list
