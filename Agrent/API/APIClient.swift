@@ -85,6 +85,20 @@ actor APIClient {
     /// `NoURLCacheTests` can assert on the configuration itself.
     private let session = URLSession(configuration: APIClient.sessionConfiguration())
 
+    /// The session for a GENERATED DOCUMENT (#246) — `session` in every way
+    /// but one. agri-saas builds the БАБХ ДНЕВНИК before it sends a byte, on
+    /// a 60-second budget, so fifteen seconds of silence there is the work
+    /// being done, not a dead line. Its own session rather than a request
+    /// timeout: the session's idle limit is what governs, and a document is
+    /// the one request in this app that is allowed to think.
+    private let documentSession = URLSession(configuration: APIClient.documentSessionConfiguration())
+
+    static func documentSessionConfiguration() -> URLSessionConfiguration {
+        let configuration = sessionConfiguration()
+        configuration.timeoutIntervalForRequest = 90
+        return configuration
+    }
+
     static func sessionConfiguration() -> URLSessionConfiguration {
         let configuration = NoURLCache.configuration()
         configuration.timeoutIntervalForRequest = 15
@@ -637,6 +651,40 @@ actor APIClient {
     /// field or changes a default cannot alter what the farmer actually
     /// wrote down before sending it. The recorded intent goes out as
     /// recorded.
+    /// POST a JSON body whose answer is a DOCUMENT, not JSON — the БАБХ
+    /// ДНЕВНИК as PDF bytes (#246). Returned as received, with the file name
+    /// the server gave in `Content-Disposition`, if it gave one; on the
+    /// document session, which waits for the server to build it.
+    func postForDocument<B: Encodable>(_ path: String, body: B) async throws -> (data: Data, fileName: String?) {
+        let (data, http) = try await sendWithResponse(
+            path: path, method: "POST", body: try encoder.encode(body),
+            idempotencyKey: nil, session: documentSession)
+        return (data, Self.fileName(contentDisposition: http.value(forHTTPHeaderField: "Content-Disposition")))
+    }
+
+    /// The file name out of a `Content-Disposition` header: RFC 6266's
+    /// `filename*=UTF-8''…` first (a Cyrillic name can only travel that way),
+    /// then a plain `filename=`, quoted or not. Only the last path component
+    /// survives — a name is a name, never a place to write to.
+    static func fileName(contentDisposition header: String?) -> String? {
+        guard let header else { return nil }
+        let parameters = header.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+        func value(_ key: String) -> String? {
+            parameters.first { $0.lowercased().hasPrefix(key + "=") }
+                .map { String($0.dropFirst(key.count + 1)) }
+        }
+        var name: String?
+        if let extended = value("filename*"), let quote = extended.range(of: "''") {
+            name = extended[quote.upperBound...].removingPercentEncoding
+        }
+        if name == nil, let plain = value("filename") {
+            name = plain.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        }
+        guard let last = name.map({ ($0 as NSString).lastPathComponent }),
+              !last.isEmpty, last != ".", last != ".." else { return nil }
+        return last
+    }
+
     func postRaw(_ path: String, body: Data, idempotencyKey: String) async throws -> Data {
         try await send(path: path, method: "POST", body: body,
                        idempotencyKey: idempotencyKey)
@@ -771,6 +819,17 @@ actor APIClient {
         path: String, method: String, body: Data?, idempotencyKey: String?,
         ifMatch: String? = nil, contentType: String? = nil
     ) async throws -> Data {
+        try await sendWithResponse(
+            path: path, method: method, body: body, idempotencyKey: idempotencyKey,
+            ifMatch: ifMatch, contentType: contentType, session: session
+        ).data
+    }
+
+    /// `send`, keeping the response — a document's name is in its headers.
+    private func sendWithResponse(
+        path: String, method: String, body: Data?, idempotencyKey: String?,
+        ifMatch: String? = nil, contentType: String? = nil, session: URLSession
+    ) async throws -> (data: Data, http: HTTPURLResponse) {
         // Before the tokens: a refresh is a request too, and nothing goes
         // out for a farm path with no farm in it (`FarmPath`, #192).
         guard !FarmPath.isUnscoped(path) else { throw APIError.noFarmOpen }
@@ -778,16 +837,16 @@ actor APIClient {
         if tokens.isExpired { tokens = try await refresh(tokens) }
 
         var (data, http) = try await perform(
-            path, method, body, idempotencyKey, ifMatch, tokens, contentType)
+            path, method, body, idempotencyKey, ifMatch, tokens, contentType, session: session)
         if http.statusCode == 401 {
             tokens = try await refresh(tokens)
             (data, http) = try await perform(
-                path, method, body, idempotencyKey, ifMatch, tokens, contentType)
+                path, method, body, idempotencyKey, ifMatch, tokens, contentType, session: session)
         }
 
         switch http.statusCode {
         case 200..<300:
-            return data
+            return (data, http)
         case 409:
             throw Self.conflict(from: data)
         case 304:
@@ -890,8 +949,10 @@ actor APIClient {
 
     private func perform(
         _ path: String, _ method: String, _ body: Data?, _ key: String?,
-        _ ifMatch: String?, _ tokens: Tokens, _ contentType: String? = nil
+        _ ifMatch: String?, _ tokens: Tokens, _ contentType: String? = nil,
+        session: URLSession? = nil
     ) async throws -> (Data, HTTPURLResponse) {
+        let session = session ?? self.session
         var req = try Self.request(for: path, method: method, accessToken: tokens.accessToken)
         if let body {
             req.httpBody = body

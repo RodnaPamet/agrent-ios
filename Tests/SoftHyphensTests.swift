@@ -22,6 +22,15 @@ final class SoftHyphensTests: XCTestCase {
         XCTAssertEqual(SoftHyphens.display("Напишете коментар…"), "На\(shy)пи\(shy)ше\(shy)те коментар…")
     }
 
+    /// «Дневник (PDF)»'s footer (#246), broken mid-word at AX5 — and given
+    /// back whole once the hyphens come out.
+    func testTheFarmRecordNoteBreaksAtASyllable() {
+        let note = "Растителнозащитните мероприятия"
+        XCTAssertEqual(SoftHyphens.display(note),
+                       "Рас\(shy)ти\(shy)тел\(shy)но\(shy)за\(shy)щит\(shy)ни\(shy)те мероприятия")
+        XCTAssertEqual(SoftHyphens.display(note).replacingOccurrences(of: shy, with: ""), note)
+    }
+
     /// Invisible: take the soft hyphens out and every wizard string is itself
     /// again — what the accessibility label carries.
     func testDisplayChangesNothingButTheBreaks() {

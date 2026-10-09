@@ -157,6 +157,9 @@ enum SessionReset {
         // A half-made farm's name does not stay on a shared phone after its
         // person has gone (#197).
         FarmWizardDrafts(defaults: .standard).clear()
+        // Nor a generated ДНЕВНИК, which names the farm's producer (#246) —
+        // normally gone with its sheet, but not if the app died under it.
+        FarmRecordAPI.removeGenerated()
     }
 }
 

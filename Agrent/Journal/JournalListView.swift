@@ -3,6 +3,8 @@ import SwiftUI
 struct JournalListView: View {
     @State private var store = JournalStore()
     @State private var composing = false
+    /// «Дневник (PDF)» is up (#246).
+    @State private var exportingRecord = false
 
     var body: some View {
         RoutedStack {
@@ -29,8 +31,26 @@ struct JournalListView: View {
                 .safeAreaInset(edge: .bottom, spacing: 0) { newEntryButton }
             .navigationTitle("Земеделски дневник")
             .appMenu()
+            .toolbar {
+                // The БАБХ ДНЕВНИК for a location and a period (#246) — the
+                // web's «Дневник (PDF)», from this page. Not the bottom bar:
+                // that is the action taken standing in a field; this one is
+                // taken for the inspector, once a season.
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        exportingRecord = true
+                    } label: {
+                        Label("Дневник (PDF)", systemImage: "doc.richtext")
+                    }
+                    .accessibilityLabel("Дневник (PDF)")
+                    .accessibilityInputLabels(A11y.Spoken.farmRecord)
+                }
+            }
             .sheet(isPresented: $composing) {
                 NewEntryView(store: store)
+            }
+            .sheet(isPresented: $exportingRecord, onDismiss: FarmRecordAPI.removeGenerated) {
+                FarmRecordSheet()
             }
             .task { if store.state.value == nil { await store.load() } }
         }

@@ -119,6 +119,8 @@ enum A11y {
         static let publish = spokenNames("Публикувай", "Post")
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")
+        /// A generated document's way out of the server (#246).
+        static let download = spokenNames("Изтегли", "Download")
         static let importing = spokenNames("Импортирай", "Import")
         /// The farm profile's way into its editor.
         static let edit = spokenNames("Редактирай", "Edit")
@@ -170,6 +172,9 @@ enum A11y {
         // app is «Профил» (the farm's page is reached through «Стопанство»),
         // and nothing else answers to "Profile" or "Sign out".
         static let profile = spokenNames("Профил", "Profile")
+        /// The Дневник page's «Дневник (PDF)» (#246) — the БАБХ register,
+        /// not the journal itself, so not «Дневник» alone: that is a tab.
+        static let farmRecord = spokenNames("Дневник (PDF)", "Farm record")
         static let signOut = spokenNames("Изход", "Sign out")
     }
 

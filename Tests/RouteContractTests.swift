@@ -167,6 +167,7 @@ final class RouteContractTests: XCTestCase {
                 ExchangeAPI.blockPath(threadID: "{threadId}"),
                 ExchangeAPI.messagePath(messageID: "{messageId}"),
             ]),
+            ("FarmRecordAPI.swift", [FarmRecordAPI.path(loc)]),
             ("LocationsAPI.swift", [
                 LocationsAPI.listPath,
                 LocationsAPI.parcelsPath(loc),

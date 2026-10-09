@@ -20,6 +20,8 @@ enum SoftHyphens {
     /// Longest first: «стопанството» contains «стопанство», and once its soft
     /// hyphens are in, the shorter pattern no longer matches inside it.
     private static let words: [(plain: String, broken: [String])] = [
+        // «Дневник (PDF)»'s footer (#246): AX5 broke «Растителноза / щитните».
+        ("Растителнозащитните", ["Рас", "ти", "тел", "но", "за", "щит", "ни", "те"]),
         ("стопанството", ["сто", "пан", "ство", "то"]),
         ("Стопанството", ["Сто", "пан", "ство", "то"]),
         ("стопанство", ["сто", "пан", "ство"]),
