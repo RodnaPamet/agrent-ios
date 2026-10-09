@@ -71,6 +71,10 @@ final class NewsTopicsTests: XCTestCase {
         let names = NewsTopics.labels(["weather", "frost-alerts", "wheat"], in: known).map(\.label)
         XCTAssertEqual(names, ["Пшеница", "Време"])
         XCTAssertEqual(NewsTopics.labels(nil, in: known), [])
+        // `[]` is «matched no rule», not «not yet classified» (agri-saas
+        // #1466): no chips, and nothing that reads as loading or failing —
+        // «Всички» is what keeps such an article reachable.
+        XCTAssertEqual(NewsTopics.labels([], in: known), [])
         XCTAssertEqual(NewsTopics.labels(["wheat"], in: nil), [])
         XCTAssertEqual(known.tag("inputs")?.labelEn, "Fertilisers and sprays")
     }

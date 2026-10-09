@@ -57,9 +57,14 @@ struct NewsView: View {
     }
 
     /// «Моите теми | Всички» (owner, 2026-10-08): the person's topics, or
-    /// everything. It replaces the Пазар / Политика / Общи control — the
-    /// topics «Цени» and «Субсидии» cover those, and two filters that both
-    /// say «Всички» would be one too many.
+    /// everything. It replaces the Пазар / Политика / Общи control: two
+    /// filters that both say «Всички» would be one too many.
+    ///
+    /// «Цени» is NOT the old Пазар. agri-saas narrowed it on purpose (#1466):
+    /// Пазар's keywords included the stems реколт, износ, внос and добив,
+    /// so a harvest story now carries its crop's tag and no topic. An
+    /// article that matches no rule carries no tag at all, and «Всички» is
+    /// what keeps it reachable.
     private var scopes: some View {
         AdaptiveRow(spacing: 8) {
             scope(.mine, NewsTopicsText.mine, spoken: A11y.Spoken.myTopics)
