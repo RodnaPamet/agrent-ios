@@ -5,6 +5,10 @@ struct JournalListView: View {
     @State private var composing = false
     /// «Дневник (PDF)» is up (#246).
     @State private var exportingRecord = false
+    /// «Филтри» is up (#252).
+    @State private var filtering = false
+    /// The blocks and crops the filter offers, read once for this screen.
+    @State private var filterOptions = JournalFilterOptions()
 
     var body: some View {
         RoutedStack {
@@ -32,6 +36,21 @@ struct JournalListView: View {
             .navigationTitle("Земеделски дневник")
             .appMenu()
             .toolbar {
+                // Type, crop, block and period (#252). The state is the
+                // icon's fill and the summary row above the entries; the
+                // name stays «Филтри» either way, as on Борса.
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        filtering = true
+                    } label: {
+                        Label("Филтри", systemImage: store.filter.isActive
+                              ? "line.3.horizontal.decrease.circle.fill"
+                              : "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityLabel("Филтри")
+                    .accessibilityValue(store.filter.isActive ? "активни" : "")
+                    .accessibilityInputLabels(A11y.Spoken.filters)
+                }
                 // The БАБХ ДНЕВНИК for a location and a period (#246) — the
                 // web's «Дневник (PDF)», from this page. Not the bottom bar:
                 // that is the action taken standing in a field; this one is
@@ -51,6 +70,11 @@ struct JournalListView: View {
             }
             .sheet(isPresented: $exportingRecord, onDismiss: FarmRecordAPI.removeGenerated) {
                 FarmRecordSheet()
+            }
+            .sheet(isPresented: $filtering) {
+                JournalFilterSheet(filter: store.filter, options: filterOptions) { chosen in
+                    Task { await store.apply(chosen) }
+                }
             }
             .task { if store.state.value == nil { await store.load() } }
         }
@@ -88,6 +112,18 @@ struct JournalListView: View {
         case .failed(let message):
             ErrorState(message: message) { await store.load() }
 
+        // A filtered no-result is not an empty diary, and saying the wrong
+        // one is a claim about the farm's records rather than about the
+        // filter. The web's words (`journal.filteredEmpty*`).
+        case .loaded(let entries, _) where entries.isEmpty && store.filter.isActive:
+            EmptyState(
+                "Няма записи, отговарящи на филтрите",
+                icon: "line.3.horizontal.decrease.circle",
+                message: "Опитайте да разширите търсенето или да изчистите някой от активните филтри."
+            ) {
+                Button("Изчисти филтрите") { Task { await store.apply(JournalFilter()) } }
+            }
+
         case .loaded(let entries, _) where entries.isEmpty:
             EmptyState(
                 "Няма записи",
@@ -109,6 +145,12 @@ struct JournalListView: View {
                 Section(titled: store.hasMore
                         ? "Показани " + Plural.bg(entries.count, "запис", "записа")
                         : Plural.bg(entries.count, "запис", "записа")) {
+                if store.filter.isActive {
+                    JournalFilterSummary(filter: store.filter) {
+                        Task { await store.apply(JournalFilter()) }
+                    }
+                    .pageRow()
+                }
                 ForEach(entries) { entry in
                     NavigationLink(value: AppRoute.journalEntry(entry)) {
                         JournalRow(entry: entry)

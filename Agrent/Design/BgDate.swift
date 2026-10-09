@@ -165,6 +165,42 @@ enum BgDate {
         isoDayWriter.string(from: date)
     }
 
+    /// An instant as the server reads one: `2026-10-09T20:59:59.999Z`, in UTC,
+    /// with milliseconds. It writes the journal filter's `occurredFrom` and
+    /// `occurredTo`, which the server hands straight to `new Date(…)`.
+    ///
+    /// ── Why not `isoDay` ──
+    ///
+    /// A bare day is UTC midnight to `new Date`, so «до 9 октомври» sent as
+    /// `2026-10-09` would end the range at 03:00 on the 9th in Sofia and drop
+    /// the rest of that day. So the app works the day's edges out in the
+    /// device's time zone and sends them as instants.
+    ///
+    /// Milliseconds because the upper bound is INCLUSIVE (`lte`) and the
+    /// column keeps them. The last moment of a day is `…:59.999`; to the
+    /// second, an entry made in the day's final second would be dropped.
+    ///
+    /// ── Rounded to the millisecond, then written from integers ──
+    ///
+    /// `ISO8601FormatStyle(includingFractionalSeconds:)` TRUNCATES, and a
+    /// `Double` holds `…:59.999` as `…:59.998999…`, so the style wrote
+    /// `.998` (measured 2026-10-10). That would drop the day's last
+    /// millisecond. So the instant is rounded to whole milliseconds; the
+    /// seconds are written by the style, which is exact for whole seconds,
+    /// and the milliseconds are appended as digits.
+    static func isoInstant(_ date: Date) -> String {
+        let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
+        var (seconds, fraction) = ms.quotientAndRemainder(dividingBy: 1000)
+        // Before 1970 the remainder is negative; the seconds round down.
+        if fraction < 0 { seconds -= 1; fraction += 1000 }
+        // UTC, `.iso8601`'s default: `2026-10-09T20:59:59Z`, so the `Z` the
+        // server writes is the `Z` it reads back.
+        let whole = Date(timeIntervalSince1970: TimeInterval(seconds)).formatted(.iso8601)
+        // `1000 + fraction` is four digits; dropping the 1 pads to three.
+        let digits = String(String(1000 + fraction).dropFirst())
+        return "\(whole.dropLast()).\(digits)Z"
+    }
+
     /// Separate from `isoDay` the parser only because a `DateFormatter` is
     /// cheap to hold and sharing one mutable instance across read and write
     /// invites somebody to set `dateFormat` on it.

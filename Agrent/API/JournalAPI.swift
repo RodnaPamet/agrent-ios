@@ -24,12 +24,27 @@ enum JournalAPI {
     /// one needs the bearer token anyway. A name, an email or an assignee
     /// filter would be, in either position, and those still must go in a
     /// header or a body.
+    ///
+    /// A filter's values (a type, a crop name, a block id and two instants)
+    /// are farm records, not a person, so they go in the query as the web
+    /// sends them (#252).
     static func path(cursor: String?) -> String {
-        guard let cursor, !cursor.isEmpty else { return "\(base)?limit=50" }
+        path(filter: JournalFilter(), cursor: cursor)
+    }
+
+    /// The unfiltered first page is `?limit=50` exactly, as it always was:
+    /// that string is the cache key and the fixture key, and a filter that
+    /// adds nothing must not change it.
+    static func path(filter: JournalFilter, cursor: String?,
+                     now: Date = Date(), calendar: Calendar = .current) -> String {
+        var path = "\(base)?limit=50"
+        let query = filter.query(now: now, calendar: calendar)
+        if !query.isEmpty { path += "&" + query }
         // Percent-encoded by the caller, because `APIClient.url(for:)` takes
         // the query VERBATIM — its header says so, and a cursor is opaque
         // server output that may legitimately contain `+` or `=`.
-        return "\(base)?limit=50&cursor=\(URLEscape.queryValue(cursor))"
+        if let cursor, !cursor.isEmpty { path += "&cursor=\(URLEscape.queryValue(cursor))" }
+        return path
     }
 
     /// The route returns a paginated envelope when `limit` is present and a

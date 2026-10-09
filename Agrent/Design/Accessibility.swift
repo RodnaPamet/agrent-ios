@@ -175,6 +175,11 @@ enum A11y {
         /// The Дневник page's «Дневник (PDF)» (#246) — the БАБХ register,
         /// not the journal itself, so not «Дневник» alone: that is a tab.
         static let farmRecord = spokenNames("Дневник (PDF)", "Farm record")
+        /// A list's filter button, Борса's and the Дневник's (#252). Its
+        /// name stays the same when a filter is on; that state is its value.
+        static let filters = spokenNames("Филтри", "Filters")
+        /// The filter sheet's «Покажи»: show the list the filter describes.
+        static let show = spokenNames("Покажи", "Show")
         static let signOut = spokenNames("Изход", "Sign out")
     }
 
