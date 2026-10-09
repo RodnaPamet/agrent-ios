@@ -255,3 +255,41 @@ final class CalculatorPayloadTests: XCTestCase {
     }
 
 }
+
+/// The per-decare block's words, the web's (`grain.calculator.perArea…`,
+/// `uncertaintyAtMost`): why the figures are missing when they are, and
+/// what kind of figure the margin is when it is one.
+final class PerAreaWordingTests: XCTestCase {
+
+    private func perArea(margin: Double? = nil, uncertainty: Uncertainty = .exact,
+                         refusal: String? = nil) -> PerArea {
+        PerArea(areaDca: 0, standingValuePerDca: nil, attributableCostPerDca: nil,
+                marginPerDca: margin, uncertainty: uncertainty, refusalCode: refusal)
+    }
+
+    /// They used to vanish without a word — on a farm whose crop area is on
+    /// its parcels, every row (agri-saas #1512).
+    func testARefusalIsSaidInTheWebsWords() {
+        XCTAssertEqual(perArea(uncertainty: .refused, refusal: "NO_STANDING_CROP_AREA").refusalText,
+                       "Няма площ с реколта на корен, върху която да се раздели.")
+        XCTAssertEqual(perArea(uncertainty: .refused, refusal: "NO_STANDING_CROP_VALUE").refusalText,
+                       "Няма пазарна цена за реколтата на корен.")
+        XCTAssertEqual(perArea(uncertainty: .refused, refusal: "SOME_FUTURE_CODE").refusalText,
+                       "Стойностите на декар не могат да се изчислят.",
+                       "a code this build does not know still says something")
+        XCTAssertNil(perArea(margin: 12).refusalText, "positive control: figures, no refusal")
+    }
+
+    /// An upper bound shown bare reads as measured.
+    func testAnUpperBoundMarginSaysSo() {
+        XCTAssertEqual(perArea(margin: 12.5, uncertainty: .atMost).marginText, "най-много \(Num.text(12.5))")
+        XCTAssertEqual(perArea(margin: 12.5).marginText, Num.text(12.5))
+        XCTAssertNil(perArea().marginText)
+    }
+
+    func testAPartialMarginIsCalledUnderstated() {
+        XCTAssertEqual(perArea(margin: 3, uncertainty: .partial).partialNote,
+                       "Разходът тук включва насаждения без прогноза за добив, затова маржът е занижен.")
+        XCTAssertNil(perArea(margin: 3).partialNote)
+    }
+}

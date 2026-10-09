@@ -243,6 +243,10 @@ struct CalculatorView: View {
             ValueRow("Площ") {
                 Text("\(Num.text(row.perArea.areaDca)) дка")
             }
+            // Why the per-decare lines below are missing, when they are.
+            if let refusal = row.perArea.refusalText {
+                RefusalNote(text: refusal)
+            }
             ValueRow("Очаквана реколта") {
                 Text("\(Num.text(row.expectedTonnes)) т")
             }
@@ -253,8 +257,14 @@ struct CalculatorView: View {
             if let cost = row.perArea.attributableCostPerDca {
                 ValueRow("Разход / дка") { Text(Num.text(cost)) }
             }
-            if let margin = row.perArea.marginPerDca {
-                ValueRow("Марж / дка") { Text(Num.text(margin)) }
+            if let margin = row.perArea.marginText {
+                ValueRow("Марж / дка") { Text(margin) }
+            }
+            if let partial = row.perArea.partialNote {
+                Text(partial)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let breakEven = row.breakEven.breakEvenPricePerTonne {
