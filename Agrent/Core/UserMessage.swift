@@ -82,6 +82,16 @@ enum UserMessage {
         // A sentence about THIS failure, when the server named what went
         // wrong. Only for codes that have one — see `interpolated`.
         if let code, let built = interpolated(code: code, params: params) { return built }
+        // ── THE PLAN LIMIT IS NOT CODED (agrent-ios#241) ──
+        //
+        // agri-saas refuses it with a prose `forbidden()`: a 403 `FORBIDDEN`
+        // whose message LEADS with `plan_limit_exceeded: …`, and that prefix
+        // is the one thing telling it apart. Read before the table, where
+        // FORBIDDEN is «Нямате права» — which would send the farmer to the
+        // owner for a limit that no permission lifts.
+        if code == "FORBIDDEN", let message, message.hasPrefix(planLimitMarker) {
+            return planLimitReached
+        }
         if let code, let known = bulgarian[code] { return known }
         // ── A 429 IS SAID BY STATUS, whatever prose came with it ──
         //
@@ -229,6 +239,13 @@ enum UserMessage {
         default: "Възникна грешка при връзката със сървъра."
         }
     }
+
+    /// The marker leading a plan-limit refusal's message — see `httpText`.
+    static let planLimitMarker = "plan_limit_exceeded"
+
+    /// A statement and nothing more, for the reason `PAST_DUE_RESTRICTED`'s
+    /// is (agrent-ios#241).
+    static let planLimitReached = "Достигнат е лимитът на абонаментния план на стопанството."
 
     /// Server error codes this app can say in Bulgarian.
     ///
@@ -429,6 +446,16 @@ enum UserMessage {
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "
             + "приемете ги и опитайте отново.",
+
+        // A failed payment (agrent-ios#241): after a 14-day grace the server
+        // withholds named capabilities — the exchange, trends, creating
+        // tasks, uploads and journal entries — with a 403 of this code, and
+        // its message is English. Said as a FACT and nothing more: App Store
+        // guideline 3.1.1 rules out sending anyone to pay outside the app,
+        // and the member who meets it could not pay anyway. NOT a missing
+        // right, which would send them to the owner for the wrong reason.
+        "PAST_DUE_RESTRICTED":
+            "Тази функция е спряна, защото плащането за абонамента на стопанството не е преминало.",
 
         // Creating a farm (`POST /api/me/farms`, agri-saas#1362) — codes
         // rather than prose BY DESIGN, so the words are this app's. The two
