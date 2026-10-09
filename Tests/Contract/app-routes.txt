@@ -55,6 +55,7 @@
 /api/t/{tenantSlug}/items
 /api/t/{tenantSlug}/journal
 /api/t/{tenantSlug}/locations
+/api/t/{tenantSlug}/locations/{locationId}/farm-record
 /api/t/{tenantSlug}/locations/{locationId}/operations
 /api/t/{tenantSlug}/locations/{locationId}/parcels
 /api/t/{tenantSlug}/locations/{locationId}/parcels/{parcelId}

@@ -471,6 +471,31 @@ This is the largest functional gap in the app. The journal is the legally
 filed record — the ДНЕВНИК PDF is generated from exactly these rows — and
 an operator standing in a field cannot check what was recorded.
 
+### Divergence — «Дневник (PDF)» on the page, not on an entry (#246, owner 2026-10-09)
+
+**The web** offers «Дневник (PDF)» on a journal entry that records a field
+operation (`journal/[id]`, where `entry.fieldOperation.locationId` is computed
+server-side) and on a location's page. Both use «От» / «До» (1 January to
+today by default) and `POST /locations/{id}/farm-record` `{ from, to }`, which
+returns the PDF's bytes.
+
+**iOS** offers it on the Дневник page itself, as the owner asked:
+- **Where:** a toolbar button opens `FarmRecordSheet`, which asks for the
+  location (chosen for the person when the farm has only one) and the same
+  period. The list's `LogEntry` carries no field operation, so a per-entry
+  button would have had no location to name.
+- **Waiting:** it travels on `APIClient`'s document session, which waits 90 s
+  rather than 15 s. The server builds the PDF before it sends a byte, on a
+  60 s budget.
+- **Checked:** a 200 that is not `%PDF` is refused.
+- **Opening:** the PDF opens in Quick Look, which shares it or saves it to
+  Files.
+- **Storage:** it is written under complete file protection to a temporary
+  folder of its own, which is removed when the sheet closes and on sign-out.
+
+**Unverified:** no ДНЕВНИК has been downloaded from this app. Under the
+UI-test seam the POST is a 501, so the first real one is the owner's.
+
 ### Gap 6 — the list is capped at 50 with no paging — CLOSED 2026-09-22
 
 Cursor paging with an explicit "Покажи още", and the header count now

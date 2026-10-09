@@ -112,6 +112,7 @@ final class A11yShotsTests: XCTestCase {
             assertFixtureWorld(app)
             switch only {
             case "08-tasks": captureTabOrMenu("08-tasks", label: "Задачи", app: app)
+            case "01b-farm-record": captureFarmRecordSheet(app)
             case "08b-task-parcel-lines": captureFieldOperationTask(app)
             case "08d-task-parcels": captureTaskParcels(app)
             case "16-profile": captureProfile(app)
@@ -127,6 +128,7 @@ final class A11yShotsTests: XCTestCase {
         // shape PR #93 changed.
         capture("01-journal", app: app)
         assertFixtureWorld(app)
+        captureFarmRecordSheet(app)
         captureNewEntryForm(app)
 
         // ── The screens reached from the menu, done BEFORE Локации ──
@@ -276,6 +278,26 @@ final class A11yShotsTests: XCTestCase {
     /// is on screen.
     private var schematicIsOn: String { "Точни очертания" }
 
+
+    // MARK: - «Дневник (PDF)» (agrent-ios#246)
+
+    /// The Дневник page's «Дневник (PDF)»: the location (`locations-list.json`
+    /// holds one, so it is chosen and named) and the period. Opened,
+    /// photographed and cancelled — «Изтегли» is a POST the seam answers 501,
+    /// and the document itself is the server's to build. Starts on Дневник.
+    private func captureFarmRecordSheet(_ app: XCUIApplication) {
+        let open = app.navigationBars.buttons["Дневник (PDF)"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10), "Дневник has no «Дневник (PDF)»")
+        open.tap()
+        XCTAssertTrue(app.staticTexts["Synthetic Land"].waitForExistence(timeout: 10),
+                      "the sheet named no location — locations-list.json did not load")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01b-farm-record", app: app)
+        let cancel = app.navigationBars.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
+        cancel.tap()
+        XCTAssertTrue(open.waitForExistence(timeout: 10), "«Отказ» did not put Дневник back")
+    }
 
     // MARK: - reaching the screens that are not tabs
 
