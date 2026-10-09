@@ -183,6 +183,34 @@ struct PerArea: Decodable, Equatable, Sendable {
     let refusalCode: String?
 }
 
+extension PerArea {
+    /// Why there are no per-decare figures, in the web's words
+    /// (`grain.calculator.perAreaNoArea` / `perAreaNoValue`); nil when there
+    /// are some. They used to vanish without a word: «Площ» stood alone, and
+    /// a farm whose crop area is on its parcels rather than on plantings
+    /// (agri-saas #1512) read as a calculator with nothing to say. A code this
+    /// build does not know still says something.
+    var refusalText: String? {
+        guard refusalCode != nil else { return nil }
+        return RefusalText.resolve(code: refusalCode, params: nil,
+                                   fallback: "Стойностите на декар не могат да се изчислят.")
+    }
+
+    /// The margin as the web writes it: «най-много …» when it is an upper
+    /// bound (`uncertaintyAtMost`). A bare figure there reads as measured.
+    var marginText: String? {
+        marginPerDca.map { uncertainty == .atMost ? "най-много \(Num.text($0))" : Num.text($0) }
+    }
+
+    /// The web's `perAreaPartial`: the cost takes in plantings with no yield
+    /// estimate, so the margin is understated.
+    var partialNote: String? {
+        uncertainty == .partial
+            ? "Разходът тук включва насаждения без прогноза за добив, затова маржът е занижен."
+            : nil
+    }
+}
+
 struct BreakEven: Decodable, Equatable, Sendable {
     let breakEvenPricePerTonne: Double?
     let marketPricePerTonne: Double?

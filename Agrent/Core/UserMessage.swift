@@ -411,6 +411,11 @@ enum UserMessage {
         // because `{commodity}` needs translating before it goes in.
         "NO_MARKET_PRICE":
             "Няма налична пазарна цена за {commodity}.",
+        // The per-decare refusals (`PerAreaRefusalCode`, agri-saas
+        // `per-area.ts`), in the web's words (`grain.calculator.perAreaNoArea`
+        // / `perAreaNoValue`).
+        "NO_STANDING_CROP_AREA": "Няма площ с реколта на корен, върху която да се раздели.",
+        "NO_STANDING_CROP_VALUE": "Няма пазарна цена за реколтата на корен.",
         "MIXED_COST_CURRENCY":
             "Разходите са записани в повече от една валута; смесването им в нетната стойност би изкривило общата сума.",
         "RENT_CURRENCY_UNRECORDED":
