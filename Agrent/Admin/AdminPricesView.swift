@@ -158,7 +158,11 @@ private struct AdminPriceRow: View {
                         // Borderless, so only the words clear it: in a form
                         // row a plain button takes the whole row, field and all.
                         .buttonStyle(.borderless)
+                        // VoiceOver hears WHICH price; Voice Control answers
+                        // to the word on screen as well, and numbers the
+                        // rows when several say it.
                         .accessibilityLabel("Изчисти ръчната цена за \(name)")
+                        .accessibilityInputLabels(A11y.spokenNames("Изчисти", "Изчисти \(name)"))
                 }
             }
         }
