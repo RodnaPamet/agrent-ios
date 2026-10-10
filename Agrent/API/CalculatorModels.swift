@@ -79,6 +79,12 @@ struct CalculatorRow: Decodable, Equatable, Sendable, Identifiable {
     let priceSource: String?
 
     let standingCropAreaHa: Double
+    /// The land the crop OCCUPIES: every parcel it is on, by its plantings
+    /// if it has any, else the parcel itself (agri-saas #1606). Not
+    /// `standingCropAreaHa`, which counts only land with a yield forecast and
+    /// is 0 on a farm with no real plantings. The «Култура» sheet multiplies
+    /// a per-dca cost by THIS. Optional, so a server from before it reads.
+    let occupiedAreaHa: Double?
     let standingCropExpectedKg: Double
     let standingCropValue: Double?
 
@@ -168,14 +174,27 @@ struct CalculatorRow: Decodable, Equatable, Sendable, Identifiable {
 
 /// Per-decare figures.
 ///
-/// USE `areaDca` FROM HERE. Do not recompute it from `standingCropAreaHa`:
+/// USE THE AREAS FROM HERE. Do not recompute them from `standingCropAreaHa`:
 /// the web does exactly that at `CalculatorClient.tsx:472` via an UNROUNDED
-/// `haToDca`, while this field is rounded to 2dp at `per-area.ts:82`. The web
+/// `haToDca`, while these are rounded to 2dp at `per-area.ts`. The web
 /// therefore carries two values of the same name that differ, and every
-/// per-dca figure here was computed against THIS one — so anything displayed
-/// beside them has to match it.
+/// per-dca figure here was computed against one of THESE, so anything shown
+/// beside a figure has to be that figure's own area.
+///
+/// ── Two denominators since agri-saas #1606 ──
+///
+///     areaDca      yield-covered land: value and margin per dca
+///     costAreaDca  the land the crop occupies: cost per dca
+///
+/// The cost rate needs only the cost and the land, so it is given even when
+/// value and margin are refused. On a farm with no yield forecasts `areaDca`
+/// is 0 while the cost rate is real; showing 0 as «Площ» above it was the
+/// contradiction #262 fixes.
 struct PerArea: Decodable, Equatable, Sendable {
     let areaDca: Double
+    /// The denominator of `attributableCostPerDca`. nil from a server before
+    /// #1606, which divided the cost by `areaDca` too.
+    let costAreaDca: Double?
     let standingValuePerDca: Double?
     let attributableCostPerDca: Double?
     let marginPerDca: Double?
@@ -184,6 +203,18 @@ struct PerArea: Decodable, Equatable, Sendable {
 }
 
 extension PerArea {
+    /// The land shown as «Площ»: what the crop occupies, which the cost per
+    /// dca beside it is divided by. Before #1606 there was one area for all.
+    var landDca: Double { costAreaDca ?? areaDca }
+
+    /// The yield-covered area, shown on its own line only where it differs
+    /// from the land and is not 0. That is the area the value and margin are
+    /// per; the refusal note covers a 0.
+    var forecastAreaDca: Double? {
+        guard let costAreaDca, areaDca > 0, abs(areaDca - costAreaDca) >= 0.005 else { return nil }
+        return areaDca
+    }
+
     /// Why there are no per-decare figures, in the web's words
     /// (`grain.calculator.perAreaNoArea` / `perAreaNoValue`); nil when there
     /// are some. They used to vanish without a word: «Площ» stood alone, and
