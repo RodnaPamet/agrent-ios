@@ -83,16 +83,33 @@ struct NewCostView: View {
     @State private var saving = false
     @State private var failure: Failure?
 
-    private enum Failure: Equatable {
-        /// The server answered and said no. The row does not exist.
-        case refused(String)
+    enum Failure: Equatable {
+        /// Nothing was written: the server answered and said no, or the
+        /// request never left the phone. Trying again is safe.
+        case notSaved(String)
         /// No answer arrived. The row may or may not exist, and only the
         /// books can say which.
         case unknown(String)
 
+        /// What a failed save says about the books, for both sides of the
+        /// form alike (#265).
+        init(_ error: Error) {
+            let message = UserMessage.text(for: error)
+            if let url = error as? URLError, !WriteOutcome.neverSent(url) {
+                // The ambiguous one: the request may have reached the server
+                // and been written before the answer was lost.
+                self = .unknown(message)
+            } else {
+                // The server answered, and whatever it said, it said it; or
+                // the connection was never made (`WriteOutcome`). Either way
+                // the row does not exist.
+                self = .notSaved(message)
+            }
+        }
+
         var message: String {
             switch self {
-            case .refused(let message), .unknown(let message): message
+            case .notSaved(let message), .unknown(let message): message
             }
         }
     }
@@ -300,7 +317,7 @@ struct NewCostView: View {
     @ViewBuilder
     private func failureView(_ failure: Failure) -> some View {
         switch failure {
-        case .refused(let message):
+        case .notSaved(let message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(Palette.error)
                 Text(scope == .crop
@@ -343,8 +360,8 @@ struct NewCostView: View {
     /// The answer, and what it means for the books, in one announcement.
     private func spoken(_ failure: Failure) -> String {
         let outcome = switch (failure, scope) {
-        case (.refused, .crop): "Разходът НЕ е записан."
-        case (.refused, .overhead): "Нито една от сумите НЕ е записана."
+        case (.notSaved, .crop): "Разходът НЕ е записан."
+        case (.notSaved, .overhead): "Нито една от сумите НЕ е записана."
         case (.unknown, .crop): "Разходът може да е записан, а може и да не е. Проверете списъка с разходи."
         case (.unknown, .overhead): "Сумите може да са записани, а може и да не са. Проверете списъка с разходи."
         }
@@ -389,8 +406,9 @@ struct NewCostView: View {
     /// this sheet's nonce, every line's content), so a replay of the same
     /// sheet cannot book it twice and a corrected sheet is a new write.
     ///
-    /// The outcomes are the one-line form's, for the sheet as a whole: a
-    /// refusal wrote nothing, so the sheet stays editable and goes again on
+    /// The outcomes are the one-line form's, for the sheet as a whole
+    /// (`Failure.init`): a refusal, or a request that never left the phone,
+    /// wrote nothing, so the sheet stays editable and goes again on
     /// «Запази»; a lost answer locks it (`answerLost`).
     private func saveOverheads() async {
         guard canSave else { return }
@@ -405,10 +423,8 @@ struct NewCostView: View {
                 sheet, idempotencyKey: CostIdempotencyKey.mint(nonce: nonce, draft: sheet))
             onSaved()
             dismiss()
-        } catch let error as URLError {
-            failure = .unknown(UserMessage.text(for: error))
         } catch {
-            failure = .refused(UserMessage.text(for: error))
+            failure = Failure(error)
         }
     }
 
@@ -428,15 +444,8 @@ struct NewCostView: View {
             )
             onSaved()
             dismiss()
-        } catch let error as URLError {
-            // A transport failure is the ambiguous one: the request may
-            // have reached the server and been written before the answer
-            // was lost.
-            failure = .unknown(UserMessage.text(for: error))
         } catch {
-            // The server answered. Whatever it said, it said it — so the
-            // row does not exist and trying again is safe.
-            failure = .refused(UserMessage.text(for: error))
+            failure = Failure(error)
         }
     }
 }
