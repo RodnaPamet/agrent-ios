@@ -95,8 +95,9 @@ everything spreads over the WHOLE farm. The web is to work the same way
   with no crop on its land is told so and pointed at «Общи».
 - **The lines.** Рента, Семена, Горива — one rate each; Препарати, Торове and
   Услуги — named rows, as many as wanted («total or manually added rows»). All
-  per decare. **Услуги is not in the owner's list**: it keeps the place it had
-  in the one-line form, so a harvest contract still has a home. Owner to confirm.
+  per decare. **Услуги** was not in the owner's list; it kept the place it had
+  in the one-line form, so a harvest contract still has a home, and the owner
+  confirmed keeping it (2026-10-10).
 - **Sent as** `allocationBasis: CROP` with `commodityCanonical`, `amountPerDca`
   as typed, and `amount` = rate × the crop's decares to the cent (agri-saas
   #1583); no land link, no season (the server takes the one containing the
