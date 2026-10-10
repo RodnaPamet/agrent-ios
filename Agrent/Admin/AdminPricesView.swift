@@ -123,7 +123,9 @@ private struct AdminPriceRow: View {
     let clearing: Bool
     let clear: () -> Void
 
-    private var name: String { AdminPricesStore.name(row.commodity) }
+    /// «Пшеница», «Нафта (дизелово гориво)»: the canonical slug's Bulgarian
+    /// name, never the slug itself.
+    private var name: String { CommodityName.canonical(row.commodity) ?? row.commodity }
     private var unit: String { AdminPricesStore.unitLabel(AdminPricesStore.entryUnit(row.commodity)) }
 
     var body: some View {

@@ -117,6 +117,7 @@ final class A11yShotsTests: XCTestCase {
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "01c-journal-filter": captureJournalFilter(app)
             case "17-new-entry": captureNewEntryForm(app)
+            case "19-admin-prices": captureAdminPrices(app)
             case "18-operation-typed-product":
                 openTheLocation(app)
                 captureOperationSheet(app)
@@ -373,6 +374,33 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
         cancel.tap()
         XCTAssertTrue(open.waitForExistence(timeout: 10), "«Отказ» did not put Дневник back")
+    }
+
+    // MARK: - Админ → «Цени» (agrent-ios#258)
+
+    /// The superuser's day of prices, on the fixture's platform farm
+    /// (`me-farms.json`'s first row carries `isPlatform`). Opened and
+    /// photographed only: nothing is typed and «Запази» is never tapped,
+    /// because a price saved here changes every farm's figures, and a suite
+    /// that relies on the seam to catch a write is one typo from production.
+    /// Starts on any tab; ends with Админ closed.
+    private func captureAdminPrices(_ app: XCUIApplication) {
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Админ")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        let prices = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Цени")).firstMatch
+        // At AX5 the account card fills the first screen and a lazy list has
+        // not built the rows below it yet.
+        if !prices.waitForExistence(timeout: 10) { app.swipeUp() }
+        XCTAssertTrue(prices.waitForExistence(timeout: 10),
+                      "Админ offered no «Цени» — me-farms.json's platform flag did not reach the gate")
+        prices.tap()
+        XCTAssertTrue(app.navigationBars["Цени"].waitForExistence(timeout: 10), "«Цени» did not push its page")
+        Thread.sleep(forTimeInterval: 2)
+        capture("19-admin-prices", app: app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let close = app.navigationBars.buttons["Затвори"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "«Цени» did not go back to Админ")
+        close.tap()
     }
 
     // MARK: - The Дневник's filter (agrent-ios#252)
