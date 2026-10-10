@@ -19,6 +19,8 @@
 /api/public/eik-check
 /api/t/{tenantSlug}/admin/farm-profile
 /api/t/{tenantSlug}/admin/invites
+/api/t/{tenantSlug}/admin/market-prices/overrides
+/api/t/{tenantSlug}/admin/market-prices/overrides/{commodity}
 /api/t/{tenantSlug}/admin/members
 /api/t/{tenantSlug}/admin/members/{membershipId}/deactivate
 /api/t/{tenantSlug}/admin/members/{membershipId}/reactivate
