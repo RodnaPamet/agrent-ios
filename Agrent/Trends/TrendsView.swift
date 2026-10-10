@@ -280,7 +280,7 @@ struct TrendsView: View {
                         }
                     }
 
-                    staleness(stale)
+                    staleness(stale, typed: series.isPlatformPrice)
 
                     if let count = latest?.count {
                         // Only on listings-derived series, where it says how
@@ -308,7 +308,7 @@ struct TrendsView: View {
     private func seriesTitle(_ series: PriceSeries) -> String {
         var parts = [SeriesVocabulary.region(series.region)]
         if let stage = SeriesVocabulary.stage(series.stage) { parts.append(stage) }
-        if let label = series.label, !label.isEmpty { parts.append(label) }
+        if let label = series.displayLabel, !label.isEmpty { parts.append(label) }
         return parts.joined(separator: " · ")
     }
 
@@ -319,11 +319,13 @@ struct TrendsView: View {
     /// series was eighty-three days behind the payload that carried it,
     /// under a chart that looked entirely current.
     @ViewBuilder
-    private func staleness(_ days: Int?) -> some View {
+    private func staleness(_ days: Int?, typed: Bool) -> some View {
         if let days {
             if days >= Staleness.concerning {
                 Label(
-                    "Последно наблюдение преди \(Plural.bg(days, "ден", "дни"))",
+                    // The platform's price was typed, not observed (#1587),
+                    // and Табло says so in the same word.
+                    "\(typed ? "Въведена" : "Последно наблюдение") преди \(Plural.bg(days, "ден", "дни"))",
                     systemImage: "exclamationmark.triangle"
                 )
                 .font(.caption)

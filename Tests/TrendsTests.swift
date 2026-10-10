@@ -130,6 +130,23 @@ final class PriceSeriesIdentityTests: XCTestCase {
         XCTAssertEqual(store.groups.first?.series.count, 3)
     }
 
+    /// The chart holding the platform's typed price is drawn first (#1587):
+    /// typed diesel is per litre, so it is a chart of its own, and it is the
+    /// price the farm's figures use today.
+    func testThePlatformsChartComesFirst() async throws {
+        let json = """
+        {"commodity":"diesel","range":"1y","generatedAt":"2026-09-22T20:03:25.529Z","series":[
+          {"source":"oil-bulletin","region":"BG","stage":"without-tax","unit":"EUR/1000l","currency":"EUR","label":"Automotive gas oil","lastObservedAt":"2026-09-14","points":[{"date":"2026-09-14","price":1216.62}]},
+          {"source":"platform","region":"BG","stage":null,"unit":"EUR/l","currency":"EUR","label":null,"lastObservedAt":"2026-09-20","points":[{"date":"2026-09-20","price":1.42}]}
+        ]}
+        """
+        let store = TrendsStore()
+        store.setPricesForTesting(try await decode(json))
+        XCTAssertEqual(store.groups.map(\.unit), ["EUR/l", "EUR/1000l"])
+        XCTAssertEqual(SeriesVocabulary.unitHeading(unit: "EUR/l", currency: "EUR"), "евро на литър")
+        XCTAssertEqual(store.groups.first?.series.first?.headline(1.42), "1,42 евро на литър")
+    }
+
     /// Hiding every line leaves a full legend over an empty chart, which
     /// reads as a load failure.
     func testTheLastVisibleSeriesCannotBeHidden() async throws {

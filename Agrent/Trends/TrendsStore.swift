@@ -150,10 +150,15 @@ final class TrendsStore {
             if buckets[key] == nil { order.append(key) }
             buckets[key, default: []].append(series)
         }
-        return order.compactMap { key in
+        let groups = order.compactMap { key -> SeriesGroup? in
             guard let series = buckets[key], let first = series.first else { return nil }
             return SeriesGroup(unit: first.unit, currency: first.currency, series: series)
         }
+        // The chart holding the platform's typed price on top: it is the price
+        // the farm's figures use today (#1587), and typed diesel is per litre,
+        // so it is often a chart of its own.
+        let typed = groups.filter { $0.series.contains(where: \.isPlatformPrice) }
+        return typed + groups.filter { group in !group.series.contains(where: \.isPlatformPrice) }
     }
 
     func isVisible(_ series: PriceSeries) -> Bool { !hiddenSeriesIDs.contains(series.id) }
