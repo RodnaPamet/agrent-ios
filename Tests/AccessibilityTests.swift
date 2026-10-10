@@ -240,11 +240,12 @@ final class SpokenVocabularyTests: XCTestCase {
             ("search", A11y.Spoken.search), ("clearSearch", A11y.Spoken.clearSearch),
             ("complete", A11y.Spoken.complete), ("completeTask", A11y.Spoken.completeTask),
             ("download", A11y.Spoken.download), ("farmRecord", A11y.Spoken.farmRecord),
+            ("filters", A11y.Spoken.filters), ("show", A11y.Spoken.show),
         ]
         // 18 since the house search field and its clear button (#164); 20
         // since a task is completed, not closed (#236); 22 with the ДНЕВНИК
-        // PDF's (#246).
-        XCTAssertEqual(vocabulary.count, 22)
+        // PDF's (#246); 24 with the Дневник's filter and its sheet (#252).
+        XCTAssertEqual(vocabulary.count, 24)
         for (name, names) in vocabulary {
             XCTAssertEqual(names.count, 2, "\(name) should offer exactly two names")
             XCTAssertTrue(names[0].unicodeScalars.contains { $0.properties.isAlphabetic
@@ -272,6 +273,7 @@ final class SpokenVocabularyTests: XCTestCase {
             A11y.Spoken.search, A11y.Spoken.clearSearch,
             A11y.Spoken.complete, A11y.Spoken.completeTask,
             A11y.Spoken.download, A11y.Spoken.farmRecord,
+            A11y.Spoken.filters, A11y.Spoken.show,
         ]
         let bulgarian = all.map { $0[0].lowercased() }
         XCTAssertEqual(Set(bulgarian).count, bulgarian.count, "a Bulgarian name is used twice: \(bulgarian)")

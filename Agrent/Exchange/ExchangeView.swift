@@ -252,7 +252,7 @@ struct ExchangeView: View {
         // is the one thing a spoken interface cannot tolerate.
         .accessibilityLabel("Филтри")
         .accessibilityValue(listings.query.isFiltered ? "активни" : "")
-        .accessibilityInputLabels(A11y.spokenNames("Филтри", "Filters"))
+        .accessibilityInputLabels(A11y.Spoken.filters)
     }
 
     // MARK: - Mine: the seller's custody view
