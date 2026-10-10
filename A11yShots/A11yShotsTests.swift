@@ -115,6 +115,7 @@ final class A11yShotsTests: XCTestCase {
             case "09-overhead-costs": captureOverheadCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "01c-journal-filter": captureJournalFilter(app)
+            case "17-new-entry": captureNewEntryForm(app)
             case "18-operation-typed-product":
                 openTheLocation(app)
                 captureOperationSheet(app)
@@ -846,7 +847,10 @@ final class A11yShotsTests: XCTestCase {
         open.tap()
         let cancel = app.buttons["Отказ"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 10), "«Нов запис» did not present its form")
-        Thread.sleep(forTimeInterval: 1)
+        // Two seconds, not one: «Блокове» (#254) waits on locations-list.json.
+        // Not awaited by name, because at AX5 the section is below the fold
+        // and a lazy form has not built its rows yet.
+        Thread.sleep(forTimeInterval: 2)
         capture("17-new-entry", app: app)
         cancel.tap()
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 10),
