@@ -158,4 +158,31 @@ final class AdminPricesTests: XCTestCase {
         XCTAssertNil(farms.first?.isPlatform)
         XCTAssertFalse(Farm(farms[0]).offersPlatformPrices)
     }
+
+    // MARK: - The day refused (agri-saas #1618)
+
+    /// Each of the four refusals says which crop, in Bulgarian, never the slug;
+    /// without its params it still says something true.
+    func testTheDaysRefusalsNameTheCropInBulgarian() {
+        func said(_ code: String, _ params: [String: String]? = nil) -> String {
+            UserMessage.httpText(status: 400, code: code, message: "English fallback.", params: params)
+        }
+        XCTAssertEqual(said("DUPLICATE_COMMODITY", ["commodity": "wheat"]),
+                       "Цената на „\(CommodityName.canonical("wheat")!)“ е въведена два пъти за един ден.")
+        XCTAssertEqual(said("UNKNOWN_COMMODITY", ["commodity": "wheat"]),
+                       "Сървърът не разпознава „\(CommodityName.canonical("wheat")!)“.")
+        XCTAssertEqual(said("COMMODITY_NOT_OVERRIDABLE", ["commodity": "oats"]),
+                       "За „\(CommodityName.canonical("oats")!)“ не се въвежда цена от тук.")
+        XCTAssertEqual(said("OVERRIDE_DENOMINATION_CHANGED",
+                            ["commodity": "diesel", "stored": "EUR EUR/t", "expected": "EUR EUR/l"]),
+                       "Цената на „\(CommodityName.canonical("diesel")!)“ е въведена в EUR/t, "
+                       + "а вече се въвежда в EUR/l. Изчистете я, преди да въведете нова.")
+        for code in ["DUPLICATE_COMMODITY", "UNKNOWN_COMMODITY", "COMMODITY_NOT_OVERRIDABLE",
+                     "OVERRIDE_DENOMINATION_CHANGED"] {
+            let bare = said(code)
+            XCTAssertNotEqual(bare, "English fallback.", code)
+            XCTAssertTrue(bare.hasSuffix("."), code)
+            XCTAssertFalse(bare.contains("_"), code)
+        }
+    }
 }

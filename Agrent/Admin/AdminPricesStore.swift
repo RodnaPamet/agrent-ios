@@ -135,7 +135,7 @@ final class AdminPricesStore {
             let written = try await AdminPricesAPI.save(day, key: CostIdempotencyKey.mint(nonce: nonce, draft: day))
             texts = [:]
             savedNote = "Записани " + Plural.bg(written.written, "цена", "цени")
-                + " за " + BgDate.rowDay(self.day) + "."
+                + " за " + BgDate.rowDayEndingSentence(self.day)
             await load()
         } catch {
             failure = UserMessage.text(for: error)

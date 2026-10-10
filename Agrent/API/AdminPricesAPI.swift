@@ -1,6 +1,7 @@
 import Foundation
 
-/// The superuser's daily prices (#258), against agri-saas #1587 contract v1.
+/// The superuser's daily prices (#258), against agri-saas #1587 contract v1.2,
+/// as built in agri-saas #1618.
 ///
 /// The owner, 2026-10-10: price fields, filled daily, that update the price
 /// for every farm. A typed price ALWAYS wins over the API's for its commodity
@@ -112,10 +113,12 @@ enum AdminPricesAPI {
         }
     }
 
-    /// The request body: the day, plus the key it was minted under. The key
-    /// travels in the body because that is where the server dedupes
-    /// (`(tenantId, clientMutationId)`, #1587 §5d); the header carries the
-    /// same value for the client's own retry layer.
+    /// The request body: the day, plus the key it was minted under, in the
+    /// body and the header alike. The server RECORDS the key and does not
+    /// dedupe on it (agri-saas #1618): the price tables are global, with no
+    /// tenant to scope a key by, and need none — each price upserts on its
+    /// series and date, so a day sent twice leaves the same prices. A retry
+    /// over a bad link is safe by construction.
     private struct Body: Encodable {
         let date: String
         let prices: [Day.Price]
@@ -126,8 +129,8 @@ enum AdminPricesAPI {
         let written: Int
     }
 
-    /// `key` comes from `CostIdempotencyKey.mint(nonce:draft:)` over `day`. A
-    /// retry of the same day dedupes; a corrected one is a new write.
+    /// `key` comes from `CostIdempotencyKey.mint(nonce:draft:)` over `day`:
+    /// the same day, the same key, for the audit row to tie the two together.
     static func save(_ day: Day, key: String) async throws -> Written {
         try await APIClient.shared.post(
             path, body: Body(date: day.date, prices: day.prices, clientMutationId: key),
@@ -137,8 +140,11 @@ enum AdminPricesAPI {
 
     // MARK: - Clearing
 
-    /// Ends one commodity's override. The server marks the typed series
-    /// cleared and keeps its points, so the history survives (#1587 §5b).
+    /// Ends one commodity's override, in every region and stage. The server
+    /// marks the series and its points cleared and keeps them, so the history
+    /// survives (#1587 §5b); a later price starts a fresh run, and only the
+    /// days typed again rejoin it. Clearing nothing is a 200 with
+    /// `cleared: false`, so a retried clear is not an error.
     static func clear(_ commodity: String) async throws {
         _ = try await APIClient.shared.deleteReturningData(clearPath(commodity))
     }

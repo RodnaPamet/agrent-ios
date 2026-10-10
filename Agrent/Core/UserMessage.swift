@@ -332,9 +332,42 @@ enum UserMessage {
             guard !named.isEmpty, named.allSatisfy({ $0 != nil }) else { return generic }
             return "Липсва за нов препарат: \(named.compactMap { $0 }.joined(separator: " и "))."
 
+        // ── The superuser's day of prices (#258, agri-saas #1587) ──
+        //
+        // Each refuses the WHOLE day. `params.commodity` is a slug or the
+        // spelling sent, so it is named through `CommodityName`, never quoted
+        // raw. The form sends one field per row the server listed, so the
+        // first three mean the two lists drifted; the fourth is real.
+        case "DUPLICATE_COMMODITY":
+            return commodityNamed(params, "Цената на „%@“ е въведена два пъти за един ден.",
+                                  otherwise: "Една от цените е въведена два пъти за един ден.")
+        case "UNKNOWN_COMMODITY":
+            return commodityNamed(params, "Сървърът не разпознава „%@“.",
+                                  otherwise: "Сървърът не разпознава една от културите.")
+        case "COMMODITY_NOT_OVERRIDABLE":
+            return commodityNamed(params, "За „%@“ не се въвежда цена от тук.",
+                                  otherwise: "За една от културите не се въвежда цена от тук.")
+        case "OVERRIDE_DENOMINATION_CHANGED":
+            // `stored` and `expected` are «EUR EUR/t»: currency, then unit.
+            // The unit says it all, and is what differs.
+            let unit = { (key: String) in params?[key]?.split(separator: " ").last.map(String.init) }
+            let name = params?["commodity"].flatMap { CommodityName.canonical($0) }
+            guard let name, let stored = unit("stored"), let expected = unit("expected") else {
+                return "Една от цените е въведена в друга мярка. Изчистете я, преди да въведете нова."
+            }
+            return "Цената на „\(name)“ е въведена в \(stored), а вече се въвежда в \(expected). "
+                 + "Изчистете я, преди да въведете нова."
+
         default:
             return nil
         }
+    }
+
+    /// A sentence naming `params.commodity` in Bulgarian, or the general one.
+    private static func commodityNamed(_ params: [String: String]?, _ format: String,
+                                       otherwise: String) -> String {
+        guard let name = params?["commodity"].flatMap({ CommodityName.canonical($0) }) else { return otherwise }
+        return format.replacingOccurrences(of: "%@", with: name)
     }
 
     /// `PESTICIDE_REGULATORY_FIELDS_REQUIRED`'s `params.missing`, wire name →
