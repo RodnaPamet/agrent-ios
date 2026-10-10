@@ -52,6 +52,7 @@
 /api/t/{tenantSlug}/field-operations/{taskId}/parcels/{lineId}
 /api/t/{tenantSlug}/grain/calculator
 /api/t/{tenantSlug}/grain/costs
+/api/t/{tenantSlug}/grain/costs/batch
 /api/t/{tenantSlug}/grain/costs/defaults
 /api/t/{tenantSlug}/insurance/leads
 /api/t/{tenantSlug}/insurance/products

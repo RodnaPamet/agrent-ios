@@ -63,6 +63,49 @@ final class OverheadSheetTests: XCTestCase {
         }
     }
 
+    // MARK: - One sheet, one write (#260)
+
+    private func sheet(_ credit: String) -> CostsAPI.Sheet {
+        var sheet = OverheadSheet()
+        sheet.payroll.amountText = "36 000"
+        sheet.credit.amountText = credit
+        return CostsAPI.Sheet(lines: sheet.drafts(currency: "EUR", incurredOn: day))
+    }
+
+    /// The batch body is `{ lines: [...] }`, each line the single-create
+    /// body, in the sheet's order — agri-saas #1604 answers in the order sent.
+    func testTheSheetGoesOutAsOneBodyInItsOrder() throws {
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(sheet("1250"))) as? [String: Any])
+        XCTAssertEqual(Set(body.keys), ["lines"])
+        let lines = try XCTUnwrap(body["lines"] as? [[String: Any]])
+        XCTAssertEqual(lines.compactMap { $0["category"] as? String }, ["PAYROLL", "CREDIT"])
+        XCTAssertEqual(lines.compactMap { $0["allocationBasis"] as? String }, ["HOLDING", "HOLDING"])
+        XCTAssertTrue(CostsAPI.batchPath.hasSuffix("/grain/costs/batch"))
+    }
+
+    /// One key for the whole sheet: a retry of the same sheet dedupes, and
+    /// correcting any one line makes it a new write.
+    func testARetryKeepsTheSheetsKeyAndACorrectedLineDoesNot() {
+        let nonce = "6C4E0E84-8F9C-4F8E-9B0A-1D2C3E4F5A6B"
+        let key = CostIdempotencyKey.mint(nonce: nonce, draft: sheet("1250"))
+        XCTAssertEqual(CostIdempotencyKey.mint(nonce: nonce, draft: sheet("1250")), key)
+        XCTAssertNotEqual(CostIdempotencyKey.mint(nonce: nonce, draft: sheet("1251")), key)
+        // Another sheet with the same figures is another write.
+        XCTAssertNotEqual(CostIdempotencyKey.mint(nonce: UUID().uuidString, draft: sheet("1250")), key)
+    }
+
+    /// «Общи» saves through the batch only: a per-line POST is what left a
+    /// sheet half-saved.
+    func testOverheadsAreSavedAsOneSheet() throws {
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Agrent/Calculator/NewCostView.swift"), encoding: .utf8)
+        let save = try XCTUnwrap(source.range(of: "private func saveOverheads()"))
+        // Up to the next function, the crop side's one-line save.
+        let body = String(source[save.upperBound...]).components(separatedBy: "private func save()").first ?? ""
+        XCTAssertTrue(body.contains("CostsAPI.createSheet("), "positive control: «Общи» sends the sheet")
+        XCTAssertFalse(body.contains("CostsAPI.create("), "«Общи» went back to one POST per line")
+    }
+
     // MARK: - The salary's total
 
     /// The total follows people × salary until the farmer types it — then it

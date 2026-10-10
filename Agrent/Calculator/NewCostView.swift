@@ -65,9 +65,8 @@ struct NewCostView: View {
         case overhead
     }
 
-    /// The «Общи» sheet, its prefill sources, and what became of each line.
+    /// The «Общи» sheet and its prefill sources.
     @State private var overhead = OverheadSheet()
-    @State private var overheadResults: [CostCategory: OverheadLineResult] = [:]
     @State private var machinery: MachineryDepreciation?
     @State private var overheadPrefilled = false
     @State private var currencyEdited = false
@@ -90,6 +89,12 @@ struct NewCostView: View {
         /// No answer arrived. The row may or may not exist, and only the
         /// books can say which.
         case unknown(String)
+
+        var message: String {
+            switch self {
+            case .refused(let message), .unknown(let message): message
+            }
+        }
     }
 
     /// Parsed with an explicit locale, not `Decimal(string:)`'s default.
@@ -143,19 +148,17 @@ struct NewCostView: View {
             guard let draft else { return false }
             return draft.problems.isEmpty
         case .overhead:
-            return overhead.problems.isEmpty && !pendingOverheads.isEmpty
+            // `problems` holds `.nothingEntered` for an empty sheet.
+            return overhead.problems.isEmpty && !answerLost
         }
     }
 
-    /// The overhead lines still to send: entered, and neither saved nor lost
-    /// in transit (`OverheadLineResult`).
-    private var pendingOverheads: [CostCategory] {
-        overhead.entered.filter {
-            switch overheadResults[$0] {
-            case .saved?, .unknown?: false
-            case .refused?, nil: true
-            }
-        }
+    /// The last save's answer was lost: what was sent may be in the books.
+    /// «Общи» is then not sent again from this sheet (the owner's rule for a
+    /// cost, 2026-09-25: look at the list first), and the choice of side is
+    /// fixed so the text saying so stays in front of the operator.
+    private var answerLost: Bool {
+        if case .unknown? = failure { true } else { false }
     }
 
     /// The crop side's categories: what a crop's decares carry — the
@@ -171,7 +174,7 @@ struct NewCostView: View {
                         Text("Общи").tag(Scope.overhead)
                     }
                     .pickerStyle(.segmented)
-                    .disabled(saving || !overheadResults.isEmpty)
+                    .disabled(saving || answerLost)
                 } footer: {
                     SectionFooter {
                         Text(scope == .crop
@@ -184,7 +187,15 @@ struct NewCostView: View {
                 switch scope {
                 case .crop: cropFields
                 case .overhead:
-                    OverheadFields(sheet: $overhead, results: overheadResults, machinery: machinery)
+                    // At the top, under the choice it fixes: a lost answer
+                    // dims the whole sheet, and the reason belongs where the
+                    // operator is looking, not under four sections.
+                    if let failure {
+                        Section { failureView(failure) }
+                    }
+                    // Fixed while the sheet is in flight, too: a figure typed
+                    // then is not in what was sent, and would close unsaved.
+                    OverheadFields(sheet: $overhead, locked: saving || answerLost, machinery: machinery)
                     commonFields
                     if let problem = overheadProblemText {
                         Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
@@ -213,6 +224,14 @@ struct NewCostView: View {
             .interactiveDismissDisabled(saving)
             .task(id: scope) { if scope == .overhead { await prefillOverheads() } }
             .onChange(of: currency) { currencyEdited = true }
+            // A refusal belongs to the side that was sent; a lost answer
+            // cannot get here, because it fixes the side.
+            .onChange(of: scope) { failure = nil }
+            // Said, not only shown: «Запази» is in the toolbar, far from
+            // where the answer is drawn.
+            .onChange(of: failure) { _, failure in
+                if let failure { AccessibilityNotification.Announcement(spoken(failure)).post() }
+            }
         }
     }
 
@@ -265,7 +284,7 @@ struct NewCostView: View {
             DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
                 .tint(Palette.DatePill.tint)
         }
-        .disabled(saving || !overheadResults.isEmpty)
+        .disabled(saving || answerLost)
     }
 
     private var overheadProblemText: String? {
@@ -284,7 +303,9 @@ struct NewCostView: View {
         case .refused(let message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(Palette.error)
-                Text("Разходът НЕ е записан. Можете да опитате отново.")
+                Text(scope == .crop
+                     ? "Разходът НЕ е записан. Можете да опитате отново."
+                     : "Нито една от сумите НЕ е записана. Можете да опитате отново.")
                     .font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         case .unknown(let message):
@@ -302,16 +323,32 @@ struct NewCostView: View {
                 Label("Неясен резултат", systemImage: "questionmark.circle")
                     .foregroundStyle(Palette.error)
                 Text(message).font(.footnote).foregroundStyle(Palette.secondaryText)
-                Text("""
+                Text(scope == .crop ? """
                     Връзката прекъсна, преди сървърът да отговори. Разходът \
                     може да е записан, а може и да не е. Проверете списъка с \
                     разходи, преди да го въведете отново — повторното \
                     въвеждане създава втори запис.
+                    """ : """
+                    Връзката прекъсна, преди сървърът да отговори. Сумите \
+                    може да са записани, а може и да не са — всички или нито \
+                    една. Проверете списъка с разходи, преди да ги въведете \
+                    отново — повторното въвеждане ги записва втори път.
                     """)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
             }
         }
+    }
+
+    /// The answer, and what it means for the books, in one announcement.
+    private func spoken(_ failure: Failure) -> String {
+        let outcome = switch (failure, scope) {
+        case (.refused, .crop): "Разходът НЕ е записан."
+        case (.refused, .overhead): "Нито една от сумите НЕ е записана."
+        case (.unknown, .crop): "Разходът може да е записан, а може и да не е. Проверете списъка с разходи."
+        case (.unknown, .overhead): "Сумите може да са записани, а може и да не са. Проверете списъка с разходи."
+        }
+        return "\(failure.message) \(outcome)"
     }
 
     private var firstProblemText: String? {
@@ -346,34 +383,32 @@ struct NewCostView: View {
         overhead.useRegister(machinery?.offered, onlyIfEmpty: true)
     }
 
-    /// Each line its own cost — one POST each, each under its own key
-    /// (`CostIdempotencyKey`: this sheet's nonce, that line's content), so a
-    /// replay of any one of them cannot book it twice. A line that landed, or
-    /// whose answer was lost, is not sent again: the first is done, and the
-    /// second is the one-line form's rule — look at the list before entering
-    /// it again. A refused one stays editable and goes again on «Запази».
-    /// The sheet closes only when every line it holds has landed.
+    /// The year's overheads as ONE write (#260, agri-saas #1604): every
+    /// line lands or none does, so there is no half-saved sheet to explain.
+    /// One key for the sheet, minted from all of it (`CostIdempotencyKey`:
+    /// this sheet's nonce, every line's content), so a replay of the same
+    /// sheet cannot book it twice and a corrected sheet is a new write.
+    ///
+    /// The outcomes are the one-line form's, for the sheet as a whole: a
+    /// refusal wrote nothing, so the sheet stays editable and goes again on
+    /// «Запази»; a lost answer locks it (`answerLost`).
     private func saveOverheads() async {
         guard canSave else { return }
         saving = true
+        failure = nil
         defer { saving = false }
-        let drafts = overhead.drafts(
+        let sheet = CostsAPI.Sheet(lines: overhead.drafts(
             currency: currency.trimmingCharacters(in: .whitespaces).uppercased(),
-            incurredOn: BgDate.isoDay(incurredOn))
-        for draft in drafts where pendingOverheads.contains(draft.category) {
-            do {
-                _ = try await CostsAPI.create(
-                    draft, idempotencyKey: CostIdempotencyKey.mint(nonce: nonce, draft: draft))
-                overheadResults[draft.category] = .saved
-            } catch let error as URLError {
-                overheadResults[draft.category] = .unknown(UserMessage.text(for: error))
-            } catch {
-                overheadResults[draft.category] = .refused(UserMessage.text(for: error))
-            }
-        }
-        if overhead.entered.allSatisfy({ overheadResults[$0] == .saved }) {
+            incurredOn: BgDate.isoDay(incurredOn)))
+        do {
+            _ = try await CostsAPI.createSheet(
+                sheet, idempotencyKey: CostIdempotencyKey.mint(nonce: nonce, draft: sheet))
             onSaved()
             dismiss()
+        } catch let error as URLError {
+            failure = .unknown(UserMessage.text(for: error))
+        } catch {
+            failure = .refused(UserMessage.text(for: error))
         }
     }
 
