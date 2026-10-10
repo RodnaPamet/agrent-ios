@@ -1,5 +1,10 @@
 {
   "category": "all",
+  "tags": [
+    "subsidies",
+    "wheat"
+  ],
+  "q": null,
   "items": [
     {
       "id": "news_synthetic_1",
@@ -27,33 +32,7 @@
       "tags": [
         "subsidies"
       ]
-    },
-    {
-      "id": "news_synthetic_3",
-      "source": "Примерен портал",
-      "category": "general",
-      "title": "Съвети за съхранение на слънчоглед при висока влажност",
-      "summary": null,
-      "url": "https://news.example.invalid/articles/3",
-      "imageUrl": null,
-      "publishedAt": "2026-09-26T16:45:10.500Z",
-      "tags": [
-        "sunflower"
-      ]
-    },
-    {
-      "id": "news_synthetic_4",
-      "source": "Example Wire",
-      "category": "weather",
-      "title": "Прогноза: застудяване и валежи в Северна България през уикенда",
-      "summary": "Очакват се до 20 л/кв.м валежи и понижение на температурите с шест до осем градуса.",
-      "url": "https://news.example.invalid/articles/4",
-      "imageUrl": null,
-      "publishedAt": "2026-09-25T05:10:00.000Z",
-      "tags": [
-        "weather",
-        "frost-alerts"
-      ]
     }
-  ]
+  ],
+  "nextCursor": null
 }

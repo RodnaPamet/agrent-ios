@@ -21,7 +21,6 @@ struct SeriesGroup: Identifiable {
 @MainActor
 final class TrendsStore {
     private(set) var prices: LoadState<PricesResponse> = .loading
-    private(set) var news: LoadState<NewsResponse> = .loading
 
     /// A `ChartableCommodity`, never a raw slug string.
     ///
@@ -34,7 +33,6 @@ final class TrendsStore {
     /// guard is right to make someone say why.
     var commodity: ChartableCommodity = .wheat
     var range: PriceRange = .default
-    var newsCategory: NewsCategory = .all
 
     /// Which series are drawn. Reset and re-derived whenever the commodity
     /// changes, since an id from the previous commodity means nothing here.
@@ -55,30 +53,6 @@ final class TrendsStore {
             try await APIClient.shared.decode(data, as: PricesResponse.self)
         } publish: { [weak self] in self?.prices = $0 }
         applyDefaultVisibility()
-    }
-
-    /// Start with Bulgaria, not with everything.
-    ///
-    /// Wheat's EUR/t group is the EC agri-food feed, which quotes every
-    /// member state — the first build drew all of them and produced
-    /// fifteen overlapping lines in one 220-point-tall chart, from which
-    /// nothing at all could be read. Showing more data than can be
-    /// distinguished is not more information.
-    ///
-    /// So the default is the series this farm is in: region BG, plus any
-    /// GLOBAL reference, which is the benchmark a Bulgarian price is
-    /// judged against. Everything else stays one tap away in the legend
-    /// rather than being removed.
-    ///
-    /// If a group has neither — a commodity quoted only elsewhere — the
-    /// first series is shown, because an empty chart under a full legend
-    /// reads as a load failure.
-    func loadNews() async {
-        if news.value == nil { news = .loading }
-        let path = TrendsAPI.newsPath(newsCategory)
-        await CachedResource.loadShowingCacheFirst(path) { data in
-            try await APIClient.shared.decode(data, as: NewsResponse.self)
-        } publish: { [weak self] in self?.news = $0 }
     }
 
     func select(_ commodity: ChartableCommodity) async {
@@ -102,13 +76,22 @@ final class TrendsStore {
         await loadPrices()
     }
 
-    func select(_ category: NewsCategory) async {
-        guard category != newsCategory else { return }
-        newsCategory = category
-        news = .loading
-        await loadNews()
-    }
-
+    /// Start with Bulgaria, not with everything.
+    ///
+    /// Wheat's EUR/t group is the EC agri-food feed, which quotes every
+    /// member state — the first build drew all of them and produced
+    /// fifteen overlapping lines in one 220-point-tall chart, from which
+    /// nothing at all could be read. Showing more data than can be
+    /// distinguished is not more information.
+    ///
+    /// So the default is the series this farm is in: region BG, plus any
+    /// GLOBAL reference, which is the benchmark a Bulgarian price is
+    /// judged against. Everything else stays one tap away in the legend
+    /// rather than being removed.
+    ///
+    /// If a group has neither — a commodity quoted only elsewhere — the
+    /// first series is shown, because an empty chart under a full legend
+    /// reads as a load failure.
     private func applyDefaultVisibility() {
         guard !seriesChosenByHand else { return }
         var hidden: Set<String> = []

@@ -308,3 +308,25 @@ list does not have, and under the seam the open farm is always `agrent`.
 The second farm has no fixtures of its own. A11yShots never taps it; a tap
 under the seam would open a farm whose every path is `NO_FIXTURE`, which is a
 true report of a fixture world with one farm in it.
+
+## Новини's topics (agrent-ios#231)
+
+`trends-news-tags.json`, `news-preferences.json`, `trends-news-mine.json`,
+and `tags` on every item of `trends-news.json`.
+
+**Synthetic, all of them.** They are shaped as agri-saas's written contract
+(#1446, `docs/implementation-notes/2026-10-08-news-tags-and-preferences-contract.md`),
+because the server half did not exist yet when they were written:
+
+- The catalogue holds the eleven tags the owner's proposal named, in two
+  groups, Култури and Теми, with `labelEn`.
+- The fixture person follows `subsidies` and `wheat`, so Новини opens on
+  «Моите теми». `trends-news-mine.json` is that feed: the wheat-prices and
+  subsidy items, with the contract's echo of the applied tags.
+- The weather item also carries `frost-alerts`, a tag the catalogue does not
+  hold, so the capture shows an unknown key left out rather than drawn as
+  code.
+
+Choosing a topic is a PUT, which the seam answers with a 501 like every write.
+A11yShots opens «Предпочитания» and closes it, and never touches a switch.
+

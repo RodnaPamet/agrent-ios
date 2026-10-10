@@ -15,6 +15,7 @@
 /api/auth/terms
 /api/auth/token/refresh
 /api/me/farms
+/api/me/news-preferences
 /api/public/eik-check
 /api/t/{tenantSlug}/admin/farm-profile
 /api/t/{tenantSlug}/admin/invites
@@ -71,5 +72,6 @@
 /api/t/{tenantSlug}/tasks/{id}/status
 /api/t/{tenantSlug}/tasks/{id}/weed-observations
 /api/t/{tenantSlug}/trends/news
+/api/t/{tenantSlug}/trends/news/tags
 /api/t/{tenantSlug}/trends/prices
 /api/t/{tenantSlug}/units

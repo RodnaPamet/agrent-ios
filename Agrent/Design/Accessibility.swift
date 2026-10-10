@@ -142,6 +142,10 @@ enum A11y {
 
         /// The composer's send, which names its object.
         static let sendMessage = spokenNames("Изпрати съобщението", "Send message")
+        /// Новини's topics (#231): the button, and the two scopes of the feed.
+        static let newsPreferences = spokenNames("Предпочитания", "Preferences")
+        static let myTopics = spokenNames("Моите теми", "My topics")
+        static let allNews = spokenNames("Всички", "All")
         /// A task's comment (#225) — a different send from a message, so a
         /// different name: one screen could one day hold both.
         static let sendComment = spokenNames("Изпрати коментара", "Send comment")

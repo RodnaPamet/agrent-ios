@@ -128,6 +128,10 @@ final class FixtureSeamTests: XCTestCase {
             (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
             (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
             (TrendsAPI.newsPath(.all), "trends-news"),
+            // #231: the topics' feed, the catalogue and the choices.
+            (TrendsAPI.newsPath(tags: ["subsidies", "wheat"], query: nil, cursor: nil), "trends-news-mine"),
+            (TrendsAPI.newsTagsPath, "trends-news-tags"),
+            (NewsPreferencesAPI.path, "news-preferences"),
             // agrent-ios#138 — the field-operation task and its lines.
             (WorkItemAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID), "task-detail-fieldop"),
             (FieldOperationAPI.detailPath(FixtureCatalogue.fixtureFieldOperationTaskID),
@@ -428,6 +432,9 @@ final class FixtureSeamTests: XCTestCase {
         // is what runs here.
         ("trends-prices", { _ = try await APIClient.shared.decode($0, as: PricesResponse.self) }),
         ("trends-news", { _ = try await APIClient.shared.decode($0, as: NewsResponse.self) }),
+        ("trends-news-mine", { _ = try await APIClient.shared.decode($0, as: NewsResponse.self) }),
+        ("trends-news-tags", { _ = try await APIClient.shared.decode($0, as: NewsTagCatalogue.self) }),
+        ("news-preferences", { _ = try await APIClient.shared.decode($0, as: NewsPreferencesAPI.Body.self) }),
         // agrent-ios#138.
         ("task-detail-fieldop", { _ = try await WorkItemAPI.decodeDetail(from: $0) }),
         ("task-detail-task", { _ = try await WorkItemAPI.decodeDetail(from: $0) }),
