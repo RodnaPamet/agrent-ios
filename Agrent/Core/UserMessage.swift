@@ -233,6 +233,9 @@ enum UserMessage {
         case 403: "Нямате права за това действие."
         case 404: "Търсеното не беше намерено."
         case 408: "Заявката отне твърде дълго."
+        // A coded 409 that is not a stale edit (#240): something with that
+        // name or key already exists. Re-reading will not change it.
+        case 409: "Това вече съществува на сървъра."
         case 413: "Файлът е твърде голям."
         case 429: "Твърде много заявки. Опитайте отново след малко."
         case 500...599: "Проблем със сървъра. Опитайте отново по-късно."
@@ -449,6 +452,13 @@ enum UserMessage {
         // visible to the farm's owner. Worth knowing before anything here
         // grows a retry.
         "FORBIDDEN": "Нямате права за това действие.",
+
+        // 409s that are not a stale edit (#240, agri-saas #1489): a collision
+        // with something that already exists, so the remedy is a different
+        // name or the thing already there, never a re-read.
+        "ITEM_NAME_ALREADY_EXISTS": "Вече има продукт с това име. Въведете друго име.",
+        "LISTING_INTEREST_ALREADY_SENT": "Вече сте изпратили запитване за тази обява.",
+        "CONFLICT": "Това вече съществува на сървъра.",
 
         // Every zod refusal, app-wide: `toApiErrorResponse` answers a
         // `ZodError` with this code and the English "Invalid request payload",

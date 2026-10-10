@@ -143,7 +143,9 @@ actor APIClient {
         /// so this is a read that outlived its farm, or a bug, never a
         /// person's mistake.
         case noFarmOpen
-        /// 409 STALE_DATA. `currentVersion` is what the server holds now —
+        /// 409 STALE_DATA, or a 409 with no code — never another code, which
+        /// is an `.http` (`conflict(from:)`, #240). `currentVersion` is what
+        /// the server holds now —
         /// resend with `If-Match: currentVersion` to take-server, or show the
         /// operator both. NEVER treat this as a save: the web modal closed
         /// like a success on 409 and parked the write where nothing could
@@ -379,13 +381,33 @@ actor APIClient {
     /// is no URLProtocol seam in `Tests/`, and "the versions come from
     /// `error.details`, not the body root" is exactly the rule that silently
     /// broke on the web (#922).
+    ///
+    /// ── A 409 is a stale edit only when it says so (#240) ──
+    ///
+    /// `.conflict` means one thing to every consumer — the outbox's keep-mine
+    /// or take-server, the profile editor's re-read, «Записът е променен на
+    /// сървъра» — and that thing is `STALE_DATA`. Every locked route raises
+    /// exactly that (agri-saas `staleData`). A 409 with any OTHER code is a
+    /// collision with something that exists: a taken product name
+    /// (`ITEM_NAME_ALREADY_EXISTS`), an enquiry already sent
+    /// (`LISTING_INTEREST_ALREADY_SENT`), a unique index (`CONFLICT`). Told as
+    /// someone else's edit, the farmer re-reads and finds nothing changed. So
+    /// those keep their code as an ordinary `.http`, said by `UserMessage`
+    /// like any other refusal. A 409 with NO code is a server from before the
+    /// codes, and was always a stale edit.
     static func conflict(from data: Data) -> APIError {
         let env = envelope(from: data)
+        if let code = env?.code, code != staleCode {
+            return .http(status: 409, code: code, message: env?.message, params: env?.params)
+        }
         return .conflict(
             currentVersion: env?.details?.currentVersion,
             expectedVersion: env?.details?.expectedVersion
         )
     }
+
+    /// The optimistic lock's code, and the only one `.conflict` stands for.
+    static let staleCode = "STALE_DATA"
 
     /// The `If-Match` value for a version: the BARE integer, `5`.
     ///

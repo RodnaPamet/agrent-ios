@@ -259,13 +259,18 @@ struct CreateFieldOperation: Encodable, Sendable {
     /// and the unique index does not, so a sample the owner's removal kept
     /// for a past record answers `ITEM_NAME_ALREADY_EXISTS` on create — even
     /// for a name the sheet's catalogue does not show, if the removal hid it
-    /// from `/items` (agri-saas, 2026-10-09). The app-wide 409 sentence is
-    /// about a stale edit, which this is not (#240).
+    /// from `/items` (agri-saas, 2026-10-09). The app-wide sentence for that
+    /// code is a plain taken name, which on THIS route misleads (#240).
+    ///
+    /// By its code, since #240 keeps a coded 409 as `.http`; a codeless 409
+    /// (`.conflict`, a server from before the codes) meant the same here.
     static func failureText(_ error: Error) -> String {
-        if case APIClient.APIError.conflict = error {
-            return "Това наименование е заето от образцов продукт. Въведете истинското търговско наименование."
+        switch error {
+        case APIClient.APIError.http(409, "ITEM_NAME_ALREADY_EXISTS"?, _, _, _), APIClient.APIError.conflict:
+            "Това наименование е заето от образцов продукт. Въведете истинското търговско наименование."
+        default:
+            UserMessage.text(for: error)
         }
-        return UserMessage.text(for: error)
     }
 
     enum Invalid: Equatable {
