@@ -57,6 +57,14 @@ enum BgDate {
             ? dayMonth(date) : full(date)
     }
 
+    /// `rowDay` closing a sentence: «… на 21 септември.», and «… на 1 октомври
+    /// 2025 г.» with the year's «г.» as the full stop. Appending one after
+    /// `rowDay` read «2025 г..» on every date from another year.
+    static func rowDayEndingSentence(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let day = rowDay(date, now: now, calendar: calendar)
+        return day.hasSuffix(".") ? day : day + "."
+    }
+
     /// 14:32 — a clock time, for a promise about later today.
     ///
     /// Twenty-four hour because the LOCALE is: measured, bg_BG gives "14:32"

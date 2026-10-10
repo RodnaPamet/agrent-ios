@@ -47,16 +47,16 @@ final class CostSaveOutcomeTests: XCTestCase {
         XCTAssertEqual(Failure(URLError(.notConnectedToInternet)).message, "Няма интернет връзка.")
     }
 
-    /// Both sides of the form sort a failure through `Failure.init`, and
-    /// neither keeps a `URLError` rule of its own that would skip it.
+    /// Both sides of the form save through `saveSheet`, which sorts a failure
+    /// through `Failure.init`; no `URLError` rule of its own skips it.
     func testBothSavesUseTheOneRule() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent().deletingLastPathComponent()
                 .appendingPathComponent("Agrent/Calculator/NewCostView.swift"),
             encoding: .utf8)
-        XCTAssertEqual(source.components(separatedBy: "failure = Failure(error)").count - 1, 2,
-                       "positive control: «Общи» and the crop side each classify through Failure")
+        XCTAssertTrue(source.contains("failure = Failure(error)"),
+                      "positive control: the sheet save classifies through Failure")
         XCTAssertFalse(source.contains("catch let error as URLError"),
                        "a save sorts URLErrors itself again, past WriteOutcome")
     }

@@ -1,0 +1,40 @@
+{
+  "commodity": "wheat",
+  "lines": [
+    {
+      "category": "RENT",
+      "amountPerDca": 50,
+      "currency": "BGN",
+      "incurredOn": "2025-10-01T00:00:00.000Z",
+      "description": null
+    },
+    {
+      "category": "SEED",
+      "amountPerDca": 9.5,
+      "currency": "EUR",
+      "incurredOn": "2025-10-01T00:00:00.000Z",
+      "description": null
+    },
+    {
+      "category": "PESTICIDE",
+      "amountPerDca": 3.2,
+      "currency": "EUR",
+      "incurredOn": "2025-10-01T00:00:00.000Z",
+      "description": "Хербицид"
+    },
+    {
+      "category": "PESTICIDE",
+      "amountPerDca": 2.8,
+      "currency": "EUR",
+      "incurredOn": "2025-10-01T00:00:00.000Z",
+      "description": "Фунгицид"
+    },
+    {
+      "category": "FERTILIZER",
+      "amountPerDca": null,
+      "currency": "EUR",
+      "incurredOn": "2025-10-01T00:00:00.000Z",
+      "description": "Амониева селитра"
+    }
+  ]
+}

@@ -99,11 +99,12 @@ final class OverheadSheetTests: XCTestCase {
     func testOverheadsAreSavedAsOneSheet() throws {
         let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("Agrent/Calculator/NewCostView.swift"), encoding: .utf8)
-        let save = try XCTUnwrap(source.range(of: "private func saveOverheads()"))
-        // Up to the next function, the crop side's one-line save.
-        let body = String(source[save.upperBound...]).components(separatedBy: "private func save()").first ?? ""
-        XCTAssertTrue(body.contains("CostsAPI.createSheet("), "positive control: «Общи» sends the sheet")
-        XCTAssertFalse(body.contains("CostsAPI.create("), "«Общи» went back to one POST per line")
+        // Both sides save through the one function, «Общи» and «Култура».
+        let save = try XCTUnwrap(source.range(of: "private func saveSheet()"))
+        let body = String(source[save.upperBound...])
+        XCTAssertTrue(body.contains("overhead.drafts("), "positive control: «Общи» goes through the sheet save")
+        XCTAssertTrue(body.contains("CostsAPI.createSheet("), "positive control: the sheet is sent whole")
+        XCTAssertFalse(source.contains("CostsAPI.create("), "a sheet went back to one POST per line")
     }
 
     // MARK: - The salary's total

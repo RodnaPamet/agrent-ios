@@ -122,6 +122,10 @@ enum FixtureCatalogue {
         // agrent-ios#231: the feed for the fixture person's topics, exactly
         // as `NewsStore` asks for it — sorted, no search, first page.
         (TrendsAPI.newsPath(tags: ["subsidies", "wheat"], query: nil, cursor: nil), "trends-news-mine"),
+        // agrent-ios#245: «Култура»'s last sheet for the calculator fixture's
+        // first crop, as `NewCostView` asks for it. Without the query this is
+        // the overhead payload, which is `costs-defaults` on the path alone.
+        (CostsAPI.cropDefaultsPath("WHEAT"), "costs-defaults-crop"),
     ]) { $0 }
 
     /// Routes matched on the path alone.

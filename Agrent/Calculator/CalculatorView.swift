@@ -18,7 +18,7 @@ struct CalculatorView: View {
             .navigationTitle("Калкулатор")
             .appMenu()
             .sheet(isPresented: $addingCost) {
-                NewCostView {
+                NewCostView(crops: CropChoice.from(store.state.value?.rows ?? [])) {
                     Task {
                         await costs.load()
                         await store.load()

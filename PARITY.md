@@ -84,15 +84,32 @@ everything spreads over the WHOLE farm. The web is to work the same way
   documented #1506). Its caveats are said: «not computed» is not zero, machines
   without a useful life understate the total, and a truncated register is
   partial.
-- **Saving.** One POST per line, each under its own idempotency key. A line that
-  landed, or whose answer was lost, is not sent again; a refused one is.
+- **Saving.** The whole sheet as one write (`POST /grain/costs/batch`, agri-saas
+  #1604, #260): every line lands or none does, under the sheet's one key. A lost
+  answer locks the sheet; a refusal, or a request that never left the phone
+  (#265), leaves it editable.
 
-**The «Култура» half waits** on how a crop's area is counted (agri-saas #1512).
-Until then «Култура» is the one-line form, limited to the crop categories.
+**iOS now — the «Култура» half** (`CropSheet`, `CropFields`, #245):
+- **The crop.** Chosen from the calculator's crops with land
+  (`occupiedAreaHa`, agri-saas #1606); one with none is not offered, and a farm
+  with no crop on its land is told so and pointed at «Общи».
+- **The lines.** Рента, Семена, Горива — one rate each; Препарати, Торове and
+  Услуги — named rows, as many as wanted («total or manually added rows»). All
+  per decare. **Услуги is not in the owner's list**: it keeps the place it had
+  in the one-line form, so a harvest contract still has a home. Owner to confirm.
+- **Sent as** `allocationBasis: CROP` with `commodityCanonical`, `amountPerDca`
+  as typed, and `amount` = rate × the crop's decares to the cent (agri-saas
+  #1583); no land link, no season (the server takes the one containing the
+  date). The same batch as «Общи», bounded at 25 lines.
+- **Defaults** from the crop's last sheet (`GET /grain/costs/defaults?commodity=`,
+  agri-saas #1611), row for row. Leva converted at 1.95583 and said so; a line
+  entered as a total keeps its name and is left unfilled; another currency is
+  left unfilled and said; `UNKNOWN_COMMODITY` is said beside the crop.
+- **Supplier and notes are gone** from the crop side: a per-decare plan figure
+  has no supplier, and a row's name is its description.
 
-**Unverified:** no overhead has been saved from the app. Defaults (#1523) were
-not live when this merged: the sheet works without them and prefills once they
-are.
+**Unverified:** no crop or overhead sheet has been saved from the app. The web
+has neither sheet yet.
 
 ### Gap 1 — refusal text renders in English
 

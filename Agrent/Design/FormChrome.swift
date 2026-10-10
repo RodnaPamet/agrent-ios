@@ -207,10 +207,15 @@ extension ValueRow where Label == Text {
 /// `LabeledContent` gives a value: it is the farmer's input, not a hint.
 struct FieldRow<Field: View>: View {
     let title: String
+    /// What VoiceOver says for the field when the title alone does not tell
+    /// it from its neighbours — six rows titled «EUR / дка» on one sheet.
+    /// Voice Control still answers to the visible title.
+    let spoken: String?
     @ViewBuilder var field: Field
 
-    init(_ title: String, @ViewBuilder field: () -> Field) {
+    init(_ title: String, spoken: String? = nil, @ViewBuilder field: () -> Field) {
         self.title = title
+        self.spoken = spoken
         self.field = field()
     }
 
@@ -221,7 +226,7 @@ struct FieldRow<Field: View>: View {
                 // The row's title is what the field IS. A field's own title
                 // here is its hint («0», «по избор»), and VoiceOver read that
                 // as its name; Voice Control could not name it at all.
-                .accessibilityLabel(title)
+                .accessibilityLabel(spoken ?? title)
                 .accessibilityInputLabels(A11y.spokenNames(title))
         } label: {
             Text(title)
