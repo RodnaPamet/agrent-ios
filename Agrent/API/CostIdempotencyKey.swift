@@ -117,8 +117,9 @@ enum CostIdempotencyKey {
     /// Generic since «Общи» became one all-or-nothing sheet (#260, agri-saas
     /// #1604): the key is the SHEET's, minted from every line at once, with
     /// the same promise per sheet as per line — a retry of the same sheet
-    /// dedupes, and a corrected one does not. Any `Encodable` draft works;
-    /// `.sortedKeys` makes its bytes stable.
+    /// dedupes, and a corrected one does not. The superuser's day of prices
+    /// (#258) mints the same way. Any `Encodable` draft works; `.sortedKeys`
+    /// makes its bytes stable.
     static func mint<Draft: Encodable>(nonce: String, draft: Draft) -> String {
         // A local, synchronous encoder — see the header on why not
         // `APIClient.encodeBody`. `.sortedKeys` is REQUIRED, not tidiness:
@@ -128,8 +129,9 @@ enum CostIdempotencyKey {
         encoder.outputFormatting = .sortedKeys
 
         guard let body = try? encoder.encode(draft) else {
-            // Unreachable for every draft minted today: `CreateCostEntry`
-            // and `CostsAPI.Sheet` write strings, `Decimal`s and arrays of
+            // Unreachable for every draft minted today: `CreateCostEntry`,
+            // `CostsAPI.Sheet` and `AdminPricesAPI.Day` write strings,
+            // `Decimal`s and arrays of
             // them, and none of those throw. Kept
             // total anyway, and the fallback leans the SAFE way: a fresh
             // value is deduped against nothing, which is exactly the

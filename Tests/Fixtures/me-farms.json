@@ -4,13 +4,15 @@
       "id": "ten_synthetic",
       "slug": "agrent",
       "name": "Синтетично стопанство",
-      "role": "OWNER"
+      "role": "OWNER",
+      "isPlatform": true
     },
     {
       "id": "ten_synthetic_second",
       "slug": "vtoro-sintetichno",
       "name": "Второ синтетично стопанство",
-      "role": "MECHANISATOR"
+      "role": "MECHANISATOR",
+      "isPlatform": false
     }
   ]
 }

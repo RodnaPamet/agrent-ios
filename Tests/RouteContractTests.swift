@@ -120,7 +120,17 @@ final class RouteContractTests: XCTestCase {
     /// off by the refresh from main a4d00ab, once `/api/health` (264aa36dc,
     /// 2026-10-09) carried it. The person's topics followed with agri-saas
     /// #1578 (46aaae619, 2026-10-10), so the list is empty again.
-    private static let pendingServerRoutes: [String: String] = [:]
+    ///
+    /// From 2026-10-10: the superuser's daily prices (#258), built against
+    /// agri-saas #1587's written contract (v1.1) before the server serves it.
+    /// Until it does, Админ offers «Цени» to nobody: the farm list's
+    /// `isPlatform` is the gate, and no farm carries it yet.
+    private static let pendingServerRoutes: [String: String] = [
+        "/api/t/{tenantSlug}/admin/market-prices/overrides":
+            "agri-saas #1587 v1.1 (c)+(d): the form's read and the day's prices, for #258",
+        "/api/t/{tenantSlug}/admin/market-prices/overrides/{commodity}":
+            "agri-saas #1587 v1.1 (b): clear one commodity's override, for #258",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [

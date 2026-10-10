@@ -31,6 +31,10 @@ enum FarmsAPI {
         let name: String
         /// The caller's role IN THAT FARM. A growing union, so a string.
         let role: String
+        /// True for the platform farm only, and false everywhere while the
+        /// server has none configured (agri-saas #1587 v1.1). Optional, so a
+        /// server from before it, and a fixture without it, read as false.
+        var isPlatform: Bool? = nil
     }
 
     /// The envelope. `farms[0]` is the OLDEST membership — the same farm

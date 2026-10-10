@@ -143,6 +143,8 @@ final class FixtureSeamTests: XCTestCase {
             (WorkItemAPI.parcelsPath(FixtureCatalogue.fixtureTaskID), "task-parcels"),
             // agrent-ios#179 stage 3 — Профил's farm list.
             (FarmsAPI.farmsPath, "me-farms"),
+            // agrent-ios#258 — the superuser's prices form.
+            (AdminPricesAPI.path, "admin-price-overrides"),
         ]
         for (pathAndQuery, fixture) in expected {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
@@ -445,6 +447,8 @@ final class FixtureSeamTests: XCTestCase {
         ("field-operation-detail", { _ = try await FieldOperationAPI.decodeDetail(from: $0) }),
         // agrent-ios#179 stage 3.
         ("me-farms", { _ = try await FarmsAPI.decodeFarms(from: $0) }),
+        // agrent-ios#258.
+        ("admin-price-overrides", { _ = try await APIClient.shared.decode($0, as: AdminPricesAPI.Overrides.self) }),
     ]
 
     /// A MISSING FIXTURE IS A FAILURE, NOT A SKIP.

@@ -18,15 +18,30 @@ struct Farm: Codable, Equatable, Hashable, Sendable {
     /// the next list read corrects it. A farm remembered before stage 3 has
     /// no `role` key and decodes as nil.
     let role: String?
+    /// The platform farm: the one whose admins type the daily prices every
+    /// farm sees (#258, agri-saas #1587 v1.1). From the farm list's own row,
+    /// because `/api/auth/me` answers for the OLDEST membership and would say
+    /// no while this farm is open. It decides only what to OFFER; the server
+    /// checks on every request. nil until the list has said, and on a farm
+    /// remembered before it said: no.
+    let isPlatform: Bool?
 
-    init(slug: String, name: String?, role: String? = nil) {
+    init(slug: String, name: String?, role: String? = nil, isPlatform: Bool? = nil) {
         self.slug = slug
         self.name = name
         self.role = role
+        self.isPlatform = isPlatform
     }
 
     init(_ membership: FarmsAPI.Membership) {
-        self.init(slug: membership.slug, name: membership.name, role: membership.role)
+        self.init(slug: membership.slug, name: membership.name, role: membership.role,
+                  isPlatform: membership.isPlatform)
+    }
+
+    /// Whether to offer Админ → «Цени»: the platform farm, to its owner or
+    /// an admin. The same pair the routes' `admin.manage` resolves from.
+    var offersPlatformPrices: Bool {
+        isPlatform == true && (role == "OWNER" || role == "ADMIN")
     }
 }
 
@@ -291,7 +306,7 @@ final class FarmStore {
     func adoptName(from tenant: CurrentUser.Tenant?) {
         guard let tenant, let farm = activeFarm, farm.slug == tenant.slug,
               farm.name != tenant.name else { return }
-        activate(Farm(slug: farm.slug, name: tenant.name, role: farm.role))
+        activate(Farm(slug: farm.slug, name: tenant.name, role: farm.role, isPlatform: farm.isPlatform))
     }
 
     /// Read this person's farms, and square the open farm with them.

@@ -40,6 +40,8 @@ struct AdminView: View {
     /// The shared instance, held as `@State` the way `ConversationView` does,
     /// so the card redraws when `/me` resolves while Админ is open.
     @State private var me = CurrentUserStore.shared
+    /// Which farm is open, for the platform farm's «Цени» row (#258).
+    @State private var farms = FarmStore.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -76,6 +78,11 @@ struct AdminView: View {
 
             case .allowed:
                 Section { farmRow }.pageRow()
+                // The superuser's daily prices: the platform farm only, to its
+                // owner or admins. Every other farm's Админ looks as it did.
+                if farms.activeFarm?.offersPlatformPrices == true {
+                    Section { pricesRow }.pageRow()
+                }
                 // The bottom-row editor, moved off every screen's toolbar
                 // and into the one place that holds settings.
                 Section { TabCustomiserRow() }.pageRow()
@@ -176,6 +183,18 @@ struct AdminView: View {
                 Label("Потребители", systemImage: "person.2")
             }
         }
+    }
+
+    /// The day's prices for every farm (#258). The hint says the reach,
+    /// because «Цени» alone reads like this farm's own.
+    private var pricesRow: some View {
+        NavigationLink {
+            AdminPricesView()
+        } label: {
+            Label("Цени", systemImage: "eurosign.circle")
+        }
+        .accessibilityHint("Дневните цени, които заменят цените от външния източник за всички стопанства")
+        .accessibilityInputLabels(A11y.spokenNames("Цени", "Prices"))
     }
 
     /// No value on the row: a flag count would invite reading it as "how much
