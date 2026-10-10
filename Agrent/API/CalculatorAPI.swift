@@ -135,4 +135,32 @@ enum CostsAPI {
             base, body: entry, idempotencyKey: idempotencyKey
         )
     }
+
+    // MARK: - A whole sheet
+
+    /// `POST /grain/costs/batch` (agri-saas #1604): up to 25 lines, each the
+    /// single-create body, in ONE transaction. Every line is checked before
+    /// anything is written, so one bad line refuses the whole sheet — there
+    /// is no half-saved sheet for the screen to explain (#260).
+    static var batchPath: String { "\(base)/batch" }
+
+    /// The request body, and also what the sheet's key is minted from: every
+    /// line, in order, so changing any of them is a new write.
+    struct Sheet: Encodable, Sendable {
+        let lines: [CreateCostEntry]
+    }
+
+    /// `idempotencyKey` is the SHEET's: `CostIdempotencyKey.mint` over
+    /// `sheet`, under the sheet's nonce. The server derives a key per line
+    /// from it and a replay returns the original rows; nothing here builds or
+    /// reads those per-line keys. Everything said on `create` about the 401
+    /// replay, an unknown answer and the absence of an outbox holds for the
+    /// sheet as a whole.
+    static func createSheet(
+        _ sheet: Sheet, idempotencyKey: String
+    ) async throws -> Data {
+        try await APIClient.shared.postReturningData(
+            batchPath, body: sheet, idempotencyKey: idempotencyKey
+        )
+    }
 }
