@@ -135,12 +135,15 @@ struct JournalFilter: Equatable, Sendable {
     /// Otherwise the operator would see a row the server would never return
     /// for this filter, and it would vanish on the next refresh.
     ///
-    /// The phone writes free-hand entries: no operation line and no link to
-    /// a block. Neither the crop filter nor the block filter can match one,
-    /// so either facet rules it out. Type and period are checked the way the
-    /// server checks them.
-    func admits(_ entry: LogEntry, now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        if crop != nil || block != nil { return false }
+    /// The phone writes free-hand entries: no operation line, and links only
+    /// to the blocks chosen on «Нов запис» (`blockIDs`, #254). The crop
+    /// filter matches only through an operation line, so it rules out every
+    /// one of them. The block filter matches a linked block. Type and period
+    /// are checked the way the server checks them.
+    func admits(_ entry: LogEntry, linkedTo blockIDs: [String] = [],
+                now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        if crop != nil { return false }
+        if let block, !blockIDs.contains(block.id) { return false }
         if let type, entry.type != type { return false }
         let (from, to) = bounds(now: now, calendar: calendar)
         guard from != nil || to != nil else { return true }

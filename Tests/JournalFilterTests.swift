@@ -161,6 +161,19 @@ final class JournalFilterTests: XCTestCase {
         XCTAssertFalse(filter.admits(entry(.activity, at: "2026-10-09T08:00:00.000Z"), now: now, calendar: sofia))
     }
 
+    /// An entry linked to the filtered block on «Нов запис» (#254) is one
+    /// the server returns through `LogLocation`, so it stays on the list.
+    func testABlockFilterAdmitsAnEntryLinkedToThatBlock() {
+        var filter = JournalFilter(now: now, calendar: sofia)
+        filter.block = .init(id: "loc_1", name: "Северен")
+        let written = entry(.activity, at: "2026-10-09T08:00:00.000Z")
+        XCTAssertTrue(filter.admits(written, linkedTo: ["loc_2", "loc_1"], now: now, calendar: sofia))
+        XCTAssertFalse(filter.admits(written, linkedTo: ["loc_2"], now: now, calendar: sofia))
+        // A crop still rules it out: a link is not an operation line.
+        filter.crop = .init(label: "Пшеница", values: ["Wheat"])
+        XCTAssertFalse(filter.admits(written, linkedTo: ["loc_1"], now: now, calendar: sofia))
+    }
+
     func testTypeAndPeriodAreCheckedAsTheServerChecksThem() {
         var filter = JournalFilter(now: now, calendar: sofia)
         filter.type = .seeding
