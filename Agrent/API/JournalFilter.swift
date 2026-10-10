@@ -16,13 +16,17 @@ import Foundation
 ///
 /// ── What each one matches, on the server ──
 ///
+/// The journal holds only what a person wrote (owner, 2026-10-10, #256): the
+/// entries a task's spray line wrote are hidden from every journal surface,
+/// though not deleted (`includeTaskWritten`, agri-saas). So every entry the
+/// list can return is free-hand, and a facet reaches it through the blocks it
+/// was linked to on «Нов запис» (#254).
+///
 ///     type          the entry's own type
-///     crop          entries written from an operation line on a parcel whose
-///                   `cropType` is one of the values; a free-hand entry has
-///                   no line, so it never matches
-///     locationId    entries linked to the block (`LogLocation`), and the
-///                   operations on its parcels once backend 1 widens it; see
-///                   agrent-ios#252
+///     crop          entries linked (`LogLocation`) to a block with a live
+///                   parcel whose `cropType` is one of the values (agri-saas
+///                   #1560); compared as stored, so every spelling is sent
+///     locationId    entries linked to the block (`LogLocation`)
 ///     occurredFrom / occurredTo   inclusive instants on `occurredAt`
 struct JournalFilter: Equatable, Sendable {
     var type: LogEntryType?
@@ -142,11 +146,16 @@ struct JournalFilter: Equatable, Sendable {
     /// Otherwise the operator would see a row the server would never return
     /// for this filter, and it would vanish on the next refresh.
     ///
-    /// The phone writes free-hand entries: no operation line, and links only
-    /// to the blocks chosen on «Нов запис» (`blockIDs`, #254). The crop
-    /// filter matches only through an operation line, so it rules out every
-    /// one of them. The block filter matches a linked block. Type and period
-    /// are checked the way the server checks them.
+    /// The phone writes free-hand entries, linked only to the blocks chosen
+    /// on «Нов запис» (`blockIDs`, #254). The block filter matches a linked
+    /// block. Type and period are checked the way the server checks them.
+    ///
+    /// A crop is the one facet the phone cannot judge: it matches through
+    /// what grows on the linked blocks, which the phone does not hold beside
+    /// the entry. So `decidesLocally` is false under a crop filter, and the
+    /// store asks the server again rather than guessing either way.
+    var decidesLocally: Bool { crop == nil }
+
     func admits(_ entry: LogEntry, linkedTo blockIDs: [String] = [],
                 now: Date = Date(), calendar: Calendar = .current) -> Bool {
         if crop != nil { return false }
