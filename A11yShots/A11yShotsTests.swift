@@ -113,6 +113,7 @@ final class A11yShotsTests: XCTestCase {
             switch only {
             case "08-tasks": captureTabOrMenu("08-tasks", label: "Задачи", app: app)
             case "09-overhead-costs": captureOverheadCosts(app)
+            case "09a-crop-costs": captureCropCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "01c-journal-filter": captureJournalFilter(app)
             case "17-new-entry": captureNewEntryForm(app)
@@ -166,6 +167,7 @@ final class A11yShotsTests: XCTestCase {
         // "no Задачи button" for a farm that simply arranged its bar
         // differently.
         captureTabOrMenu("08-tasks", label: "Задачи", app: app)
+        captureCropCosts(app)
         captureOverheadCosts(app)
         captureFieldOperationTask(app)
         captureTaskParcels(app)
@@ -422,6 +424,32 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(clear.waitForExistence(timeout: 5), "the summary row has no «Изчисти филтрите»")
         clear.tap()
         XCTAssertTrue(summary.waitForNonExistence(timeout: 15), "«Изчисти филтрите» left the filter on")
+    }
+
+    // MARK: - «Култура» (agrent-ios#245)
+
+    /// Калкулатор → «Нов разход», which opens on «Култура»: the calculator
+    /// fixture's wheat, prefilled from `costs-defaults-crop.json` — rent
+    /// converted from leva, two named plant-protection rows, and a fertiliser
+    /// last entered as a total. Opened, photographed and cancelled — «Запази»
+    /// would be a write. Starts on any tab; ends on Дневник.
+    private func captureCropCosts(_ app: XCUIApplication) {
+        let tab = labelled("Калкулатор", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        tab.tap()
+        let add = app.buttons["Нов разход"]
+        XCTAssertTrue(add.waitForExistence(timeout: 20), "the calculator has no «Нов разход»")
+        add.tap()
+        // The crop picker, valued with the fixture's first crop: at the top,
+        // where AX5 still has it; the sections under it are below the fold.
+        let crop = app.buttons.matching(NSPredicate(format: "label == %@ AND value == %@", "Култура", "Пшеница"))
+        XCTAssertTrue(crop.firstMatch.waitForExistence(timeout: 10), "«Култура» drew no crop picker on «Пшеница»")
+        Thread.sleep(forTimeInterval: 2)
+        capture("09a-crop-costs", app: app)
+        let cancel = app.navigationBars.buttons["Отказ"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
+        cancel.tap()
+        app.tabBars.buttons["Дневник"].tap()
     }
 
     // MARK: - «Общи» (agrent-ios#245)

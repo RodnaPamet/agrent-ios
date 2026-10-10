@@ -140,7 +140,7 @@ struct OverheadFields: View {
     @ViewBuilder
     private func notes(_ line: OverheadSheet.Line) -> some View {
         if let last = line.lastEnteredOn {
-            Text("Последно въведено на \(BgDate.rowDay(last)).")
+            Text("Последно въведено на \(BgDate.rowDayEndingSentence(last))")
                 .font(.footnote)
                 .foregroundStyle(Palette.secondaryText)
         }

@@ -33,6 +33,18 @@ enum CostsAPI {
         return try await APIClient.shared.decode(data, as: OverheadDefaults.self)
     }
 
+    /// One crop's last «Култура» sheet (#245, agri-saas #1611): the same
+    /// route, with the crop named. A crop the server's vocabulary does not
+    /// cover is a 400 `UNKNOWN_COMMODITY`, never an empty sheet.
+    static func cropDefaultsPath(_ commodity: String) -> String {
+        "\(defaultsPath)?commodity=\(URLEscape.queryValue(commodity))"
+    }
+
+    static func loadCropDefaults(_ commodity: String) async throws -> CropCostDefaults {
+        let data = try await APIClient.shared.data(for: cropDefaultsPath(commodity))
+        return try await APIClient.shared.decode(data, as: CropCostDefaults.self)
+    }
+
     /// The machine register's straight-line depreciation (agri-saas
     /// `GET /costs/machinery`, documented in #1506) — the figure «Амортизация»
     /// is offered. Not under `/grain`: the register is the farm's, not the

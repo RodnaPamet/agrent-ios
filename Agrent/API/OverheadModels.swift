@@ -76,3 +76,37 @@ struct MachineryDepreciation: Decodable, Equatable, Sendable {
         return found
     }
 }
+
+/// The farm's last «Култура» sheet for one crop (#245): agri-saas
+/// `GET /grain/costs/defaults?commodity=` → `{ commodity, lines }` (#1611).
+///
+/// Its own type, read on its own: the route answers the overhead shape when
+/// no crop is named and this one when one is, and the spec still types the
+/// 200 as the overhead payload (the union is held back on the server, #1612).
+///
+/// The latest SET, not the latest line: every row of the crop's most recent
+/// sheet, each named by its `description`. An empty `lines` is a crop with no
+/// history, the first run.
+struct CropCostDefaults: Decodable, Equatable, Sendable {
+    /// The canonical crop the spelling sent resolved to. `commodity` on the
+    /// wire, not `commodityCanonical`: that is the storage column.
+    let commodity: String
+    let lines: [Line]
+
+    struct Line: Decodable, Equatable, Sendable {
+        /// As entered, not narrowed to the sheet's: a crop sheet books what a
+        /// crop incurs. A category this build has not heard of is `unknown`.
+        let category: CostCategory
+        /// The rate per decare AS TYPED. NULL means the farmer entered a
+        /// TOTAL, not that the line is empty: the row is shown unfilled
+        /// rather than dropped, or the farm's having that cost is hidden.
+        let amountPerDca: WireDecimal?
+        /// Read, never assumed: rows from before the euro are in leva.
+        let currency: String
+        /// Shared by every line of one sheet; shown, so a stale figure looks
+        /// like one.
+        let incurredOn: Date
+        /// The row's name: what tells ПРЗ from торове on one sheet.
+        let description: String?
+    }
+}

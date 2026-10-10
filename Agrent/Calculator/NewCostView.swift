@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Add a cost to the farm's books.
+/// Add costs to the farm's books: one crop's rates per decare, or the
+/// year's overheads, each as one sheet that lands whole or not at all.
 ///
 /// ── This form does NOT retry, and that is still the whole design ──
 ///
@@ -24,7 +25,15 @@ import SwiftUI
 ///     fresh nonce, so the key would NOT dedupe it; the dedupe covers a
 ///     replay of one attempt, not a human doing the work twice.
 struct NewCostView: View {
+    /// The crops the calculator reports with land, for «Култура».
+    let crops: [CropChoice]
     let onSaved: () -> Void
+
+    init(crops: [CropChoice], onSaved: @escaping () -> Void) {
+        self.crops = crops
+        self.onSaved = onSaved
+        _commodity = State(initialValue: crops.first?.commodity)
+    }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -56,10 +65,8 @@ struct NewCostView: View {
     @State private var scope: Scope = .crop
 
     enum Scope: Hashable {
-        /// One cost for the crops' side of the books. The per-decare lines by
-        /// crop replace this once agri-saas settles how a crop's area is
-        /// counted (#1512); until then it is the one-line form, limited to
-        /// the crop categories so the two halves do not overlap.
+        /// One crop's costs, each a rate per decare over the land the crop
+        /// stands on (agri-saas #1583, #1606, #1611).
         case crop
         /// The year's overheads, each spread over the whole farm.
         case overhead
@@ -71,14 +78,21 @@ struct NewCostView: View {
     @State private var overheadPrefilled = false
     @State private var currencyEdited = false
 
-    @State private var category: CostCategory = .fuel
-    @State private var amountText = ""
+    /// The «Култура» sheet: the crop chosen and its rows. A sheet typed for
+    /// one crop is kept while another is looked at, so choosing a different
+    /// crop by mistake loses nothing.
+    @State private var commodity: String?
+    @State private var cropSheet = CropSheet()
+    @State private var otherCropSheets: [String: CropSheet] = [:]
+    @State private var cropsPrefilled: Set<String> = []
+    /// Crops the server answered `UNKNOWN_COMMODITY` for: said beside the
+    /// crop, since its save would be refused for the same reason.
+    @State private var unrecognisedCrops: Set<String> = []
+
     /// EUR: Bulgaria's currency since 1 January 2026 (owner, 2026-10-10).
     /// Typed over for a cost in another currency.
     @State private var currency = "EUR"
     @State private var incurredOn = Date()
-    @State private var supplier = ""
-    @State private var notes = ""
 
     @State private var saving = false
     @State private var failure: Failure?
@@ -114,73 +128,29 @@ struct NewCostView: View {
         }
     }
 
-    /// Parsed with an explicit locale, not `Decimal(string:)`'s default.
-    /// A Bulgarian keyboard produces "12,50" and the wire wants 12.5; the
-    /// device also reports en_BG, so neither the comma nor the full stop
-    /// can be assumed. Both are accepted and normalised here.
-    private var amount: Decimal? {
-        let cleaned = amountText
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "\u{00A0}", with: "")
-            .replacingOccurrences(of: ",", with: ".")
-        guard !cleaned.isEmpty else { return nil }
-        return Decimal(string: cleaned, locale: Locale(identifier: "en_US_POSIX"))
-    }
-
-    private var draft: CreateCostEntry? {
-        guard let amount else { return nil }
-        return CreateCostEntry(
-            category: category,
-            amount: amount,
-            currency: currency.trimmingCharacters(in: .whitespaces).uppercased(),
-            // yyyy-mm-dd, IN THE DEVICE'S ZONE.
-            //
-            // This was `.formatted(.iso8601.year().month().day()…)`, which
-            // defaults to GMT. Bulgaria is UTC+3 in summer, so a cost the
-            // farmer dated 25.09 went to the server as 2026-09-24 — measured:
-            //
-            //     picked  25.09.2026 г., 0:30
-            //     sent    2026-09-24
-            //
-            // A `DatePicker` in `.date` mode keeps the time of day it opened
-            // with, so every cost entered between midnight and 03:00 local was
-            // booked to the previous day. In the farm's BOOKS. See
-            // `BgDate.isoDay`, which is the write side of the parser that has
-            // always pinned this contract.
-            incurredOn: BgDate.isoDay(incurredOn),
-            // `.recorded`, not `.isEmpty`. These mapped only EXACTLY empty, so
-            // a supplier of three spaces went to the books as "   " — and,
-            // because the idempotency key is a hash of this payload, it also
-            // minted a different key from the omitted one, so editing a field
-            // to whitespace and back would write a second row.
-            supplier: supplier.recorded,
-            description: notes.recorded
-        )
-    }
-
     private var canSave: Bool {
         guard !saving else { return false }
         switch scope {
         case .crop:
-            guard let draft else { return false }
-            return draft.problems.isEmpty
-        case .overhead:
+            guard let crop = chosenCrop else { return false }
             // `problems` holds `.nothingEntered` for an empty sheet.
+            return cropSheet.problems(areaDca: crop.areaDca).isEmpty && !answerLost
+        case .overhead:
             return overhead.problems.isEmpty && !answerLost
         }
     }
 
+    private var chosenCrop: CropChoice? {
+        crops.first { $0.commodity == commodity }
+    }
+
     /// The last save's answer was lost: what was sent may be in the books.
-    /// «Общи» is then not sent again from this sheet (the owner's rule for a
-    /// cost, 2026-09-25: look at the list first), and the choice of side is
-    /// fixed so the text saying so stays in front of the operator.
+    /// The sheet is then not sent again from here (the owner's rule for a
+    /// cost, 2026-09-25: look at the list first), and the choice of side and
+    /// crop is fixed so the text saying so stays in front of the operator.
     private var answerLost: Bool {
         if case .unknown? = failure { true } else { false }
     }
-
-    /// The crop side's categories: what a crop's decares carry — the
-    /// overheads are «Общи»'s.
-    private static let cropCategories: [CostCategory] = [.rent, .seed, .fuel, .pesticide, .fertilizer, .service]
 
     var body: some View {
         NavigationStack {
@@ -195,21 +165,22 @@ struct NewCostView: View {
                 } footer: {
                     SectionFooter {
                         Text(scope == .crop
-                             ? "Един разход за култура. Разходите на декар по култура предстоят."
+                             ? "Разходите на една култура, всеки на декар, по площта ѝ в стопанството."
                              : "Годишни суми. Всяка се разпределя по площ върху цялото стопанство — "
                                + "земята без култура запазва своя дял.")
                     }
                 }
 
+                // At the top, under the choice it fixes: a lost answer dims
+                // the whole sheet, and the reason belongs where the operator
+                // is looking, not under six sections.
+                if let failure {
+                    Section { failureView(failure) }
+                }
+
                 switch scope {
                 case .crop: cropFields
                 case .overhead:
-                    // At the top, under the choice it fixes: a lost answer
-                    // dims the whole sheet, and the reason belongs where the
-                    // operator is looking, not under four sections.
-                    if let failure {
-                        Section { failureView(failure) }
-                    }
                     // Fixed while the sheet is in flight, too: a figure typed
                     // then is not in what was sent, and would close unsaved.
                     OverheadFields(sheet: $overhead, locked: saving || answerLost, machinery: machinery)
@@ -231,7 +202,7 @@ struct NewCostView: View {
                         ProgressView()
                     } else {
                         Button("Запази") {
-                            Task { scope == .crop ? await save() : await saveOverheads() }
+                            Task { await saveSheet() }
                         }
                         .disabled(!canSave)
                         .accessibilityInputLabels(A11y.Spoken.save)
@@ -240,6 +211,12 @@ struct NewCostView: View {
             }
             .interactiveDismissDisabled(saving)
             .task(id: scope) { if scope == .overhead { await prefillOverheads() } }
+            .task(id: commodity) { await prefillCrop() }
+            .onChange(of: commodity) { old, new in
+                if let old { otherCropSheets[old] = cropSheet }
+                cropSheet = new.flatMap { otherCropSheets[$0] } ?? CropSheet()
+                failure = nil
+            }
             .onChange(of: currency) { currencyEdited = true }
             // A refusal belongs to the side that was sent; a lost answer
             // cannot get here, because it fixes the side.
@@ -252,47 +229,49 @@ struct NewCostView: View {
         }
     }
 
-    /// The one-line form, as it always was — for the crop categories only.
+    /// The crop, its rows per decare, and the sheet's currency and date.
     @ViewBuilder
     private var cropFields: some View {
-        Section {
-            // `MenuPicker`: the system menu picker cuts a Bulgarian
-            // value short in the row (#160).
-            MenuPicker("Категория", selection: $category, value: category.label) {
-                ForEach(Self.cropCategories, id: \.self) {
-                    Text($0.label).tag($0)
+        if let crop = chosenCrop {
+            Section {
+                // `MenuPicker`: the system menu picker cuts a Bulgarian
+                // value short in the row (#160). The slug is the selection
+                // only; every name shown is `CropChoice.name`, which is
+                // `CommodityName.canonical`.
+                MenuPicker("Култура", selection: $commodity, value: crop.name) {
+                    ForEach(crops) { Text($0.name).tag(Optional($0.commodity)) }
+                }
+                .disabled(saving || answerLost)
+                if unrecognisedCrops.contains(crop.commodity) {
+                    Text("Сървърът не разпознава „\(crop.name)“ като култура — "
+                         + "разход на декар не може да се запише за нея.")
+                        .font(.footnote)
+                        .foregroundStyle(Palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            // `.decimalPad` has no minus sign, which is right: the
-            // server requires amount > 0 and a negative cost is a
-            // different concept the books do not have here.
-            TextField("Сума", text: $amountText, prompt: .fieldPrompt("Сума"))
-                .keyboardType(.decimalPad)
-            TextField("Валута", text: $currency, prompt: .fieldPrompt("Валута"))
-                .textInputAutocapitalization(.characters)
-            DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
-                // The date while its calendar is open — see
-                // `Palette.DatePill` (#164).
-                .tint(Palette.DatePill.tint)
-        }
-
-        Section(titled: "Доставчик") {
-            TextField("по избор", text: $supplier, prompt: .fieldPrompt("по избор"), axis: .vertical)
-        }
-        Section(titled: "Бележки") {
-            TextEditor(text: $notes).frame(minHeight: 100)
-        }
-
-        if let problem = firstProblemText {
-            Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
-        }
-
-        if let failure {
-            Section { failureView(failure) }
+            CropFields(sheet: $cropSheet, crop: crop, currency: currency, locked: saving || answerLost)
+            commonFields
+            if let problem = cropProblemText(crop) {
+                Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) }
+            }
+        } else {
+            // A rate per decare needs decares. A farm whose calculator shows
+            // no crop on its land has nothing to multiply one by; its yearly
+            // costs still go in «Общи».
+            Section {
+                Text("Няма култура с площ")
+                    .font(.headline)
+                Text("Разходите на декар се въвеждат за култура, която калкулаторът отчита на "
+                     + "площите на стопанството. Годишните разходи се въвеждат в „Общи“.")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    /// The overhead sheet's currency and date: one each, for every line.
+    /// The sheet's currency and date: one each, for every line.
     @ViewBuilder
     private var commonFields: some View {
         Section {
@@ -320,9 +299,7 @@ struct NewCostView: View {
         case .notSaved(let message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(Palette.error)
-                Text(scope == .crop
-                     ? "Разходът НЕ е записан. Можете да опитате отново."
-                     : "Нито една от сумите НЕ е записана. Можете да опитате отново.")
+                Text("Нито една от сумите НЕ е записана. Можете да опитате отново.")
                     .font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         case .unknown(let message):
@@ -340,12 +317,7 @@ struct NewCostView: View {
                 Label("Неясен резултат", systemImage: "questionmark.circle")
                     .foregroundStyle(Palette.error)
                 Text(message).font(.footnote).foregroundStyle(Palette.secondaryText)
-                Text(scope == .crop ? """
-                    Връзката прекъсна, преди сървърът да отговори. Разходът \
-                    може да е записан, а може и да не е. Проверете списъка с \
-                    разходи, преди да го въведете отново — повторното \
-                    въвеждане създава втори запис.
-                    """ : """
+                Text("""
                     Връзката прекъсна, преди сървърът да отговори. Сумите \
                     може да са записани, а може и да не са — всички или нито \
                     една. Проверете списъка с разходи, преди да ги въведете \
@@ -359,25 +331,41 @@ struct NewCostView: View {
 
     /// The answer, and what it means for the books, in one announcement.
     private func spoken(_ failure: Failure) -> String {
-        let outcome = switch (failure, scope) {
-        case (.notSaved, .crop): "Разходът НЕ е записан."
-        case (.notSaved, .overhead): "Нито една от сумите НЕ е записана."
-        case (.unknown, .crop): "Разходът може да е записан, а може и да не е. Проверете списъка с разходи."
-        case (.unknown, .overhead): "Сумите може да са записани, а може и да не са. Проверете списъка с разходи."
+        let outcome = switch failure {
+        case .notSaved: "Нито една от сумите НЕ е записана."
+        case .unknown: "Сумите може да са записани, а може и да не са. Проверете списъка с разходи."
         }
         return "\(failure.message) \(outcome)"
     }
 
-    private var firstProblemText: String? {
-        guard !amountText.isEmpty, let draft else {
-            return amountText.isEmpty ? nil : "Сумата не е разчетена."
+    private func cropProblemText(_ crop: CropChoice) -> String? {
+        switch cropSheet.problems(areaDca: crop.areaDca).first {
+        case .nothingEntered?, nil: nil
+        case .unreadable(let category)?: "\(category.label): сумата на декар не е разчетена."
+        case .notPositive(let category)?: "\(category.label): сумата на декар трябва да е по-голяма от нула."
+        case .roundsToNothing(let category)?:
+            "\(category.label): върху \(Num.text(CropFields.double(crop.areaDca))) дка сумата се закръглява до нула."
+        case .tooLarge(let category)?: "\(category.label): сумата е прекалено голяма."
+        case .tooManyLines?: "Най-много \(CropSheet.maxLines) реда в един разход."
         }
-        switch draft.problems.first {
-        case .amountNotPositive: return "Сумата трябва да е по-голяма от нула."
-        case .amountTooLarge: return "Сумата е прекалено голяма."
-        case .currencyMissing: return "Валутата е задължителна."
-        case .dateMissing: return "Датата е задължителна."
-        case nil: return nil
+    }
+
+    /// The crop's last sheet, once per crop, when it is first chosen. Failing
+    /// costs only the prefill, as for «Общи»: an empty sheet is still a
+    /// sheet. Marked done only once answered, so a crop left mid-request is
+    /// asked again when it is chosen again.
+    private func prefillCrop() async {
+        guard let crop = chosenCrop, !cropsPrefilled.contains(crop.commodity) else { return }
+        do {
+            let defaults = try await CostsAPI.loadCropDefaults(crop.commodity)
+            guard !Task.isCancelled, commodity == crop.commodity else { return }
+            cropsPrefilled.insert(crop.commodity)
+            cropSheet.prefill(from: defaults, currency: currency)
+        } catch let APIClient.APIError.http(_, code, _, _, _) where code == "UNKNOWN_COMMODITY" {
+            cropsPrefilled.insert(crop.commodity)
+            unrecognisedCrops.insert(crop.commodity)
+        } catch {
+            if !Task.isCancelled { cropsPrefilled.insert(crop.commodity) }
         }
     }
 
@@ -400,48 +388,39 @@ struct NewCostView: View {
         overhead.useRegister(machinery?.offered, onlyIfEmpty: true)
     }
 
-    /// The year's overheads as ONE write (#260, agri-saas #1604): every
-    /// line lands or none does, so there is no half-saved sheet to explain.
-    /// One key for the sheet, minted from all of it (`CostIdempotencyKey`:
-    /// this sheet's nonce, every line's content), so a replay of the same
-    /// sheet cannot book it twice and a corrected sheet is a new write.
+    /// The sheet as ONE write (#260, agri-saas #1604): every line lands or
+    /// none does, so there is no half-saved sheet to explain. One key for
+    /// the sheet, minted from all of it (`CostIdempotencyKey`: this sheet's
+    /// nonce, every line's content), so a replay of the same sheet cannot
+    /// book it twice and a corrected sheet is a new write.
     ///
-    /// The outcomes are the one-line form's, for the sheet as a whole
-    /// (`Failure.init`): a refusal, or a request that never left the phone,
-    /// wrote nothing, so the sheet stays editable and goes again on
-    /// «Запази»; a lost answer locks it (`answerLost`).
-    private func saveOverheads() async {
+    /// The outcomes are the same on both sides (`Failure.init`): a refusal,
+    /// or a request that never left the phone, wrote nothing, so the sheet
+    /// stays editable and goes again on «Запази»; a lost answer locks it
+    /// (`answerLost`).
+    ///
+    /// The date goes as yyyy-mm-dd IN THE DEVICE'S ZONE (`BgDate.isoDay`).
+    /// It once went through `.iso8601`, which is GMT, and a cost dated 25.09
+    /// between midnight and 03:00 was booked to the 24th.
+    private func saveSheet() async {
         guard canSave else { return }
+        let currency = currency.trimmingCharacters(in: .whitespaces).uppercased()
+        let day = BgDate.isoDay(incurredOn)
+        let lines: [CreateCostEntry]
+        switch scope {
+        case .crop:
+            guard let crop = chosenCrop else { return }
+            lines = cropSheet.drafts(crop: crop, currency: currency, incurredOn: day)
+        case .overhead:
+            lines = overhead.drafts(currency: currency, incurredOn: day)
+        }
         saving = true
         failure = nil
         defer { saving = false }
-        let sheet = CostsAPI.Sheet(lines: overhead.drafts(
-            currency: currency.trimmingCharacters(in: .whitespaces).uppercased(),
-            incurredOn: BgDate.isoDay(incurredOn)))
+        let sheet = CostsAPI.Sheet(lines: lines)
         do {
             _ = try await CostsAPI.createSheet(
                 sheet, idempotencyKey: CostIdempotencyKey.mint(nonce: nonce, draft: sheet))
-            onSaved()
-            dismiss()
-        } catch {
-            failure = Failure(error)
-        }
-    }
-
-    private func save() async {
-        guard let draft, !saving else { return }
-        saving = true
-        failure = nil
-        defer { saving = false }
-
-        do {
-            // Minted HERE, from the draft being sent, not held in state. The
-            // key is a function of content by construction, so it cannot go
-            // stale behind an edit — which is the failure that would drop a
-            // correction and leave the books wrong.
-            _ = try await CostsAPI.create(
-                draft, idempotencyKey: CostIdempotencyKey.mint(nonce: nonce, draft: draft)
-            )
             onSaved()
             dismiss()
         } catch {

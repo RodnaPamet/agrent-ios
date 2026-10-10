@@ -110,6 +110,8 @@ final class FixtureSeamTests: XCTestCase {
             (WorkItemAPI.listPath, "tasks-list"),
             (CalculatorAPI.path, "calculator-sample"),
             (CostsAPI.defaultsPath, "costs-defaults"),
+            // #245: the same route with the crop named is the crop's sheet.
+            (CostsAPI.cropDefaultsPath("WHEAT"), "costs-defaults-crop"),
             (CostsAPI.machineryPath, "costs-machinery"),
             (ExchangeAPI.listingsPath, "exchange-listings"),
             (ExchangeAPI.myListingsPath, "exchange-my-listings"),
@@ -413,6 +415,7 @@ final class FixtureSeamTests: XCTestCase {
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),
         ("costs-defaults", { _ = try await APIClient.shared.decode($0, as: OverheadDefaults.self) }),
+        ("costs-defaults-crop", { _ = try await APIClient.shared.decode($0, as: CropCostDefaults.self) }),
         ("costs-machinery", { _ = try await APIClient.shared.decode($0, as: MachineryDepreciation.self) }),
         ("exchange-listings", { _ = try await ExchangeAPI.decodeListings(from: $0) }),
         ("exchange-my-listings", { _ = try await ExchangeAPI.decodeMyListings(from: $0) }),

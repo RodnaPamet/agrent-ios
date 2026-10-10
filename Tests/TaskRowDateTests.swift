@@ -61,4 +61,14 @@ final class TaskRowDateTests: XCTestCase {
         // Positive control: this year's has none.
         XCTAssertFalse(BgDate.rowDay(BgDate.parseInstant("2026-03-03T12:00:00.000Z")!, now: now).contains("2026"))
     }
+
+    /// One full stop at the end of a sentence: another year's «г.» is it.
+    func testADateEndsASentenceWithOneFullStop() throws {
+        let lastYear = try XCTUnwrap(BgDate.parseInstant("2025-10-01T12:00:00.000Z"))
+        let thisYear = try XCTUnwrap(BgDate.parseInstant("2026-03-03T12:00:00.000Z"))
+        XCTAssertEqual(BgDate.rowDayEndingSentence(lastYear, now: now), BgDate.full(lastYear))
+        XCTAssertTrue(BgDate.full(lastYear).hasSuffix("г."), "positive control: the year closes with «г.»")
+        XCTAssertFalse(BgDate.rowDayEndingSentence(lastYear, now: now).hasSuffix(".."))
+        XCTAssertEqual(BgDate.rowDayEndingSentence(thisYear, now: now), BgDate.dayMonth(thisYear) + ".")
+    }
 }

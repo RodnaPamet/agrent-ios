@@ -211,6 +211,7 @@ final class RouteContractTests: XCTestCase {
                 DashboardAPI.taskTrendPath(days: 14), DashboardAPI.fieldBriefingPath,
             ]),
             ("CalculatorAPI.swift", [CalculatorAPI.path, CostsAPI.listPath, CostsAPI.defaultsPath,
+                                     CostsAPI.cropDefaultsPath("wheat"),
                                      CostsAPI.machineryPath, CostsAPI.batchPath]),
             ("ParcelHistoryAPI.swift", [
                 ParcelHistoryAPI.cropSeasonsPath(parcel),

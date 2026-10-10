@@ -124,6 +124,10 @@ enum CostCategory: String, LenientDecodable, Sendable {
 /// no crop keeping its share and reported apart.
 enum CostAllocationBasis: String, Sendable {
     case holding = "HOLDING"
+    /// One crop's own figure, per decare of the land it stands on (#245,
+    /// agri-saas #1583): names the crop (`commodityCanonical`) and no land,
+    /// and replaces the consumption-derived cost for that crop and season.
+    case crop = "CROP"
 }
 
 /// What the app SENDS to create one.
@@ -167,12 +171,20 @@ struct CreateCostEntry: Encodable, Sendable {
     var payrollHeadcount: Int? = nil
     var payrollAnnualPerPerson: Decimal? = nil
 
+    /// The crop a `CROP` cost is for, as the calculator names it; the server
+    /// resolves any spelling and refuses one it cannot (agri-saas #1583).
+    var commodityCanonical: String? = nil
+    /// The rate per decare AS TYPED, kept beside `amount`, which is what the
+    /// books sum: rate × the crop's land (agri-saas #1518).
+    var amountPerDca: Decimal? = nil
+
     /// Optional, so every existing call site builds the same one-line draft —
     /// and, being omitted when nil, mints the same idempotency key it always
     /// did (`CostIdempotencyKey` hashes the encoded body).
     enum CodingKeys: String, CodingKey {
         case category, amount, currency, incurredOn, supplier, description
         case allocationBasis, payrollHeadcount, payrollAnnualPerPerson
+        case commodityCanonical, amountPerDca
     }
 
     func encode(to encoder: Encoder) throws {
@@ -190,6 +202,8 @@ struct CreateCostEntry: Encodable, Sendable {
         try c.encodeIfPresent(allocationBasis?.rawValue, forKey: .allocationBasis)
         try c.encodeIfPresent(payrollHeadcount, forKey: .payrollHeadcount)
         try c.encodeIfPresent(payrollAnnualPerPerson, forKey: .payrollAnnualPerPerson)
+        try c.encodeIfPresent(commodityCanonical, forKey: .commodityCanonical)
+        try c.encodeIfPresent(amountPerDca, forKey: .amountPerDca)
     }
 
     /// The server's bounds, mirrored so the operator learns before the
