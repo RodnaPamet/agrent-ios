@@ -91,13 +91,13 @@ final class OverheadSheetTests: XCTestCase {
     func testThePrefillIsTheFarmsLastValuesAndNothingElse() throws {
         let last = try defaults(#"""
         {"overheads":[
-          {"category":"PAYROLL","amount":36000,"currency":"BGN","incurredOn":"2026-01-15T00:00:00.000Z",
+          {"category":"PAYROLL","amount":36000,"currency":"EUR","incurredOn":"2026-01-15T00:00:00.000Z",
            "payrollHeadcount":3,"payrollAnnualPerPerson":12000},
           {"category":"OTHER","amount":4200.5,"currency":"EUR","incurredOn":"2026-02-01T00:00:00.000Z",
            "payrollHeadcount":null,"payrollAnnualPerPerson":null}]}
         """#)
         var sheet = OverheadSheet()
-        sheet.prefill(from: last)
+        sheet.prefill(from: last, currency: "EUR")
         XCTAssertEqual(sheet.payrollMode, .perPerson)
         XCTAssertEqual(sheet.headcountText, "3")
         XCTAssertEqual(sheet.perPersonText, "12000")
@@ -107,7 +107,41 @@ final class OverheadSheetTests: XCTestCase {
         XCTAssertEqual(sheet.other.amountText, "4200,5")
         XCTAssertEqual(sheet.credit.amountText, "", "no history is empty, not zero")
         XCTAssertEqual(sheet.depreciation.amountText, "")
-        XCTAssertEqual(OverheadSheet.lastCurrency(last), "EUR", "the latest line's currency")
+        XCTAssertNil(sheet.payroll.convertedFromLeva, "a figure already in the sheet's currency is as entered")
+    }
+
+    /// Costs default to EUR (owner, 2026-10-10). A leva figure from the farm's
+    /// history comes in at the changeover's fixed rate and says so; one in a
+    /// currency with no fixed rate is left out, never prefilled as euros.
+    func testLevaArePrefilledAsEurosAtTheFixedRate() throws {
+        let last = try defaults(#"""
+        {"overheads":[
+          {"category":"PAYROLL","amount":36000,"currency":"BGN","incurredOn":"2025-12-15T00:00:00.000Z",
+           "payrollHeadcount":3,"payrollAnnualPerPerson":12000},
+          {"category":"CREDIT","amount":24000,"currency":"BGN","incurredOn":"2025-11-01T00:00:00.000Z",
+           "payrollHeadcount":null,"payrollAnnualPerPerson":null},
+          {"category":"OTHER","amount":900,"currency":"USD","incurredOn":"2026-02-01T00:00:00.000Z",
+           "payrollHeadcount":null,"payrollAnnualPerPerson":null}]}
+        """#)
+        var sheet = OverheadSheet()
+        sheet.prefill(from: last, currency: "EUR")
+        XCTAssertEqual(sheet.payroll.amountText, "18406,51")
+        XCTAssertEqual(sheet.perPersonText, "6135,5")
+        XCTAssertEqual(sheet.payroll.convertedFromLeva, 36000)
+        // 3 × 6135,50 is not 18406,51 to the cent; that is rounding, not the
+        // farmer typing over the product, so the total still follows it.
+        XCTAssertFalse(sheet.payrollTotalEdited)
+        XCTAssertEqual(sheet.credit.amountText, "12271,01")
+        XCTAssertEqual(sheet.other.amountText, "", "no fixed rate for USD: left out, not prefilled as euros")
+        XCTAssertEqual(OverheadFields.convertedNote(24000),
+                       "Превалутирано от 24\u{00A0}000,00 лв. по фиксирания курс 1,95583 лв. за 1 €.")
+    }
+
+    func testTheFixedRateIsExactAndOnlyForLevaToEuro() {
+        XCTAssertEqual(EuroChangeover.convert(Decimal(string: "1.95583")!, from: "BGN", to: "EUR"), 1)
+        XCTAssertEqual(EuroChangeover.convert(100, from: "eur", to: "EUR"), 100)
+        XCTAssertNil(EuroChangeover.convert(100, from: "EUR", to: "BGN"), "the sheet never converts back into leva")
+        XCTAssertNil(EuroChangeover.convert(100, from: "USD", to: "EUR"))
     }
 
     /// A total that did not match its people was the farmer's — prefilled as
@@ -118,7 +152,7 @@ final class OverheadSheetTests: XCTestCase {
           "incurredOn":"2026-01-15T00:00:00.000Z","payrollHeadcount":3,"payrollAnnualPerPerson":12000}]}
         """#)
         var sheet = OverheadSheet()
-        sheet.prefill(from: last)
+        sheet.prefill(from: last, currency: "BGN")
         XCTAssertTrue(sheet.payrollTotalEdited)
     }
 
@@ -131,7 +165,7 @@ final class OverheadSheetTests: XCTestCase {
         """#)
         var sheet = OverheadSheet()
         sheet.other.amountText = "999"
-        sheet.prefill(from: last)
+        sheet.prefill(from: last, currency: "BGN")
         XCTAssertEqual(sheet.other.amountText, "999")
     }
 
