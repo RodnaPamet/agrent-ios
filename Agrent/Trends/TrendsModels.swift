@@ -110,6 +110,21 @@ struct PriceSeries: Decodable, Identifiable, Equatable, Sendable {
     /// on the screen a farmer uses to plan a season's costs.
     var id: String { "\(source)|\(region)|\(stage ?? "")" }
 
+    /// The platform's typed price (agri-saas #1587; the owner's ruling,
+    /// 2026-10-10, option A): published as its own series while it is in
+    /// force, and absent from the payload once cleared. It is the price every
+    /// farm's figures use that day, so where a screen shows ONE price it
+    /// shows this one — across units and ahead of every observed series.
+    /// Otherwise Табло could show the feed's price beside a calculator that
+    /// uses the typed one: two prices for one commodity on one day.
+    var isPlatformPrice: Bool { source == Self.platformSource }
+
+    static let platformSource = "platform"
+
+    /// What the series is called on screen. The platform's was typed, not
+    /// observed, so it has no market label worth showing; the phone names it.
+    var displayLabel: String? { isPlatformPrice ? "Въведена от Agrent" : label }
+
     /// «1216,62 евро на 1000 литра» — a price in this series' unit, for a
     /// screen that shows one number rather than a chart (Табло).
     ///
@@ -143,6 +158,10 @@ extension Array where Element == PriceSeries {
     /// today than one that stopped in spring, and between two equally current
     /// ones the longer record is the better line.
     ///
+    /// Ahead of all of that, the platform's typed price (`isPlatformPrice`):
+    /// typed ALWAYS wins until it is cleared (owner, 2026-10-10), however
+    /// short or old its record next to a feed's.
+    ///
     /// ── What this does NOT do ──
     ///
     /// It does not pick across units or currencies. Wheat arrives as USD per
@@ -152,9 +171,11 @@ extension Array where Element == PriceSeries {
     /// `SeriesGroup`, which is grouped by (unit, currency) for exactly that
     /// reason — see its header.
     func rankedForDefaultDisplay() -> [PriceSeries] {
-        let preferred = filter { ["BG", "GLOBAL"].contains($0.region.uppercased()) }
+        // The platform's price whatever region it names: it is never hidden.
+        let preferred = filter { $0.isPlatformPrice || ["BG", "GLOBAL"].contains($0.region.uppercased()) }
         let candidates = preferred.isEmpty ? self : preferred
         return candidates.sorted { left, right in
+            if left.isPlatformPrice != right.isPlatformPrice { return left.isPlatformPrice }
             let l = left.lastObservedAt ?? ""
             let r = right.lastObservedAt ?? ""
             if l != r { return l > r }
@@ -218,6 +239,13 @@ extension PricesResponse {
     var dashboardSeries: (series: PriceSeries, outOf: Int)? {
         let withPoints = series.filter { !$0.points.isEmpty }
         guard !withPoints.isEmpty else { return nil }
+
+        // The platform's typed price first, in whatever group it is: typed
+        // diesel is per litre, the bulletin per 1000 litres, so ranking inside
+        // the largest group would never see it (#1587).
+        if let typed = withPoints.first(where: \.isPlatformPrice) {
+            return (typed, withPoints.count)
+        }
 
         let groups = Dictionary(grouping: withPoints) { "\($0.unit)|\($0.currency)" }
         // Ties broken by id so the choice is stable across launches rather than

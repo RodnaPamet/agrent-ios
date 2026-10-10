@@ -130,6 +130,36 @@ final class DashboardScreenTests: XCTestCase {
         XCTAssertNil(response([]).dashboardSeries)
     }
 
+    /// The platform's typed price (#1587, option A) takes the block from any
+    /// group: typed diesel per litre beats four bulletin series per 1000
+    /// litres, fresher and longer as they are. Every series still counts.
+    func testThePlatformsTypedPriceTakesTheBlockAcrossUnits() {
+        let chosen = response([
+            series("oil-bulletin", region: "BG", stage: "without-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
+            series("oil-bulletin", region: "BG", stage: "with-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
+            series("platform", region: "BG", unit: "EUR/l", lastObserved: "2026-09-20", points: 1),
+            series("oil-bulletin", region: "EL", stage: "without-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
+        ]).dashboardSeries
+        XCTAssertEqual(chosen?.series.source, "platform")
+        XCTAssertEqual(chosen?.outOf, 4)
+        XCTAssertEqual(chosen?.series.displayLabel, "Въведена от Agrent")
+        // Positive control: without it, the bulletin leads as before.
+        XCTAssertEqual(response([
+            series("oil-bulletin", region: "BG", stage: "without-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
+            series("oil-bulletin", region: "BG", stage: "with-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
+        ]).dashboardSeries?.series.source, "oil-bulletin")
+    }
+
+    /// Inside one unit too: a typed wheat price older and shorter than the
+    /// feed's still leads, because typed wins until it is cleared.
+    func testThePlatformsTypedPriceLeadsItsOwnGroup() {
+        let ranked = [
+            series("ec-agrifood", region: "BG", unit: "EUR/t", lastObserved: "2026-09-25", points: 20),
+            series("platform", region: "BG", unit: "EUR/t", lastObserved: "2026-09-01", points: 1),
+        ].rankedForDefaultDisplay()
+        XCTAssertEqual(ranked.map(\.source), ["platform", "ec-agrifood"])
+    }
+
     /// Stable across launches. Two groups of equal size must not swap by
     /// dictionary order — a block that shows a different series every time it
     /// opens is worse than either series alone.

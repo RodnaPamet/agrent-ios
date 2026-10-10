@@ -288,6 +288,8 @@ enum SeriesVocabulary {
         "tonne": "тон",
         "metricton": "тон",
         "1000l": "1000 литра",
+        // The platform's typed diesel (agri-saas #1587).
+        "l": "литър",
         "100kg": "100 кг",
     ]
 

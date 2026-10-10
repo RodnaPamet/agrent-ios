@@ -257,7 +257,7 @@ struct DashboardView: View {
                     // series differ by over fifty per cent and a bare number
                     // would be one of them pretending to be both.
                     Text(A11y.sentence([
-                        chosen.series.label,
+                        chosen.series.displayLabel,
                         chosen.series.region,
                         chosen.series.stage,
                     ]))
@@ -267,7 +267,8 @@ struct DashboardView: View {
                     if let age = Staleness.days(
                         generatedAt: store.prices.value?.generatedAt ?? Date(),
                         lastObservedAt: chosen.series.lastObservedAt) {
-                        Text("Отчетена преди \(Plural.bg(age, "ден", "дни"))")
+                        // Typed, not observed: the platform's price says so.
+                        Text("\(chosen.series.isPlatformPrice ? "Въведена" : "Отчетена") преди \(Plural.bg(age, "ден", "дни"))")
                             .font(.caption)
                             .foregroundStyle(age >= Staleness.concerning ? Palette.warning : Palette.secondaryText)
                     }
