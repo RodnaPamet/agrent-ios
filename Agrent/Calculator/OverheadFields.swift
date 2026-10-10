@@ -139,13 +139,26 @@ struct OverheadFields: View {
         .disabled(locked)
     }
 
-    /// When the prefill was last entered, and what became of the line.
+    /// «Превалутирано от 24 000,00 лв. по фиксирания курс 1,95583 лв. за 1 €.»
+    nonisolated static func convertedNote(_ leva: Decimal) -> String {
+        let figure = leva.formatted(.number.precision(.fractionLength(2)).grouping(.automatic).locale(BgDate.locale))
+        return "Превалутирано от \(figure) лв. по фиксирания курс 1,95583 лв. за 1 €."
+    }
+
+    /// When the prefill was last entered, whether it was converted from
+    /// leva, and what became of the line.
     @ViewBuilder
     private func notes(_ category: CostCategory, _ line: OverheadSheet.Line) -> some View {
         if let last = line.lastEnteredOn, results[category] == nil {
             Text("Последно въведено на \(BgDate.rowDay(last)).")
                 .font(.footnote)
                 .foregroundStyle(Palette.secondaryText)
+        }
+        if let leva = line.convertedFromLeva, results[category] == nil {
+            Text(Self.convertedNote(leva))
+                .font(.footnote)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
         switch results[category] {
         case .saved:

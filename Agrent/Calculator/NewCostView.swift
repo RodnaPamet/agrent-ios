@@ -74,7 +74,9 @@ struct NewCostView: View {
 
     @State private var category: CostCategory = .fuel
     @State private var amountText = ""
-    @State private var currency = "BGN"
+    /// EUR: Bulgaria's currency since 1 January 2026 (owner, 2026-10-10).
+    /// Typed over for a cost in another currency.
+    @State private var currency = "EUR"
     @State private var incurredOn = Date()
     @State private var supplier = ""
     @State private var notes = ""
@@ -333,9 +335,10 @@ struct NewCostView: View {
         guard !overheadPrefilled else { return }
         overheadPrefilled = true
         if let defaults = try? await CostsAPI.loadDefaults() {
-            overhead.prefill(from: defaults)
-            // The farm's last currency, unless the farmer already chose one.
-            if !currencyEdited, let last = OverheadSheet.lastCurrency(defaults) { currency = last }
+            // Into the sheet's currency: a leva figure converted at the fixed
+            // rate, and said so; one in any other currency left out. The
+            // owner chose EUR over following the farm's last currency.
+            overhead.prefill(from: defaults, currency: currency)
         }
         machinery = try? await CostsAPI.loadMachinery()
         // The register's figure, where the farm has no amortisation of its own
