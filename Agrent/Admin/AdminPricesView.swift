@@ -126,7 +126,7 @@ private struct AdminPriceRow: View {
     /// «Пшеница», «Нафта (дизелово гориво)»: the canonical slug's Bulgarian
     /// name, never the slug itself.
     private var name: String { CommodityName.canonical(row.commodity) ?? row.commodity }
-    private var unit: String { AdminPricesStore.unitLabel(AdminPricesStore.entryUnit(row.commodity)) }
+    private var unit: String { AdminPricesStore.unitLabel(row.entryUnit) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {

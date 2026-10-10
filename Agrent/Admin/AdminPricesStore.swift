@@ -106,7 +106,7 @@ final class AdminPricesStore {
     func isFarFromAPI(_ row: AdminPricesAPI.Overrides.Row) -> Bool {
         guard let text = texts[row.commodity], let typed = OverheadSheet.amount(text), typed > 0,
               let api = row.api, api.value.value > 0,
-              let factor = Self.factor(from: Self.entryUnit(row.commodity), to: api.unit) else { return false }
+              let factor = Self.factor(from: row.entryUnit, to: api.unit) else { return false }
         let ratio = typed * factor / api.value.value
         return ratio > 1.5 || ratio < Decimal(2) / Decimal(3)
     }
@@ -156,13 +156,6 @@ final class AdminPricesStore {
     }
 
     // MARK: - Words
-
-    /// The unit a figure is typed in (#1587 §3): EUR per tonne, diesel EUR
-    /// per litre. The server derives the stored unit itself; this only
-    /// labels the field and gates the far-from-API check.
-    static func entryUnit(_ commodity: String) -> String {
-        commodity == "diesel" ? "EUR/l" : "EUR/t"
-    }
 
     /// The unit as a Bulgarian reader writes it.
     static func unitLabel(_ unit: String) -> String {

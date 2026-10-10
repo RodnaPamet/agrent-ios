@@ -10,7 +10,8 @@ final class AdminPricesTests: XCTestCase {
     private func row(_ commodity: String, api: (Decimal, String)? = nil,
                      feed: AdminPricesAPI.Overrides.Feed = .ecAgrifood) throws -> AdminPricesAPI.Overrides.Row {
         let apiJSON = api.map { #"{"value":\#($0.0),"currency":"EUR","unit":"\#($0.1)","date":"2026-10-06","source":"x"}"# } ?? "null"
-        let json = #"{"commodity":"\#(commodity)","typed":null,"api":\#(apiJSON),"apiFeed":"\#(feed.rawValue)"}"#
+        let unit = commodity == "diesel" ? "EUR/l" : "EUR/t"
+        let json = #"{"commodity":"\#(commodity)","typed":null,"api":\#(apiJSON),"apiFeed":"\#(feed.rawValue)","entryUnit":"\#(unit)","entryCurrency":"EUR"}"#
         return try JSONDecoder().decode(AdminPricesAPI.Overrides.Row.self, from: Data(json.utf8))
     }
 
@@ -32,7 +33,7 @@ final class AdminPricesTests: XCTestCase {
 
     /// A feed this build has not heard of is a feed, not «none».
     func testAnUnknownFeedStillCountsAsAFeed() throws {
-        let json = #"{"commodity":"oats","typed":null,"api":null,"apiFeed":"some-new-feed"}"#
+        let json = #"{"commodity":"oats","typed":null,"api":null,"apiFeed":"some-new-feed","entryUnit":"EUR/t","entryCurrency":"EUR"}"#
         let row = try JSONDecoder().decode(AdminPricesAPI.Overrides.Row.self, from: Data(json.utf8))
         XCTAssertEqual(row.apiFeed, .unknown)
         XCTAssertTrue(row.apiFeed.exists)
@@ -121,9 +122,16 @@ final class AdminPricesTests: XCTestCase {
         XCTAssertTrue(AdminPricesView.clearMessage(rapeseed).contains("Рапица няма външен източник"))
     }
 
-    func testEachFieldNamesItsUnit() {
-        XCTAssertEqual(AdminPricesStore.unitLabel(AdminPricesStore.entryUnit("wheat")), "€/т")
-        XCTAssertEqual(AdminPricesStore.unitLabel(AdminPricesStore.entryUnit("diesel")), "€/л")
+    /// The unit comes off the payload (contract v1.2); the phone keeps no
+    /// copy of which commodity is per litre.
+    func testEachFieldNamesTheUnitTheServerSays() throws {
+        XCTAssertEqual(try row("diesel", feed: .oilBulletin).entryUnit, "EUR/l")
+        XCTAssertEqual(AdminPricesStore.unitLabel("EUR/t"), "€/т")
+        XCTAssertEqual(AdminPricesStore.unitLabel("EUR/l"), "€/л")
+        let source = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Agrent/Admin/AdminPricesStore.swift"), encoding: .utf8)
+        XCTAssertTrue(source.contains("row.entryUnit"), "positive control: the store reads the payload's unit")
+        XCTAssertFalse(source.contains("== \"diesel\""), "the store kept its own copy of the per-litre split")
     }
 
     func testAClearPathCarriesTheSlugAsOneSegment() {

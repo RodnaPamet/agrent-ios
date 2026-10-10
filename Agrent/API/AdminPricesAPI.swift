@@ -46,6 +46,14 @@ enum AdminPricesAPI {
             let typed: Quote?
             let api: Quote?
             let apiFeed: Feed
+            /// What a figure is typed in: `EUR/t`, or `EUR/l` for diesel
+            /// (contract v1.2). Read off the payload, never restated here: a
+            /// second copy of this split is a price wrong by 1000× that looks
+            /// like an ordinary number, and no guard sees both repos. A label
+            /// and a sanity-check hint only; the server derives the stored
+            /// unit itself and refuses one from a client.
+            let entryUnit: String
+            let entryCurrency: String
 
             var id: String { commodity }
         }
