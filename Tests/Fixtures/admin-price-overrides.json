@@ -1,0 +1,135 @@
+{
+  "commodities": [
+    {
+      "commodity": "wheat",
+      "typed": {
+        "value": 215.5,
+        "currency": "EUR",
+        "unit": "EUR/t",
+        "date": "2026-10-09"
+      },
+      "api": {
+        "value": 209,
+        "currency": "EUR",
+        "unit": "EUR/t",
+        "date": "2026-10-06",
+        "source": "ec-agrifood"
+      },
+      "apiFeed": "ec-agrifood",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "barley",
+      "typed": null,
+      "api": {
+        "value": 188,
+        "currency": "EUR",
+        "unit": "EUR/t",
+        "date": "2026-10-06",
+        "source": "ec-agrifood"
+      },
+      "apiFeed": "ec-agrifood",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "maize",
+      "typed": null,
+      "api": null,
+      "apiFeed": "ec-agrifood",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "sunflower",
+      "typed": null,
+      "api": {
+        "value": 452,
+        "currency": "EUR",
+        "unit": "EUR/t",
+        "date": "2026-10-06",
+        "source": "ec-agrifood"
+      },
+      "apiFeed": "ec-agrifood",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "rapeseed",
+      "typed": {
+        "value": 470,
+        "currency": "EUR",
+        "unit": "EUR/t",
+        "date": "2026-10-08"
+      },
+      "api": null,
+      "apiFeed": "none",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "urea",
+      "typed": null,
+      "api": {
+        "value": 395,
+        "currency": "USD",
+        "unit": "USD/mt",
+        "date": "2026-09-01",
+        "source": "world-bank"
+      },
+      "apiFeed": "world-bank",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "ammonium-nitrate",
+      "typed": null,
+      "api": null,
+      "apiFeed": "none",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "map",
+      "typed": null,
+      "api": null,
+      "apiFeed": "none",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "dap",
+      "typed": null,
+      "api": {
+        "value": 610,
+        "currency": "USD",
+        "unit": "USD/mt",
+        "date": "2026-09-01",
+        "source": "world-bank"
+      },
+      "apiFeed": "world-bank",
+      "entryUnit": "EUR/t",
+      "entryCurrency": "EUR"
+    },
+    {
+      "commodity": "diesel",
+      "typed": {
+        "value": 1.42,
+        "currency": "EUR",
+        "unit": "EUR/l",
+        "date": "2026-10-09"
+      },
+      "api": {
+        "value": 1395,
+        "currency": "EUR",
+        "unit": "EUR/1000l",
+        "date": "2026-10-06",
+        "source": "oil-bulletin"
+      },
+      "apiFeed": "oil-bulletin",
+      "entryUnit": "EUR/l",
+      "entryCurrency": "EUR"
+    }
+  ]
+}

@@ -120,6 +120,14 @@ final class RouteContractTests: XCTestCase {
     /// off by the refresh from main a4d00ab, once `/api/health` (264aa36dc,
     /// 2026-10-09) carried it. The person's topics followed with agri-saas
     /// #1578 (46aaae619, 2026-10-10), so the list is empty again.
+    ///
+    /// Empty again from agri-saas main 475000d: the superuser's daily prices
+    /// (#258), built against agri-saas #1587's written contract before the
+    /// server served it, sat here until `/api/health` carried agri-saas #1618
+    /// (e4f567145, 2026-10-11) and were taken off by the refresh that brought
+    /// them in. Админ still offers «Цени» to nobody until a farm's row says
+    /// `isPlatform`, which none does before the owner creates the platform
+    /// farm.
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -178,6 +186,7 @@ final class RouteContractTests: XCTestCase {
                 ExchangeAPI.messagePath(messageID: "{messageId}"),
             ]),
             ("FarmRecordAPI.swift", [FarmRecordAPI.path(loc)]),
+            ("AdminPricesAPI.swift", [AdminPricesAPI.path, AdminPricesAPI.clearPath("{commodity}")]),
             ("LocationsAPI.swift", [
                 LocationsAPI.listPath,
                 LocationsAPI.parcelsPath(loc),

@@ -229,7 +229,11 @@ struct FieldRow<Field: View>: View {
                 .accessibilityLabel(spoken ?? title)
                 .accessibilityInputLabels(A11y.spokenNames(title))
         } label: {
+            // WRAPS, never cut. The field takes the row's spare width, and a
+            // long title was squeezed to «Уреа (карбамид),…» at the DEFAULT
+            // size on «Цени» (#258): the name of what is being priced, cut.
             Text(title)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

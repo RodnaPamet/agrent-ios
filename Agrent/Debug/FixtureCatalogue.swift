@@ -176,6 +176,10 @@ enum FixtureCatalogue {
         // GETs only — choosing a topic is a PUT, answered 501 as every write.
         (TrendsAPI.newsTagsPath, "trends-news-tags"),
         (NewsPreferencesAPI.path, "news-preferences"),
+        // agrent-ios#258: the superuser's prices form. The GET only — the
+        // day's prices (POST) and a clear (DELETE) are writes to every
+        // farm's prices, answered 501 as every write is.
+        (AdminPricesAPI.path, "admin-price-overrides"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 
