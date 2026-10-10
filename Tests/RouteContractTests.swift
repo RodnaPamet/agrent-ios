@@ -118,11 +118,9 @@ final class RouteContractTests: XCTestCase {
     /// person who chose nothing. #231 merges only once `/api/health` carries
     /// both. The catalogue (`/trends/news/tags`, agri-saas #1480) was taken
     /// off by the refresh from main a4d00ab, once `/api/health` (264aa36dc,
-    /// 2026-10-09) carried it; the person's topics wait.
-    private static let pendingServerRoutes: [String: String] = [
-        "/api/me/news-preferences":
-            "agri-saas news contract #1446 §4: a person's news topics for #231",
-    ]
+    /// 2026-10-09) carried it. The person's topics followed with agri-saas
+    /// #1578 (46aaae619, 2026-10-10), so the list is empty again.
+    private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
