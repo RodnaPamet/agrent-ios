@@ -188,6 +188,7 @@ final class RouteContractTests: XCTestCase {
                 ExchangeAPI.messagePath(messageID: "{messageId}"),
             ]),
             ("FarmRecordAPI.swift", [FarmRecordAPI.path(loc)]),
+            ("AdminPricesAPI.swift", [AdminPricesAPI.path, AdminPricesAPI.clearPath("wheat")]),
             ("LocationsAPI.swift", [
                 LocationsAPI.listPath,
                 LocationsAPI.parcelsPath(loc),
