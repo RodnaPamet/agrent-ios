@@ -174,6 +174,20 @@ final class JournalFilterTests: XCTestCase {
         XCTAssertFalse(filter.admits(written, linkedTo: ["loc_1"], now: now, calendar: sofia))
     }
 
+    /// A crop matches through what grows on the linked blocks (agri-saas
+    /// #1560), which the phone does not hold beside an entry. It does not
+    /// guess; the store asks the server again.
+    func testOnlyACropFilterIsLeftToTheServer() {
+        var filter = JournalFilter(now: now, calendar: sofia)
+        XCTAssertTrue(filter.decidesLocally)
+        filter.type = .seeding
+        filter.block = .init(id: "loc_1", name: "Северен")
+        filter.period = .last30Days
+        XCTAssertTrue(filter.decidesLocally)
+        filter.crop = .init(label: "Пшеница", values: ["Wheat"])
+        XCTAssertFalse(filter.decidesLocally)
+    }
+
     func testTypeAndPeriodAreCheckedAsTheServerChecksThem() {
         var filter = JournalFilter(now: now, calendar: sofia)
         filter.type = .seeding

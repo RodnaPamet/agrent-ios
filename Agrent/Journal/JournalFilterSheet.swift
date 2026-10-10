@@ -22,10 +22,12 @@ struct JournalFilterSheet: View {
 
     private static let all = "Всички"
 
+    // The journal holds only what a person wrote (#256), so both facets reach
+    // an entry through the blocks it was linked to on «Нов запис».
     private static let cropNote =
-        "По култура се показват записите от операции върху парцели с тази култура."
+        "По култура се показват записите, свързани с блок, в който расте тази култура."
     private static let blockNote =
-        "По блок се показват записите, свързани с блока, и операциите върху парцелите му."
+        "По блок се показват записите, свързани с блока."
 
     var body: some View {
         NavigationStack {
