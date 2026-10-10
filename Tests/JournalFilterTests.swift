@@ -241,6 +241,15 @@ final class JournalFilterTests: XCTestCase {
         XCTAssertEqual(JournalFilterSheet.keeping(nil, in: [here]), [here])
     }
 
+    /// Renamed on the web, a chosen block is still the one offered: one
+    /// choice, under its new name.
+    func testARenamedBlockIsStillOneChoice() {
+        let chosen = JournalFilter.Block(id: "l1", name: "Север")
+        let renamed = JournalFilter.Block(id: "l1", name: "Северен блок")
+        XCTAssertEqual(chosen, renamed)
+        XCTAssertEqual(JournalFilterSheet.keeping(chosen, in: [renamed]).map(\.name), ["Северен блок"])
+    }
+
     // MARK: - Said back
 
     func testTheSummaryNamesEachFacet() {

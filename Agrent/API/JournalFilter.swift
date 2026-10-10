@@ -57,6 +57,13 @@ struct JournalFilter: Equatable, Sendable {
     struct Block: Hashable, Sendable, Identifiable {
         let id: String
         let name: String
+
+        /// The same block is the same id, whatever it is called. A block
+        /// renamed on the web would otherwise be two choices: the old name
+        /// kept from a choice made earlier, and the new one from the farm's
+        /// list, both with one id under one `ForEach`.
+        static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
+        func hash(into hasher: inout Hasher) { hasher.combine(id) }
     }
 
     enum Period: String, CaseIterable, Identifiable, Sendable {
