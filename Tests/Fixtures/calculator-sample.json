@@ -17,7 +17,8 @@
         "attributableCostPerDca": 10.13,
         "marginPerDca": 199.87,
         "uncertainty": "allocated",
-        "refusalCode": null
+        "refusalCode": null,
+        "costAreaDca": 123.4
       },
       "breakEven": {
         "breakEvenPricePerTonne": 20.26,
@@ -66,7 +67,8 @@
           "value": 150,
           "variant": "info"
         }
-      ]
+      ],
+      "occupiedAreaHa": 12.34
     },
     {
       "commodity": "SUNFLOWER",
@@ -83,7 +85,8 @@
         "attributableCostPerDca": null,
         "marginPerDca": null,
         "uncertainty": "refused",
-        "refusalCode": "NO_STANDING_CROP_VALUE"
+        "refusalCode": "NO_STANDING_CROP_VALUE",
+        "costAreaDca": 45
       },
       "breakEven": {
         "breakEvenPricePerTonne": null,
@@ -134,7 +137,8 @@
           "value": 0,
           "variant": "info"
         }
-      ]
+      ],
+      "occupiedAreaHa": 4.5
     }
   ],
   "farm": {

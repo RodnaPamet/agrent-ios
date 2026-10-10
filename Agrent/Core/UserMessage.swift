@@ -426,8 +426,11 @@ enum UserMessage {
         // The per-decare refusals (`PerAreaRefusalCode`, agri-saas
         // `per-area.ts`), in the web's words (`grain.calculator.perAreaNoArea`
         // / `perAreaNoValue`).
-        "NO_STANDING_CROP_AREA": "Няма площ с реколта на корен, върху която да се раздели.",
-        "NO_STANDING_CROP_VALUE": "Няма пазарна цена за реколтата на корен.",
+        // Since agri-saas #1606 the cost per dca is given under both codes;
+        // only value and margin are refused, and the words say exactly that
+        // (the web's, mirrored).
+        "NO_STANDING_CROP_AREA": "Няма площ с прогноза за добив, затова стойността и маржът на декар не се изчисляват.",
+        "NO_STANDING_CROP_VALUE": "Няма пазарна цена за реколтата на корен, затова стойността и маржът на декар не се изчисляват.",
         "MIXED_COST_CURRENCY":
             "Разходите са записани в повече от една валута; смесването им в нетната стойност би изкривило общата сума.",
         "RENT_CURRENCY_UNRECORDED":

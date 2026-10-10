@@ -262,18 +262,39 @@ final class CalculatorPayloadTests: XCTestCase {
 final class PerAreaWordingTests: XCTestCase {
 
     private func perArea(margin: Double? = nil, uncertainty: Uncertainty = .exact,
-                         refusal: String? = nil) -> PerArea {
-        PerArea(areaDca: 0, standingValuePerDca: nil, attributableCostPerDca: nil,
-                marginPerDca: margin, uncertainty: uncertainty, refusalCode: refusal)
+                         refusal: String? = nil, areaDca: Double = 0,
+                         costAreaDca: Double? = nil) -> PerArea {
+        PerArea(areaDca: areaDca, costAreaDca: costAreaDca, standingValuePerDca: nil,
+                attributableCostPerDca: nil, marginPerDca: margin, uncertainty: uncertainty,
+                refusalCode: refusal)
+    }
+
+    /// «Площ» is the land the cost per dca divides (agri-saas #1606). On a
+    /// farm with no yield forecasts the forecast area is 0 while the cost
+    /// rate is real; 0 above that rate was the contradiction (#262).
+    func testTheLandShownIsTheCostRatesOwnArea() {
+        let noForecasts = perArea(uncertainty: .refused, refusal: "NO_STANDING_CROP_AREA",
+                                  areaDca: 0, costAreaDca: 6910)
+        XCTAssertEqual(noForecasts.landDca, 6910)
+        XCTAssertNil(noForecasts.forecastAreaDca, "a 0 forecast area is the refusal note's to say")
+        let partial = perArea(areaDca: 500, costAreaDca: 2000)
+        XCTAssertEqual(partial.landDca, 2000)
+        XCTAssertEqual(partial.forecastAreaDca, 500, "value and margin are per the forecast area, said apart")
+        XCTAssertNil(perArea(areaDca: 500, costAreaDca: 500).forecastAreaDca, "one area, one line")
+        // A server before #1606: one area for every figure, as before.
+        XCTAssertEqual(perArea(areaDca: 450).landDca, 450)
+        XCTAssertNil(perArea(areaDca: 450).forecastAreaDca)
     }
 
     /// They used to vanish without a word — on a farm whose crop area is on
     /// its parcels, every row (agri-saas #1512).
     func testARefusalIsSaidInTheWebsWords() {
+        // Since agri-saas #1606: value and margin are refused, the cost per
+        // dca is not, and the words say only what is missing.
         XCTAssertEqual(perArea(uncertainty: .refused, refusal: "NO_STANDING_CROP_AREA").refusalText,
-                       "Няма площ с реколта на корен, върху която да се раздели.")
+                       "Няма площ с прогноза за добив, затова стойността и маржът на декар не се изчисляват.")
         XCTAssertEqual(perArea(uncertainty: .refused, refusal: "NO_STANDING_CROP_VALUE").refusalText,
-                       "Няма пазарна цена за реколтата на корен.")
+                       "Няма пазарна цена за реколтата на корен, затова стойността и маржът на декар не се изчисляват.")
         XCTAssertEqual(perArea(uncertainty: .refused, refusal: "SOME_FUTURE_CODE").refusalText,
                        "Стойностите на декар не могат да се изчислят.",
                        "a code this build does not know still says something")

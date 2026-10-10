@@ -240,10 +240,19 @@ struct CalculatorView: View {
 
             // areaDca comes from the payload — never recomputed from
             // standingCropAreaHa. See PerArea's header.
+            // The land the crop occupies, which the cost per dca divides
+            // (#262). The forecast area, which value and margin divide, gets
+            // its own line where it differs.
             ValueRow("Площ") {
-                Text("\(Num.text(row.perArea.areaDca)) дка")
+                Text("\(Num.text(row.perArea.landDca)) дка")
             }
-            // Why the per-decare lines below are missing, when they are.
+            if let forecast = row.perArea.forecastAreaDca {
+                ValueRow("С прогноза за добив") {
+                    Text("\(Num.text(forecast)) дка")
+                }
+            }
+            // Why value and margin per decare are missing, when they are.
+            // The cost per decare stands without them (agri-saas #1606).
             if let refusal = row.perArea.refusalText {
                 RefusalNote(text: refusal)
             }
