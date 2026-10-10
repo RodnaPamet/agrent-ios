@@ -155,4 +155,9 @@ struct CreateLogEntry: Encodable, Sendable {
     var title: String
     var notes: String?
     var occurredAt: Date?
+    /// The blocks the entry is about (#254). These are `LogLocation` links,
+    /// the only path by which a hand-written entry reaches the Дневник's
+    /// «Блок» filter. Nil when none is chosen, and then left out, so an
+    /// unlinked entry's body is the one the app always sent.
+    var locationIds: [String]?
 }

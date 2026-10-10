@@ -125,32 +125,3 @@ struct CloseTaskSheet: View {
         sending = false
     }
 }
-
-/// One answer to tap: the page picker's row — the text, and a check mark
-/// when chosen, said to VoiceOver as `.isSelected` (the system's own word).
-private struct ChoiceRow: View {
-    let title: String
-    let chosen: Bool
-    let choose: () -> Void
-
-    var body: some View {
-        Button(action: choose) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                if chosen {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Palette.accent)
-                        .accessibilityHidden(true)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        // No input label: an answer is DATA, and Voice Control answers to
-        // the visible text.
-        .accessibilityAddTraits(chosen ? .isSelected : [])
-    }
-}

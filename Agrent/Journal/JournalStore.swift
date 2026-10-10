@@ -156,7 +156,7 @@ final class JournalStore {
         // Not shown under a filter it does not meet (`JournalFilter.admits`):
         // that row would vanish on the next refresh, which reads as a lost
         // entry. It is saved either way; clearing the filter shows it.
-        guard filter.admits(saved) else { return }
+        guard filter.admits(saved, linkedTo: draft.locationIds ?? []) else { return }
         if case .loaded(var rows, let freshness) = state {
             rows.insert(saved, at: 0)
             state = .loaded(rows, freshness)

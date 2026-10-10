@@ -66,7 +66,7 @@ struct JournalListView: View {
                 }
             }
             .sheet(isPresented: $composing) {
-                NewEntryView(store: store)
+                NewEntryView(store: store, preselected: store.filter.block.map { [$0] } ?? [])
             }
             .sheet(isPresented: $exportingRecord, onDismiss: FarmRecordAPI.removeGenerated) {
                 FarmRecordSheet()
