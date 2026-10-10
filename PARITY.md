@@ -898,6 +898,31 @@ card (one `AccountCard`), for every role.
   (password change) is for credential accounts; this app signs in through the
   browser. The web's sound/haptics preferences are device-local web settings.
 
+### «Цени» — the superuser's daily prices (#258, owner 2026-10-10)
+
+The owner's fallback for the market feeds: a superuser types the day's prices
+and they win over the API, for every farm, until cleared. Server: agri-saas
+#1587 (contract), built in #1618 (live e4f567145, 2026-10-11).
+
+**iOS:**
+- **Offered only** on the platform farm, to its owner or an admin: the farm
+  row's `isPlatform` (absent means false) and `role`. Every route still
+  enforces its own gate and answers 404 elsewhere.
+- **The form** reads `GET …/admin/market-prices/overrides`: per commodity, the
+  typed price, the feed's, and whether a feed exists at all (`apiFeed: none`
+  is said apart from `api: null`). The unit to type in is the row's
+  `entryUnit` (EUR/t; diesel EUR/l), never a phone copy.
+- **Saving** sends the day, all or nothing (`{date, prices, clientMutationId}`);
+  the server takes no unit from the phone. A retry is safe because each price
+  upserts on its series and date. Clearing is per commodity, and clearing
+  nothing is not an error.
+- **Табло and Тенденции** put the typed series (`source: "platform"`) first,
+  across unit groups (#266).
+
+**Unverified:** no price has been typed from the app. Nothing can be until
+the owner creates the platform farm and `PLATFORM_TENANT_SLUG` names it; the
+owner makes the first entry. The web console is agri-saas's.
+
 ### Haptics — since 2026-10-06 (agri-saas#1193 P2.8)
 
 Web `src/lib/haptics.ts` (Vibration API; Android browsers only — iOS Safari
