@@ -73,6 +73,53 @@ final class AccountDeletionTests: XCTestCase {
                        "Профилът Ви е спрян и не може да се използва.")
     }
 
+    // MARK: - The recovery screen's signal
+
+    /// `user.deletion` on `/me`: read when set, and absent, null or
+    /// unreadable all mean nothing pending — never the identity lost with it.
+    func testMeSaysWhenADeletionIsPending() throws {
+        func me(_ deletion: String) throws -> CurrentUser {
+            let json = #"{"user":{"id":"u1","name":null,"email":null,"role":"OWNER""# + deletion + "}}"
+            return try JSONDecoder().decode(CurrentUser.self, from: Data(json.utf8))
+        }
+        let pending = try me(#","deletion":{"requestedAt":"2026-10-11T21:04:00.000Z","erasesAt":"2026-11-10T21:04:00.000Z"}"#)
+        XCTAssertEqual(pending.deletion?.erasesAt, BgDate.parseInstant("2026-11-10T21:04:00.000Z"))
+        XCTAssertNotNil(pending.deletion?.requestedAt)
+
+        XCTAssertNil(try me("").deletion, "an older server stranded someone on the recovery screen")
+        XCTAssertNil(try me(#","deletion":null"#).deletion)
+        let unreadable = try me(#","deletion":"soon""#)
+        XCTAssertNil(unreadable.deletion)
+        XCTAssertEqual(unreadable.id, "u1", "an unreadable field cost the identity")
+
+        // Kept through the open farm's role, as everything of the person's is.
+        XCTAssertEqual(pending.inFarm(role: "READER").deletion, pending.deletion)
+    }
+
+    /// The server's date, and what restoring does not bring back.
+    func testTheRecoveryScreenSaysTheDateAndWhatRestoringDoes() throws {
+        let date = try XCTUnwrap(BgDate.parseInstant("2026-11-10T21:04:00.000Z"))
+        let dated = AccountDeletionText.pending(erasesAt: date)
+        XCTAssertTrue(dated.contains(BgDate.full(date)), dated)
+        let undated = AccountDeletionText.pending(erasesAt: nil)
+        for text in [dated, undated] {
+            XCTAssertTrue(text.contains("влезете отново"), "the other devices' sign-out is not said: \(text)")
+            XCTAssertTrue(text.hasSuffix("."), text)
+        }
+    }
+
+    /// Only a signed-in session is moved to the recovery screen by `/me`;
+    /// a code being asked for is left alone, and nothing restores outside it.
+    func testOnlyASignedInSessionIsMovedToTheRecoveryScreen() async {
+        let auth = AuthClient()
+        auth.awaitCode(.init(ticket: "t", verifier: "v", deadline: Date().addingTimeInterval(300)))
+        auth.deletionPendingSeen(.init(requestedAt: nil, erasesAt: nil))
+        XCTAssertEqual(auth.state, .codeRequired)
+        await auth.restoreAccount()
+        XCTAssertEqual(auth.state, .codeRequired, "a restore ran outside the recovery screen")
+        XCTAssertFalse(auth.restoringAccount)
+    }
+
     // MARK: - Fired from one place
 
     /// The request is an outward-facing write that revokes every session, so
@@ -87,14 +134,18 @@ final class AccountDeletionTests: XCTestCase {
             .filter { $0.hasSuffix(".swift") }
         var senders: [String] = []
         var askers: [String] = []
+        var cancellers: [String] = []
         for path in sources {
             let text = try String(contentsOf: root.appendingPathComponent("Agrent").appendingPathComponent(path),
                                   encoding: .utf8)
             let code = SignOutHygieneTests.code(text)
             if code.contains("AccountDeletionAPI.request()") { senders.append(path) }
             if code.contains("auth.requestAccountDeletion()") { askers.append(path) }
+            if code.contains("AccountDeletionAPI.cancel()") { cancellers.append(path) }
         }
         XCTAssertEqual(senders, ["Auth/AuthClient.swift"])
         XCTAssertEqual(askers, ["Account/DeleteAccountView.swift"])
+        // And the cancel, from the recovery screen's one action.
+        XCTAssertEqual(cancellers, ["Auth/AuthClient.swift"])
     }
 }

@@ -93,6 +93,40 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// see the header for the one place it is read.
     let tenant: Tenant?
 
+    /// A deletion this person asked for and has not cancelled — nil when
+    /// none is pending (agrent-ios#281, agri-saas #1597). Inside `user`,
+    /// beside `role`. While it is set, the app shows only the recovery
+    /// screen (`AuthClient.deletionPendingSeen`).
+    ///
+    /// Lenient like the picture: absent and null both mean nothing pending,
+    /// so an older server never strands anyone on the recovery screen, and a
+    /// value this build cannot read costs the field, never the identity. A
+    /// SUSPENDED account never gets here: `/me` refuses it with
+    /// `ACCOUNT_SUSPENDED` before composing a payload.
+    let deletion: Deletion?
+
+    struct Deletion: Decodable, Equatable, Sendable {
+        let requestedAt: Date?
+        /// When the erasure runs — the server's, said as it is and never
+        /// derived here.
+        let erasesAt: Date?
+
+        private enum CodingKeys: String, CodingKey { case requestedAt, erasesAt }
+
+        init(requestedAt: Date?, erasesAt: Date?) {
+            self.requestedAt = requestedAt
+            self.erasesAt = erasesAt
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            requestedAt = (try? c.decodeIfPresent(String.self, forKey: .requestedAt)).flatMap { $0 }
+                .flatMap(BgDate.parseInstant)
+            erasesAt = (try? c.decodeIfPresent(String.self, forKey: .erasesAt)).flatMap { $0 }
+                .flatMap(BgDate.parseInstant)
+        }
+    }
+
     struct Tenant: Decodable, Equatable, Sendable {
         let id: String
         let name: String
@@ -100,7 +134,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     }
 
     private enum Outer: String, CodingKey { case user, featureFlags, tenant }
-    private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder, avatarUrl }
+    private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder, avatarUrl, deletion }
 
     init(from decoder: Decoder) throws {
         let outer = try decoder.container(keyedBy: Outer.self)
@@ -111,6 +145,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.role = try user.decodeIfPresent(String.self, forKey: .role)
         self.bottomTabOrder = try user.decodeIfPresent([String].self, forKey: .bottomTabOrder)
         self.avatarUrl = (try? user.decodeIfPresent(String.self, forKey: .avatarUrl)) ?? nil
+        self.deletion = (try? user.decodeIfPresent(Deletion.self, forKey: .deletion)) ?? nil
         self.featureFlags = (try? outer.decodeIfPresent([String: Bool].self, forKey: .featureFlags)) ?? nil
         // Lenient like the flags: a tenant block that will not decode costs a
         // first sign-in its starting farm (it is asked to choose), never the
@@ -185,12 +220,12 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         guard let farmRole, farmRole != role else { return self }
         return CurrentUser(id: id, name: name, email: email, role: farmRole,
                            bottomTabOrder: bottomTabOrder, featureFlags: featureFlags,
-                           avatarUrl: avatarUrl, tenant: tenant)
+                           avatarUrl: avatarUrl, tenant: tenant, deletion: deletion)
     }
 
     init(id: String, name: String?, email: String?, role: String?,
          bottomTabOrder: [String]? = nil, featureFlags: [String: Bool]? = nil,
-         avatarUrl: String? = nil, tenant: Tenant? = nil) {
+         avatarUrl: String? = nil, tenant: Tenant? = nil, deletion: Deletion? = nil) {
         self.id = id
         self.name = name
         self.email = email
@@ -199,6 +234,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.featureFlags = featureFlags
         self.avatarUrl = avatarUrl
         self.tenant = tenant
+        self.deletion = deletion
     }
 }
 

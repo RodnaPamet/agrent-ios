@@ -188,6 +188,8 @@ enum A11y {
         /// Профил's row, its page's button and the confirmation's (#281).
         /// "Delete profile" too: it is what «профила» literally says.
         static let deleteAccount = spokenNames("Изтрий профила", "Delete account", "Delete profile")
+        /// The recovery screen's way back (#281).
+        static let restoreAccount = spokenNames("Възстанови профила", "Restore account", "Restore profile")
     }
 
     /// Join facts as speech: nils and blanks dropped, comma-separated, one

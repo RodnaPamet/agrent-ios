@@ -4,6 +4,9 @@ import SwiftUI
 @main
 struct AgrentApp: App {
     @State private var auth = AuthClient()
+    /// Watched for one thing here: a pending account deletion, which takes a
+    /// signed-in session to the recovery screen (#281).
+    @State private var me = CurrentUserStore.shared
 
     /// BEFORE ANY SCENE EXISTS, because the defect it fixes is paid by the
     /// first Bulgarian string UIKit measures — and on this app that can be
@@ -66,11 +69,20 @@ struct AgrentApp: App {
                     // Apple sign-in at a farm that requires a second factor:
                     // nothing is signed in until the code is (#274).
                     SecondFactorView()
+                case .deletionPending(let erasesAt):
+                    // The account is frozen until the person restores it or
+                    // leaves (#281).
+                    DeletionPendingView(erasesAt: erasesAt)
                 default:
                     SignInView()
                 }
             }
             .environment(auth)
+            // A session opened on stored tokens learns of a pending deletion
+            // from the first `/me` it reads; a sign-in decides for itself.
+            .onChange(of: me.user?.deletion, initial: true) { _, deletion in
+                if let deletion { auth.deletionPendingSeen(deletion) }
+            }
             // Ochre, not the system blue and emphatically not green: green on
             // the parcel map is DATA — it encodes whether a parcel is sown —
             // so an accent in that family would read as one more state.

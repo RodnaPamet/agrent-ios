@@ -24,6 +24,11 @@ final class AuthClient: NSObject {
         /// only `SecondFactorView` is shown until the code is redeemed or the
         /// person goes back (agri-saas #1649, agrent-ios#274).
         case codeRequired
+        /// Signed in, and this account's deletion is pending: only
+        /// `DeletionPendingView` is shown — «Възстанови профила» or Изход —
+        /// until the person chooses (owner, 2026-10-11; agrent-ios#281).
+        /// Signing in does not cancel by itself.
+        case deletionPending(erasesAt: Date?)
         case failed(String)
     }
 
@@ -123,7 +128,7 @@ final class AuthClient: NSObject {
             // will be. Not fatal if it fails: `MainTabView` asks again.
             _ = await CurrentUserStore.shared.load()
             signInNotice = nil
-            state = .signedIn
+            state = stateAfterSignIn()
             Log.auth.info("sign-in complete")
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             state = .signedOut
@@ -230,6 +235,65 @@ final class AuthClient: NSObject {
     /// SUCCEEDS, not where one starts: a sign-in cancelled in the browser
     /// comes back to `.signedOut`, and the date would otherwise be gone.
     private(set) var signInNotice: String?
+
+    /// Where a completed sign-in lands: the recovery screen when `/me` says
+    /// this account's deletion is pending, the farm otherwise. Read from the
+    /// `/me` the sign-in has just loaded — the one read made before any
+    /// screen is shown.
+    private func stateAfterSignIn() -> State {
+        guard let deletion = CurrentUserStore.shared.user?.deletion else { return .signedIn }
+        Log.auth.info("account deletion pending; showing the recovery screen")
+        return .deletionPending(erasesAt: deletion.erasesAt)
+    }
+
+    /// `/me` said a deletion is pending while a session was already open —
+    /// a launch on stored tokens after a sign-in that left the recovery
+    /// screen unanswered. Only a signed-in session moves; one signing in
+    /// decides for itself (`stateAfterSignIn`).
+    func deletionPendingSeen(_ deletion: CurrentUser.Deletion) {
+        guard state == .signedIn else { return }
+        state = .deletionPending(erasesAt: deletion.erasesAt)
+        Log.auth.info("account deletion pending; showing the recovery screen")
+    }
+
+    /// The recovery screen's «Възстанови профила» on its way, and its last
+    /// refusal — final when no retry can help (`restoreRefused`).
+    private(set) var restoringAccount = false
+    private(set) var restoreError: String?
+    /// The account is past restoring: erased already, or suspended by a
+    /// moderator, whose termination runs the same erasure and cannot be
+    /// cancelled by the person. The screen then offers only Изход.
+    private(set) var restoreRefused = false
+
+    /// Cancel the pending deletion (`DELETE /api/account/deletion`) and open
+    /// the app. `wasRequested: false` — nothing was pending — is success.
+    ///
+    /// `/me` is read again, fresh, before the farm opens, so a disk copy of
+    /// the answer that sent the person here cannot send them straight back.
+    /// Revoked sessions elsewhere stay revoked; the screen says so.
+    func restoreAccount() async {
+        guard case .deletionPending = state, !restoringAccount, !restoreRefused else { return }
+        restoringAccount = true
+        defer { restoringAccount = false }
+        restoreError = nil
+        let epoch = SessionEpoch.current
+        do {
+            _ = try await AccountDeletionAPI.cancel()
+            guard SessionEpoch.isCurrent(epoch), case .deletionPending = state else { return }
+            await CurrentUserStore.shared.refresh()
+            guard SessionEpoch.isCurrent(epoch), case .deletionPending = state else { return }
+            state = .signedIn
+            Log.auth.info("account deletion cancelled")
+        } catch {
+            guard SessionEpoch.isCurrent(epoch) else { return }
+            restoreError = UserMessage.text(for: error)
+            if case APIClient.APIError.http(_, let code, _, _, _) = error,
+               code == "ACCOUNT_ALREADY_ERASED" || code == "ACCOUNT_SUSPENDED" {
+                restoreRefused = true
+            }
+            Log.auth.error("account restore failed: \(Log.summary(for: error), privacy: .public)")
+        }
+    }
 
     /// A deletion request on its way — on the client, not the page, so going
     /// Back and opening «Изтрий профила» again cannot send a second one.
@@ -411,7 +475,7 @@ final class AuthClient: NSObject {
             Log.auth.info("apple sign-in complete, terms pending")
         } else {
             _ = await CurrentUserStore.shared.load()
-            state = .signedIn
+            state = stateAfterSignIn()
             Log.auth.info("apple sign-in complete")
         }
     }
@@ -522,6 +586,8 @@ final class AuthClient: NSObject {
 
         pendingCode = nil
         codeError = nil
+        restoreError = nil
+        restoreRefused = false
         state = .signedOut
     }
 

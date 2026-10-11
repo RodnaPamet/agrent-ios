@@ -126,6 +126,20 @@ enum AccountDeletionText {
     static let confirmMessage = "Ще бъдете отписани от всички устройства. Докато срокът тече, "
         + "можете да влезете отново и да възстановите профила."
 
+    // ── The recovery screen (`DeletionPendingView`) ──
+
+    static let pendingTitle = "Профилът Ви е заявен за изтриване"
+    static let restore = "Възстанови профила"
+    static let restoring = "Възстановяване"
+
+    /// The server's date, and what restoring does — including what it does
+    /// not: the sessions the request ended stay ended.
+    static func pending(erasesAt: Date?) -> String {
+        let when = erasesAt.map { "Ще бъде изтрит на \(BgDate.full($0)). Дотогава можете да го възстановите." }
+            ?? "Докато не бъде изтрит, можете да го възстановите."
+        return when + " Ако го възстановите, на другите си устройства ще трябва да влезете отново."
+    }
+
     /// When the request's answer was lost and the session turned out to be
     /// revoked: likely recorded, not known. Signing in shows which — the
     /// recovery screen if it was.
