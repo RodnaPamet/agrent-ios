@@ -174,6 +174,19 @@ enum Palette {
     ///     on Surface.page    7.26   7.57   7.75
     static let error = Color(token: AgrentColor.contentError)
 
+    /// A control that ends or destroys something — «Изход», «Изтрий профила»
+    /// — written in `error`'s ink without borrowing its meaning: starting a
+    /// deletion is not a failure. Its own name for that reason, and so the
+    /// two can part later without a hunt through every call site.
+    ///
+    /// Not the system's destructive red, which `role: .destructive` draws in
+    /// a List: #FF3B30 measures about 3.2:1 on the light page, below the 4.5
+    /// body text needs. `role:` stays on those buttons for what it means to
+    /// dialogs and VoiceOver; the ink is set over it.
+    ///
+    ///     on Surface.page    7.26   7.57   7.75
+    static let destructive = Color(token: AgrentColor.contentError)
+
     /// WHAT TO WRITE ON TOP OF `error` when it is the FILL rather than the
     /// ink — the same pairing `onAccent` makes, for the same reason: the dark
     /// error is light precisely so it can be READ on a dark page, which

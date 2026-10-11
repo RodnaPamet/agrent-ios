@@ -4,6 +4,9 @@ import SwiftUI
 @main
 struct AgrentApp: App {
     @State private var auth = AuthClient()
+    /// Watched for one thing here: a pending account deletion, which takes a
+    /// signed-in session to the recovery screen (#281).
+    @State private var me = CurrentUserStore.shared
 
     /// BEFORE ANY SCENE EXISTS, because the defect it fixes is paid by the
     /// first Bulgarian string UIKit measures — and on this app that can be
@@ -66,11 +69,23 @@ struct AgrentApp: App {
                     // Apple sign-in at a farm that requires a second factor:
                     // nothing is signed in until the code is (#274).
                     SecondFactorView()
+                case .deletionPending(let erasesAt):
+                    // The account is frozen until the person restores it or
+                    // leaves (#281).
+                    DeletionPendingView(erasesAt: erasesAt)
                 default:
                     SignInView()
                 }
             }
             .environment(auth)
+            // A session opened on stored tokens learns of a pending deletion
+            // from the first `/me` it reads; a sign-in decides for itself.
+            // Keyed on the state too, so ANY way into `.signedIn` is checked —
+            // not only a change of the field, which a path that skipped
+            // `stateAfterSignIn` would never make.
+            .onChange(of: auth.state == .signedIn ? me.user?.deletion : nil, initial: true) { _, deletion in
+                if let deletion { auth.deletionPendingSeen(deletion) }
+            }
             // Ochre, not the system blue and emphatically not green: green on
             // the parcel map is DATA — it encodes whether a parcel is sown —
             // so an accent in that family would read as one more state.
@@ -282,10 +297,12 @@ struct SignInView: View {
                 .foregroundStyle(Palette.secondaryText)
                 .multilineTextAlignment(.center)
 
-            if case .failed(let message) = auth.state {
+            if let message = spokenMessage {
+                // A failure in the error colour; the deletion notice — the
+                // date and the way back (agrent-ios#281) — is not one.
                 Text(message)
                     .font(.subheadline)
-                    .foregroundStyle(Palette.error)
+                    .foregroundStyle(isFailure ? Palette.error : Palette.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -368,13 +385,28 @@ struct SignInView: View {
         // swap settles and at high priority, as `FarmGate`'s: the focus move
         // that follows a replaced screen is what cuts a default one short.
         .task(id: auth.state) {
-            guard case .failed(let message) = auth.state else { return }
+            guard let message = spokenMessage else { return }
             try? await Task.sleep(for: .milliseconds(600))
             guard !Task.isCancelled else { return }
             var line = AttributedString(message)
             line.accessibilitySpeechAnnouncementPriority = .high
             AccessibilityNotification.Announcement(line).post()
         }
+    }
+}
+
+extension SignInView {
+    /// What the screen says above its buttons, and announces: a failure, or
+    /// after «Изтрий профила» the deletion notice. One decision for both, so
+    /// what is shown and what is spoken cannot disagree.
+    private var spokenMessage: String? {
+        if case .failed(let failure) = auth.state { return failure }
+        return auth.state == .signedOut ? auth.signInNotice : nil
+    }
+
+    private var isFailure: Bool {
+        if case .failed = auth.state { return true }
+        return false
     }
 }
 

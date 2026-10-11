@@ -54,6 +54,7 @@ final class PaletteTokenTests: XCTestCase {
         ("onAccent on accent", Palette.onAccent, Palette.accent, [8.45, 5.21, 5.21]),
         ("onAccent on accentDeep", Palette.onAccent, Palette.accentDeep, [5.46, 6.19, 6.19]),
         ("error on page", Palette.error, Palette.Surface.page, [7.26, 7.57, 7.75]),
+        ("destructive on page", Palette.destructive, Palette.Surface.page, [7.26, 7.57, 7.75]),
         ("onError on error", Palette.onError, Palette.error, [7.76, 8.05, 7.37]),
         ("success on page", Palette.success, Palette.Surface.page, [10.25, 6.59, 8.08]),
         ("warning on page", Palette.warning, Palette.Surface.page, [9.96, 6.24, 7.13]),

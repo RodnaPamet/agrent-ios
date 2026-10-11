@@ -561,6 +561,15 @@ enum UserMessage {
         // so this should be unreachable; the server says a retry will not
         // help, and the sentence does not offer one.
         "CSRF_BLOCKED": "Сървърът отказа заявката от съображения за сигурност.",
+        // Account deletion (agrent-ios#281): the grace period is over and the
+        // account was pseudonymised, so there is nothing to cancel or ask
+        // for. Said, rather than offering a button that cannot work.
+        "ACCOUNT_ALREADY_ERASED": "Профилът вече е изтрит и не може да бъде възстановен.",
+        // Every request of a suspended account — a moderator's suspension,
+        // or a termination, which also starts the erasure (agri-saas P5.9,
+        // `getSessionOrThrow`). Its message is the bare code, so without this
+        // the person was told «Нямате права», as if a role were missing.
+        "ACCOUNT_SUSPENDED": "Профилът Ви е спрян и не може да се използва.",
 
         // 409s that are not a stale edit (#240, agri-saas #1489): a collision
         // with something that already exists, so the remedy is a different

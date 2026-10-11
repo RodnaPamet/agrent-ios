@@ -185,6 +185,11 @@ enum A11y {
         /// The filter sheet's «Покажи»: show the list the filter describes.
         static let show = spokenNames("Покажи", "Show")
         static let signOut = spokenNames("Изход", "Sign out")
+        /// Профил's row, its page's button and the confirmation's (#281).
+        /// "Delete profile" too: it is what «профила» literally says.
+        static let deleteAccount = spokenNames("Изтрий профила", "Delete account", "Delete profile")
+        /// The recovery screen's way back (#281).
+        static let restoreAccount = spokenNames("Възстанови профила", "Restore account", "Restore profile")
     }
 
     /// Join facts as speech: nils and blanks dropped, comma-separated, one

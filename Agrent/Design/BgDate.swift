@@ -65,6 +65,15 @@ enum BgDate {
         return day.hasSuffix(".") ? day : day + "."
     }
 
+    /// `full` closing a sentence: «… на 10 ноември 2026 г.», the year's «г.»
+    /// being the full stop. Appending one read «2026 г..» — the same defect
+    /// `rowDayEndingSentence` exists for, met again in the deletion date
+    /// (agrent-ios#281).
+    static func fullEndingSentence(_ date: Date) -> String {
+        let day = full(date)
+        return day.hasSuffix(".") ? day : day + "."
+    }
+
     /// 14:32 — a clock time, for a promise about later today.
     ///
     /// Twenty-four hour because the LOCALE is: measured, bg_BG gives "14:32"

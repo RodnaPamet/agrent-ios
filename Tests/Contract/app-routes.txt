@@ -6,6 +6,7 @@
 # still calls.
 /api/account/avatar/{userId}
 /api/account/bottom-tabs
+/api/account/deletion
 /api/auth/accept-terms
 /api/auth/me
 /api/auth/native/apple

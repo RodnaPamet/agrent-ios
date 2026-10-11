@@ -5,7 +5,8 @@
     "email": "owner@example.invalid",
     "role": "OWNER",
     "bottomTabOrder": null,
-    "avatarUrl": null
+    "avatarUrl": null,
+    "deletion": null
   },
   "tenant": {
     "id": "ten_synthetic",
