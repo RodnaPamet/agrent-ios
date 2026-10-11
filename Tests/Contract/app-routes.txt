@@ -10,6 +10,7 @@
 /api/auth/me
 /api/auth/native/apple
 /api/auth/native/exchange
+/api/auth/native/mfa
 /api/auth/native/revoke
 /api/auth/native/start
 /api/auth/terms

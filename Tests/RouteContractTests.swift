@@ -128,6 +128,12 @@ final class RouteContractTests: XCTestCase {
     /// them in. Админ still offers «Цени» to nobody until a farm's row says
     /// `isPlatform`, which none does before the owner creates the platform
     /// farm.
+    ///
+    /// Empty again from agri-saas main 9fb89a3: the Apple second-factor code
+    /// (#274), built against agri-saas #1649's OpenAPI diff before the server
+    /// served it, came off with the refresh from the merge that brought
+    /// `/api/auth/native/mfa` in. Its PR merged only once `/api/health`
+    /// carried #1649.
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -157,7 +163,7 @@ final class RouteContractTests: XCTestCase {
             // A person's farms, outside any one farm (#179).
             ("FarmsAPI.swift", [FarmsAPI.farmsPath, FarmsAPI.eikCheckPath]),
             // Sign in with Apple and in-app terms acceptance (#193, P4.4).
-            ("AppleSignIn.swift", [AppleSignIn.path]),
+            ("AppleSignIn.swift", [AppleSignIn.path, AppleSignIn.codePath]),
             ("TermsAcceptance.swift", [TermsAPI.currentPath, TermsAPI.acceptPath]),
             // The Админ account card's picture. The app no longer BUILDS this
             // path — it follows a root-relative `avatarUrl` from `/me` — but

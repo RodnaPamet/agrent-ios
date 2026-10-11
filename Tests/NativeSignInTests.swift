@@ -61,10 +61,14 @@ final class AppleSignInTests: XCTestCase {
 
     // MARK: - The wire
 
-    func testTheBodyCarriesTheRawNonce() throws {
-        let body = try JSONEncoder().encode(AppleSignIn.Request(identityToken: "t", nonce: "raw"))
+    /// The raw nonce, and the PKCE challenge under the spelling the spec
+    /// documents first: `code_challenge` is how this build says it can take
+    /// a ticket (agri-saas #1649). Without it, a two-factor farm refuses.
+    func testTheBodyCarriesTheRawNonceAndDeclaresItCanTakeACode() throws {
+        let body = try JSONEncoder().encode(AppleSignIn.Request(identityToken: "t", nonce: "raw",
+                                                                codeChallenge: "c"))
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
-        XCTAssertEqual(json, ["identityToken": "t", "nonce": "raw"])
+        XCTAssertEqual(json, ["identityToken": "t", "nonce": "raw", "code_challenge": "c"])
     }
 
     /// The exchange sends the nonce it TOOK from its request's entry, as it
@@ -114,23 +118,27 @@ final class AppleSignInTests: XCTestCase {
                           "an old build was told to try again")
         for text in [AppleSignIn.Text.notAvailable, AppleSignIn.Text.failed,
                      AppleSignIn.Text.emailRequired, AppleSignIn.Text.unavailableHere,
-                     AppleSignIn.Text.secondFactor] {
+                     AppleSignIn.Text.secondFactor, AppleSignIn.Text.enrollmentRequired] {
             XCTAssertTrue(text.hasSuffix("."), text)
         }
     }
 
-    /// A farm that requires a second factor refuses Apple sign-in with a
-    /// coded 403 in the canonical envelope (agri-saas #1644), not the bare
-    /// `invalid_grant`. It names Google and Microsoft, which can ask for the
-    /// code, rather than «try again», which cannot help, and rather than the
-    /// house sentence for the code, which tells a signed-in session to sign in
-    /// again.
+    /// The two second-factor refusals of Apple sign-in, each a coded 403 in
+    /// the canonical envelope rather than the bare `invalid_grant`, and each
+    /// with its own remedy (agri-saas #1644, #1649). `MFA_REQUIRED` — the
+    /// code could not be asked for — names Google and Microsoft, which ask in
+    /// their sheet, and not the house sentence, which tells a signed-in
+    /// session to sign in again. `MFA_ENROLLMENT_REQUIRED` — no authenticator
+    /// to ask — sends the person to set one up, which another provider would
+    /// not get them past.
     func testAFarmThatRequiresASecondFactorSendsAppleToGoogleOrMicrosoft() {
         let body = #"{"error":{"code":"MFA_REQUIRED","message":"This farm requires a second factor, which Apple sign-in cannot yet collect. Sign in with Google or Microsoft, or from the web."}}"#
         let code = APIClient.envelope(from: Data(body.utf8))?.code
         XCTAssertEqual(code, "MFA_REQUIRED", "precondition: the canonical envelope's code")
         XCTAssertEqual(AppleSignIn.message(status: 403, code: code), AppleSignIn.Text.secondFactor)
         XCTAssertNotEqual(AppleSignIn.Text.secondFactor, UserMessage.bulgarian["MFA_REQUIRED"])
+        XCTAssertEqual(AppleSignIn.message(status: 403, code: "MFA_ENROLLMENT_REQUIRED"),
+                       AppleSignIn.Text.enrollmentRequired)
         // Positive control: any other 403 still gets the house words.
         XCTAssertEqual(AppleSignIn.message(status: 403, code: "FORBIDDEN"),
                        UserMessage.httpText(status: 403, code: "FORBIDDEN", message: nil))
