@@ -200,6 +200,74 @@ final class SpatialImportTests: XCTestCase {
         XCTAssertFalse(text.contains("Missing"), text)
     }
 
+    // MARK: - A job that failed after the 202 (agri-saas #1637)
+
+    private func failed(_ code: String, _ params: String = "null",
+                        reason: String = "Import is too complex (812340 vertices across all parcels; limit is 500000).") throws -> ImportJobStatus {
+        let json = #"{"jobId":"j","state":"failed","result":null,"failedReason":""# + reason
+            + #"","failedCode":"# + code + #","failedParams":"# + params + "}"
+        return try JSONDecoder().decode(ImportJobStatus.self, from: Data(json.utf8))
+    }
+
+    /// Each code a boundary upload can fail with, said from its numbers.
+    /// The worker's English is beside it on the wire and never shown.
+    func testEachJobFailureIsSaidInBulgarian() throws {
+        let cases: [(String, String, String)] = [
+            (#""SPATIAL_PARSE_TIMEOUT""#, #"{"seconds":30}"#,
+             "Файлът се обработваше твърде дълго (над 30 секунди). Опростете го или го разделете на части и го качете отново."),
+            (#""SPATIAL_TOO_MANY_PARCELS""#, #"{"count":12000,"limit":10000}"#,
+             "Файлът съдържа 12 000 парцела, а максимумът е 10 000. Разделете го на части."),
+            (#""SPATIAL_PARCEL_TOO_COMPLEX""#, #"{"vertices":61000,"limit":50000}"#,
+             "Един от парцелите има 61 000 точки по границата, а максимумът е 50 000. Опростете геометрията и качете файла отново."),
+            (#""SPATIAL_IMPORT_TOO_COMPLEX""#, #"{"vertices":812340,"limit":500000}"#,
+             "Границите във файла имат общо 812 340 точки, а максимумът е 500 000. Опростете геометрията или разделете файла на части."),
+            (#""SPATIAL_GEOMETRY_UNPARSEABLE""#, "null",
+             "Границите във файла не могат да бъдат прочетени. Проверете файла и го качете отново."),
+            (#""SPATIAL_GEOMETRY_INVALID""#, #"{"count":3}"#,
+             "3 парцела са с невалидна геометрия (пресичащи се граници). Поправете ги и качете файла отново."),
+            (#""SPATIAL_GEOMETRY_INVALID""#, #"{"count":1}"#,
+             "1 парцел е с невалидна геометрия (пресичаща се граница). Поправете го и качете файла отново."),
+            (#""SPATIAL_SOURCE_CRS_UNRESOLVED""#, "null",
+             "Координатната система на файла не може да се определи. Експортирайте слоя в WGS84 (EPSG:4326) или добавете файла .prj и качете отново."),
+            (#""SPATIAL_IMPORT_INTERNAL""#, "null", SpatialJobFailure.serverFault),
+        ]
+        for (code, params, expected) in cases {
+            let text = try failed(code, params).failureText
+            // The thousands separator is bg_BG's, which is not a plain space.
+            XCTAssertEqual(text.replacingOccurrences(of: "\u{00A0}", with: " ")
+                               .replacingOccurrences(of: "\u{202F}", with: " "),
+                           expected, code)
+        }
+    }
+
+    /// Numbers the phone cannot read cost the numbers, never the poll.
+    func testUnreadableParamsStillGiveASentence() throws {
+        let noNumbers = try failed(#""SPATIAL_IMPORT_TOO_COMPLEX""#, #"["not","an","object"]"#)
+        XCTAssertEqual(noNumbers.failedCode, "SPATIAL_IMPORT_TOO_COMPLEX")
+        XCTAssertEqual(noNumbers.failureText,
+                       "Границите във файла са твърде сложни. Опростете геометрията или разделете файла на части.")
+        XCTAssertEqual(try failed(#""SPATIAL_GEOMETRY_INVALID""#, #"{"count":"many"}"#).failureText,
+                       "Някои парцели са с невалидна геометрия (пресичащи се граници). Поправете ги и качете файла отново.")
+    }
+
+    /// A code this build does not know: the English reason, which knows
+    /// something this build does not. No code at all is a crash, whose
+    /// reason is not for a farmer.
+    func testAnUnknownCodeFallsBackAndACrashDoesNot() throws {
+        let newer = try failed(#""SPATIAL_SOMETHING_NEW""#, reason: "The layer has no polygons.")
+        XCTAssertEqual(newer.failureText, "The layer has no polygons.")
+
+        let crash = try failed("null", reason: "connect ECONNREFUSED 10.0.0.5:6379")
+        XCTAssertNil(crash.failedCode)
+        XCTAssertEqual(crash.failureText, SpatialJobFailure.serverFault)
+
+        // A server before #1637 sends neither field, and the poll still reads.
+        let old = try JSONDecoder().decode(ImportJobStatus.self, from: Data(
+            #"{"jobId":"j","state":"failed","result":null,"failedReason":"Too many parcels."}"#.utf8))
+        XCTAssertNil(old.failedCode)
+        XCTAssertNil(old.failedParams)
+    }
+
     // MARK: - The body on the wire
 
     /// Multipart fails silently when it fails: a missing CRLF or a mis-spelled

@@ -11,8 +11,10 @@ import Foundation
 /// With the codes it is gone: a bare string is a CODE again, used only as
 /// a lookup key and never printed, as on every other route.
 ///
-/// A failed JOB is a different path: the poll answers 200 and the reason
-/// travels in `ImportJobStatus.failedReason`, which is still English.
+/// A failed JOB is a different path: the poll answers 200 with
+/// `state: failed`, and since agri-saas #1637 the reason travels as
+/// `failedCode` + `failedParams` beside the English `failedReason`.
+/// `ImportJobStatus.failureText` says it.
 enum SpatialImportAPI {
     private static var base: String { "\(FarmPath.root)/locations" }
 

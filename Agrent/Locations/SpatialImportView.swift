@@ -323,8 +323,7 @@ struct SpatialImportView: View {
                     onFinished()
                     return
                 case .failed:
-                    phase = .failed(status.failedReason?.recorded
-                                    ?? "Импортът не успя.")
+                    phase = .failed(status.failureText)
                     return
                 case .waiting, .running, .unknown:
                     continue
