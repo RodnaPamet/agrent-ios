@@ -175,6 +175,39 @@ final class UserMessageHTTPTests: XCTestCase {
         }
     }
 
+    /// agri-saas's coded-but-UNDOCUMENTED refusals that can reach the paths
+    /// this app builds: backend 1 crossed its baseline with
+    /// `Tests/Contract/app-routes.txt` on 2026-10-11 and found these 49.
+    /// Each carries an English sentence as its message, which `httpText`
+    /// shows verbatim when the code has no sentence here. Run through
+    /// `httpText` itself, not looked up in the table: some are built in
+    /// `interpolated` or matched elsewhere.
+    func testEveryUndocumentedCodeReachableHereIsSaidInBulgarian() {
+        let english = "Title is required for this entry."
+        XCTAssertTrue(UserMessage.isHumanSentence(english), "precondition")
+        let measured = [
+            "ACCOUNT_HAS_NO_EMAIL", "API_KEY_FAMILY_NOT_ENABLED", "API_KEY_WRONG_SURFACE",
+            "BLOCK_SELLER_ONLY", "CROP_SEASON_YEAR_INVALID", "CROP_TYPE_INVALID", "DOSE_UNIT_NOT_FOUND",
+            "FARM_NAME_NOT_SLUGGABLE", "FARM_NAME_REQUIRED", "FARM_SLUG_UNAVAILABLE",
+            "FIELD_OPERATION_NOT_FOUND", "FILE_TOO_LARGE", "FILE_TYPE_NOT_ALLOWED", "IDEMPOTENCY_KEY_INVALID",
+            "IF_MATCH_EMPTY", "IF_MATCH_MALFORMED", "IF_MATCH_WEAK_TAG", "INSURANCE_PRODUCT_UNKNOWN",
+            "INSURANCE_QUOTE_INVALID", "INVALID_EQUIPMENT", "INVALID_FARM_PAYLOAD", "INVALID_FILE",
+            "INVALID_LIMIT", "INVALID_LOCATION", "INVALID_PLANTING", "INVALID_REVIEW_ACTION",
+            "INVALID_TAB_ORDER", "ITEM_NAME_ALREADY_EXISTS", "JOURNAL_ENTRY_NOT_DELETED",
+            "JOURNAL_ENTRY_NOT_FOUND", "JOURNAL_ENTRY_NOT_SOFT_DELETED", "JOURNAL_FILE_LINK_NOT_FOUND",
+            "JOURNAL_TITLE_REQUIRED", "LISTING_NOT_FOUND", "LOCATION_NOT_FOUND", "MESSAGE_NOT_FOUND",
+            "NOTES_TOO_LONG", "NOT_A_FIELD_OPERATION_TASK", "OPERATION_NOT_ASSIGNED_TO_YOU",
+            "OPERATION_PARCEL_NOT_FOUND", "PARCELS_NOT_IN_LOCATION", "PRODUCT_IS_SAMPLE_ARCHETYPE",
+            "TASK_NOT_AWAITING_REVIEW", "THREAD_NOT_A_PARTY", "THREAD_NOT_FOUND", "WATER_RATE_UNIT_NOT_FOUND",
+            "WATER_RATE_UNIT_REQUIRED", "WEED_ENTRIES_TOO_MANY", "WEED_NAME_TOO_LONG",
+        ]
+        XCTAssertEqual(measured.count, 49)
+        for code in measured {
+            let text = UserMessage.httpText(status: 400, code: code, message: english)
+            XCTAssertNotEqual(text, english, "\(code) reaches the screen in English")
+        }
+    }
+
     /// The error path itself must never be the thing that fails. This is the
     /// route a blank screen took once already.
     func testEveryStatusProducesSomethingReadable() {

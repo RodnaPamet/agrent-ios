@@ -739,5 +739,48 @@ enum UserMessage {
         "INVALID_TASK": "Задачата не е намерена или принадлежи на друго стопанство.",
         "INVALID_VARIETY": "Сортът не е намерен или принадлежи на друго стопанство.",
         "PARCEL_LOCATION_MISMATCH": "Парцелът не принадлежи на тази локация.",
+
+        // ── Coded but undocumented (agri-saas, measured 2026-10-11) ──
+        //
+        // Backend 1 crossed its undocumented-codes baseline with the paths
+        // this app builds: 49 reachable, and these 24 had no sentence here,
+        // so their English `message` reached the screen. The attribution is
+        // by import reachability, so some may never fire from this app;
+        // a sentence costs nothing where it does not.
+        //
+        // Journal.
+        "JOURNAL_TITLE_REQUIRED": "Въведете заглавие на записа.",
+        "JOURNAL_ENTRY_NOT_FOUND": "Записът в дневника не е намерен. Може да е изтрит.",
+        "JOURNAL_ENTRY_NOT_DELETED": "Записът в дневника не е изтрит, затова няма какво да се възстанови.",
+        "JOURNAL_ENTRY_NOT_SOFT_DELETED": "Записът в дневника трябва първо да бъде изтрит.",
+        "JOURNAL_FILE_LINK_NOT_FOUND": "Файлът вече не е прикачен към този запис.",
+        // Field operations: creating one, and reviewing it.
+        "LOCATION_NOT_FOUND": "Блокът не е намерен. Може да е изтрит.",
+        "PARCELS_NOT_IN_LOCATION": "Някои от избраните парцели не са в този блок.",
+        "DOSE_UNIT_NOT_FOUND": "Мерната единица на дозата не е намерена. Изберете я отново.",
+        "WATER_RATE_UNIT_REQUIRED": "Изберете мерна единица за работния разтвор.",
+        "WATER_RATE_UNIT_NOT_FOUND": "Мерната единица на работния разтвор не е намерена. Изберете я отново.",
+        "NOT_A_FIELD_OPERATION_TASK": "Оттук се преглеждат само земеделски операции.",
+        // `params.status` is the task's current status, a wire name; not
+        // quoted. The task moved on while the screen was open.
+        "TASK_NOT_AWAITING_REVIEW": "Задачата вече не чака преглед. Обновете списъка.",
+        // A parcel's history: crops by year and weed observations.
+        "CROP_TYPE_INVALID": "Посочете културата.",
+        "CROP_SEASON_YEAR_INVALID": "Годината на реколтата е извън допустимия диапазон.",
+        "NOTES_TOO_LONG": "Бележките са твърде дълги.",
+        "WEED_ENTRIES_TOO_MANY": "Твърде много плевели в едно наблюдение.",
+        "WEED_NAME_TOO_LONG": "Името на плевела е твърде дълго.",
+        // Reachable only through a defect in this app: it builds the
+        // If-Match, the page size and the review action itself, and signs in
+        // with a bearer, never an API key. Nothing for the farmer to fix, so
+        // each says the request was refused and what to do next, as
+        // IDEMPOTENCY_KEY_INVALID does.
+        "IF_MATCH_EMPTY": "Промяната не беше запазена заради техническа грешка. Обновете и опитайте отново.",
+        "IF_MATCH_MALFORMED": "Промяната не беше запазена заради техническа грешка. Обновете и опитайте отново.",
+        "IF_MATCH_WEAK_TAG": "Промяната не беше запазена заради техническа грешка. Обновете и опитайте отново.",
+        "INVALID_LIMIT": "Списъкът не можа да се зареди заради техническа грешка.",
+        "INVALID_REVIEW_ACTION": "Прегледът не беше приет заради техническа грешка. Опитайте отново.",
+        "API_KEY_WRONG_SURFACE": "Сървърът отказа достъпа за тази заявка.",
+        "API_KEY_FAMILY_NOT_ENABLED": "Сървърът отказа достъпа за тази заявка.",
     ]
 }
