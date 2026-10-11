@@ -125,46 +125,79 @@ final class SpatialImportTests: XCTestCase {
         XCTAssertFalse(ImportJobStage.waiting.isTerminal)
     }
 
-    // MARK: - The bare error body
+    // MARK: - The server's refusals (agri-saas #1633)
 
-    /// These routes answer a bare `{ "error": "..." }` on every failure, and
-    /// the reason was being thrown away.
-    ///
-    /// The envelope has parsed a bare string since the auth work, so it lands
-    /// in `code` — and `UserMessage.httpText` uses `code` as a LOOKUP KEY,
-    /// matching it against tables and otherwise dropping it. Never printing
-    /// it. So «file too large» became a sentence derived from the status.
-    func testABareErrorSentenceReachesTheOperator() {
-        let raw = APIClient.APIError.http(
-            status: 400, code: "File exceeds the 5 MB limit", message: nil)
-        let text = UserMessage.text(for: SpatialImportAPI.humanised(raw))
-        XCTAssertEqual(text, "File exceeds the 5 MB limit")
+    /// A refusal body as the farmer reads it.
+    private func said(_ status: Int, _ json: String) -> String {
+        let env = APIClient.envelope(from: Data(json.utf8))
+        return UserMessage.text(for: APIClient.APIError.http(
+            status: status, code: env?.code, message: env?.message, params: env?.params))
     }
 
-    /// AND A CODE IS STILL A CODE. `invalid_grant` is one token, and
-    /// `isHumanSentence` would have accepted it as language — which is why the
-    /// rule here is a SPACE rather than that function, and why it is applied
-    /// only on the routes whose spec documents the bare body as prose.
-    func testASingleTokenCodeIsNotMistakenForAMessage() {
-        let raw = APIClient.APIError.http(status: 401, code: "invalid_grant", message: nil)
-        guard case APIClient.APIError.http(_, let code, let message, _, _) =
-                SpatialImportAPI.humanised(raw) else {
-            return XCTFail("shape changed")
-        }
-        XCTAssertEqual(code, "invalid_grant", "still a code")
-        XCTAssertNil(message, "and not promoted to prose")
+    /// Every refusal on these routes is coded, and each is said in Bulgarian.
+    /// The bodies are the server's own, from #1633's handlers.
+    func testEachRefusalIsSaidInBulgarian() {
+        XCTAssertEqual(
+            said(400, #"{"error":{"code":"FILE_REQUIRED","message":"No file was included in the form data."}}"#),
+            "Файлът не стигна до сървъра. Изберете го и опитайте отново.")
+        XCTAssertEqual(
+            said(400, #"{"error":{"code":"FILE_EMPTY","message":"The uploaded file has no content."}}"#),
+            "Файлът е празен.")
+        XCTAssertEqual(
+            said(415, #"{"error":{"code":"UNSUPPORTED_FILE_TYPE","message":"Upload a shapefile (.zip), KML (.kml/.kmz), or GeoJSON (.geojson/.json).","params":{"allowed":".zip .kml .kmz .geojson .json"}}}"#),
+            "Този тип файл не се приема. Приемат се: .zip, .kml, .kmz, .geojson, .json.")
+        XCTAssertEqual(
+            said(404, #"{"error":{"code":"IMPORT_JOB_NOT_FOUND","message":"No such import job."}}"#),
+            "Сървърът не намира това импортиране. Качете файла отново.")
     }
 
-    /// A canonical envelope is left exactly as it was.
-    func testACanonicalEnvelopeIsUntouched() {
-        let raw = APIClient.APIError.http(
-            status: 409, code: "STALE_DATA", message: "Changed on the server")
-        guard case APIClient.APIError.http(_, let code, let message, _, _) =
-                SpatialImportAPI.humanised(raw) else {
-            return XCTFail("shape changed")
-        }
-        XCTAssertEqual(code, "STALE_DATA")
-        XCTAssertEqual(message, "Changed on the server")
+    /// THE ONE A FARMER QUOTED, «File exceeds the 5 MB limit». The numbers
+    /// arrive formatted for English, with a point and «5.0» for five, and are
+    /// said again the Bulgarian way, in the sentence the phone's own check
+    /// uses.
+    func testTheSizeRefusalIsSaidWithTheServersNumbers() {
+        let text = said(413, #"{"error":{"code":"SPATIAL_UPLOAD_TOO_LARGE","message":"Spatial file is too large (7.2 MB; shapefile limit is 5.0 MB). Simplify or split the upload.","params":{"size":"7.2 MB","limit":"5.0 MB","format":"shapefile"}}}"#)
+        XCTAssertEqual(text, "Файлът е 7,2 MB. Максимумът за Shapefile (.zip) е 5 MB.")
+        XCTAssertEqual(
+            text,
+            SpatialImportRefusal.tooLarge(format: .shapefile, actualBytes: 7_549_747).text,
+            "one sentence, whichever side refused the file")
+
+        // The follow-up's form: whole bytes, nothing to parse. Same sentence.
+        XCTAssertEqual(
+            said(413, #"{"error":{"code":"SPATIAL_UPLOAD_TOO_LARGE","params":{"sizeBytes":7549747,"limitBytes":5242880,"format":"shapefile"}}}"#),
+            text)
+
+        // A format this build does not know still gets the numbers.
+        XCTAssertEqual(
+            said(413, #"{"error":{"code":"SPATIAL_UPLOAD_TOO_LARGE","params":{"size":"12.5 MB","limit":"10.0 MB","format":"gpx"}}}"#),
+            "Файлът е 12,5 MB. Максимумът е 10 MB.")
+    }
+
+    /// A figure that is not plainly megabytes is not quoted at all: «512.0
+    /// KB» read as 512 MB would be a wrong sentence, which is worse than a
+    /// general one.
+    func testAFigureThatIsNotMegabytesIsNotQuoted() {
+        let general = "Файлът е твърде голям. Опростете го или го разделете на части."
+        XCTAssertEqual(
+            said(413, #"{"error":{"code":"SPATIAL_UPLOAD_TOO_LARGE","params":{"size":"512.0 KB","limit":"5.0 MB","format":"shapefile"}}}"#),
+            general)
+        XCTAssertEqual(
+            said(413, #"{"error":{"code":"SPATIAL_UPLOAD_TOO_LARGE","message":"Spatial file is too large."}}"#),
+            general)
+        XCTAssertEqual(
+            said(415, #"{"error":{"code":"UNSUPPORTED_FILE_TYPE"}}"#),
+            "Този тип файл не се приема.")
+    }
+
+    /// The bare form is still READ, since the auth routes send it, but a bare
+    /// string is a code, and a code is never printed. Were one of these
+    /// routes to answer bare again, the farmer would get the status sentence
+    /// rather than English: the trade #271 chose.
+    func testABareSentenceIsNotShownVerbatim() {
+        let text = said(400, #"{"error":"Missing or invalid file in form data"}"#)
+        XCTAssertEqual(text, UserMessage.statusText(400))
+        XCTAssertFalse(text.contains("Missing"), text)
     }
 
     // MARK: - The body on the wire

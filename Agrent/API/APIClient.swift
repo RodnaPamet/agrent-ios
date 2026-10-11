@@ -209,9 +209,11 @@ actor APIClient {
         /// matched against a client that only ever threw `.conflict`.
         ///
         /// Defaulted for the reason `params` gives, so constructions compile
-        /// unchanged. Four-element PATTERNS do not, and that is wanted: the
-        /// one site that would have compiled is a rebuild that omits the
-        /// label, `SpatialImportAPI.humanised`, and a test holds it.
+        /// unchanged. Four-element PATTERNS do not, and that is wanted. A
+        /// REBUILD still would: one that omits the label compiles and drops
+        /// the wait. Nothing rebuilds an `.http` today (the last,
+        /// `SpatialImportAPI.humanised`, went with agri-saas #1633); one that
+        /// does must forward `retryAfterSeconds`.
         case http(status: Int, code: String?, message: String?,
                   params: [String: String]? = nil,
                   retryAfterSeconds: Int? = nil)
