@@ -129,13 +129,12 @@ final class RouteContractTests: XCTestCase {
     /// `isPlatform`, which none does before the owner creates the platform
     /// farm.
     ///
-    /// From 2026-10-11: the Apple second-factor code (#274), built against
-    /// agri-saas #1649's OpenAPI diff before the server serves it. The PR
-    /// merges only once `/api/health` carries #1649, and the refresh that
-    /// brings the route in takes it off this list.
-    private static let pendingServerRoutes: [String: String] = [
-        "/api/auth/native/mfa": "Apple second-factor code, agri-saas #1649 (open)",
-    ]
+    /// Empty again from agri-saas main 9fb89a3: the Apple second-factor code
+    /// (#274), built against agri-saas #1649's OpenAPI diff before the server
+    /// served it, came off with the refresh from the merge that brought
+    /// `/api/auth/native/mfa` in. Its PR merged only once `/api/health`
+    /// carried #1649.
+    private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
