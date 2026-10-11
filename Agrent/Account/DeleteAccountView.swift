@@ -131,11 +131,16 @@ enum AccountDeletionText {
     static let pendingTitle = "Профилът Ви е заявен за изтриване"
     static let restore = "Възстанови профила"
     static let restoring = "Възстановяване"
+    /// Said once the farm has replaced the recovery screen: nothing else
+    /// would tell a VoiceOver user that the restore worked.
+    static let restored = "Профилът е възстановен."
 
     /// The server's date, and what restoring does — including what it does
     /// not: the sessions the request ended stay ended.
     static func pending(erasesAt: Date?) -> String {
-        let when = erasesAt.map { "Ще бъде изтрит на \(BgDate.full($0)). Дотогава можете да го възстановите." }
+        let when = erasesAt.map {
+            "Ще бъде изтрит на \(BgDate.fullEndingSentence($0)) Дотогава можете да го възстановите."
+        }
             ?? "Докато не бъде изтрит, можете да го възстановите."
         return when + " Ако го възстановите, на другите си устройства ще трябва да влезете отново."
     }
@@ -153,7 +158,7 @@ enum AccountDeletionText {
             return "Профилът Ви ще бъде изтрит. Докато срокът тече, можете да влезете отново "
                 + "и да го възстановите."
         }
-        return "Профилът Ви ще бъде изтрит на \(BgDate.full(erasesAt)). Дотогава можете да влезете "
-            + "отново и да го възстановите."
+        return "Профилът Ви ще бъде изтрит на \(BgDate.fullEndingSentence(erasesAt)) Дотогава можете "
+            + "да влезете отново и да го възстановите."
     }
 }

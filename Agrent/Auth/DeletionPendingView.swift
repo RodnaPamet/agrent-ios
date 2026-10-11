@@ -30,6 +30,12 @@ struct DeletionPendingView: View {
 
     @Environment(AuthClient.self) private var auth
     @State private var confirmingSignOut = false
+    /// Where VoiceOver is put: on the title once the screen swap settles —
+    /// it replaces the whole app, after a browser sheet or under a farm that
+    /// was already open — and on Изход when a final refusal takes away the
+    /// button the cursor was on.
+    @AccessibilityFocusState private var titleFocused: Bool
+    @AccessibilityFocusState private var signOutFocused: Bool
 
     private typealias Words = AccountDeletionText
 
@@ -44,6 +50,7 @@ struct DeletionPendingView: View {
                     .font(.title2.bold())
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused($titleFocused)
                 Text(Words.pending(erasesAt: erasesAt))
                     .foregroundStyle(Palette.secondaryText)
                     .multilineTextAlignment(.center)
@@ -78,7 +85,7 @@ struct DeletionPendingView: View {
 
                     // The one question any Изход asks (`SignOutConfirmation`).
                     // Leaving keeps the deletion as it is.
-                    Button {
+                    Button(role: .destructive) {
                         confirmingSignOut = true
                     } label: {
                         Label("Изход", systemImage: "rectangle.portrait.and.arrow.right")
@@ -88,12 +95,23 @@ struct DeletionPendingView: View {
                     .buttonStyle(.bordered)
                     .disabled(auth.restoringAccount)
                     .accessibilityInputLabels(A11y.Spoken.signOut)
+                    .accessibilityFocused($signOutFocused)
                     .signOutConfirmation(isPresented: $confirmingSignOut)
                 }
                 .controlSize(.large)
             }
             .padding(.horizontal, 24)
             .padding()
+        }
+        .task {
+            try? await Task.sleep(for: .milliseconds(600))
+            titleFocused = true
+        }
+        // A final refusal removes «Възстанови профила» from under the cursor;
+        // Изход is the only way on, so that is where it goes. The refusal
+        // itself is announced below.
+        .onChange(of: auth.restoreRefused) { _, refused in
+            if refused { signOutFocused = true }
         }
         // A refusal is said, not only shown — at high priority, because the
         // same update swaps the spinner back under VoiceOver's cursor.

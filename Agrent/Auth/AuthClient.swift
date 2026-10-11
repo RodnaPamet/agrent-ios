@@ -291,6 +291,16 @@ final class AuthClient: NSObject {
             if fresh?.deletion != nil { CurrentUserStore.shared.deletionCancelled() }
             state = .signedIn
             Log.auth.info("account deletion cancelled")
+            // The farm replaces the recovery screen; said once that settles,
+            // or nothing would tell a VoiceOver user the restore worked. High
+            // priority, as `FarmGate`'s: a replaced screen's focus move is
+            // what cuts a default one short.
+            Task {
+                try? await Task.sleep(for: .milliseconds(600))
+                var line = AttributedString(AccountDeletionText.restored)
+                line.accessibilitySpeechAnnouncementPriority = .high
+                AccessibilityNotification.Announcement(line).post()
+            }
         } catch {
             guard SessionEpoch.isCurrent(epoch) else { return }
             restoreError = UserMessage.text(for: error)

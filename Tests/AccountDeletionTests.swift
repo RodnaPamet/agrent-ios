@@ -43,8 +43,9 @@ final class AccountDeletionTests: XCTestCase {
     func testTheSignInScreenSaysTheDateAndTheWayBack() throws {
         let date = try XCTUnwrap(BgDate.parseInstant("2026-11-10T21:04:00.000Z"))
         let dated = AccountDeletionText.requested(erasesAt: date)
-        XCTAssertTrue(dated.contains(BgDate.full(date)), dated)
+        XCTAssertTrue(dated.contains(BgDate.fullEndingSentence(date)), dated)
         XCTAssertTrue(dated.contains("възстановите"), "the way back is not said")
+        XCTAssertFalse(dated.contains(".."), "the year's «г.» and a full stop: \(dated)")
         let undated = AccountDeletionText.requested(erasesAt: nil)
         XCTAssertTrue(undated.contains("възстановите"))
         for text in [dated, undated, AccountDeletionText.confirmMessage, AccountDeletionText.sessionEnded]
@@ -100,11 +101,13 @@ final class AccountDeletionTests: XCTestCase {
     func testTheRecoveryScreenSaysTheDateAndWhatRestoringDoes() throws {
         let date = try XCTUnwrap(BgDate.parseInstant("2026-11-10T21:04:00.000Z"))
         let dated = AccountDeletionText.pending(erasesAt: date)
-        XCTAssertTrue(dated.contains(BgDate.full(date)), dated)
+        XCTAssertTrue(dated.contains(BgDate.fullEndingSentence(date)), dated)
         let undated = AccountDeletionText.pending(erasesAt: nil)
         for text in [dated, undated] {
             XCTAssertTrue(text.contains("влезете отново"), "the other devices' sign-out is not said: \(text)")
             XCTAssertTrue(text.hasSuffix("."), text)
+            // The year's «г.» is the full stop; a second one read «2026 г..».
+            XCTAssertFalse(text.contains(".."), text)
         }
     }
 
