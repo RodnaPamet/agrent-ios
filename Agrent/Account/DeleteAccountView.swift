@@ -51,16 +51,17 @@ struct DeleteAccountView: View {
                             .accessibilityLabel(Words.deleting)
                     } else {
                         Label(Words.action, systemImage: "trash")
+                            .foregroundStyle(Palette.destructive)
                     }
                 }
                 .disabled(auth.requestingDeletion)
-                .accessibilityInputLabels(A11y.spokenNames(Words.action, "Delete account"))
+                .accessibilityInputLabels(A11y.Spoken.deleteAccount)
                 // On the row that asks: the dialog animates from its trigger.
                 .confirmationDialog(Words.confirmTitle, isPresented: $confirming, titleVisibility: .visible) {
                     Button(Words.action, role: .destructive) {
                         Task { await delete() }
                     }
-                    .accessibilityInputLabels(A11y.spokenNames(Words.action, "Delete account"))
+                    .accessibilityInputLabels(A11y.Spoken.deleteAccount)
                     Button("Отказ", role: .cancel) {}
                         .accessibilityInputLabels(A11y.Spoken.cancel)
                 } message: {

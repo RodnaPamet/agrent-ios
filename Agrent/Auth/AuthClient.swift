@@ -90,7 +90,6 @@ final class AuthClient: NSObject {
 
     func signIn(with provider: Provider = .google) async {
         state = .signingIn
-        signInNotice = nil
         signingInVia = provider == .google ? .google : .microsoft
         defer { signingInVia = nil }
         Log.auth.info("sign-in started (\(provider.rawValue, privacy: .public))")
@@ -123,6 +122,7 @@ final class AuthClient: NSObject {
             // completed the exchange — so this is the cheapest moment there
             // will be. Not fatal if it fails: `MainTabView` asks again.
             _ = await CurrentUserStore.shared.load()
+            signInNotice = nil
             state = .signedIn
             Log.auth.info("sign-in complete")
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
@@ -199,8 +199,7 @@ final class AuthClient: NSObject {
                 return
             }
             state = .signingIn
-            signInNotice = nil
-            signingInVia = .apple
+                signingInVia = .apple
             defer { signingInVia = nil }
             do {
                 switch try await exchangeApple(identityToken: token, nonce: raw) {
@@ -227,7 +226,9 @@ final class AuthClient: NSObject {
 
     /// Said on the sign-in screen after the account was asked to be deleted:
     /// the date, and that signing in again can still undo it. Not a failure,
-    /// so not `.failed`; the next sign-in clears it.
+    /// so not `.failed`. In memory only, so it is cleared where a sign-in
+    /// SUCCEEDS, not where one starts: a sign-in cancelled in the browser
+    /// comes back to `.signedOut`, and the date would otherwise be gone.
     private(set) var signInNotice: String?
 
     /// A deletion request on its way — on the client, not the page, so going
@@ -320,6 +321,7 @@ final class AuthClient: NSObject {
     /// Ask for the code: the code screen takes over until it is redeemed,
     /// refused for good, or abandoned.
     func awaitCode(_ pending: AppleSignIn.PendingCode) {
+        signInNotice = nil
         pendingCode = pending
         codeError = nil
         state = .codeRequired
@@ -403,6 +405,7 @@ final class AuthClient: NSObject {
     }
 
     private func finishAppleSignIn(termsPending: Bool) async {
+        signInNotice = nil
         if termsPending {
             state = .termsPending
             Log.auth.info("apple sign-in complete, terms pending")

@@ -282,18 +282,12 @@ struct SignInView: View {
                 .foregroundStyle(Palette.secondaryText)
                 .multilineTextAlignment(.center)
 
-            if case .failed(let message) = auth.state {
+            if let message = spokenMessage {
+                // A failure in the error colour; the deletion notice — the
+                // date and the way back (agrent-ios#281) — is not one.
                 Text(message)
                     .font(.subheadline)
-                    .foregroundStyle(Palette.error)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            } else if auth.state == .signedOut, let notice = auth.signInNotice {
-                // After «Изтрий профила»: the date and the way back. Not an
-                // error, so not in the error colour (agrent-ios#281).
-                Text(notice)
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.secondaryText)
+                    .foregroundStyle(isFailure ? Palette.error : Palette.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
@@ -376,21 +370,28 @@ struct SignInView: View {
         // swap settles and at high priority, as `FarmGate`'s: the focus move
         // that follows a replaced screen is what cuts a default one short.
         .task(id: auth.state) {
-            // The deletion notice arrives the same way, with this view.
-            let message: String
-            if case .failed(let failure) = auth.state {
-                message = failure
-            } else if auth.state == .signedOut, let notice = auth.signInNotice {
-                message = notice
-            } else {
-                return
-            }
+            guard let message = spokenMessage else { return }
             try? await Task.sleep(for: .milliseconds(600))
             guard !Task.isCancelled else { return }
             var line = AttributedString(message)
             line.accessibilitySpeechAnnouncementPriority = .high
             AccessibilityNotification.Announcement(line).post()
         }
+    }
+}
+
+extension SignInView {
+    /// What the screen says above its buttons, and announces: a failure, or
+    /// after «Изтрий профила» the deletion notice. One decision for both, so
+    /// what is shown and what is spoken cannot disagree.
+    private var spokenMessage: String? {
+        if case .failed(let failure) = auth.state { return failure }
+        return auth.state == .signedOut ? auth.signInNotice : nil
+    }
+
+    private var isFailure: Bool {
+        if case .failed = auth.state { return true }
+        return false
     }
 }
 

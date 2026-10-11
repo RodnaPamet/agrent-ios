@@ -109,7 +109,11 @@ struct ProfileView: View {
                 Button(role: .destructive) {
                     confirmingSignOut = true
                 } label: {
+                    // `destructive`'s ink over the role's system red, which
+                    // is ~3.2:1 on the light page — and the same red as the
+                    // «Изтрий профила» row below, not a second one.
                     Label("Изход", systemImage: "rectangle.portrait.and.arrow.right")
+                        .foregroundStyle(Palette.destructive)
                 }
                 .accessibilityInputLabels(A11y.Spoken.signOut)
                 // On the row that asks, not on the List: the dialog animates
@@ -126,9 +130,9 @@ struct ProfileView: View {
                     DeleteAccountView()
                 } label: {
                     Label(AccountDeletionText.action, systemImage: "trash")
-                        .foregroundStyle(Palette.error)
+                        .foregroundStyle(Palette.destructive)
                 }
-                .accessibilityInputLabels(A11y.spokenNames(AccountDeletionText.action, "Delete account"))
+                .accessibilityInputLabels(A11y.Spoken.deleteAccount)
             }
             .pageRow()
         }
