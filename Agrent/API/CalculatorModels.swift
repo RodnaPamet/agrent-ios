@@ -200,6 +200,17 @@ struct PerArea: Decodable, Equatable, Sendable {
     let marginPerDca: Double?
     let uncertainty: Uncertainty
     let refusalCode: String?
+    /// The currency `attributableCostPerDca` is in (agri-saas #1614), which
+    /// is NOT `priceCurrency`: a cost and a market price need not share one.
+    ///
+    /// nil means no cost row recorded a currency, which by the server's
+    /// convention is the farm's display currency. This app has no such
+    /// setting to name, so the rate is shown bare there, as before.
+    let costCurrency: String?
+    /// Why `attributableCostPerDca` is nil, and non-nil exactly when it is
+    /// (#1614). A separate vocabulary from `refusalCode`, which explains
+    /// value and margin: the cost rate can be refused while they stand.
+    let costRefusalCode: String?
 }
 
 extension PerArea {
@@ -225,6 +236,21 @@ extension PerArea {
         guard refusalCode != nil else { return nil }
         return RefusalText.resolve(code: refusalCode, params: nil,
                                    fallback: "Стойностите на декар не могат да се изчислят.")
+    }
+
+    /// The cost per decare in its own currency, as the web prints it: two
+    /// decimals and the code.
+    var costText: String? {
+        attributableCostPerDca.map { Money.text($0, costCurrency) }
+    }
+
+    /// Why there is no cost per decare, in the web's words
+    /// (`grain.calculator.costPerDca*`); nil when there is one. A code this
+    /// build does not know still says something.
+    var costRefusalText: String? {
+        guard attributableCostPerDca == nil, costRefusalCode != nil else { return nil }
+        return RefusalText.resolve(code: costRefusalCode, params: nil,
+                                   fallback: "Разходът на декар не може да се изчисли.")
     }
 
     /// The margin as the web writes it: «най-много …» when it is an upper

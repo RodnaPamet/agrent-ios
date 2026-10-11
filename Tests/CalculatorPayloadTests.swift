@@ -85,6 +85,51 @@ final class CalculatorPayloadTests: XCTestCase {
         XCTAssertEqual(payload.rows[1].perArea.areaDca, 45)
     }
 
+    // MARK: - The cost per decare's own currency (agri-saas #1614)
+
+    /// A crop with land but no yield forecast: value and margin refused, the
+    /// cost rate given (or refused for its own reason).
+    private func perArea(_ cost: String) throws -> PerArea {
+        let json = #"{"areaDca":0,"costAreaDca":120,"standingValuePerDca":null,"marginPerDca":null,"uncertainty":"exact","refusalCode":"NO_STANDING_CROP_AREA","#
+            + cost + "}"
+        return try JSONDecoder().decode(PerArea.self, from: Data(json.utf8))
+    }
+
+    /// The rate in ITS currency, never the market price's: the two need not
+    /// share one, which is why the field exists.
+    func testTheCostRateCarriesItsOwnCurrency() throws {
+        let euro = try perArea(#""attributableCostPerDca":12.5,"costCurrency":"EUR","costRefusalCode":null"#)
+        XCTAssertEqual(euro.costText, "12,50 EUR")
+        XCTAssertNil(euro.costRefusalText)
+
+        // No cost row recorded a currency: the farm's display currency, which
+        // this app cannot name, so the figure stays bare.
+        let bare = try perArea(#""attributableCostPerDca":12.5,"costCurrency":null,"costRefusalCode":null"#)
+        XCTAssertEqual(bare.costText, "12,50")
+
+        // A server before #1614 sends neither field, and nothing changes.
+        XCTAssertEqual(try perArea(#""attributableCostPerDca":12.5"#).costText, "12,50")
+    }
+
+    /// A missing rate says why, in the web's words, rather than the row
+    /// silently vanishing.
+    func testAMissingCostRateSaysWhy() throws {
+        let reasons = [
+            ("NO_OCCUPIED_AREA", "Няма парцел, записан с тази култура"),
+            ("COST_CURRENCY_MIXED", "Разходите за тази култура са записани в повече от една валута"),
+            ("COST_CURRENCY_UNRECORDED", "Валутата на арендата не е записана"),
+        ]
+        for (code, words) in reasons {
+            let refused = try perArea(
+                #""attributableCostPerDca":null,"costCurrency":null,"costRefusalCode":""# + code + #"""#)
+            XCTAssertNil(refused.costText, code)
+            XCTAssertTrue(refused.costRefusalText?.hasPrefix(words) == true,
+                          "\(code): \(refused.costRefusalText ?? "nil")")
+        }
+        let unknown = try perArea(#""attributableCostPerDca":null,"costCurrency":null,"costRefusalCode":"SOMETHING_NEW""#)
+        XCTAssertEqual(unknown.costRefusalText, "Разходът на декар не може да се изчисли.")
+    }
+
     // MARK: - Uncertainty: two casings, and an unknown that must not be fatal
 
     /// The server's whole vocabulary, written out literally rather than
@@ -266,7 +311,7 @@ final class PerAreaWordingTests: XCTestCase {
                          costAreaDca: Double? = nil) -> PerArea {
         PerArea(areaDca: areaDca, costAreaDca: costAreaDca, standingValuePerDca: nil,
                 attributableCostPerDca: nil, marginPerDca: margin, uncertainty: uncertainty,
-                refusalCode: refusal)
+                refusalCode: refusal, costCurrency: nil, costRefusalCode: nil)
     }
 
     /// «Площ» is the land the cost per dca divides (agri-saas #1606). On a

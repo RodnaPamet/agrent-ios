@@ -517,6 +517,13 @@ enum UserMessage {
         // (the web's, mirrored).
         "NO_STANDING_CROP_AREA": "Няма площ с прогноза за добив, затова стойността и маржът на декар не се изчисляват.",
         "NO_STANDING_CROP_VALUE": "Няма пазарна цена за реколтата на корен, затова стойността и маржът на декар не се изчисляват.",
+        // Why the COST per decare is missing (agri-saas #1614's
+        // `costRefusalCode`, a separate vocabulary from the two above), in
+        // the web's words (`grain.calculator.costPerDcaNoArea` /
+        // `costPerDcaMixedCurrency` / `costPerDcaCurrencyUnrecorded`).
+        "NO_OCCUPIED_AREA": "Няма парцел, записан с тази култура, затова разходът на декар не се изчислява. Укажете културата върху парцелите, където е засета.",
+        "COST_CURRENCY_MIXED": "Разходите за тази култура са записани в повече от една валута, затова разходът на декар не се изчислява — събирането им би го изкривило.",
+        "COST_CURRENCY_UNRECORDED": "Валутата на арендата не е записана в договора, затова разходът на декар не се изчислява.",
         "MIXED_COST_CURRENCY":
             "Разходите са записани в повече от една валута; смесването им в нетната стойност би изкривило общата сума.",
         "RENT_CURRENCY_UNRECORDED":
