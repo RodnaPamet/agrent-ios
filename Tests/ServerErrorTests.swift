@@ -187,6 +187,8 @@ final class UserMessageHTTPTests: XCTestCase {
         XCTAssertTrue(UserMessage.isHumanSentence(english), "precondition")
         let measured = [
             "ACCOUNT_HAS_NO_EMAIL", "API_KEY_FAMILY_NOT_ENABLED", "API_KEY_WRONG_SURFACE",
+            // Coded since agri-saas #1645; `FORBIDDEN` with the token as `message` before.
+            "OPERATOR_SCOPE", "API_KEY_NOT_PERSON_SCOPED", "AI_BUDGET_REQUIRES_VERIFIED_FARM",
             "BLOCK_SELLER_ONLY", "CROP_SEASON_YEAR_INVALID", "CROP_TYPE_INVALID", "DOSE_UNIT_NOT_FOUND",
             "FARM_NAME_NOT_SLUGGABLE", "FARM_NAME_REQUIRED", "FARM_SLUG_UNAVAILABLE",
             "FIELD_OPERATION_NOT_FOUND", "FILE_TOO_LARGE", "FILE_TYPE_NOT_ALLOWED", "IDEMPOTENCY_KEY_INVALID",
@@ -201,7 +203,7 @@ final class UserMessageHTTPTests: XCTestCase {
             "TASK_NOT_AWAITING_REVIEW", "THREAD_NOT_A_PARTY", "THREAD_NOT_FOUND", "WATER_RATE_UNIT_NOT_FOUND",
             "WATER_RATE_UNIT_REQUIRED", "WEED_ENTRIES_TOO_MANY", "WEED_NAME_TOO_LONG",
         ]
-        XCTAssertEqual(measured.count, 49)
+        XCTAssertEqual(measured.count, 52)
         for code in measured {
             let text = UserMessage.httpText(status: 400, code: code, message: english)
             XCTAssertNotEqual(text, english, "\(code) reaches the screen in English")
