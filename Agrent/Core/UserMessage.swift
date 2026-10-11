@@ -791,5 +791,22 @@ enum UserMessage {
         "INVALID_REVIEW_ACTION": "Прегледът не беше приет заради техническа грешка. Опитайте отново.",
         "API_KEY_WRONG_SURFACE": "Сървърът отказа достъпа за тази заявка.",
         "API_KEY_FAMILY_NOT_ENABLED": "Сървърът отказа достъпа за тази заявка.",
+
+        // Three refusals that reached the client as `FORBIDDEN` — the token
+        // sat in `message` — until agri-saas #1645 made each its own code
+        // and gave it an English sentence as `message`. Without a sentence
+        // here that English is what `httpText` would now show, where
+        // «Нямате права» stood before: a regression the server fix would
+        // have caused on this side alone.
+        //
+        // A machine operator (MECHANISATOR) is confined to its own work; a
+        // person-scoped social route refuses that persona.
+        "OPERATOR_SCOPE": "Това не е достъпно за механизатори.",
+        // An API key on a person's route. This app never sends one — it signs
+        // in as a person — so this is for completeness, in the API-key words.
+        "API_KEY_NOT_PERSON_SCOPED": "Сървърът отказа достъпа за тази заявка.",
+        // No AI budget for a self-registered farm until it is verified (OD11).
+        "AI_BUDGET_REQUIRES_VERIFIED_FARM":
+            "Функциите с изкуствен интелект са достъпни, след като стопанството бъде потвърдено.",
     ]
 }
