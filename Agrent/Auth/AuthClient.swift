@@ -230,6 +230,42 @@ final class AuthClient: NSObject {
     /// so not `.failed`; the next sign-in clears it.
     private(set) var signInNotice: String?
 
+    /// A deletion request on its way — on the client, not the page, so going
+    /// Back and opening «Изтрий профила» again cannot send a second one.
+    private(set) var requestingDeletion = false
+
+    /// Ask the server to delete this account (`DeleteAccountView`'s one
+    /// call). Throws what the page should say when it fails.
+    ///
+    /// The answer is applied only to the session that asked: Изход and
+    /// another sign-in while it was out must not have THAT session ended by
+    /// it (`SessionEpoch`, as `termsAccepted`). The app is kept alive for
+    /// the request when it goes to the background — the answer is what ends
+    /// the session, and one lost to suspension strands dead tokens.
+    ///
+    /// A request that lands and loses its answer revokes this phone's session
+    /// all the same, and then any retry meets a refused refresh:
+    /// `notSignedIn`. That is not a failure to show on a page whose tokens are
+    /// gone; it is the session already ended, so it is ended here too, and the
+    /// sign-in screen says only what is known.
+    func requestAccountDeletion() async throws {
+        guard !requestingDeletion else { return }
+        requestingDeletion = true
+        defer { requestingDeletion = false }
+        let epoch = SessionEpoch.current
+        let background = UIApplication.shared.beginBackgroundTask(withName: "account-deletion")
+        defer { UIApplication.shared.endBackgroundTask(background) }
+        do {
+            let requested = try await AccountDeletionAPI.request()
+            guard SessionEpoch.isCurrent(epoch) else { return }
+            accountDeletionRequested(requested)
+        } catch APIClient.APIError.notSignedIn {
+            guard SessionEpoch.isCurrent(epoch) else { return }
+            endSessionAfterDeletion(notice: AccountDeletionText.sessionEnded)
+            Log.auth.info("account deletion: session already revoked; signed out")
+        }
+    }
+
     /// The deletion request was recorded (`AccountDeletionAPI.request`), and
     /// with it the server revoked every session — this phone's included.
     ///
@@ -239,12 +275,17 @@ final class AuthClient: NSObject {
     /// revoke — there is nothing left for that to revoke. The date goes to
     /// the sign-in screen instead of an alert, which that refused refresh
     /// could tear down before it is read.
-    func accountDeletionRequested(_ requested: AccountDeletionAPI.Requested) {
+    private func accountDeletionRequested(_ requested: AccountDeletionAPI.Requested) {
+        endSessionAfterDeletion(notice: AccountDeletionText.requested(erasesAt: requested.erasesAt))
+        Log.auth.info("account deletion requested; signed out")
+    }
+
+    private func endSessionAfterDeletion(notice: String) {
         #if DEBUG
         // As `signOut`: under the seam the Keychain is the owner's, not ours.
         if UITestSeam.isActive {
             SessionReset.endSession(clearTokens: {}, cache: nil)
-            signInNotice = AccountDeletionText.requested(erasesAt: requested.erasesAt)
+            signInNotice = notice
             state = .signedOut
             return
         }
@@ -252,9 +293,8 @@ final class AuthClient: NSObject {
         SessionReset.endSession()
         pendingCode = nil
         codeError = nil
-        signInNotice = AccountDeletionText.requested(erasesAt: requested.erasesAt)
+        signInNotice = notice
         state = .signedOut
-        Log.auth.info("account deletion requested; signed out")
     }
 
     /// The terms are accepted (`TermsAcceptanceView`): the session is an

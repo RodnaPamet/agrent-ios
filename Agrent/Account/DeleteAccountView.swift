@@ -26,7 +26,6 @@ import SwiftUI
 struct DeleteAccountView: View {
     @Environment(AuthClient.self) private var auth
     @State private var confirming = false
-    @State private var deleting = false
     @State private var failure: String?
 
     private typealias Words = AccountDeletionText
@@ -46,7 +45,7 @@ struct DeleteAccountView: View {
                 Button(role: .destructive) {
                     confirming = true
                 } label: {
-                    if deleting {
+                    if auth.requestingDeletion {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .accessibilityLabel(Words.deleting)
@@ -54,7 +53,7 @@ struct DeleteAccountView: View {
                         Label(Words.action, systemImage: "trash")
                     }
                 }
-                .disabled(deleting)
+                .disabled(auth.requestingDeletion)
                 .accessibilityInputLabels(A11y.spokenNames(Words.action, "Delete account"))
                 // On the row that asks: the dialog animates from its trigger.
                 .confirmationDialog(Words.confirmTitle, isPresented: $confirming, titleVisibility: .visible) {
@@ -86,18 +85,14 @@ struct DeleteAccountView: View {
         }
     }
 
-    /// Sent once. If it landed, this phone's session is gone with every
-    /// other and `AuthClient` takes the app to the sign-in screen; if it did
-    /// not, the person can ask again — the server does not restart the clock
-    /// for a second request.
+    /// Sent once, by `AuthClient`. If it landed, this phone's session is
+    /// gone with every other and the app goes to the sign-in screen; if it
+    /// did not, the person can ask again — the server does not restart the
+    /// clock for a second request.
     private func delete() async {
-        guard !deleting else { return }
-        deleting = true
         failure = nil
-        defer { deleting = false }
         do {
-            let requested = try await AccountDeletionAPI.request()
-            auth.accountDeletionRequested(requested)
+            try await auth.requestAccountDeletion()
         } catch {
             failure = UserMessage.text(for: error)
         }
@@ -129,6 +124,12 @@ enum AccountDeletionText {
     static let confirmTitle = "Изтриване на профила?"
     static let confirmMessage = "Ще бъдете отписани от всички устройства. Докато срокът тече, "
         + "можете да влезете отново и да възстановите профила."
+
+    /// When the request's answer was lost and the session turned out to be
+    /// revoked: likely recorded, not known. Signing in shows which — the
+    /// recovery screen if it was.
+    static let sessionEnded = "Сесията Ви е прекратена и заявката за изтриване вероятно е приета. "
+        + "Влезте отново, за да видите състоянието на профила."
 
     /// On the sign-in screen once the request is recorded: the server's date,
     /// never one computed here, and how to undo it.

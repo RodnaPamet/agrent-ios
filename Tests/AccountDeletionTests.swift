@@ -47,7 +47,8 @@ final class AccountDeletionTests: XCTestCase {
         XCTAssertTrue(dated.contains("възстановите"), "the way back is not said")
         let undated = AccountDeletionText.requested(erasesAt: nil)
         XCTAssertTrue(undated.contains("възстановите"))
-        for text in [dated, undated, AccountDeletionText.confirmMessage] + AccountDeletionText.explanation {
+        for text in [dated, undated, AccountDeletionText.confirmMessage, AccountDeletionText.sessionEnded]
+            + AccountDeletionText.explanation {
             XCTAssertTrue(text.hasSuffix("."), text)
         }
     }
@@ -75,20 +76,25 @@ final class AccountDeletionTests: XCTestCase {
     // MARK: - Fired from one place
 
     /// The request is an outward-facing write that revokes every session, so
-    /// it is sent from exactly one place: the confirmation on
-    /// `DeleteAccountView`. Read from the source because nothing at runtime
-    /// may send it; the positive control is that the one call is there.
+    /// it is sent from exactly one place: `AuthClient.requestAccountDeletion`,
+    /// which only the confirmation on `DeleteAccountView` calls. Read from the
+    /// source because nothing at runtime may send it; the positive control
+    /// is that each one call is there.
     func testTheRequestIsSentOnlyFromTheConfirmation() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let sources = try FileManager.default
             .subpathsOfDirectory(atPath: root.appendingPathComponent("Agrent").path)
             .filter { $0.hasSuffix(".swift") }
-        var callers: [String] = []
+        var senders: [String] = []
+        var askers: [String] = []
         for path in sources {
             let text = try String(contentsOf: root.appendingPathComponent("Agrent").appendingPathComponent(path),
                                   encoding: .utf8)
-            if SignOutHygieneTests.code(text).contains("AccountDeletionAPI.request()") { callers.append(path) }
+            let code = SignOutHygieneTests.code(text)
+            if code.contains("AccountDeletionAPI.request()") { senders.append(path) }
+            if code.contains("auth.requestAccountDeletion()") { askers.append(path) }
         }
-        XCTAssertEqual(callers, ["Account/DeleteAccountView.swift"])
+        XCTAssertEqual(senders, ["Auth/AuthClient.swift"])
+        XCTAssertEqual(askers, ["Account/DeleteAccountView.swift"])
     }
 }
