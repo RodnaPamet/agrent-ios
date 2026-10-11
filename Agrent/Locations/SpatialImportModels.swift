@@ -272,7 +272,15 @@ struct ImportJobStatus: Decodable, Equatable, Sendable {
     /// value need not be.
     let jobId: String?
     let state: String
+    /// ENGLISH, whatever the worker threw: a fallback, not copy. Shown only
+    /// for a code this build does not know; see `failureText`.
     let failedReason: String?
+    /// Why the import failed, as a code to say in Bulgarian (agri-saas
+    /// #1637). Null unless the job failed, and null for an unexpected crash.
+    let failedCode: String?
+    /// The numbers behind `failedCode`. Never a parcel name: the owner keeps
+    /// names out of params (2026-10-11), so a sentence gives counts only.
+    let failedParams: JobFailureParams?
 
     /// OPTIONAL, although `result` is in the spec's `required` list.
     ///
@@ -287,6 +295,97 @@ struct ImportJobStatus: Decodable, Equatable, Sendable {
     /// not modelled. `result` no longer is: #1137 gave it a `$ref` to
     /// `JobRunEnvelope`, which is what made the counts readable.
     var stage: ImportJobStage { ImportJobStage(state) }
+}
+
+/// `failedParams`, each value a string or a number, as text.
+///
+/// It can never fail the poll: a shape this build cannot read costs the
+/// numbers, not the status, since a poll that throws hides the failure it
+/// was reporting.
+struct JobFailureParams: Decodable, Equatable, Sendable {
+    let values: [String: String]
+
+    init(from decoder: Decoder) throws {
+        values = (try? APIClient.ErrorEnvelope.Err.Params(from: decoder))?.values ?? [:]
+    }
+}
+
+extension ImportJobStatus {
+    /// Why the import failed, in Bulgarian (agrent-ios#271).
+    ///
+    /// 1. A code this build knows: its own sentence, from the numbers.
+    /// 2. A code it does not (a newer server): `failedReason`, when it is a
+    ///    sentence. English, but it knows something this build does not, the
+    ///    same trade `UserMessage.httpText` makes.
+    /// 3. No code: an unexpected crash, whose reason is a stack-trace line
+    ///    («connect ECONNREFUSED …»), not something to show a farmer. The
+    ///    spec suggests `failedReason` there; this app does not.
+    var failureText: String {
+        if let failedCode {
+            if let known = SpatialJobFailure.text(code: failedCode, params: failedParams?.values ?? [:]) {
+                return known
+            }
+            if let reason = failedReason?.recorded, UserMessage.isHumanSentence(reason) { return reason }
+        }
+        return SpatialJobFailure.serverFault
+    }
+}
+
+/// The boundary-upload job's failures (agri-saas #1637), said in Bulgarian.
+///
+/// Each names what to do, since the farmer's only move is a better file. A
+/// sentence missing its numbers still says what went wrong, without them.
+enum SpatialJobFailure {
+    static let serverFault = "Импортът не успя заради грешка на сървъра. Опитайте отново по-късно."
+
+    static func text(code: String, params: [String: String]) -> String? {
+        let number = { (key: String) in params[key].flatMap { Int($0) }.map { Num.text(Double($0)) } }
+        switch code {
+        case "SPATIAL_PARSE_TIMEOUT":
+            let budget = number("seconds").map { " (над \($0) секунди)" } ?? ""
+            return "Файлът се обработваше твърде дълго\(budget). "
+                 + "Опростете го или го разделете на части и го качете отново."
+        case "SPATIAL_TOO_MANY_PARCELS":
+            guard let count = number("count"), let limit = number("limit") else {
+                return "Файлът съдържа твърде много парцели. Разделете го на части."
+            }
+            return "Файлът съдържа \(count) парцела, а максимумът е \(limit). Разделете го на части."
+        case "SPATIAL_PARCEL_TOO_COMPLEX":
+            guard let vertices = number("vertices"), let limit = number("limit") else {
+                return "Един от парцелите има твърде сложна граница. "
+                     + "Опростете геометрията и качете файла отново."
+            }
+            return "Един от парцелите има \(vertices) точки по границата, а максимумът е \(limit). "
+                 + "Опростете геометрията и качете файла отново."
+        case "SPATIAL_IMPORT_TOO_COMPLEX":
+            guard let vertices = number("vertices"), let limit = number("limit") else {
+                return "Границите във файла са твърде сложни. "
+                     + "Опростете геометрията или разделете файла на части."
+            }
+            return "Границите във файла имат общо \(vertices) точки, а максимумът е \(limit). "
+                 + "Опростете геометрията или разделете файла на части."
+        case "SPATIAL_GEOMETRY_UNPARSEABLE":
+            return "Границите във файла не могат да бъдат прочетени. Проверете файла и го качете отново."
+        case "SPATIAL_GEOMETRY_INVALID":
+            // A count and no names (the owner's call, 2026-10-11).
+            guard let raw = params["count"], let count = Int(raw), count > 0 else {
+                return "Някои парцели са с невалидна геометрия (пресичащи се граници). "
+                     + "Поправете ги и качете файла отново."
+            }
+            return count == 1
+                ? "1 парцел е с невалидна геометрия (пресичаща се граница). "
+                    + "Поправете го и качете файла отново."
+                : "\(Num.text(Double(count))) парцела са с невалидна геометрия (пресичащи се граници). "
+                    + "Поправете ги и качете файла отново."
+        case "SPATIAL_SOURCE_CRS_UNRESOLVED":
+            return "Координатната система на файла не може да се определи. Експортирайте слоя "
+                 + "в WGS84 (EPSG:4326) или добавете файла .prj и качете отново."
+        case "SPATIAL_IMPORT_INTERNAL":
+            return serverFault
+        default:
+            return nil
+        }
+    }
 }
 
 /// What the queue state means for someone standing in a field.
