@@ -68,8 +68,6 @@ enum SpatialImportFormat: String, CaseIterable, Sendable {
         }
     }
 
-    var capText: String { "\(byteCap / (1024 * 1024)) MB" }
-
     /// What a `.zip` of shapefile parts is, as far as the wire is concerned.
     /// The server decides the real format from the extension; this only has to
     /// be honest about the bytes.
@@ -117,12 +115,27 @@ enum SpatialImportRefusal: Equatable, Sendable {
                 ? "Файлът няма разширение. Приемат се: \(kinds)."
                 : "Файлове «.\(ext)» не се приемат. Приемат се: \(kinds)."
         case .tooLarge(let format, let actual):
-            let mb = Double(actual) / (1024 * 1024)
-            return "Файлът е \(Num.text(mb)) MB. Максимумът за \(format.label) е \(format.capText)."
+            return Self.tooLargeText(megabytes: Double(actual) / Self.megabyte,
+                                     limit: Double(format.byteCap) / Self.megabyte,
+                                     format: format)
         case .empty:
             return "Файлът е празен."
         }
     }
+
+    /// One sentence for a file over the cap, whichever side found it: this
+    /// check before sending, or the server's `SPATIAL_UPLOAD_TOO_LARGE` when
+    /// the two caps have drifted. There the server's numbers are used, since
+    /// they are what refused the file. `format` is nil when the server named
+    /// one this build does not know.
+    static func tooLargeText(megabytes: Double, limit: Double,
+                             format: SpatialImportFormat?) -> String {
+        let cap = "\(Num.text(limit)) MB"
+        return "Файлът е \(Num.text(megabytes)) MB. "
+             + (format.map { "Максимумът за \($0.label) е \(cap)." } ?? "Максимумът е \(cap).")
+    }
+
+    private static let megabyte = Double(1024 * 1024)
 }
 
 extension SpatialImportFormat {

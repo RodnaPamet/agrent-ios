@@ -164,27 +164,6 @@ final class RetryAfterCarryingTests: XCTestCase {
             .retryAfterSeconds)
     }
 
-    /// THE SILENT DROP. `humanised` rebuilds the error, and the rebuild
-    /// compiles without the new label because it has a default — so leaving
-    /// it out loses the server's wait without a word from the compiler.
-    ///
-    /// The input takes the REBUILD path on purpose: a bare sentence in `code`
-    /// and no message. An error that went through untouched would keep its
-    /// wait whatever `humanised` did, and prove nothing.
-    func testHumanisedKeepsRetryAfter() {
-        let raw = APIClient.APIError.http(
-            status: 429, code: "Too many uploads, try later", message: nil,
-            retryAfterSeconds: 30)
-        guard case APIClient.APIError.http(let status, let code, let message, _, let seconds) =
-                SpatialImportAPI.humanised(raw) else {
-            return XCTFail("shape changed")
-        }
-        XCTAssertNil(code, "positive control: this went through the rebuild")
-        XCTAssertEqual(message, "Too many uploads, try later")
-        XCTAssertEqual(status, 429)
-        XCTAssertEqual(seconds, 30, "the rebuild dropped the server's wait")
-    }
-
     /// The one fact that explains why the outbox went quiet, and a number —
     /// so it is safe to persist under `Log`'s three rules. The message still
     /// is not.

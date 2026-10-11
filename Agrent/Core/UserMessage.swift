@@ -358,9 +358,41 @@ enum UserMessage {
             return "Цената на „\(name)“ е въведена в \(stored), а вече се въвежда в \(expected). "
                  + "Изчистете я, преди да въведете нова."
 
+        // ── Parcel-boundary upload (agri-saas #1633) ──
+        //
+        // The phone refuses an oversized or unsupported file BEFORE sending
+        // (`SpatialImportRefusal`), against the same caps and extensions, so
+        // meeting either here means the two rules drifted. The server's
+        // values are used then: they are what refused the file.
+        case "SPATIAL_UPLOAD_TOO_LARGE":
+            guard let size = megabytes(params?["size"]),
+                  let limit = megabytes(params?["limit"]) else {
+                return "Файлът е твърде голям. Опростете го или го разделете на части."
+            }
+            return SpatialImportRefusal.tooLargeText(
+                megabytes: size, limit: limit,
+                format: params?["format"].flatMap(SpatialImportFormat.init(rawValue:)))
+        case "UNSUPPORTED_FILE_TYPE":
+            // `allowed` is the extensions, space-separated.
+            let allowed = params?["allowed"]?.split(separator: " ").joined(separator: ", ") ?? ""
+            return allowed.isEmpty
+                ? "Този тип файл не се приема."
+                : "Този тип файл не се приема. Приемат се: \(allowed)."
+
         default:
             return nil
         }
+    }
+
+    /// «7.2 MB» → 7.2. The server formats `size` and `limit` for English, a
+    /// point and always one decimal («5.0 MB»), so the number is read back
+    /// and said again with a comma. Megabytes only: a figure in another unit
+    /// is not quoted as one.
+    private static func megabytes(_ text: String?) -> Double? {
+        let parts = text?.split(separator: " ") ?? []
+        guard parts.count == 2, parts[1] == "MB",
+              let value = Double(parts[0]), value.isFinite, value > 0 else { return nil }
+        return value
     }
 
     /// A sentence naming `params.commodity` in Bulgarian, or the general one.
@@ -443,6 +475,17 @@ enum UserMessage {
         // sentence says the order was not accepted rather than implying
         // the person did something wrong.
         "INVALID_TAB_ORDER": "Подредбата на разделите не беше приета.",
+
+        // ── Parcel-boundary upload (agri-saas #1633) ──
+        //
+        // No file part reached the server. Its sibling `FILE_EMPTY` (one did,
+        // with no bytes) is in Batch 1 below; the phone refuses an empty file
+        // itself, so that one is a backstop.
+        "FILE_REQUIRED": "Файлът не стигна до сървъра. Изберете го и опитайте отново.",
+        // The poll. The server gives the SAME answer for a job that never
+        // existed and one belonging to another farm, so job ids cannot be
+        // probed across farms. There is no reason to give, only what to do.
+        "IMPORT_JOB_NOT_FOUND": "Сървърът не намира това импортиране. Качете файла отново.",
 
         // Calculator refusals, from `grain.calculator.refusal.*`, VERBATIM.
         //
