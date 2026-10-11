@@ -70,7 +70,11 @@ final class AccountDeletionTests: XCTestCase {
 
         // A suspended (or terminated) account is told so, not that it lacks a
         // right: the server's message is the bare code, which is no sentence.
-        XCTAssertEqual(UserMessage.httpText(status: 403, code: "ACCOUNT_SUSPENDED", message: "ACCOUNT_SUSPENDED"),
+        // The canonical envelope, as `/me` and every ctx-resolved route send it.
+        let refusal = APIClient.envelope(from: Data(
+            #"{"error":{"code":"ACCOUNT_SUSPENDED","message":"ACCOUNT_SUSPENDED"}}"#.utf8))
+        XCTAssertEqual(refusal?.code, "ACCOUNT_SUSPENDED", "precondition: the envelope's code")
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: refusal?.code, message: refusal?.message),
                        "Профилът Ви е спрян и не може да се използва.")
     }
 
