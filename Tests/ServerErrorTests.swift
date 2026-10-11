@@ -229,6 +229,24 @@ final class SubscriptionRefusalTests: XCTestCase {
         XCTAssertEqual(text, "Тази функция е спряна, защото плащането за абонамента на стопанството не е преминало.")
     }
 
+    /// The middleware's 403s reach every route, and each message is English
+    /// that `httpText` would have shown verbatim. The messages are the
+    /// server's own (`src/middleware.ts`), so the positive control is that
+    /// they ARE sentences.
+    func testTheMiddlewaresRefusalsAreSaidInBulgarian() {
+        let refusals = [
+            ("ADMIN_REQUIRED", "Admin access required"),
+            ("MFA_REQUIRED", "MFA verification required"),
+            ("CSRF_BLOCKED", "Cross-site admin requests are not allowed"),
+        ]
+        for (code, english) in refusals {
+            XCTAssertTrue(UserMessage.isHumanSentence(english), "precondition: \(code)")
+            let text = UserMessage.httpText(status: 403, code: code, message: english)
+            XCTAssertNotEqual(text, english, code)
+            XCTAssertEqual(text, UserMessage.bulgarian[code], code)
+        }
+    }
+
     /// Uncoded on the server: FORBIDDEN, told apart only by the message's
     /// prefix — and FORBIDDEN alone says «Нямате права».
     func testAPlanLimitIsNotCalledAMissingRight() {
