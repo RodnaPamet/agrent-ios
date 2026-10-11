@@ -268,8 +268,10 @@ final class AuthClient: NSObject {
     /// Cancel the pending deletion (`DELETE /api/account/deletion`) and open
     /// the app. `wasRequested: false` — nothing was pending — is success.
     ///
-    /// `/me` is read again, fresh, before the farm opens, so a disk copy of
-    /// the answer that sent the person here cannot send them straight back.
+    /// `/me` is read again, fresh, before the farm opens; when that read
+    /// fails, the pending deletion is dropped from the held answer and its
+    /// disk copy (`CurrentUserStore.deletionCancelled`) — either would send
+    /// the person straight back here.
     /// Revoked sessions elsewhere stay revoked; the screen says so.
     func restoreAccount() async {
         guard case .deletionPending = state, !restoringAccount, !restoreRefused else { return }
@@ -280,8 +282,13 @@ final class AuthClient: NSObject {
         do {
             _ = try await AccountDeletionAPI.cancel()
             guard SessionEpoch.isCurrent(epoch), case .deletionPending = state else { return }
-            await CurrentUserStore.shared.refresh()
+            let fresh = await CurrentUserStore.shared.refresh()
             guard SessionEpoch.isCurrent(epoch), case .deletionPending = state else { return }
+            // The server has cancelled it. A `/me` still saying "pending" did
+            // not reach the server or predates the cancel: dropped in the same
+            // turn as the state changes, so no render sees one without the
+            // other, and no disk copy can bring it back.
+            if fresh?.deletion != nil { CurrentUserStore.shared.deletionCancelled() }
             state = .signedIn
             Log.auth.info("account deletion cancelled")
         } catch {
@@ -376,7 +383,9 @@ final class AuthClient: NSObject {
         await APIClient.shared.termsAccepted()
         _ = await CurrentUserStore.shared.load()
         guard SessionEpoch.isCurrent(epoch), state == .termsPending else { return }
-        state = .signedIn
+        // The same landing as a sign-in: an account whose deletion is pending
+        // goes to the recovery screen, not past it.
+        state = stateAfterSignIn()
         Log.auth.info("terms accepted")
     }
 

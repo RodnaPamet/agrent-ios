@@ -504,6 +504,24 @@ final class CurrentUserStore {
         answer?.inFarm(role: roleHere)
     }
 
+    /// The server cancelled this person's deletion (`AuthClient.restoreAccount`)
+    /// and no fresh `/me` has said so yet — the refresh after it failed, or
+    /// coalesced onto one that predates it. Dropped from the session's answer
+    /// AND from the disk copy, because either would send a restored person
+    /// back to the recovery screen: an offline launch reads the copy, and
+    /// offline the restore cannot be sent again. Losing the copy costs an
+    /// offline cold launch its identity until the next `/me`; being shut out
+    /// of the farm would cost more.
+    func deletionCancelled() {
+        guard let held = answered, held.deletion != nil else { return }
+        answered = CurrentUser(id: held.id, name: held.name, email: held.email, role: held.role,
+                               bottomTabOrder: held.bottomTabOrder, featureFlags: held.featureFlags,
+                               avatarUrl: held.avatarUrl, tenant: held.tenant, deletion: nil)
+        guard let scope = CacheScope.current(for: MeAPI.path, identity: identity) else { return }
+        let key = ResponseCache.key(scope: scope, pathAndQuery: MeAPI.path)
+        Task { await ResponseCache.shared.remove(key) }
+    }
+
     /// The one place a resolved `/me` is adopted, by both paths, and only
     /// AFTER each has checked the epoch.
     ///

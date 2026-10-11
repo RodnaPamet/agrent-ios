@@ -80,7 +80,10 @@ struct AgrentApp: App {
             .environment(auth)
             // A session opened on stored tokens learns of a pending deletion
             // from the first `/me` it reads; a sign-in decides for itself.
-            .onChange(of: me.user?.deletion, initial: true) { _, deletion in
+            // Keyed on the state too, so ANY way into `.signedIn` is checked —
+            // not only a change of the field, which a path that skipped
+            // `stateAfterSignIn` would never make.
+            .onChange(of: auth.state == .signedIn ? me.user?.deletion : nil, initial: true) { _, deletion in
                 if let deletion { auth.deletionPendingSeen(deletion) }
             }
             // Ochre, not the system blue and emphatically not green: green on
