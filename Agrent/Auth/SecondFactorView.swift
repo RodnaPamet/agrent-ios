@@ -44,6 +44,11 @@ struct SecondFactorView: View {
                     .multilineTextAlignment(.center)
                     .textFieldStyle(.roundedBorder)
                     .focused($fieldFocused)
+                    // Return on a hardware keyboard; the number pad has none.
+                    // `submitCode` ignores a second submit while one is out.
+                    .onSubmit {
+                        if code.count == 6 { Task { await auth.submitCode(code) } }
+                    }
                     .accessibilityLabel(Words.codeField)
                     .onChange(of: code) { _, typed in
                         // Digits only, six at most — a pasted «123 456» keeps
@@ -64,7 +69,11 @@ struct SecondFactorView: View {
                         Task { await auth.submitCode(code) }
                     } label: {
                         if auth.submittingCode {
-                            ProgressView().accessibilityLabel(Words.checking)
+                            // Full width, as the label it replaces: the button
+                            // under the finger does not shrink while it checks.
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .accessibilityLabel(Words.checking)
                         } else {
                             Text(Words.confirm)
                                 .multilineTextAlignment(.center)
@@ -93,12 +102,22 @@ struct SecondFactorView: View {
             .padding()
         }
         .onAppear { fieldFocused = true }
-        // A refusal is said, not only shown, and the field is emptied for the
-        // next code — the one refused is no use again.
+        // A refusal is said, not only shown — at high priority, because the
+        // same update swaps the spinner back and dims the button under
+        // VoiceOver's cursor, which is what cuts a default one short.
         .onChange(of: auth.codeError) { _, error in
             guard let error else { return }
+            var line = AttributedString(error)
+            line.accessibilitySpeechAnnouncementPriority = .high
+            AccessibilityNotification.Announcement(line).post()
+        }
+        // Emptied for the next code only when the server refused this one; a
+        // dropped connection leaves it for another try. Focus goes back to
+        // the field, or a keyboard user is left on a button the empty field
+        // has just disabled.
+        .onChange(of: auth.codesRefused) {
             code = ""
-            AccessibilityNotification.Announcement(error).post()
+            fieldFocused = true
         }
     }
 }

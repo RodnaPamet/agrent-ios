@@ -359,10 +359,21 @@ struct SignInView: View {
         // A refusal is said, not only shown: the words appear above buttons a
         // VoiceOver user's focus is on — and `email_required` tells them what
         // to do in Settings.
-        .onChange(of: auth.state) { _, state in
-            if case .failed(let message) = state {
-                AccessibilityNotification.Announcement(message).post()
-            }
+        //
+        // A task keyed on the state rather than `onChange`, because it also
+        // runs for the state this view STARTS in: the code screen hands back
+        // a sign-in that ended («…кодът изтече») by swapping this view in
+        // already failed, which `onChange` never sees. Nothing else arrives
+        // here failed — launch and Изход both land on `.signedOut`. After the
+        // swap settles and at high priority, as `FarmGate`'s: the focus move
+        // that follows a replaced screen is what cuts a default one short.
+        .task(id: auth.state) {
+            guard case .failed(let message) = auth.state else { return }
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            var line = AttributedString(message)
+            line.accessibilitySpeechAnnouncementPriority = .high
+            AccessibilityNotification.Announcement(line).post()
         }
     }
 }

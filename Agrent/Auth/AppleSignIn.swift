@@ -136,9 +136,12 @@ enum AppleSignIn {
         let deadline: Date
     }
 
-    /// What the code screen does with a refusal: say it and let the person
-    /// type again, or end this sign-in and send them back to the buttons.
+    /// What the code screen does with a refusal: the CODE was refused, so it
+    /// is cleared for the next one; something else failed and the code typed
+    /// may still be good, so it stays for another try; or the ticket is gone
+    /// and this sign-in ends, back at the buttons.
     enum CodeOutcome: Equatable, Sendable {
+        case retype(String)
         case again(String)
         case restart(String)
     }
@@ -156,11 +159,11 @@ enum AppleSignIn {
         case (400, "MFA_CODE_INVALID"):
             switch params?["attemptsRemaining"].flatMap({ Int($0) }) {
             case .some(let left) where left <= 0: return .restart(Text.tooManyWrong)
-            case .some(let left): return .again(Text.wrongCode(attemptsLeft: left))
-            case .none: return .again(Text.wrongCodeAgain)
+            case .some(let left): return .retype(Text.wrongCode(attemptsLeft: left))
+            case .none: return .retype(Text.wrongCodeAgain)
             }
         case (400, "MFA_CODE_MALFORMED"):
-            return .again(Text.sixDigits)
+            return .retype(Text.sixDigits)
         case (403, "MFA_TICKET_INVALID"):
             return .restart(expired ? Text.codeExpired : Text.startAgain)
         default:

@@ -47,8 +47,9 @@ final class AppleSecondFactorTests: XCTestCase {
 
     // MARK: - The refusals
 
-    /// Each refusal of a code says what to do next, and only a ticket that
-    /// no code can redeem ends the sign-in.
+    /// Each refusal of a code says what to do next. Only a refused CODE
+    /// clears the field, and only a ticket no code can redeem ends the
+    /// sign-in.
     func testEachRefusalOfACodeSaysWhatToDoNext() {
         func outcome(_ status: Int, _ json: String, expired: Bool = false) -> AppleSignIn.CodeOutcome {
             let env = envelope(json)
@@ -56,15 +57,15 @@ final class AppleSecondFactorTests: XCTestCase {
         }
         // `attemptsRemaining` arrives as an integer, in the real envelope.
         XCTAssertEqual(outcome(400, #"{"error":{"code":"MFA_CODE_INVALID","message":"Invalid code","params":{"attemptsRemaining":3}}}"#),
-                       .again("Грешен код. Остават 3 опита."))
+                       .retype("Грешен код. Остават 3 опита."))
         XCTAssertEqual(outcome(400, #"{"error":{"code":"MFA_CODE_INVALID","params":{"attemptsRemaining":1}}}"#),
-                       .again("Грешен код. Остава 1 опит."))
+                       .retype("Грешен код. Остава 1 опит."))
         XCTAssertEqual(outcome(400, #"{"error":{"code":"MFA_CODE_INVALID","params":{"attemptsRemaining":0}}}"#),
                        .restart(AppleSignIn.Text.tooManyWrong),
                        "the final miss burns the ticket in that response; asking again cannot help")
         XCTAssertEqual(outcome(400, #"{"error":{"code":"MFA_CODE_INVALID"}}"#),
-                       .again(AppleSignIn.Text.wrongCodeAgain), "no count is still a wrong code, not a failure")
-        XCTAssertEqual(outcome(400, #"{"error":{"code":"MFA_CODE_MALFORMED"}}"#), .again(AppleSignIn.Text.sixDigits))
+                       .retype(AppleSignIn.Text.wrongCodeAgain), "no count is still a wrong code, not a failure")
+        XCTAssertEqual(outcome(400, #"{"error":{"code":"MFA_CODE_MALFORMED"}}"#), .retype(AppleSignIn.Text.sixDigits))
 
         // One opaque code for every dead ticket; the phone's own clock tells
         // the one case worth its own words.
@@ -74,7 +75,7 @@ final class AppleSecondFactorTests: XCTestCase {
                        .restart(AppleSignIn.Text.startAgain))
 
         // Not about the code: the ticket may still be good, unless its time
-        // is up.
+        // is up — and so may the code typed, which `.again` keeps.
         XCTAssertEqual(outcome(429, #"{"error":{"code":"RATE_LIMITED"}}"#),
                        .again(UserMessage.httpText(status: 429, code: "RATE_LIMITED", message: nil)))
         XCTAssertEqual(outcome(500, "{}"), .again(UserMessage.httpText(status: 500, code: nil, message: nil)))
@@ -134,8 +135,11 @@ final class AppleSecondFactorTests: XCTestCase {
     /// Nothing to redeem, nothing sent: a submit outside the code screen is
     /// ignored.
     func testASubmitWithoutATicketDoesNothing() async {
+        // Whatever this simulator's Keychain opened the client in.
         let auth = AuthClient()
+        let before = auth.state
         await auth.submitCode("123456")
-        XCTAssertEqual(auth.state, .signedOut)
+        XCTAssertEqual(auth.state, before, "a submit with no ticket changed the state")
+        XCTAssertEqual(auth.codesRefused, 0)
     }
 }

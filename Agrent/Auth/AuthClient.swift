@@ -60,6 +60,10 @@ final class AuthClient: NSObject {
     private var pendingCode: AppleSignIn.PendingCode?
     /// The code screen's last refusal, said under the field.
     private(set) var codeError: String?
+    /// Counts the codes the server refused, so the screen clears the field
+    /// for those and only those: after a dropped connection or a busy
+    /// server the code typed may still be good for its thirty seconds.
+    private(set) var codesRefused = 0
     private(set) var submittingCode = false
 
     override init() {
@@ -288,6 +292,9 @@ final class AuthClient: NSObject {
             Log.auth.error("apple code refused: \(status, privacy: .public) \(env?.code ?? "no code", privacy: .public)")
             switch AppleSignIn.codeOutcome(status: status, code: env?.code, params: env?.params,
                                            expired: Date() >= pending.deadline) {
+            case .retype(let text):
+                codesRefused += 1
+                codeError = text
             case .again(let text): codeError = text
             case .restart(let text): endCode(text)
             }
