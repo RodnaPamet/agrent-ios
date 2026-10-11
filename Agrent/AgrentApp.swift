@@ -288,6 +288,14 @@ struct SignInView: View {
                     .foregroundStyle(Palette.error)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+            } else if auth.state == .signedOut, let notice = auth.signInNotice {
+                // After «Изтрий профила»: the date and the way back. Not an
+                // error, so not in the error colour (agrent-ios#281).
+                Text(notice)
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
 
             // ── Three ways in (agrent-ios#193, P4.4) ──
@@ -368,7 +376,15 @@ struct SignInView: View {
         // swap settles and at high priority, as `FarmGate`'s: the focus move
         // that follows a replaced screen is what cuts a default one short.
         .task(id: auth.state) {
-            guard case .failed(let message) = auth.state else { return }
+            // The deletion notice arrives the same way, with this view.
+            let message: String
+            if case .failed(let failure) = auth.state {
+                message = failure
+            } else if auth.state == .signedOut, let notice = auth.signInNotice {
+                message = notice
+            } else {
+                return
+            }
             try? await Task.sleep(for: .milliseconds(600))
             guard !Task.isCancelled else { return }
             var line = AttributedString(message)

@@ -141,6 +141,8 @@ final class RouteContractTests: XCTestCase {
         // The web app's page routes the bottom tabs map onto, compared with
         // `/api/account/bottom-tabs` values. Never requested.
         "AppSurface.swift": "web page routes, not API paths",
+        // The web's privacy notice, opened in Safari from «Изтрий профила».
+        "DeleteAccountView.swift": "the web's /privacy page, not an API path",
     ]
 
     // MARK: - Every path the app builds
@@ -193,6 +195,7 @@ final class RouteContractTests: XCTestCase {
             ]),
             ("FarmRecordAPI.swift", [FarmRecordAPI.path(loc)]),
             ("AdminPricesAPI.swift", [AdminPricesAPI.path, AdminPricesAPI.clearPath("{commodity}")]),
+            ("AccountDeletionAPI.swift", [AccountDeletionAPI.path]),
             ("LocationsAPI.swift", [
                 LocationsAPI.listPath,
                 LocationsAPI.parcelsPath(loc),

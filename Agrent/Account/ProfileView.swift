@@ -48,6 +48,10 @@ import SwiftUI
 /// ── The app's only Изход ──
 ///
 /// Behind `SignOutConfirmation`, the one question any Изход asks.
+///
+/// ── And «Изтрий профила» ──
+///
+/// Below it, to `DeleteAccountView` (agrent-ios#281).
 struct ProfileView: View {
     /// The shared instance, held as `@State` the way `AdminView` holds it, so
     /// the card appears when `/me` resolves while this page is open.
@@ -111,6 +115,20 @@ struct ProfileView: View {
                 // On the row that asks, not on the List: the dialog animates
                 // from its trigger (and on iPad points at it).
                 .signOutConfirmation(isPresented: $confirmingSignOut)
+            }
+            .pageRow()
+
+            // Deleting the account, in the app (App Store 5.1.1(v),
+            // agrent-ios#281). Below Изход and on a page of its own: what it
+            // does is said before the one question is asked.
+            Section {
+                NavigationLink {
+                    DeleteAccountView()
+                } label: {
+                    Label(AccountDeletionText.action, systemImage: "trash")
+                        .foregroundStyle(Palette.error)
+                }
+                .accessibilityInputLabels(A11y.spokenNames(AccountDeletionText.action, "Delete account"))
             }
             .pageRow()
         }

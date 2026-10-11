@@ -90,6 +90,7 @@ final class AuthClient: NSObject {
 
     func signIn(with provider: Provider = .google) async {
         state = .signingIn
+        signInNotice = nil
         signingInVia = provider == .google ? .google : .microsoft
         defer { signingInVia = nil }
         Log.auth.info("sign-in started (\(provider.rawValue, privacy: .public))")
@@ -198,6 +199,7 @@ final class AuthClient: NSObject {
                 return
             }
             state = .signingIn
+            signInNotice = nil
             signingInVia = .apple
             defer { signingInVia = nil }
             do {
@@ -219,6 +221,40 @@ final class AuthClient: NSObject {
                 }
             }
         }
+    }
+
+    // MARK: - Account deletion (agrent-ios#281)
+
+    /// Said on the sign-in screen after the account was asked to be deleted:
+    /// the date, and that signing in again can still undo it. Not a failure,
+    /// so not `.failed`; the next sign-in clears it.
+    private(set) var signInNotice: String?
+
+    /// The deletion request was recorded (`AccountDeletionAPI.request`), and
+    /// with it the server revoked every session — this phone's included.
+    ///
+    /// Ended here, locally and at once, rather than by asking first: the
+    /// tokens are already dead, so any request in between would only meet a
+    /// refused refresh. Изход's local half (`SessionReset`), without its
+    /// revoke — there is nothing left for that to revoke. The date goes to
+    /// the sign-in screen instead of an alert, which that refused refresh
+    /// could tear down before it is read.
+    func accountDeletionRequested(_ requested: AccountDeletionAPI.Requested) {
+        #if DEBUG
+        // As `signOut`: under the seam the Keychain is the owner's, not ours.
+        if UITestSeam.isActive {
+            SessionReset.endSession(clearTokens: {}, cache: nil)
+            signInNotice = AccountDeletionText.requested(erasesAt: requested.erasesAt)
+            state = .signedOut
+            return
+        }
+        #endif
+        SessionReset.endSession()
+        pendingCode = nil
+        codeError = nil
+        signInNotice = AccountDeletionText.requested(erasesAt: requested.erasesAt)
+        state = .signedOut
+        Log.auth.info("account deletion requested; signed out")
     }
 
     /// The terms are accepted (`TermsAcceptanceView`): the session is an
