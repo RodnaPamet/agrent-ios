@@ -72,14 +72,17 @@ enum AppleSignIn {
     /// The server makes every token failure one `400 invalid_grant` — bad
     /// signature, wrong audience, expired, mismatched or replayed nonce — so
     /// this does not branch on the reason: it asks for another try, which is
-    /// a new nonce. Two answers are worth their own words: Apple sign-in not
-    /// switched on (503, or 404 while the route is not deployed), which is
-    /// not the person's failure, and a first authorisation without an email.
+    /// a new nonce. Three answers are worth their own words: Apple sign-in
+    /// not switched on (503, or 404 while the route is not deployed), which
+    /// is not the person's failure; a first authorisation without an email;
+    /// and a farm that requires a second factor (agri-saas #1644), which this
+    /// route cannot collect while Google and Microsoft can.
     static func message(status: Int, code: String?) -> String {
         switch (status, code) {
         case (503, _), (404, _): Text.notAvailable
         case (400, "email_required"): Text.emailRequired
         case (400, _): Text.failed
+        case (403, "MFA_REQUIRED"): Text.secondFactor
         // Anything else is not about the token — a 429, a 426 for an old
         // build, a 5xx — and the house words already say what each means.
         default: UserMessage.httpText(status: status, code: code, message: nil)
@@ -95,6 +98,14 @@ enum AppleSignIn {
         /// server cannot create an account without one.
         static let emailRequired = "Apple не изпрати имейл адрес. В Настройки спрете използването на "
             + "Apple ID за Agrent и опитайте отново, като споделите имейла."
+        /// The farm's policy asks for an authenticator code. Google and
+        /// Microsoft sign-in ask for it in their sheet; Apple's has no page
+        /// to type it into and the app no code screen yet, so the server
+        /// refuses rather than letting the person in without it. Not the
+        /// person's failure, and a retry with Apple cannot help, so it names
+        /// the way in that works.
+        static let secondFactor = "Стопанството изисква код за двуфакторно потвърждение, а входът с Apple "
+            + "още не може да го поиска. Влезте с Google или Microsoft."
         /// Apple's own sheet failed — no iCloud account on the phone, or the
         /// capability missing from this build.
         static let unavailableHere = "Входът с Apple не е достъпен на това устройство."

@@ -552,11 +552,11 @@ enum UserMessage {
         //
         // The route is admin-only and this member's role is not.
         "ADMIN_REQUIRED": "Това е достъпно само за администратор на стопанството.",
-        // The session signed in but has not cleared its second factor, and
-        // this app has no step to clear it (agrent-ios#274). Says so, rather
-        // than suggesting a retry that cannot help.
-        "MFA_REQUIRED":
-            "Профилът ви изисква двуфакторно потвърждение, а то още не се поддържа в приложението.",
+        // The session has not cleared the farm's second factor. Google and
+        // Microsoft sign-in ask for the code inside their sheet (agri-saas
+        // #1644), so signing in again is the step that clears it. Apple
+        // sign-in's own refusal has its own words (`AppleSignIn.Text`).
+        "MFA_REQUIRED": "Стопанството изисква двуфакторно потвърждение. Излезте и влезте отново, за да въведете кода.",
         // A cross-site admin request. The app sends a bearer from no site,
         // so this should be unreachable; the server says a retry will not
         // help, and the sentence does not offer one.
