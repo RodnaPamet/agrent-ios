@@ -20,6 +20,10 @@ final class AuthClient: NSObject {
         /// server answers 403 to every farm and person route until it is
         /// done (agrent-ios#193).
         case termsPending
+        /// Apple accepted the person and the farm requires a second factor:
+        /// only `SecondFactorView` is shown until the code is redeemed or the
+        /// person goes back (agri-saas #1649, agrent-ios#274).
+        case codeRequired
         case failed(String)
     }
 
@@ -49,6 +53,14 @@ final class AuthClient: NSObject {
     private var appleNonces: [String: String] = [:]
 
     private var termsObserver: NSObjectProtocol?
+
+    /// The ticket the code screen redeems, with its PKCE verifier. In memory
+    /// only and never logged: the verifier is what makes a leaked ticket
+    /// useless, and it is worth five minutes at most.
+    private var pendingCode: AppleSignIn.PendingCode?
+    /// The code screen's last refusal, said under the field.
+    private(set) var codeError: String?
+    private(set) var submittingCode = false
 
     override init() {
         super.init()
@@ -150,7 +162,8 @@ final class AuthClient: NSObject {
     func completeAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
         // An answer while a sign-in is already running belongs to a request
         // that overlapped it: it neither cancels that sign-in nor races it.
-        guard state != .signingIn else {
+        // Nor while a code is being asked for, whose ticket it would replace.
+        guard state != .signingIn, state != .codeRequired else {
             if case .success(let authorization) = result,
                let key = (authorization.credential as? ASAuthorizationAppleIDCredential)?.state {
                 appleNonces[key] = nil
@@ -184,13 +197,11 @@ final class AuthClient: NSObject {
             signingInVia = .apple
             defer { signingInVia = nil }
             do {
-                if try await exchangeApple(identityToken: token, nonce: raw) {
-                    state = .termsPending
-                    Log.auth.info("apple sign-in complete, terms pending")
-                } else {
-                    _ = await CurrentUserStore.shared.load()
-                    state = .signedIn
-                    Log.auth.info("apple sign-in complete")
+                switch try await exchangeApple(identityToken: token, nonce: raw) {
+                case .granted(let termsPending):
+                    await finishAppleSignIn(termsPending: termsPending)
+                case .codeRequired(let pending):
+                    awaitCode(pending)
                 }
             } catch {
                 if case .server(let status, let code, _) = error as? AuthError {
@@ -224,24 +235,140 @@ final class AuthClient: NSObject {
         Log.auth.info("terms accepted")
     }
 
-    /// Returns whether the new account's terms are pending.
-    private func exchangeApple(identityToken: String, nonce: String) async throws -> Bool {
+    // MARK: - The second factor (agri-saas #1649, agrent-ios#274)
+
+    /// Ask for the code: the code screen takes over until it is redeemed,
+    /// refused for good, or abandoned.
+    func awaitCode(_ pending: AppleSignIn.PendingCode) {
+        pendingCode = pending
+        codeError = nil
+        state = .codeRequired
+        Log.auth.info("apple sign-in needs a second factor")
+    }
+
+    /// Redeem the ticket with the six digits from the authenticator.
+    ///
+    /// A wrong code, a dropped connection or a busy server keeps the screen
+    /// and the ticket; a used-up, expired or refused ticket ends this
+    /// sign-in, because no code can redeem it (`AppleSignIn.codeOutcome`).
+    /// An expired ticket is not even sent: the deadline is this phone's own.
+    func submitCode(_ code: String) async {
+        guard state == .codeRequired, let pending = pendingCode, !submittingCode else { return }
+        guard Date() < pending.deadline else {
+            endCode(AppleSignIn.Text.codeExpired)
+            return
+        }
+        submittingCode = true
+        defer { submittingCode = false }
+        // Cleared first, so the same refusal twice in a row is still a change
+        // the screen announces.
+        codeError = nil
+        do {
+            var req = URLRequest(url: Config.baseURL.appending(path: AppleSignIn.codePath))
+            ClientHeader.stamp(&req)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONEncoder().encode(AppleSignIn.CodeRequest(
+                ticket: pending.ticket, code: code, codeVerifier: pending.verifier))
+
+            // `NoURLCache.session`: the 200 carries the pair.
+            let (data, response) = try await NoURLCache.session.data(for: req)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            Log.auth.info("apple code → \(status, privacy: .public)")
+            guard pendingCode == pending else { return }
+            if status == 200 {
+                let granted = try JSONDecoder().decode(AppleSignIn.Granted.self, from: data)
+                pendingCode = nil
+                saveApplePair(granted)
+                await finishAppleSignIn(termsPending: granted.termsPending)
+                return
+            }
+            let env = APIClient.envelope(from: data)
+            // The server's code is not secret; the code typed is never logged.
+            Log.auth.error("apple code refused: \(status, privacy: .public) \(env?.code ?? "no code", privacy: .public)")
+            switch AppleSignIn.codeOutcome(status: status, code: env?.code, params: env?.params,
+                                           expired: Date() >= pending.deadline) {
+            case .again(let text): codeError = text
+            case .restart(let text): endCode(text)
+            }
+        } catch {
+            guard pendingCode == pending else { return }
+            Log.auth.error("apple code failed: \(Log.summary(for: error), privacy: .public)")
+            if Date() >= pending.deadline {
+                endCode(AppleSignIn.Text.codeExpired)
+            } else {
+                codeError = UserMessage.text(for: error)
+            }
+        }
+    }
+
+    /// Back to the sign-in buttons. The ticket is dropped here and expires
+    /// on the server on its own; it never authenticated anything.
+    func cancelCode() {
+        guard state == .codeRequired, !submittingCode else { return }
+        pendingCode = nil
+        codeError = nil
+        state = .signedOut
+        Log.auth.info("second factor cancelled by user")
+    }
+
+    /// This sign-in is over and the reason is said on the sign-in screen.
+    private func endCode(_ text: String) {
+        pendingCode = nil
+        codeError = nil
+        state = .failed(text)
+    }
+
+    private func finishAppleSignIn(termsPending: Bool) async {
+        if termsPending {
+            state = .termsPending
+            Log.auth.info("apple sign-in complete, terms pending")
+        } else {
+            _ = await CurrentUserStore.shared.load()
+            state = .signedIn
+            Log.auth.info("apple sign-in complete")
+        }
+    }
+
+    /// What Apple's identity token came back as: the pair, saved, or a
+    /// ticket waiting for its code.
+    private enum AppleStep {
+        case granted(termsPending: Bool)
+        case codeRequired(AppleSignIn.PendingCode)
+    }
+
+    private func exchangeApple(identityToken: String, nonce: String) async throws -> AppleStep {
+        // Fresh per attempt, like the nonce. Its challenge declares that this
+        // build can collect a second factor; its verifier is kept only if a
+        // ticket comes back.
+        let pkce = PKCE()
         var req = URLRequest(url: Config.baseURL.appending(path: AppleSignIn.path))
         ClientHeader.stamp(&req)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONEncoder().encode(AppleSignIn.Request(identityToken: identityToken, nonce: nonce))
+        req.httpBody = try JSONEncoder().encode(AppleSignIn.Request(
+            identityToken: identityToken, nonce: nonce, codeChallenge: pkce.challenge))
 
         // `NoURLCache.session`, as for the code exchange: the 200 carries the
         // pair. The identity token is never logged.
         let (data, response) = try await NoURLCache.session.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         Log.auth.info("apple exchange → \(status, privacy: .public)")
-        guard status == 200 else {
+        switch try AppleSignIn.answer(status: status, data: data) {
+        case .granted(let granted):
+            saveApplePair(granted)
+            return .granted(termsPending: granted.termsPending)
+        case .codeRequired(let required):
+            return .codeRequired(AppleSignIn.PendingCode(
+                ticket: required.ticket, verifier: pkce.verifier,
+                deadline: Date().addingTimeInterval(required.expiresIn)))
+        case nil:
             let env = APIClient.envelope(from: data)
             throw AuthError.server(status: status, code: env?.code, message: env?.message)
         }
-        let granted = try JSONDecoder().decode(AppleSignIn.Granted.self, from: data)
+    }
+
+    private func saveApplePair(_ granted: AppleSignIn.Granted) {
         // From nothing, as every sign-in starts — see `exchange`.
         SessionReset.beginFreshSession()
         TokenStore.save(Tokens(
@@ -250,7 +377,6 @@ final class AuthClient: NSObject {
             expiresAt: Date().addingTimeInterval(TimeInterval(granted.expiresIn)),
             termsPending: granted.termsPending ? true : nil
         ))
-        return granted.termsPending
     }
 
     func signOut() {
@@ -308,6 +434,8 @@ final class AuthClient: NSObject {
         // including what "this device's session" can reach in Safari.
         SessionRevocation.revokeThisDevice(refreshToken: refreshToken)
 
+        pendingCode = nil
+        codeError = nil
         state = .signedOut
     }
 

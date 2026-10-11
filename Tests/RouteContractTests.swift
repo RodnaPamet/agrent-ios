@@ -128,7 +128,14 @@ final class RouteContractTests: XCTestCase {
     /// them in. Админ still offers «Цени» to nobody until a farm's row says
     /// `isPlatform`, which none does before the owner creates the platform
     /// farm.
-    private static let pendingServerRoutes: [String: String] = [:]
+    ///
+    /// From 2026-10-11: the Apple second-factor code (#274), built against
+    /// agri-saas #1649's OpenAPI diff before the server serves it. The PR
+    /// merges only once `/api/health` carries #1649, and the refresh that
+    /// brings the route in takes it off this list.
+    private static let pendingServerRoutes: [String: String] = [
+        "/api/auth/native/mfa": "Apple second-factor code, agri-saas #1649 (open)",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -157,7 +164,7 @@ final class RouteContractTests: XCTestCase {
             // A person's farms, outside any one farm (#179).
             ("FarmsAPI.swift", [FarmsAPI.farmsPath, FarmsAPI.eikCheckPath]),
             // Sign in with Apple and in-app terms acceptance (#193, P4.4).
-            ("AppleSignIn.swift", [AppleSignIn.path]),
+            ("AppleSignIn.swift", [AppleSignIn.path, AppleSignIn.codePath]),
             ("TermsAcceptance.swift", [TermsAPI.currentPath, TermsAPI.acceptPath]),
             // The Админ account card's picture. The app no longer BUILDS this
             // path — it follows a root-relative `avatarUrl` from `/me` — but

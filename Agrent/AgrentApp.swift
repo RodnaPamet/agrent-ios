@@ -62,6 +62,10 @@ struct AgrentApp: App {
                     // Nothing of a farm or a person can be read until the
                     // terms are accepted — see `TermsAPI` (#193).
                     TermsAcceptanceView()
+                case .codeRequired:
+                    // Apple sign-in at a farm that requires a second factor:
+                    // nothing is signed in until the code is (#274).
+                    SecondFactorView()
                 default:
                     SignInView()
                 }
