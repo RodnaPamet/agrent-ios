@@ -163,6 +163,11 @@ final class SpatialImportTests: XCTestCase {
             SpatialImportRefusal.tooLarge(format: .shapefile, actualBytes: 7_549_747).text,
             "one sentence, whichever side refused the file")
 
+        // The follow-up's form: whole bytes, nothing to parse. Same sentence.
+        XCTAssertEqual(
+            said(413, #"{"error":{"code":"SPATIAL_UPLOAD_TOO_LARGE","params":{"sizeBytes":7549747,"limitBytes":5242880,"format":"shapefile"}}}"#),
+            text)
+
         // A format this build does not know still gets the numbers.
         XCTAssertEqual(
             said(413, #"{"error":{"code":"SPATIAL_UPLOAD_TOO_LARGE","params":{"size":"12.5 MB","limit":"10.0 MB","format":"gpx"}}}"#),

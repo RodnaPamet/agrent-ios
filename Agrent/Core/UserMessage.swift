@@ -365,8 +365,8 @@ enum UserMessage {
         // meeting either here means the two rules drifted. The server's
         // values are used then: they are what refused the file.
         case "SPATIAL_UPLOAD_TOO_LARGE":
-            guard let size = megabytes(params?["size"]),
-                  let limit = megabytes(params?["limit"]) else {
+            guard let size = megabytes(params, "size"),
+                  let limit = megabytes(params, "limit") else {
                 return "Файлът е твърде голям. Опростете го или го разделете на части."
             }
             return SpatialImportRefusal.tooLargeText(
@@ -384,12 +384,19 @@ enum UserMessage {
         }
     }
 
-    /// «7.2 MB» → 7.2. The server formats `size` and `limit` for English, a
-    /// point and always one decimal («5.0 MB»), so the number is read back
-    /// and said again with a comma. Megabytes only: a figure in another unit
-    /// is not quoted as one.
-    private static func megabytes(_ text: String?) -> Double? {
-        let parts = text?.split(separator: " ") ?? []
+    /// A figure in megabytes, from either of the two forms the server has
+    /// sent it in.
+    ///
+    /// - `<name>Bytes`, a whole number of bytes (agri-saas #1447's follow-up).
+    /// - `<name>`, as #1633 shipped it: «7.2 MB», formatted for English with
+    ///   a point and always one decimal («5.0 MB»). Read back so it can be
+    ///   said again with a comma. Megabytes only: a figure in another unit is
+    ///   not quoted as one.
+    private static func megabytes(_ params: [String: String]?, _ name: String) -> Double? {
+        if let raw = params?["\(name)Bytes"], let bytes = Int(raw), bytes > 0 {
+            return Double(bytes) / (1024 * 1024)
+        }
+        let parts = params?[name]?.split(separator: " ") ?? []
         guard parts.count == 2, parts[1] == "MB",
               let value = Double(parts[0]), value.isFinite, value > 0 else { return nil }
         return value
