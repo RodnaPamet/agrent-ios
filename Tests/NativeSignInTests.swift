@@ -113,9 +113,27 @@ final class AppleSignInTests: XCTestCase {
         XCTAssertNotEqual(AppleSignIn.message(status: 426, code: nil), AppleSignIn.Text.failed,
                           "an old build was told to try again")
         for text in [AppleSignIn.Text.notAvailable, AppleSignIn.Text.failed,
-                     AppleSignIn.Text.emailRequired, AppleSignIn.Text.unavailableHere] {
+                     AppleSignIn.Text.emailRequired, AppleSignIn.Text.unavailableHere,
+                     AppleSignIn.Text.secondFactor] {
             XCTAssertTrue(text.hasSuffix("."), text)
         }
+    }
+
+    /// A farm that requires a second factor refuses Apple sign-in with a
+    /// coded 403 in the canonical envelope (agri-saas #1644), not the bare
+    /// `invalid_grant`. It names Google and Microsoft, which can ask for the
+    /// code, rather than «try again», which cannot help, and rather than the
+    /// house sentence for the code, which tells a signed-in session to sign in
+    /// again.
+    func testAFarmThatRequiresASecondFactorSendsAppleToGoogleOrMicrosoft() {
+        let body = #"{"error":{"code":"MFA_REQUIRED","message":"This farm requires a second factor, which Apple sign-in cannot yet collect. Sign in with Google or Microsoft, or from the web."}}"#
+        let code = APIClient.envelope(from: Data(body.utf8))?.code
+        XCTAssertEqual(code, "MFA_REQUIRED", "precondition: the canonical envelope's code")
+        XCTAssertEqual(AppleSignIn.message(status: 403, code: code), AppleSignIn.Text.secondFactor)
+        XCTAssertNotEqual(AppleSignIn.Text.secondFactor, UserMessage.bulgarian["MFA_REQUIRED"])
+        // Positive control: any other 403 still gets the house words.
+        XCTAssertEqual(AppleSignIn.message(status: 403, code: "FORBIDDEN"),
+                       UserMessage.httpText(status: 403, code: "FORBIDDEN", message: nil))
     }
 
     func testTheProvidersAreTheServersIds() {
