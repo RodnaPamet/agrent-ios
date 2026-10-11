@@ -263,8 +263,10 @@ struct CalculatorView: View {
             if let value = row.perArea.standingValuePerDca {
                 ValueRow("Стойност / дка") { Text(Num.text(value)) }
             }
-            if let cost = row.perArea.attributableCostPerDca {
-                ValueRow("Разход / дка") { Text(Num.text(cost)) }
+            if let cost = row.perArea.costText {
+                ValueRow("Разход / дка") { Text(cost) }
+            } else if let refusal = row.perArea.costRefusalText {
+                RefusalNote(text: refusal)
             }
             if let margin = row.perArea.marginText {
                 ValueRow("Марж / дка") { Text(margin) }
