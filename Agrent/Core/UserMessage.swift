@@ -536,6 +536,25 @@ enum UserMessage {
         // grows a retry.
         "FORBIDDEN": "Нямате права за това действие.",
 
+        // ── The middleware's own 403s (agri-saas `src/middleware.ts`) ──
+        //
+        // Reachable on EVERY route, and each carries an English sentence as
+        // its message, which `httpText` would have shown: of the codes
+        // documented on the routes this app builds, these three were the
+        // only ones without a sentence here (measured 2026-10-11).
+        //
+        // The route is admin-only and this member's role is not.
+        "ADMIN_REQUIRED": "Това е достъпно само за администратор на стопанството.",
+        // The session signed in but has not cleared its second factor, and
+        // this app has no step to clear it (agrent-ios#274). Says so, rather
+        // than suggesting a retry that cannot help.
+        "MFA_REQUIRED":
+            "Профилът ви изисква двуфакторно потвърждение, а то още не се поддържа в приложението.",
+        // A cross-site admin request. The app sends a bearer from no site,
+        // so this should be unreachable; the server says a retry will not
+        // help, and the sentence does not offer one.
+        "CSRF_BLOCKED": "Сървърът отказа заявката от съображения за сигурност.",
+
         // 409s that are not a stale edit (#240, agri-saas #1489): a collision
         // with something that already exists, so the remedy is a different
         // name or the thing already there, never a re-read.
