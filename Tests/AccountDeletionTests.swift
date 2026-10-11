@@ -65,6 +65,11 @@ final class AccountDeletionTests: XCTestCase {
         let text = UserMessage.httpText(status: 404, code: "ACCOUNT_ALREADY_ERASED",
                                         message: "This account has already been erased.")
         XCTAssertEqual(text, "Профилът вече е изтрит и не може да бъде възстановен.")
+
+        // A suspended (or terminated) account is told so, not that it lacks a
+        // right: the server's message is the bare code, which is no sentence.
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: "ACCOUNT_SUSPENDED", message: "ACCOUNT_SUSPENDED"),
+                       "Профилът Ви е спрян и не може да се използва.")
     }
 
     // MARK: - Fired from one place
