@@ -1293,15 +1293,14 @@ actor APIClient {
                 // 401 is the whole set of "this token is dead". Anything
                 // else means the server did not answer the question, and a
                 // question that was not answered is not a no.
+                // A SUSPENSION ARRIVES HERE AS A 401 TOO, not as its own code:
+                // it revokes every live session, and this route answers every
+                // refusal identically by design. The suspended screen comes
+                // from the next sign-in's `/me`, which can say why (#283).
                 guard status == 401 else {
                     Log.auth.error(
                         "token refresh failed but NOT rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), keeping tokens"
                     )
-                    // A suspension, should the refresh ever be the route that
-                    // says it: the same mark as any other route's (#283).
-                    if status == 403, code == "ACCOUNT_SUSPENDED" {
-                        markSuspended(for: seen, saysDeletion: false, erasesAt: nil)
-                    }
                     // A CODE, so the sentence can say what happened.
                     //
                     // Without one this threw a bare 400 and `UserMessage`
