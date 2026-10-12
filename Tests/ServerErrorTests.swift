@@ -296,4 +296,69 @@ final class SubscriptionRefusalTests: XCTestCase {
                                             message: "Forbidden (see plan_limit_exceeded docs)"),
                        "Нямате права за това действие.")
     }
+
+    /// The plan's refusals as codes (agri-saas #1679, agrent-ios #286), as
+    /// they arrive: still leading their `message` with the old English token
+    /// for one release, and next in the reader's language (agri-saas #1677).
+    /// The code decides either way, so neither change on the server's side
+    /// can turn a limit into «Нямате права».
+    func testThePlansRefusalsAreSaidByCode() {
+        let refusals: [(code: String, legacy: String, params: [String: String])] = [
+            ("PLAN_LIMIT_EXCEEDED", "plan_limit_exceeded: FREE plan allows 1 location(s); tenant currently has 1.",
+             ["plan": "FREE", "resource": "location", "limit": "1", "current": "1"]),
+            ("AI_BUDGET_EXCEEDED", "ai_budget_exceeded: FREE plan allows 1000 AI tokens per month.",
+             ["plan": "FREE", "limit": "1000", "used": "1000"]),
+            ("AI_TIER_NOT_ALLOWED", "ai_tier_not_allowed: FREE plan allows up to fast.",
+             ["plan": "FREE", "tier": "deep", "ceiling": "fast"]),
+            ("MODULE_DISABLED", "module_disabled: the trends module is disabled.", ["module": "trends"]),
+            // What a #1688 server sends when the plan leaves a module out. Not
+            // "tenant": that one names an administrator, which is right for it
+            // and is tested on its own below.
+            ("MODULE_DISABLED", "module_disabled: TRENDS", ["module": "TRENDS", "reason": "plan"]),
+            ("BILLING_UNAVAILABLE", "billing_unavailable: plan changes are not available.", ["mode": "self_hosted"]),
+        ]
+        var said = Set<String>()
+        for refusal in refusals {
+            let english = UserMessage.httpText(status: 403, code: refusal.code,
+                                               message: refusal.legacy, params: refusal.params)
+            let translated = UserMessage.httpText(status: 403, code: refusal.code,
+                                                  message: "Достигнат е лимит.", params: refusal.params)
+            XCTAssertEqual(english, translated, "\(refusal.code) depends on its message")
+            XCTAssertNotEqual(english, "Нямате права за това действие.", "\(refusal.code) reads as a missing right")
+            XCTAssertNotEqual(english, refusal.legacy, "\(refusal.code) reaches the screen in English")
+            XCTAssertFalse(english.localizedCaseInsensitiveContains("опитайте"), "\(refusal.code) offers a retry that cannot work")
+            said.insert(english)
+        }
+        XCTAssertEqual(said.count, refusals.count, "two conditions with different remedies share a sentence")
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: "PLAN_LIMIT_EXCEEDED", message: nil),
+                       UserMessage.planLimitReached, "the coded limit and the legacy prefix say different things")
+        // Without `reason`, none of them sends the farmer to an administrator:
+        // a module is also refused when the PLAN leaves it out, where no
+        // administrator can help.
+        XCTAssertFalse(said.contains { $0.localizedCaseInsensitiveContains("администратор") })
+    }
+
+    /// `MODULE_DISABLED` names the administrator only when `params.reason`
+    /// says the farm switched the module off (agri-saas #1688). The plan
+    /// half, an absent reason and one this app does not know all name
+    /// nobody, whatever the message says.
+    func testOnlyAFarmsOwnSwitchSendsTheFarmerToAnAdministrator() {
+        func said(_ reason: String?) -> String {
+            var params = ["module": "GRAIN"]
+            params["reason"] = reason
+            return UserMessage.httpText(status: 403, code: "MODULE_DISABLED",
+                                        message: "module_disabled: GRAIN", params: params)
+        }
+        XCTAssertTrue(said("tenant").contains("Администратор на стопанството"))
+        XCTAssertEqual(said(nil), UserMessage.bulgarian["MODULE_DISABLED"],
+                       "an absent reason is not the neutral sentence")
+        for reason in ["plan", nil, "seat"] {
+            XCTAssertFalse(said(reason).localizedCaseInsensitiveContains("администратор"),
+                           "reason \(reason ?? "absent") sends the farmer to someone who cannot help")
+        }
+        XCTAssertTrue(said("plan").contains("абонаментния план"))
+        // Positive control: the three are three different sentences.
+        XCTAssertEqual(Set([said("tenant"), said("plan"), said(nil)]).count, 3)
+        XCTAssertEqual(said(nil), said("seat"), "an unknown reason is not the neutral sentence")
+    }
 }

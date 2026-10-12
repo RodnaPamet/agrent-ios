@@ -275,6 +275,23 @@ enum UserMessage {
     /// means.
     static func interpolated(code: String, params: [String: String]?) -> String? {
         switch code {
+        case "MODULE_DISABLED":
+            // `params.reason` says which half of AVAILABLE refused (agri-saas
+            // #1688): the remedies differ, and only "tenant" has someone who
+            // can lift it. Anything else, absent included, is the table's
+            // sentence, which names nobody and is true of both.
+            switch params?["reason"] {
+            case "tenant":
+                // Indefinite: a farm can have several administrators, and the
+                // reader may be one. The switch is the web's (admin/modules);
+                // this app has none, so the sentence says where it is.
+                return "Тази част от приложението е изключена за стопанството. "
+                     + "Администратор на стопанството може да я включи от уеб приложението."
+            case "plan":
+                return "Тази част от приложението не е включена в абонаментния план на стопанството."
+            default:
+                return nil
+            }
         case "FARM_NAME_TOO_LONG":
             // The bound is the server's (`params.max`, agri-saas #1388) — it
             // was a hardcoded 120 here, which would have gone on saying 120
@@ -624,6 +641,38 @@ enum UserMessage {
         // right, which would send them to the owner for the wrong reason.
         "PAST_DUE_RESTRICTED":
             "Тази функция е спряна, защото плащането за абонамента на стопанството не е преминало.",
+
+        // The plan's other refusals, coded since agri-saas #1679 (agrent-ios
+        // #286). The plan limit was told apart by its message's leading
+        // token only (`planLimitMarker`, read in `httpText` for servers from
+        // before). Under the same 3.1.1 rule as above: no plan picker, no
+        // "upgrade" — and each says what is true of ITS condition, because
+        // the five differ in what, if anything, changes it.
+        //
+        // Waiting changes nothing. `params` names the resource only in wire
+        // words, so the sentence does not quote it.
+        "PLAN_LIMIT_EXCEEDED": planLimitReached,
+        // The one that waiting does lift: a token cap per UTC month, so
+        // «next month» is honest. Not «from the 1st»: in Bulgaria the UTC
+        // month turns at 02:00 or 03:00 that day.
+        "AI_BUDGET_EXCEEDED":
+            "Месечният лимит за функциите с изкуствен интелект е изчерпан. "
+            + "Той се подновява в началото на следващия месец.",
+        // Refused on capability, not spend, so the month changes nothing.
+        // The app picks no tier, so there is no other choice to point at.
+        "AI_TIER_NOT_ALLOWED":
+            "Тази функция с изкуствен интелект не е включена в абонаментния план на стопанството.",
+        // Refused when the module is not AVAILABLE, which is two conditions
+        // in one code: the farm switched it off (an administrator can switch
+        // it back on), or the plan does not include it (no administrator
+        // can). `params.reason` tells them apart (`interpolated`); this is
+        // for a refusal without it, so it names nobody: sending a farmer to
+        // an administrator who cannot help is the #241 mistake. «Не е
+        // включена» holds for both.
+        "MODULE_DISABLED": "Тази част от приложението не е включена за стопанството.",
+        // A self-hosted installation, which has no plans at all. Nothing
+        // the farmer or a retry can change, and nothing to offer.
+        "BILLING_UNAVAILABLE": "В тази инсталация на Agrent няма абонаментни планове.",
 
         // Creating a farm (`POST /api/me/farms`, agri-saas#1362) — codes
         // rather than prose BY DESIGN, so the words are this app's. The two
