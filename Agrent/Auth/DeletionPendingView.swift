@@ -20,11 +20,12 @@ import SwiftUI
 ///
 /// ── When it cannot be restored ──
 ///
-/// Erased already, or suspended by a moderator (a termination runs the same
-/// erasure and the person cannot cancel it): the refusal is said and only
-/// Изход is left (`AuthClient.restoreRefused`). A suspended account should
-/// not reach this screen at all — `/me` refuses it — so that is defence, not
-/// the design.
+/// Erased already, or an erasure a moderator started by terminating the
+/// account (`ACCOUNT_TERMINATED`): the refusal is said and only Изход is left
+/// (`AuthClient.restoreRefused`). A suspended account does not reach this
+/// screen — `/me` refuses it — but a lifted suspension leaves the
+/// moderator's erasure running, and `/me` then reports it like the person's
+/// own.
 struct DeletionPendingView: View {
     let erasesAt: Date?
 

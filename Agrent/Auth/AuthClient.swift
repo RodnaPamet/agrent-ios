@@ -260,10 +260,21 @@ final class AuthClient: NSObject {
     /// refusal — final when no retry can help (`restoreRefused`).
     private(set) var restoringAccount = false
     private(set) var restoreError: String?
-    /// The account is past restoring: erased already, or suspended by a
-    /// moderator, whose termination runs the same erasure and cannot be
-    /// cancelled by the person. The screen then offers only Изход.
+    /// The account is past restoring: erased already, or its erasure is a
+    /// moderator's termination, which the person cannot cancel. The screen
+    /// then offers only Изход.
     private(set) var restoreRefused = false
+
+    /// The cancel's refusals that a retry cannot change.
+    /// - `ACCOUNT_ALREADY_ERASED`: past the grace period.
+    /// - `ACCOUNT_TERMINATED`: a moderator started the erasure (agri-saas
+    ///   #1670). It reaches this screen when a suspension is lifted with the
+    ///   erasure still running, or when the termination lands while the
+    ///   screen is open; that cancel used to answer `ACCOUNT_SUSPENDED`.
+    /// - `ACCOUNT_SUSPENDED`: what a server from before #1670 sends for both.
+    static let finalRestoreRefusals: Set<String> = [
+        "ACCOUNT_ALREADY_ERASED", "ACCOUNT_TERMINATED", "ACCOUNT_SUSPENDED",
+    ]
 
     /// Cancel the pending deletion (`DELETE /api/account/deletion`) and open
     /// the app. `wasRequested: false` — nothing was pending — is success.
@@ -304,8 +315,8 @@ final class AuthClient: NSObject {
         } catch {
             guard SessionEpoch.isCurrent(epoch) else { return }
             restoreError = UserMessage.text(for: error)
-            if case APIClient.APIError.http(_, let code, _, _, _) = error,
-               code == "ACCOUNT_ALREADY_ERASED" || code == "ACCOUNT_SUSPENDED" {
+            if case APIClient.APIError.http(_, let code?, _, _, _) = error,
+               Self.finalRestoreRefusals.contains(code) {
                 restoreRefused = true
             }
             Log.auth.error("account restore failed: \(Log.summary(for: error), privacy: .public)")

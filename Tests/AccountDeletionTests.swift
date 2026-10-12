@@ -78,6 +78,23 @@ final class AccountDeletionTests: XCTestCase {
                        "Профилът Ви е спрян и не може да се използва.")
     }
 
+    /// An erasure a moderator started cannot be cancelled by the person
+    /// (agri-saas #1670): said in Bulgarian, with no appeal in it, and final,
+    /// so the recovery screen takes «Възстанови профила» away instead of
+    /// offering a retry the server refuses every time.
+    func testATerminationIsAFinalRefusal() {
+        let refusal = APIClient.envelope(from: Data(
+            #"{"error":{"code":"ACCOUNT_TERMINATED","message":"ACCOUNT_TERMINATED"}}"#.utf8))
+        XCTAssertEqual(refusal?.code, "ACCOUNT_TERMINATED", "precondition: the envelope's code")
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: refusal?.code, message: refusal?.message),
+                       "Профилът се изтрива по решение на модератор. Не можете да спрете изтриването.")
+
+        XCTAssertEqual(AuthClient.finalRestoreRefusals,
+                       ["ACCOUNT_ALREADY_ERASED", "ACCOUNT_TERMINATED", "ACCOUNT_SUSPENDED"])
+        // A refusal a retry can change keeps the button.
+        XCTAssertFalse(AuthClient.finalRestoreRefusals.contains("RATE_LIMITED"))
+    }
+
     // MARK: - The recovery screen's signal
 
     /// `user.deletion` on `/me`: read when set, and absent, null or
