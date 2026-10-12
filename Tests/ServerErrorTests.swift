@@ -322,7 +322,7 @@ final class SubscriptionRefusalTests: XCTestCase {
             XCTAssertEqual(english, translated, "\(refusal.code) depends on its message")
             XCTAssertNotEqual(english, "Нямате права за това действие.", "\(refusal.code) reads as a missing right")
             XCTAssertNotEqual(english, refusal.legacy, "\(refusal.code) reaches the screen in English")
-            XCTAssertFalse(english.contains("Опитайте"), "\(refusal.code) offers a retry that cannot work")
+            XCTAssertFalse(english.localizedCaseInsensitiveContains("опитайте"), "\(refusal.code) offers a retry that cannot work")
             said.insert(english)
         }
         XCTAssertEqual(said.count, refusals.count, "two conditions with different remedies share a sentence")
