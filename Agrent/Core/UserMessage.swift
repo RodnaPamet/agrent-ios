@@ -570,6 +570,11 @@ enum UserMessage {
         // `getSessionOrThrow`). Its message is the bare code, so without this
         // the person was told «Нямате права», as if a role were missing.
         "ACCOUNT_SUSPENDED": "Профилът Ви е спрян и не може да се използва.",
+        // The cancel of an erasure a moderator started, by terminating the
+        // account (agri-saas #1670/#1671). Its own code so that nothing here
+        // reads as an appeal: says who decided and that the person cannot
+        // stop it — true whether the account is still suspended or not.
+        "ACCOUNT_TERMINATED": "Профилът се изтрива по решение на модератор. Не можете да спрете изтриването.",
 
         // 409s that are not a stale edit (#240, agri-saas #1489): a collision
         // with something that already exists, so the remedy is a different
