@@ -52,9 +52,15 @@ struct DeletionPendingView: View {
                     .multilineTextAlignment(.center)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityFocused($titleFocused)
-                Text(Words.pending(erasesAt: erasesAt))
-                    .foregroundStyle(Palette.secondaryText)
-                    .multilineTextAlignment(.center)
+                // Says the account can still be restored, so it goes with the
+                // button: left above a final refusal, it read "you can restore
+                // it" right before "you cannot stop it" — and, once erased, a
+                // date already past.
+                if !auth.restoreRefused {
+                    Text(Words.pending(erasesAt: erasesAt))
+                        .foregroundStyle(Palette.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
 
                 if let error = auth.restoreError {
                     Text(error)
