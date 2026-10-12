@@ -84,7 +84,7 @@ enum FarmProfileText: String, CaseIterable, Sendable {
         case .producerName: "Земеделски производител (име/фирма)"
         case .egn: "ЕГН"
         case .eik: "ЕИК"
-        case .urn: "УРН (регистрационен номер на стопанина)"
+        case .urn: "УРН в ИСАК (ДФЗ)"
         case .address: "Адрес по регистрация / на управление"
         case .municipality: "Община"
         case .settlement: "Населено място"
@@ -105,9 +105,11 @@ enum FarmProfileText: String, CaseIterable, Sendable {
             // The web shows the encrypted note INSTEAD of this hint (its
             // ternary checks `encrypted` first), so its own УРН hint never
             // renders. Both are shown here: the hint is the one sentence that
-            // stops a farmer typing their ЕИК into the УРН box.
-            "Съхранява се криптирано. Номерът на стопанството в регистъра на "
-                + "земеделските стопани — различен от ЕИК и ЕГН."
+            // stops a farmer typing their ЕИК into the УРН box. ДФЗ's УРН from
+            // ИСАК, by the owner's ruling (agri-saas #1707); `fields.urn` and
+            // `fieldHints.urn` are pinned there as a pair (#1710).
+            "Съхранява се криптирано. Уникалният регистрационен номер от ДФЗ (ИСАК) "
+                + "— различен от ЕИК и ЕГН."
         case .registrationPlace:
             "Където е регистрирано стопанството. Обикновено това е и складът за "
                 + "растителна продукция — самият склад се записва за всеки парцел поотделно."

@@ -92,7 +92,8 @@ struct FarmProfileView: View {
 
     static let heading = "Идентификация на стопанството"
 
-    /// The web's paragraph under the card heading, verbatim.
+    /// The web's paragraph under the card heading, verbatim: `admin.farmProfile.about`,
+    /// pinned on agri-saas (#1710).
     static let about = "Данните се отпечатват в „ДНЕВНИК за проведените растителнозащитни "
         + "мероприятия и торене“ (Приложение 1 към заповед № РД 11-3194/31.12.2021 г. "
         + "на БАБХ). Всички полета са незадължителни — празните остават като точки във формата."
