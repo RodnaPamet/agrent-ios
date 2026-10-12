@@ -15,6 +15,7 @@ import SwiftUI
 /// says so (`AuthClient.submitCode`).
 struct SecondFactorView: View {
     @Environment(AuthClient.self) private var auth
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var code = ""
     @FocusState private var fieldFocused: Bool
 
@@ -98,7 +99,9 @@ struct SecondFactorView: View {
                 }
                 .controlSize(.large)
             }
-            .padding(.horizontal, 24)
+            // None of the 24 at the accessibility sizes, as `SuspendedView`:
+            // there one long word is wider than what it leaves.
+            .padding(.horizontal, typeSize.isAccessibilitySize ? 0 : 24)
             .padding()
         }
         .onAppear { fieldFocused = true }

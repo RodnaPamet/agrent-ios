@@ -190,6 +190,8 @@ enum A11y {
         static let deleteAccount = spokenNames("Изтрий профила", "Delete account", "Delete profile")
         /// The recovery screen's way back (#281).
         static let restoreAccount = spokenNames("Възстанови профила", "Restore account", "Restore profile")
+        /// The suspended screen's cancel of the person's own deletion (#283).
+        static let cancelDeletion = spokenNames("Отмени изтриването", "Cancel deletion", "Stop deletion")
     }
 
     /// Join facts as speech: nils and blanks dropped, comma-separated, one

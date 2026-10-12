@@ -18,6 +18,18 @@ struct Tokens: Codable, Equatable, Sendable {
     /// tokens. Carried across a refresh by `APIClient`. Absent on every pair
     /// stored before it existed, which reads as not pending.
     var termsPending: Bool? = nil
+    /// This session's account is suspended (agrent-ios#283): a route answered
+    /// `403 ACCOUNT_SUSPENDED`, which a new sign-in only meets again. Kept
+    /// with the pair for the reason `termsPending` is — a relaunch opens on
+    /// the suspended screen, Изход takes it away — and taken off by the first
+    /// `/me` that answers 200, which is the suspension lifted. Set and cleared
+    /// by `APIClient` only.
+    var suspended: Bool? = nil
+    /// While suspended: when the person's OWN deletion runs. `/me`'s refusal
+    /// carries it only when the server would honour a cancel (agri-saas
+    /// #1670), so nil is both "none pending" and "not theirs to stop" — and
+    /// the suspended screen offers the stop for a date, never without one.
+    var suspendedErasesAt: Date? = nil
 
     var isExpired: Bool { Date() >= expiresAt.addingTimeInterval(-30) }
 }

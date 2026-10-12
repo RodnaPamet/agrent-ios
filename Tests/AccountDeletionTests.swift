@@ -89,10 +89,10 @@ final class AccountDeletionTests: XCTestCase {
         XCTAssertEqual(UserMessage.httpText(status: 403, code: refusal?.code, message: refusal?.message),
                        "Профилът се изтрива по решение на модератор. Не можете да спрете изтриването.")
 
-        XCTAssertEqual(AuthClient.finalRestoreRefusals,
+        XCTAssertEqual(AuthClient.finalCancelRefusals,
                        ["ACCOUNT_ALREADY_ERASED", "ACCOUNT_TERMINATED", "ACCOUNT_SUSPENDED"])
         // A refusal a retry can change keeps the button.
-        XCTAssertFalse(AuthClient.finalRestoreRefusals.contains("RATE_LIMITED"))
+        XCTAssertFalse(AuthClient.finalCancelRefusals.contains("RATE_LIMITED"))
     }
 
     // MARK: - The recovery screen's signal
@@ -141,7 +141,7 @@ final class AccountDeletionTests: XCTestCase {
         XCTAssertEqual(auth.state, .codeRequired)
         await auth.restoreAccount()
         XCTAssertEqual(auth.state, .codeRequired, "a restore ran outside the recovery screen")
-        XCTAssertFalse(auth.restoringAccount)
+        XCTAssertFalse(auth.cancellingDeletion)
     }
 
     // MARK: - Fired from one place
@@ -169,7 +169,8 @@ final class AccountDeletionTests: XCTestCase {
         }
         XCTAssertEqual(senders, ["Auth/AuthClient.swift"])
         XCTAssertEqual(askers, ["Account/DeleteAccountView.swift"])
-        // And the cancel, from the recovery screen's one action.
+        // And the cancel: the recovery screen's «Възстанови профила» and the
+        // suspended screen's «Спри изтриването», both through AuthClient.
         XCTAssertEqual(cancellers, ["Auth/AuthClient.swift"])
     }
 }

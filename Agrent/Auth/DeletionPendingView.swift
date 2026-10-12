@@ -22,7 +22,7 @@ import SwiftUI
 ///
 /// Erased already, or an erasure a moderator started by terminating the
 /// account (`ACCOUNT_TERMINATED`): the refusal is said and only Изход is left
-/// (`AuthClient.restoreRefused`). A suspended account does not reach this
+/// (`AuthClient.cancelRefused`). A suspended account does not reach this
 /// screen — `/me` refuses it — but a lifted suspension leaves the
 /// moderator's erasure running, and `/me` then reports it like the person's
 /// own.
@@ -30,6 +30,7 @@ struct DeletionPendingView: View {
     let erasesAt: Date?
 
     @Environment(AuthClient.self) private var auth
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var confirmingSignOut = false
     /// Where VoiceOver is put: on the title once the screen swap settles —
     /// it replaces the whole app, after a browser sheet or under a farm that
@@ -56,13 +57,13 @@ struct DeletionPendingView: View {
                 // button: left above a final refusal, it read "you can restore
                 // it" right before "you cannot stop it" — and, once erased, a
                 // date already past.
-                if !auth.restoreRefused {
+                if !auth.cancelRefused {
                     Text(Words.pending(erasesAt: erasesAt))
                         .foregroundStyle(Palette.secondaryText)
                         .multilineTextAlignment(.center)
                 }
 
-                if let error = auth.restoreError {
+                if let error = auth.cancelError {
                     Text(error)
                         .font(.subheadline)
                         .foregroundStyle(Palette.error)
@@ -70,11 +71,11 @@ struct DeletionPendingView: View {
                 }
 
                 VStack(spacing: 12) {
-                    if !auth.restoreRefused {
+                    if !auth.cancelRefused {
                         Button {
                             Task { await auth.restoreAccount() }
                         } label: {
-                            if auth.restoringAccount {
+                            if auth.cancellingDeletion {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
                                     .accessibilityLabel(Words.restoring)
@@ -86,7 +87,7 @@ struct DeletionPendingView: View {
                             }
                         }
                         .prominentButton()
-                        .disabled(auth.restoringAccount)
+                        .disabled(auth.cancellingDeletion)
                         .accessibilityInputLabels(A11y.Spoken.restoreAccount)
                     }
 
@@ -100,14 +101,16 @@ struct DeletionPendingView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(auth.restoringAccount)
+                    .disabled(auth.cancellingDeletion)
                     .accessibilityInputLabels(A11y.Spoken.signOut)
                     .accessibilityFocused($signOutFocused)
                     .signOutConfirmation(isPresented: $confirmingSignOut)
                 }
                 .controlSize(.large)
             }
-            .padding(.horizontal, 24)
+            // None of the 24 at the accessibility sizes, as `SuspendedView`:
+            // there one long word is wider than what it leaves.
+            .padding(.horizontal, typeSize.isAccessibilitySize ? 0 : 24)
             .padding()
         }
         .task {
@@ -117,12 +120,12 @@ struct DeletionPendingView: View {
         // A final refusal removes «Възстанови профила» from under the cursor;
         // Изход is the only way on, so that is where it goes. The refusal
         // itself is announced below.
-        .onChange(of: auth.restoreRefused) { _, refused in
+        .onChange(of: auth.cancelRefused) { _, refused in
             if refused { signOutFocused = true }
         }
         // A refusal is said, not only shown — at high priority, because the
         // same update swaps the spinner back under VoiceOver's cursor.
-        .onChange(of: auth.restoreError) { _, error in
+        .onChange(of: auth.cancelError) { _, error in
             guard let error else { return }
             var line = AttributedString(error)
             line.accessibilitySpeechAnnouncementPriority = .high
