@@ -275,6 +275,20 @@ enum UserMessage {
     /// means.
     static func interpolated(code: String, params: [String: String]?) -> String? {
         switch code {
+        case "MODULE_DISABLED":
+            // `params.reason` says which half of AVAILABLE refused (agri-saas
+            // #1688): the remedies differ, and only "tenant" has someone who
+            // can lift it. Anything else, absent included, is the table's
+            // sentence, which names nobody and is true of both.
+            switch params?["reason"] {
+            case "tenant":
+                return "Тази част от приложението е изключена за стопанството. "
+                     + "Администраторът на стопанството може да я включи."
+            case "plan":
+                return "Тази част от приложението не е включена в абонаментния план на стопанството."
+            default:
+                return nil
+            }
         case "FARM_NAME_TOO_LONG":
             // The bound is the server's (`params.max`, agri-saas #1388) — it
             // was a hardcoded 120 here, which would have gone on saying 120
@@ -648,10 +662,10 @@ enum UserMessage {
         // Refused when the module is not AVAILABLE, which is two conditions
         // in one code: the farm switched it off (an administrator can switch
         // it back on), or the plan does not include it (no administrator
-        // can). `assertModuleEnabled` in agri-saas `usecases/modules.ts`, and
-        // `params` carries only `module`. So it names nobody: sending a
-        // farmer to an administrator who cannot help is the #241 mistake.
-        // «Не е включена» holds for both.
+        // can). `params.reason` tells them apart (`interpolated`); this is
+        // for a refusal without it, so it names nobody: sending a farmer to
+        // an administrator who cannot help is the #241 mistake. «Не е
+        // включена» holds for both.
         "MODULE_DISABLED": "Тази част от приложението не е включена за стопанството.",
         // A self-hosted installation, which has no plans at all. Nothing
         // the farmer or a retry can change, and nothing to offer.

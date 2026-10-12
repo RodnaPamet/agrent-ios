@@ -328,9 +328,31 @@ final class SubscriptionRefusalTests: XCTestCase {
         XCTAssertEqual(said.count, refusals.count, "two conditions with different remedies share a sentence")
         XCTAssertEqual(UserMessage.httpText(status: 403, code: "PLAN_LIMIT_EXCEEDED", message: nil),
                        UserMessage.planLimitReached, "the coded limit and the legacy prefix say different things")
-        // None of them sends the farmer to an administrator. A module is also
-        // refused when the PLAN leaves it out, where no administrator can
-        // help, and the code does not say which (agri-saas `modules.ts`).
+        // Without `reason`, none of them sends the farmer to an administrator:
+        // a module is also refused when the PLAN leaves it out, where no
+        // administrator can help.
         XCTAssertFalse(said.contains { $0.localizedCaseInsensitiveContains("администратор") })
+    }
+
+    /// `MODULE_DISABLED` names the administrator only when `params.reason`
+    /// says the farm switched the module off (agri-saas #1688). The plan
+    /// half, an absent reason and one this app does not know all name
+    /// nobody, whatever the message says.
+    func testOnlyAFarmsOwnSwitchSendsTheFarmerToAnAdministrator() {
+        func said(_ reason: String?) -> String {
+            var params = ["module": "GRAIN"]
+            params["reason"] = reason
+            return UserMessage.httpText(status: 403, code: "MODULE_DISABLED",
+                                        message: "module_disabled: GRAIN", params: params)
+        }
+        XCTAssertTrue(said("tenant").contains("Администраторът на стопанството"))
+        for reason in ["plan", nil, "seat"] {
+            XCTAssertFalse(said(reason).localizedCaseInsensitiveContains("администратор"),
+                           "reason \(reason ?? "absent") sends the farmer to someone who cannot help")
+        }
+        XCTAssertTrue(said("plan").contains("абонаментния план"))
+        // Positive control: the three are three different sentences.
+        XCTAssertEqual(Set([said("tenant"), said("plan"), said(nil)]).count, 3)
+        XCTAssertEqual(said(nil), said("seat"), "an unknown reason is not the neutral sentence")
     }
 }
