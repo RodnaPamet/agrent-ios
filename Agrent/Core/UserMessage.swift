@@ -625,6 +625,36 @@ enum UserMessage {
         "PAST_DUE_RESTRICTED":
             "Тази функция е спряна, защото плащането за абонамента на стопанството не е преминало.",
 
+        // The plan's other refusals, coded since agri-saas #1679 (agrent-ios
+        // #286). The plan limit was told apart by its message's leading
+        // token only (`planLimitMarker`, read in `httpText` for servers from
+        // before). Under the same 3.1.1 rule as above: no plan picker, no
+        // "upgrade" — and each says what is true of ITS condition, because
+        // the five differ in what, if anything, changes it.
+        //
+        // Waiting changes nothing. `params` names the resource only in wire
+        // words, so the sentence does not quote it.
+        "PLAN_LIMIT_EXCEEDED": planLimitReached,
+        // The one that waiting does lift: a token cap per UTC month, so
+        // «next month» is honest. Not «from the 1st»: in Bulgaria the UTC
+        // month turns at 02:00 or 03:00 that day.
+        "AI_BUDGET_EXCEEDED":
+            "Месечният лимит за функциите с изкуствен интелект е изчерпан. "
+            + "Той се подновява в началото на следващия месец.",
+        // Refused on capability, not spend, so the month changes nothing.
+        // The app picks no tier, so there is no other choice to point at.
+        "AI_TIER_NOT_ALLOWED":
+            "Тази функция с изкуствен интелект не е включена в абонаментния план на стопанството.",
+        // The only one of the five a farm can lift without a plan change,
+        // so the only one that names who can — the opposite of the plan
+        // limit, which no administrator lifts.
+        "MODULE_DISABLED":
+            "Тази част от приложението е изключена за стопанството. "
+            + "Администраторът на стопанството може да я включи.",
+        // A self-hosted installation, which has no plans at all. Nothing
+        // the farmer or a retry can change, and nothing to offer.
+        "BILLING_UNAVAILABLE": "В тази инсталация на Agrent няма абонаментни планове.",
+
         // Creating a farm (`POST /api/me/farms`, agri-saas#1362) — codes
         // rather than prose BY DESIGN, so the words are this app's. The two
         // ЕИК lines are the web wizard's own (`farmWizard.eikLooksLikeEgn`,
