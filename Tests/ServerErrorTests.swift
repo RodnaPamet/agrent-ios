@@ -328,9 +328,9 @@ final class SubscriptionRefusalTests: XCTestCase {
         XCTAssertEqual(said.count, refusals.count, "two conditions with different remedies share a sentence")
         XCTAssertEqual(UserMessage.httpText(status: 403, code: "PLAN_LIMIT_EXCEEDED", message: nil),
                        UserMessage.planLimitReached, "the coded limit and the legacy prefix say different things")
-        // Only the module names who can lift it; the limit must not.
-        XCTAssertTrue(UserMessage.httpText(status: 403, code: "MODULE_DISABLED", message: nil)
-            .contains("Администраторът"))
-        XCTAssertFalse(UserMessage.planLimitReached.contains("Администратор"))
+        // None of them sends the farmer to an administrator. A module is also
+        // refused when the PLAN leaves it out, where no administrator can
+        // help, and the code does not say which (agri-saas `modules.ts`).
+        XCTAssertFalse(said.contains { $0.localizedCaseInsensitiveContains("администратор") })
     }
 }

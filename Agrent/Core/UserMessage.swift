@@ -645,12 +645,14 @@ enum UserMessage {
         // The app picks no tier, so there is no other choice to point at.
         "AI_TIER_NOT_ALLOWED":
             "Тази функция с изкуствен интелект не е включена в абонаментния план на стопанството.",
-        // The only one of the five a farm can lift without a plan change,
-        // so the only one that names who can — the opposite of the plan
-        // limit, which no administrator lifts.
-        "MODULE_DISABLED":
-            "Тази част от приложението е изключена за стопанството. "
-            + "Администраторът на стопанството може да я включи.",
+        // Refused when the module is not AVAILABLE, which is two conditions
+        // in one code: the farm switched it off (an administrator can switch
+        // it back on), or the plan does not include it (no administrator
+        // can). `assertModuleEnabled` in agri-saas `usecases/modules.ts`, and
+        // `params` carries only `module`. So it names nobody: sending a
+        // farmer to an administrator who cannot help is the #241 mistake.
+        // «Не е включена» holds for both.
+        "MODULE_DISABLED": "Тази част от приложението не е включена за стопанството.",
         // A self-hosted installation, which has no plans at all. Nothing
         // the farmer or a retry can change, and nothing to offer.
         "BILLING_UNAVAILABLE": "В тази инсталация на Agrent няма абонаментни планове.",
