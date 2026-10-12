@@ -73,6 +73,10 @@ struct AgrentApp: App {
                     // The account is frozen until the person restores it or
                     // leaves (#281).
                     DeletionPendingView(erasesAt: erasesAt)
+                case .suspended(let erasesAt):
+                    // A moderator's suspension: every route refuses this
+                    // account, so nothing of a farm opens (#283).
+                    SuspendedView(erasesAt: erasesAt)
                 default:
                     SignInView()
                 }

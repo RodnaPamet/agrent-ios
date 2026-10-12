@@ -24,6 +24,11 @@ actor APIClient {
     static let shared = APIClient()
 
     private var refreshTask: Task<Tokens, Error>?
+    /// Cancels of the account's deletion that succeeded (#283). A `/me`
+    /// refusal sent before one and answered after it may still carry the
+    /// date the cancel just removed, so its word on the deletion is taken
+    /// only when no cancel landed while it was out.
+    private var deletionCancels = 0
 
     /// Prisma serialises through Next as `2026-09-12T10:00:00.000Z` — ISO 8601
     /// WITH fractional seconds. Foundation's `.iso8601` strategy rejects those
@@ -859,6 +864,7 @@ actor APIClient {
         guard !FarmPath.isUnscoped(path) else { throw APIError.noFarmOpen }
         var tokens = try currentTokens()
         if tokens.isExpired { tokens = try await refresh(tokens) }
+        let cancelsBefore = deletionCancels
 
         var (data, http) = try await perform(
             path, method, body, idempotencyKey, ifMatch, tokens, contentType, session: session)
@@ -870,6 +876,14 @@ actor APIClient {
 
         switch http.statusCode {
         case 200..<300:
+            // `/me` answered: whatever suspended this session has been lifted
+            // (agrent-ios#283). `/me` alone, because it is the read the
+            // server refuses a suspended account first and on purpose.
+            if path == MeAPI.path { liftSuspension(for: tokens) }
+            // The deletion cancelled: a suspended pair loses its date here,
+            // with the request's own final pair — a refresh this cancel made
+            // on the way has already rotated the one its caller saw.
+            if method == "DELETE", path == AccountDeletionAPI.path { deletionCancelled(for: tokens) }
             return (data, http)
         case 409:
             throw Self.conflict(from: data)
@@ -887,6 +901,16 @@ actor APIClient {
             // the session is marked and `AuthClient` shows the terms screen.
             if http.statusCode == 403, env?.code == "TERMS_ACCEPTANCE_REQUIRED" {
                 markTermsPending(for: tokens)
+            }
+            // THE SUSPENSION, the same way (agrent-ios#283): every route of a
+            // suspended account answers it, `/me` first, and signing in again
+            // only meets it again. So it is the session's state, not a
+            // screen's error — marked, and `AuthClient` shows the suspended
+            // screen in place of the farm.
+            if http.statusCode == 403, env?.code == "ACCOUNT_SUSPENDED" {
+                markSuspended(for: tokens,
+                              saysDeletion: path == MeAPI.path && cancelsBefore == deletionCancels,
+                              erasesAt: env?.params?["erasesAt"].flatMap(BgDate.parseInstant))
             }
             // `http` is the FINAL response — after the 401 → refresh → retry
             // above — so the wait read here belongs to the answer being
@@ -1095,6 +1119,64 @@ actor APIClient {
         TokenStore.save(tokens)
     }
 
+    // MARK: - The suspension (agrent-ios#283)
+
+    /// Posted when a route answered `403 ACCOUNT_SUSPENDED`; `AuthClient`
+    /// turns a signed-in session into the suspended screen.
+    static let suspendedNotification = Notification.Name("bg.agrent.app.accountSuspended")
+
+    /// What a suspension refusal makes of the stored pair.
+    ///
+    /// Only `/me`'s refusal says whether the person's own deletion is pending
+    /// (`params.erasesAt`, agri-saas #1670), and only if no cancel landed
+    /// while it was out (`deletionCancels`); any other refusal is the same
+    /// suspension saying nothing about it, so `/me`'s last word is kept.
+    /// Pure, for `AccountSuspensionTests`.
+    static func suspending(_ tokens: Tokens, saysDeletion: Bool, erasesAt: Date?) -> Tokens {
+        var marked = tokens
+        marked.suspended = true
+        if saysDeletion { marked.suspendedErasesAt = erasesAt }
+        return marked
+    }
+
+    /// The suspension lifted: both marks off. Pure, like `suspending`.
+    static func lifting(_ tokens: Tokens) -> Tokens {
+        var lifted = tokens
+        lifted.suspended = nil
+        lifted.suspendedErasesAt = nil
+        return lifted
+    }
+
+    /// Kept WITH the pair, on this actor, for the session the refused
+    /// request was made under — `markTermsPending`'s rule, for its reason: a
+    /// refusal that answers after an Изход is nobody's.
+    private func markSuspended(for seen: Tokens, saysDeletion: Bool, erasesAt: Date?) {
+        guard let stored = TokenStore.load(),
+              Self.mayCommitRefresh(seen: seen, stored: stored) else { return }
+        let marked = Self.suspending(stored, saysDeletion: saysDeletion, erasesAt: erasesAt)
+        if marked != stored { TokenStore.save(marked) }
+        NotificationCenter.default.post(name: Self.suspendedNotification, object: nil)
+    }
+
+    private func liftSuspension(for seen: Tokens) {
+        guard let stored = TokenStore.load(), stored.suspended == true,
+              Self.mayCommitRefresh(seen: seen, stored: stored) else { return }
+        TokenStore.save(Self.lifting(stored))
+    }
+
+    /// The account's deletion was cancelled (`DELETE /api/account/deletion`,
+    /// from either screen): a suspended pair's date is gone, its suspension
+    /// is not. For the session that sent the cancel only, as every other
+    /// late write of the pair.
+    private func deletionCancelled(for seen: Tokens) {
+        deletionCancels &+= 1
+        guard var stored = TokenStore.load(), stored.suspended == true,
+              Self.mayCommitRefresh(seen: seen, stored: stored),
+              stored.suspendedErasesAt != nil else { return }
+        stored.suspendedErasesAt = nil
+        TokenStore.save(stored)
+    }
+
     static func refreshDecision(seen: Tokens, stored: Tokens?) -> RefreshDecision {
         guard let stored else { return .signedOut }
         return stored.refreshToken == seen.refreshToken
@@ -1215,6 +1297,11 @@ actor APIClient {
                     Log.auth.error(
                         "token refresh failed but NOT rejected (\(status, privacy: .public) \(code ?? "no code", privacy: .public)), keeping tokens"
                     )
+                    // A suspension, should the refresh ever be the route that
+                    // says it: the same mark as any other route's (#283).
+                    if status == 403, code == "ACCOUNT_SUSPENDED" {
+                        markSuspended(for: seen, saysDeletion: false, erasesAt: nil)
+                    }
                     // A CODE, so the sentence can say what happened.
                     //
                     // Without one this threw a bare 400 and `UserMessage`
@@ -1288,8 +1375,11 @@ actor APIClient {
                 // A refresh is the same session, so the terms flag carries
                 // over — as STORED NOW, not as it was when this began: an
                 // acceptance recorded while the request was out must not be
-                // undone by its answer.
-                fresh.termsPending = TokenStore.load()?.termsPending
+                // undone by its answer. The suspension's marks likewise.
+                let stored = TokenStore.load()
+                fresh.termsPending = stored?.termsPending
+                fresh.suspended = stored?.suspended
+                fresh.suspendedErasesAt = stored?.suspendedErasesAt
                 TokenStore.save(fresh)
             } else {
                 Log.auth.info("refresh answered after the session changed, not saved")

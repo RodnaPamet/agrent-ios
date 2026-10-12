@@ -29,6 +29,12 @@ final class AuthClient: NSObject {
         /// until the person chooses (owner, 2026-10-11; agrent-ios#281).
         /// Signing in does not cancel by itself.
         case deletionPending(erasesAt: Date?)
+        /// Signed in, and the account is suspended (agrent-ios#283): every
+        /// route answers `403 ACCOUNT_SUSPENDED` and a new sign-in only meets
+        /// it again. Only `SuspendedView` is shown — the suspension and Изход,
+        /// and «Отмени изтриването» when `erasesAt` says the person's OWN
+        /// deletion is pending and the server would honour stopping it.
+        case suspended(erasesAt: Date?)
         case failed(String)
     }
 
@@ -58,6 +64,11 @@ final class AuthClient: NSObject {
     private var appleNonces: [String: String] = [:]
 
     private var termsObserver: NSObjectProtocol?
+    private var suspendedObserver: NSObjectProtocol?
+    /// Opened on the Keychain's word alone — a launch on a suspended pair —
+    /// so the suspended screen asks `/me` once as it appears. A sign-in has
+    /// just asked, and does not need to again.
+    private var suspensionFromKeychain = false
 
     /// The ticket the code screen redeems, with its PKCE verifier. In memory
     /// only and never logged: the verifier is what makes a leaked ticket
@@ -74,7 +85,14 @@ final class AuthClient: NSObject {
     override init() {
         super.init()
         if let tokens = TokenStore.load() {
-            state = tokens.termsPending == true ? .termsPending : .signedIn
+            // The suspension first: `/me` answers it whether or not the terms
+            // were accepted, and with it nothing else can be opened anyway.
+            if tokens.suspended == true {
+                state = .suspended(erasesAt: tokens.suspendedErasesAt)
+                suspensionFromKeychain = true
+            } else {
+                state = tokens.termsPending == true ? .termsPending : .signedIn
+            }
         }
         // A route answered the terms gate's 403 (`APIClient`): this session
         // goes to the terms screen, whichever provider it came from.
@@ -82,6 +100,12 @@ final class AuthClient: NSObject {
             forName: APIClient.termsPendingNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.termsRefused() }
+        }
+        // And one answered `ACCOUNT_SUSPENDED`: to the suspended screen.
+        suspendedObserver = NotificationCenter.default.addObserver(
+            forName: APIClient.suspendedNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.suspensionSeen() }
         }
     }
 
@@ -128,6 +152,7 @@ final class AuthClient: NSObject {
             // will be. Not fatal if it fails: `MainTabView` asks again.
             _ = await CurrentUserStore.shared.load()
             signInNotice = nil
+            suspensionNotice = nil
             state = stateAfterSignIn()
             Log.auth.info("sign-in complete")
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
@@ -241,6 +266,12 @@ final class AuthClient: NSObject {
     /// `/me` the sign-in has just loaded — the one read made before any
     /// screen is shown.
     private func stateAfterSignIn() -> State {
+        // That `/me` was refused as suspended: `APIClient` marked the pair
+        // before the read returned, so the mark is here to be read.
+        if let tokens = TokenStore.load(), tokens.suspended == true {
+            Log.auth.info("account suspended; showing the suspended screen")
+            return .suspended(erasesAt: tokens.suspendedErasesAt)
+        }
         guard let deletion = CurrentUserStore.shared.user?.deletion else { return .signedIn }
         Log.auth.info("account deletion pending; showing the recovery screen")
         return .deletionPending(erasesAt: deletion.erasesAt)
@@ -256,14 +287,17 @@ final class AuthClient: NSObject {
         Log.auth.info("account deletion pending; showing the recovery screen")
     }
 
-    /// The recovery screen's «Възстанови профила» on its way, and its last
-    /// refusal — final when no retry can help (`restoreRefused`).
-    private(set) var restoringAccount = false
-    private(set) var restoreError: String?
-    /// The account is past restoring: erased already, or its erasure is a
+    /// A cancel of the pending deletion on its way, and its last refusal —
+    /// final when no retry can help (`cancelRefused`). One cancel, two
+    /// screens: the recovery screen's «Възстанови профила» (`restoreAccount`)
+    /// and the suspended screen's «Отмени изтриването» (`cancelDeletion`). Only
+    /// one of them is ever up.
+    private(set) var cancellingDeletion = false
+    private(set) var cancelError: String?
+    /// The deletion is past cancelling: erased already, or its erasure is a
     /// moderator's termination, which the person cannot cancel. The screen
     /// then offers only Изход.
-    private(set) var restoreRefused = false
+    private(set) var cancelRefused = false
 
     /// The cancel's refusals that a retry cannot change.
     /// - `ACCOUNT_ALREADY_ERASED`: past the grace period.
@@ -272,7 +306,7 @@ final class AuthClient: NSObject {
     ///   erasure still running, or when the termination lands while the
     ///   screen is open; that cancel used to answer `ACCOUNT_SUSPENDED`.
     /// - `ACCOUNT_SUSPENDED`: what a server from before #1670 sends for both.
-    static let finalRestoreRefusals: Set<String> = [
+    static let finalCancelRefusals: Set<String> = [
         "ACCOUNT_ALREADY_ERASED", "ACCOUNT_TERMINATED", "ACCOUNT_SUSPENDED",
     ]
 
@@ -285,10 +319,10 @@ final class AuthClient: NSObject {
     /// the person straight back here.
     /// Revoked sessions elsewhere stay revoked; the screen says so.
     func restoreAccount() async {
-        guard case .deletionPending = state, !restoringAccount, !restoreRefused else { return }
-        restoringAccount = true
-        defer { restoringAccount = false }
-        restoreError = nil
+        guard case .deletionPending = state, !cancellingDeletion, !cancelRefused else { return }
+        cancellingDeletion = true
+        defer { cancellingDeletion = false }
+        cancelError = nil
         let epoch = SessionEpoch.current
         do {
             _ = try await AccountDeletionAPI.cancel()
@@ -300,6 +334,20 @@ final class AuthClient: NSObject {
             // turn as the state changes, so no render sees one without the
             // other, and no disk copy can bring it back.
             if fresh?.deletion != nil { CurrentUserStore.shared.deletionCancelled() }
+            // ── STOPPED, AND STILL SUSPENDED ──
+            //
+            // Suspended while this screen was open: since agri-saas #1670 the
+            // cancel is honoured for a deletion of the person's own, and the
+            // `/me` after it is refused (`APIClient` has marked the pair).
+            // «Профилът е възстановен.» and a farm that refuses everything
+            // would be one true fact and one false one, so the suspended
+            // screen says both — the deletion stopped, the access still not.
+            if TokenStore.load()?.suspended == true {
+                state = .suspended(erasesAt: nil)
+                suspensionNotice = AccountSuspensionText.deletionCancelled
+                Log.auth.info("account deletion cancelled; the account is suspended")
+                return
+            }
             state = .signedIn
             Log.auth.info("account deletion cancelled")
             // The farm replaces the recovery screen; said once that settles,
@@ -314,12 +362,131 @@ final class AuthClient: NSObject {
             }
         } catch {
             guard SessionEpoch.isCurrent(epoch) else { return }
-            restoreError = UserMessage.text(for: error)
+            cancelError = UserMessage.text(for: error)
             if case APIClient.APIError.http(_, let code?, _, _, _) = error,
-               Self.finalRestoreRefusals.contains(code) {
-                restoreRefused = true
+               Self.finalCancelRefusals.contains(code) {
+                cancelRefused = true
             }
             Log.auth.error("account restore failed: \(Log.summary(for: error), privacy: .public)")
+        }
+    }
+
+    // MARK: - The suspension (agrent-ios#283)
+
+    /// Said on the suspended screen after the person stopped their own
+    /// deletion there, or on the recovery screen just before it became this
+    /// one: that the deletion is stopped and the access is not back.
+    private(set) var suspensionNotice: String?
+
+    /// A route refused this session with `ACCOUNT_SUSPENDED`; `APIClient`
+    /// has marked the pair. A signed-in session moves to the suspended
+    /// screen, and one already there takes `/me`'s latest word on a pending
+    /// deletion. A session signing in decides for itself
+    /// (`stateAfterSignIn`), and so does the recovery screen's cancel
+    /// (`restoreAccount`), which has more to say than this can.
+    func suspensionSeen() {
+        guard let next = Self.stateOnSuspension(state, tokens: TokenStore.load()) else { return }
+        if case .suspended = state {} else {
+            suspensionNotice = nil
+            Log.auth.info("account suspended; showing the suspended screen")
+        }
+        state = next
+    }
+
+    /// Where a suspension refusal takes `state`, given the pair as it is now
+    /// stored — nil to stay. Pure, for `AccountSuspensionTests`.
+    ///
+    /// The terms screen moves too: `init` puts the suspension first, and a
+    /// refusal from the terms routes would otherwise leave an error there
+    /// until a relaunch. Signing in, a code, and the recovery screen decide
+    /// for themselves.
+    static func stateOnSuspension(_ state: State, tokens: Tokens?) -> State? {
+        guard let tokens, tokens.suspended == true else { return nil }
+        switch state {
+        case .signedIn, .termsPending:
+            return .suspended(erasesAt: tokens.suspendedErasesAt)
+        case .suspended(let erasesAt) where erasesAt != tokens.suspendedErasesAt:
+            return .suspended(erasesAt: tokens.suspendedErasesAt)
+        default:
+            return nil
+        }
+    }
+
+    /// The suspended screen is up. A launch on a suspended pair has only the
+    /// Keychain's word for it, and a suspension can be lifted while the app
+    /// is closed, so `/me` is asked once; a sign-in has just asked it.
+    func suspendedScreenAppeared() async {
+        guard suspensionFromKeychain else { return }
+        suspensionFromKeychain = false
+        await recheckSuspension()
+    }
+
+    /// Ask `/me` again — as the screen appears after a launch, and on every
+    /// return to the foreground. A 200 is the suspension lifted (`APIClient`
+    /// takes the marks off the pair), and the session goes where a sign-in
+    /// would: the recovery screen if a deletion is pending, the farm
+    /// otherwise. A refusal keeps the screen with `/me`'s latest word; no
+    /// signal changes nothing, and a pair gone meanwhile lifts nothing.
+    func recheckSuspension() async {
+        guard case .suspended = state else { return }
+        let epoch = SessionEpoch.current
+        _ = await CurrentUserStore.shared.refresh()
+        guard SessionEpoch.isCurrent(epoch), case .suspended = state,
+              let tokens = TokenStore.load(), tokens.suspended != true else { return }
+        // Nothing of this screen goes along: an error from a cancel tried
+        // here would read on the next screen with nothing to explain it.
+        // A final refusal does carry — a termination is still one.
+        cancelError = nil
+        suspensionNotice = nil
+        // The terms gate first, as a sign-in's own pair would say it: `/me`
+        // answers past it, so a lift can find the terms still unaccepted.
+        state = tokens.termsPending == true ? .termsPending : stateAfterSignIn()
+        Log.auth.info("account suspension lifted")
+    }
+
+    /// «Отмени изтриването»: cancel the person's OWN pending deletion while
+    /// the account is suspended. `DELETE /api/account/deletion` admits a
+    /// suspended account for exactly this (agri-saas #1670), and the screen
+    /// offers it only for a date from `/me`'s refusal, which is the server's
+    /// word that the cancel will be honoured.
+    ///
+    /// The suspension stays: the deletion stopping does not give the farm
+    /// back, and the screen says so rather than leaving it to be inferred.
+    /// A refusal is `restoreAccount`'s — `ACCOUNT_TERMINATED` if a moderator
+    /// terminated the account meanwhile, which is final.
+    func cancelDeletion() async {
+        guard case .suspended(erasesAt: _?) = state, !cancellingDeletion, !cancelRefused else { return }
+        cancellingDeletion = true
+        defer { cancellingDeletion = false }
+        cancelError = nil
+        let epoch = SessionEpoch.current
+        do {
+            // `APIClient` takes the date off the stored pair as the answer
+            // lands, with the request's own pair (`deletionCancelled`).
+            _ = try await AccountDeletionAPI.cancel()
+            guard SessionEpoch.isCurrent(epoch) else { return }
+            switch state {
+            case .suspended:
+                state = .suspended(erasesAt: nil)
+                suspensionNotice = AccountSuspensionText.deletionCancelled
+                Log.auth.info("account deletion cancelled; the account is suspended")
+            case .deletionPending:
+                // Lifted while the cancel was out (`recheckSuspension`): the
+                // recovery screen is offering the deletion this just ended.
+                CurrentUserStore.shared.deletionCancelled()
+                state = .signedIn
+                Log.auth.info("account deletion cancelled; the suspension was lifted meanwhile")
+            default:
+                return
+            }
+        } catch {
+            guard SessionEpoch.isCurrent(epoch) else { return }
+            cancelError = UserMessage.text(for: error)
+            if case APIClient.APIError.http(_, let code?, _, _, _) = error,
+               Self.finalCancelRefusals.contains(code) {
+                cancelRefused = true
+            }
+            Log.auth.error("account deletion cancel failed: \(Log.summary(for: error), privacy: .public)")
         }
     }
 
@@ -500,6 +667,7 @@ final class AuthClient: NSObject {
 
     private func finishAppleSignIn(termsPending: Bool) async {
         signInNotice = nil
+        suspensionNotice = nil
         if termsPending {
             state = .termsPending
             Log.auth.info("apple sign-in complete, terms pending")
@@ -616,8 +784,10 @@ final class AuthClient: NSObject {
 
         pendingCode = nil
         codeError = nil
-        restoreError = nil
-        restoreRefused = false
+        cancelError = nil
+        cancelRefused = false
+        suspensionNotice = nil
+        suspensionFromKeychain = false
         state = .signedOut
     }
 

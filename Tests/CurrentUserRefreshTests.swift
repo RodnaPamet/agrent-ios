@@ -325,7 +325,10 @@ final class CurrentUserRefreshTests: XCTestCase {
         XCTAssertGreaterThan(files.count, 50, "positive control: the app's sources were found")
 
         let home = "CurrentUser.swift"
-        let allowed = ["FixtureCatalogue.swift": "(MeAPI.path, \"auth-me\"),"]
+        // `APIClient` compares a request's path with `/me`'s — it reads
+        // the suspension off `/me`'s answer (#283) — and fetches nothing.
+        let allowed = ["FixtureCatalogue.swift": "(MeAPI.path, \"auth-me\"),",
+                       "APIClient.swift": "path == MeAPI.path"]
         var homeHits = 0
         for file in files {
             var code = SignOutHygieneTests.code(try String(contentsOf: file, encoding: .utf8))

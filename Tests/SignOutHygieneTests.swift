@@ -347,11 +347,23 @@ final class SignOutHygieneTests: XCTestCase {
                        "A's refused refresh clears B's tokens")
 
         let api = read("Agrent/API/APIClient.swift")
-        // Three writes of the pair: the refresh's, and the terms flag's two
-        // (#193) — each of the STORED pair, and the two that a late answer
-        // could make (the refresh, a terms refusal) behind the session check.
-        XCTAssertEqual(api.components(separatedBy: "TokenStore.save(").count - 1, 3,
-                       "positive control: the writes of the pair are the three known ones")
+        // Six writes of the pair: the refresh's, the terms flag's two (#193)
+        // and the suspension's three (#283) — each of the STORED pair, and
+        // every one a late answer could make (the refresh, a terms refusal,
+        // a suspension refusal, `/me`'s lift, a stop of the deletion) behind
+        // the session check.
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.save(").count - 1, 6,
+                       "positive control: the writes of the pair are the six known ones")
+        // The suspension's three read the pair once and check THAT read.
+        XCTAssertNotNil(api.range(of: #"guard let stored = TokenStore\.load\(\),\s*Self\.mayCommitRefresh\(seen: seen, stored: stored\) else \{ return \}\s*let marked = Self\.suspending\("#,
+                                  options: .regularExpression),
+                        "a late suspension refusal marks whichever session is stored now")
+        XCTAssertNotNil(api.range(of: #"guard let stored = TokenStore\.load\(\), stored\.suspended == true,\s*Self\.mayCommitRefresh\(seen: seen, stored: stored\) else \{ return \}\s*TokenStore\.save\(Self\.lifting\(stored\)\)"#,
+                                  options: .regularExpression),
+                        "a late /me lifts whichever session is stored now")
+        XCTAssertNotNil(api.range(of: #"guard var stored = TokenStore\.load\(\), stored\.suspended == true,\s*Self\.mayCommitRefresh\(seen: seen, stored: stored\),\s*stored\.suspendedErasesAt != nil else \{ return \}"#,
+                                  options: .regularExpression),
+                        "a late cancel of the deletion writes whichever session is stored now")
         let guarded = #"if Self\.mayCommitRefresh\(seen: seen, stored: TokenStore\.load\(\)\) \{[^{}]*TokenStore\.%@"#
         XCTAssertNotNil(api.range(of: String(format: guarded, #"save\(fresh\)"#), options: .regularExpression),
                         "the refresh saves without checking the session is still its own")
