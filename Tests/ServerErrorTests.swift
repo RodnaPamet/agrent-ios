@@ -311,6 +311,10 @@ final class SubscriptionRefusalTests: XCTestCase {
             ("AI_TIER_NOT_ALLOWED", "ai_tier_not_allowed: FREE plan allows up to fast.",
              ["plan": "FREE", "tier": "deep", "ceiling": "fast"]),
             ("MODULE_DISABLED", "module_disabled: the trends module is disabled.", ["module": "trends"]),
+            // What a #1688 server sends when the plan leaves a module out. Not
+            // "tenant": that one names an administrator, which is right for it
+            // and is tested on its own below.
+            ("MODULE_DISABLED", "module_disabled: TRENDS", ["module": "TRENDS", "reason": "plan"]),
             ("BILLING_UNAVAILABLE", "billing_unavailable: plan changes are not available.", ["mode": "self_hosted"]),
         ]
         var said = Set<String>()
@@ -345,7 +349,9 @@ final class SubscriptionRefusalTests: XCTestCase {
             return UserMessage.httpText(status: 403, code: "MODULE_DISABLED",
                                         message: "module_disabled: GRAIN", params: params)
         }
-        XCTAssertTrue(said("tenant").contains("Администраторът на стопанството"))
+        XCTAssertTrue(said("tenant").contains("Администратор на стопанството"))
+        XCTAssertEqual(said(nil), UserMessage.bulgarian["MODULE_DISABLED"],
+                       "an absent reason is not the neutral sentence")
         for reason in ["plan", nil, "seat"] {
             XCTAssertFalse(said(reason).localizedCaseInsensitiveContains("администратор"),
                            "reason \(reason ?? "absent") sends the farmer to someone who cannot help")

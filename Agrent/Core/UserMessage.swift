@@ -282,8 +282,11 @@ enum UserMessage {
             // sentence, which names nobody and is true of both.
             switch params?["reason"] {
             case "tenant":
+                // Indefinite: a farm can have several administrators, and the
+                // reader may be one. The switch is the web's (admin/modules);
+                // this app has none, so the sentence says where it is.
                 return "Тази част от приложението е изключена за стопанството. "
-                     + "Администраторът на стопанството може да я включи."
+                     + "Администратор на стопанството може да я включи от уеб приложението."
             case "plan":
                 return "Тази част от приложението не е включена в абонаментния план на стопанството."
             default:
