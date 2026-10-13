@@ -1117,6 +1117,15 @@ actor APIClient {
         }
     }
 
+    /// The account gained a farm (`FarmsAPI.create`, #297): the access token
+    /// treated as EXPIRED, for `termsAccepted`'s reason — the server's gate
+    /// reads the farms out of the bearer's `memberships` claim, so the token
+    /// minted before the farm existed refuses it until it lapses. Expired
+    /// here, the next request refreshes first and carries the new farm.
+    func membershipsChanged() {
+        TokenStore.updateCurrent { $0.expiresAt = .distantPast }
+    }
+
     // MARK: - The suspension (agrent-ios#283)
 
     /// Posted when a route answered `403 ACCOUNT_SUSPENDED`; `AuthClient`

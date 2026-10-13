@@ -360,8 +360,10 @@ final class SignOutHygieneTests: XCTestCase {
                        "positive control: the refresh, the terms mark and the suspension's three")
         XCTAssertEqual(api.components(separatedBy: "TokenStore.clear(ifRefreshToken: seen.refreshToken)").count - 1, 1,
                        "a refused refresh clears whichever session is stored now")
-        XCTAssertEqual(api.components(separatedBy: "TokenStore.updateCurrent").count - 1, 1,
-                       "positive control: the one write that is the current session's by construction")
+        // The current session's by construction: the terms just accepted and
+        // the farm just created (#297), each expiring the token it holds.
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.updateCurrent").count - 1, 2,
+                       "positive control: the two writes that are the current session's by construction")
 
         // And the lock is the one Изход and a sign-in take.
         let store = read("Agrent/Auth/TokenStore.swift")
