@@ -289,3 +289,27 @@ final class FarmErrorShapeTests: XCTestCase {
         XCTAssertEqual(FarmWizardText.identityLine(.unknown), FarmWizardText.doneIdentityNone)
     }
 }
+
+/// A farm created on the phone opens with a token that knows it (#297).
+/// `FarmsAPI.create` is an outward-facing write nothing in a test may send,
+/// so the order is read from the source — with a positive control.
+@MainActor
+final class NewFarmClaimsTests: XCTestCase {
+    func testCreatingAFarmExpiresTheTokenThatPredatesIt() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let farms = SignOutHygieneTests.code(try String(
+            contentsOf: root.appendingPathComponent("Agrent/API/FarmsAPI.swift"), encoding: .utf8))
+        XCTAssertTrue(farms.contains("static func create(_ farm: CreateFarm)"), "positive control: create moved")
+        XCTAssertNotNil(farms.range(
+            of: #"let created = try await APIClient\.shared\.post\(farmsPath, body: farm, as: Created\.self\)\s*await APIClient\.shared\.membershipsChanged\(\)\s*return created"#,
+            options: .regularExpression),
+            "the new farm opens with a token minted before it existed")
+
+        let api = SignOutHygieneTests.code(try String(
+            contentsOf: root.appendingPathComponent("Agrent/API/APIClient.swift"), encoding: .utf8))
+        XCTAssertNotNil(api.range(
+            of: #"func membershipsChanged\(\) \{\s*TokenStore\.updateCurrent \{ \$0\.expiresAt = \.distantPast \}"#,
+            options: .regularExpression),
+            "membershipsChanged no longer expires the token")
+    }
+}

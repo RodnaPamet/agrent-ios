@@ -111,8 +111,21 @@ enum FarmsAPI {
     /// Creates a REAL farm. Under the UI-test seam every write is a 501 that
     /// never leaves the process; nothing in development or CI calls this —
     /// the first one is the owner's.
+    ///
+    /// ── And the session learns of it before the farm opens (#297) ──
+    ///
+    /// The bearer carries the account's farms as a `memberships` claim, and
+    /// the server's edge gate checks `/api/t/{slug}/…` against that claim,
+    /// never the database. The token in hand was minted before this farm
+    /// existed, so the farm the wizard opens next would answer every request
+    /// `cross_tenant_access_denied` until the token lapsed — up to fifteen
+    /// minutes. Marked stale here, the next request refreshes first, and a
+    /// refresh rebuilds the claims (agri-saas `buildSessionClaims`; the web's
+    /// half of the same defect is agri-saas #1744).
     static func create(_ farm: CreateFarm) async throws -> Created {
-        try await APIClient.shared.post(farmsPath, body: farm, as: Created.self)
+        let created = try await APIClient.shared.post(farmsPath, body: farm, as: Created.self)
+        await APIClient.shared.membershipsChanged()
+        return created
     }
 
     static func checkEik(_ eik: String) async throws -> EikVerdict {
