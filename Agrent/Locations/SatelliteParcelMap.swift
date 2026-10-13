@@ -278,7 +278,10 @@ struct SatelliteParcelMap: UIViewRepresentable {
         ///
         /// On OUTLINES the fill is uniform green over imagery, because the
         /// index tiles are the data there and a crop-coloured fill would
-        /// argue with them.
+        /// argue with them. The outline is the one thing Increase Contrast
+        /// can strengthen without covering them, so it is what answers the
+        /// setting here (#303): this is the map Локации opens in, and it
+        /// looked the same with the setting on and off.
         ///
         /// On BOXES there are no tiles, so sown against fallow is what the
         /// map has to say, in the schematic's own palette. The dash is the
@@ -292,7 +295,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
                     ? .clear
                     : UIColor.systemGreen.withAlphaComponent(0.35)
                 renderer.strokeColor = .systemGreen
-                renderer.lineWidth = 2
+                renderer.lineWidth = Palette.Map.outlineWidth(contrast)
                 renderer.lineDashPattern = nil
 
             case .boundingBoxes:

@@ -531,6 +531,14 @@ enum Palette {
             contrast == .increased ? 3.5 : strokeWidth
         }
 
+        /// A parcel's TRUE outline over Apple's imagery — «Точни очертания».
+        /// Finer than a schematic border at rest, so it does not hide the
+        /// field edge it traces; under Increase Contrast it is the same
+        /// heavy line as on the other two maps.
+        static func outlineWidth(_ contrast: ColorSchemeContrast) -> CGFloat {
+            contrast == .increased ? strokeWidth(contrast) : 2
+        }
+
         /// A TASK'S parcels on the task map (agrent-ios#177), over Apple's
         /// hybrid imagery.
         ///
