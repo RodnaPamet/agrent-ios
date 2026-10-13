@@ -171,6 +171,13 @@ struct MainTabView: View {
                 }
             }
             .onChange(of: tabs.bottomTabs) { _, bar in router.adoptBar(bar) }
+            // A press the bar takes and does not act on is finished by the
+            // app (#305) — see `TabBarPressObserver`.
+            .background {
+                TabBarPressCatcher(router: router)
+                    .frame(width: 0, height: 0)
+                    .accessibilityHidden(true)
+            }
         }
         .environment(router)
         // Drained on launch and on every return to the foreground — which

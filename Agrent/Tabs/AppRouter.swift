@@ -44,8 +44,22 @@ final class AppRouter {
 
     private var selected: AppSurface
 
-    init(bar: [AppSurface]) {
+    /// How many times the bar has written the selection. `TabBarPressObserver`
+    /// compares it across a press to learn whether the bar answered (#305).
+    /// Not observed: no view draws from it.
+    @ObservationIgnored private(set) var selectionWrites = 0
+
+    /// A press the app finished for the bar, and when — see `finishPress`.
+    @ObservationIgnored private var finished: (surface: AppSurface, at: Date)?
+    @ObservationIgnored private let now: () -> Date
+
+    /// How long after `finishPress` the bar's own write for the same tab is
+    /// still that press, arriving late.
+    static let latePress: TimeInterval = 1
+
+    init(bar: [AppSurface], now: @escaping () -> Date = Date.init) {
         self.bar = bar
+        self.now = now
         selected = bar.first ?? AppSurface.fallback[0]
     }
 
@@ -58,9 +72,27 @@ final class AppRouter {
     var tab: AppSurface {
         get { selected }
         set {
+            selectionWrites += 1
+            // The bar answering, late, a press the app has already finished
+            // for it. One press is one selection: taken as a second, it would
+            // be a re-tap, and pop the tab the person has just arrived on.
+            if let finished, finished.surface == newValue, now().timeIntervalSince(finished.at) < Self.latePress {
+                self.finished = nil
+                return
+            }
+            finished = nil
             if newValue == selected { paths[newValue] = nil }
             selected = newValue
         }
+    }
+
+    /// Select `surface` for a press the bar took and did not act on (#305):
+    /// what the bar's own write would have done, a re-tap's pop included.
+    func finishPress(on surface: AppSurface) {
+        guard bar.contains(surface) else { return }
+        finished = (surface, now())
+        if surface == selected { paths[surface] = nil }
+        selected = surface
     }
 
     /// The bar changed: the customiser, or `/me` bringing the saved order.
