@@ -139,7 +139,10 @@ private struct LineRow: View {
                     Label(FieldOperationText.refusedQueued(item.lineMark?.lineStatus ?? .unknown),
                           systemImage: "exclamationmark.triangle")
                         .foregroundStyle(Palette.warning)
-                    if let reason = item.lastError {
+                    // Kept from the refusal, possibly by an older build that
+                    // still passed English through: shown only in Bulgarian
+                    // (owner, 2026-10-13). The line above says what happened.
+                    if let reason = item.lastError, UserMessage.isBulgarianSentence(reason) {
                         Text(reason).foregroundStyle(Palette.secondaryText)
                     }
                 }

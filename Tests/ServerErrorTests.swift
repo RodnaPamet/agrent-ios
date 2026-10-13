@@ -53,26 +53,55 @@ final class UserMessageHTTPTests: XCTestCase {
 
     /// A code this app knows beats everything else: written for an operator,
     /// by us, in their language.
-    func testAKnownCodeWinsOverTheServersEnglish() {
+    /// Over a Bulgarian message too, which would otherwise be shown.
+    func testAKnownCodeWinsOverTheServersMessage() {
         XCTAssertEqual(
             UserMessage.httpText(
                 status: 400, code: "INVALID_PARCEL",
-                message: "Parcel not found or belongs to a different tenant"
+                message: "Парцелът не е намерен."
             ),
             "Парцелът не е намерен или принадлежи на друго стопанство."
         )
     }
 
-    /// An unmapped code falls through to the server's sentence. The map is
-    /// additive and ~500 messages are still uncoded, so this is the ordinary
-    /// path, not a failure.
-    func testAnUnknownCodeFallsBackToTheServersSentence() {
+    /// An unmapped code falls through to the server's sentence when it is
+    /// Bulgarian — agri-saas resolves `message` from the person's language
+    /// (#1677) — and to the status sentence when it is English. Never English
+    /// on screen (owner, 2026-10-13); ~500 refusals are still English prose.
+    func testAnUnknownCodeFallsBackToTheServersBulgarianOnly() {
         XCTAssertEqual(
-            UserMessage.httpText(
-                status: 400, code: "SOME_FUTURE_CODE", message: "Delta must be non-zero."
-            ),
-            "Delta must be non-zero."
+            UserMessage.httpText(status: 404, code: "LEASE_NOT_FOUND", message: "Договорът не е намерен."),
+            "Договорът не е намерен."
         )
+        XCTAssertEqual(
+            UserMessage.httpText(status: 404, code: "NOT_FOUND", message: "Listing not found"),
+            "Търсеното не беше намерено.", "an English 404 reached the farmer"
+        )
+        XCTAssertEqual(
+            UserMessage.httpText(status: 400, code: "SOME_FUTURE_CODE", message: "Delta must be non-zero."),
+            "Заявката съдържа невалидни данни.", "an English 400 reached the farmer"
+        )
+    }
+
+    /// The majority of the letters decides, because each language quotes
+    /// the other: a Bulgarian product named in English prose is English, a
+    /// Latin brand named in Bulgarian prose is Bulgarian.
+    func testBulgarianIsTheMajorityOfTheLetters() {
+        XCTAssertTrue(UserMessage.isBulgarianSentence("Продуктът \"Karate Zeon\" не е намерен."))
+        XCTAssertFalse(UserMessage.isBulgarianSentence("Product \"Карате Зеон\" not found"))
+        XCTAssertFalse(UserMessage.isBulgarianSentence("Listing not found"))
+        // Still a sentence first: an identifier is no language at all.
+        XCTAssertFalse(UserMessage.isBulgarianSentence("НЕ_Е_НАМЕРЕН"))
+        XCTAssertFalse(UserMessage.isBulgarianSentence("{\"грешка\": 1}"))
+        XCTAssertTrue(UserMessage.isBulgarianSentence("Не е намерен."), "positive control")
+        // Quoted names count for neither side: what is quoted is a name, in
+        // either alphabet, and says nothing about the sentence around it.
+        XCTAssertFalse(UserMessage.isBulgarianSentence(#"Parcel "Нивата при Долна Митрополия" is archived"#),
+                       "a long Bulgarian name carried English onto the screen")
+        XCTAssertTrue(UserMessage.isBulgarianSentence("Няма цена за „Roundup Max“."),
+                      "a Latin brand cost a Bulgarian sentence")
+        XCTAssertTrue(UserMessage.isBulgarianSentence("Стопанството «Agro Invest Holding Bulgaria EOOD» вече съществува."))
+        XCTAssertFalse(UserMessage.isBulgarianSentence("„Само име“"), "a quote alone is no sentence of either")
     }
 
     /// The guard, and the defect behind it. Thirty call sites called
@@ -178,12 +207,15 @@ final class UserMessageHTTPTests: XCTestCase {
     /// agri-saas's coded-but-UNDOCUMENTED refusals that can reach the paths
     /// this app builds: backend 1 crossed its baseline with
     /// `Tests/Contract/app-routes.txt` on 2026-10-11 and found these 49.
-    /// Each carries an English sentence as its message, which `httpText`
-    /// shows verbatim when the code has no sentence here. Run through
-    /// `httpText` itself, not looked up in the table: some are built in
-    /// `interpolated` or matched elsewhere.
+    /// Each has its own sentence here, not the generic status line. Run
+    /// through `httpText` itself, not looked up in the table: some are built
+    /// in `interpolated` or matched elsewhere. With a Bulgarian placeholder
+    /// and the status line ruled out — an English message falls to the
+    /// status line by itself now, sentence of ours or not.
     func testEveryUndocumentedCodeReachableHereIsSaidInBulgarian() {
         let english = "Title is required for this entry."
+        let placeholder = "Сървърът каза нещо."
+        XCTAssertTrue(UserMessage.isBulgarianSentence(placeholder), "precondition")
         XCTAssertTrue(UserMessage.isHumanSentence(english), "precondition")
         let measured = [
             "ACCOUNT_HAS_NO_EMAIL", "API_KEY_FAMILY_NOT_ENABLED", "API_KEY_WRONG_SURFACE",
@@ -205,8 +237,11 @@ final class UserMessageHTTPTests: XCTestCase {
         ]
         XCTAssertEqual(measured.count, 52)
         for code in measured {
-            let text = UserMessage.httpText(status: 400, code: code, message: english)
-            XCTAssertNotEqual(text, english, "\(code) reaches the screen in English")
+            let text = UserMessage.httpText(status: 400, code: code, message: placeholder)
+            XCTAssertNotEqual(text, placeholder, "\(code) has no sentence here")
+            XCTAssertNotEqual(text, UserMessage.statusText(400), "\(code) has no sentence here")
+            XCTAssertNotEqual(UserMessage.httpText(status: 400, code: code, message: english), english,
+                              "\(code) reaches the screen in English")
         }
     }
 

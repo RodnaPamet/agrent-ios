@@ -250,12 +250,18 @@ final class SpatialImportTests: XCTestCase {
                        "Някои парцели са с невалидна геометрия (пресичащи се граници). Поправете ги и качете файла отново.")
     }
 
-    /// A code this build does not know: the English reason, which knows
-    /// something this build does not. No code at all is a crash, whose
-    /// reason is not for a farmer.
+    /// A code this build does not know: the server's reason when it is
+    /// Bulgarian, and when it is English a line that says the FILE was
+    /// refused — never the English, never the server's fault (owner,
+    /// 2026-10-13). No code at all is a crash, whose reason is not for a
+    /// farmer.
     func testAnUnknownCodeFallsBackAndACrashDoesNot() throws {
-        let newer = try failed(#""SPATIAL_SOMETHING_NEW""#, reason: "The layer has no polygons.")
-        XCTAssertEqual(newer.failureText, "The layer has no polygons.")
+        let newer = try failed(#""SPATIAL_SOMETHING_NEW""#, reason: "Слоят няма полигони.")
+        XCTAssertEqual(newer.failureText, "Слоят няма полигони.")
+        let english = try failed(#""SPATIAL_SOMETHING_NEW""#, reason: "The layer has no polygons.")
+        XCTAssertEqual(english.failureText, SpatialJobFailure.notAccepted, "English reached the farmer")
+        XCTAssertNotEqual(SpatialJobFailure.notAccepted, SpatialJobFailure.serverFault,
+                          "a refused file blamed on the server")
 
         let crash = try failed("null", reason: "connect ECONNREFUSED 10.0.0.5:6379")
         XCTAssertNil(crash.failedCode)

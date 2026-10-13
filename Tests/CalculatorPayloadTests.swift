@@ -182,6 +182,10 @@ final class CalculatorPayloadTests: XCTestCase {
         XCTAssertNil(row.netWorth)
         XCTAssertNil(row.pricePerTonne)
         XCTAssertEqual(row.netWorthUnavailableReason, "No market price for SUNFLOWER")
+        // Read off the wire, never shown: what the row SAYS is Bulgarian
+        // whatever the reason's language (owner, 2026-10-13).
+        let said = try XCTUnwrap(row.refusalText, "a refused row said nothing")
+        XCTAssertTrue(UserMessage.isBulgarianSentence(said), said)
         XCTAssertTrue(row.showProduceRent)
         XCTAssertTrue(row.rentCurrencyUnknown)
         XCTAssertNil(row.breakEven.breakEvenPricePerTonne)

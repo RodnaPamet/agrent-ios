@@ -15,20 +15,23 @@ final class RefusalTextTests: XCTestCase {
         )
     }
 
-    /// `explainRefusal`'s own rule: an unrecognised code falls back to the
-    /// server's English rather than to nothing. A future code must still
-    /// say something.
-    func testAnUnknownCodeFallsBackToTheServersEnglish() {
+    /// `explainRefusal`'s rule with one divergence: an unrecognised code
+    /// falls back to the server's sentence only when it is Bulgarian. The
+    /// web shows its English; this app never does (owner, 2026-10-13).
+    func testAnUnknownCodeFallsBackToTheServersBulgarianOnly() {
         XCTAssertEqual(
-            RefusalText.resolve(
-                code: "SOME_FUTURE_REFUSAL", params: nil,
-                fallback: "Something the server can explain and we cannot."),
-            "Something the server can explain and we cannot."
-        )
+            RefusalText.resolve(code: "SOME_FUTURE_REFUSAL", params: nil,
+                                fallback: "Сървърът знае защо, а приложението не."),
+            "Сървърът знае защо, а приложението не.")
+        XCTAssertNil(
+            RefusalText.resolve(code: "SOME_FUTURE_REFUSAL", params: nil,
+                                fallback: "Something the server can explain and we cannot."),
+            "English reached the calculator")
     }
 
-    func testNoCodeAtAllStillUsesTheFallback() {
-        XCTAssertEqual(RefusalText.resolve(code: nil, params: nil, fallback: "x"), "x")
+    func testNoCodeAtAllStillUsesABulgarianFallback() {
+        XCTAssertEqual(RefusalText.resolve(code: nil, params: nil, fallback: "Няма данни."), "Няма данни.")
+        XCTAssertNil(RefusalText.resolve(code: nil, params: nil, fallback: "x"), "a non-sentence was shown")
         XCTAssertNil(RefusalText.resolve(code: nil, params: nil, fallback: nil))
     }
 
