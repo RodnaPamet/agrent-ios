@@ -203,12 +203,6 @@ final class TreatmentEntryTests: XCTestCase {
 
     // MARK: - Step two: the crop's parcels across blocks
 
-    private func block(_ id: String, _ name: String) throws -> Location {
-        try JSONDecoder().decode(Location.self, from: Data("""
-        {"id":"\(id)","name":"\(name)","description":null,"status":"ACTIVE","capacityTonnes":null}
-        """.utf8))
-    }
-
     /// A synthetic square, `side` degrees wide, south-west corner at (lon, lat).
     private func square(lon: Double, lat: Double, side: Double) -> ParcelGeometry {
         let ring = [[lon, lat], [lon + side, lat], [lon + side, lat + side], [lon, lat + side], [lon, lat]]
@@ -221,49 +215,89 @@ final class TreatmentEntryTests: XCTestCase {
                soilType: nil, cadastralId: nil, ekatte: nil, hasActiveLease: nil, absentFromImportAt: nil)
     }
 
-    /// One crop is one crop wherever it grows and however it is spelt:
-    /// parcels from two blocks under one Bulgarian name, by block and then by
-    /// number; a parcel with no crop is not offered.
-    func testACropGathersItsParcelsAcrossBlocks() throws {
-        let north = try block("b1", "Блок Север")
-        let south = try block("b2", "Блок Юг")
-        let crops = TreatmentPlace.crops([
-            (south, [parcel("s10", "10", crop: "Wheat", ha: 2), parcel("s2", "2", crop: "wheat", ha: 1)]),
-            (north, [parcel("n1", "1", crop: "Wheat", ha: 3), parcel("n9", "9", crop: nil, ha: 1),
-                     parcel("n5", "5", crop: "  ", ha: 1), parcel("n3", "3", crop: "Sunflower", ha: 4)]),
-        ])
-        XCTAssertEqual(crops.count, 2, "a blank or missing crop was offered, or Wheat split by case")
-        let wheatLabel = try XCTUnwrap(CommodityName.freeText("Wheat"))
-        let wheat = try XCTUnwrap(crops.first { $0.label == wheatLabel })
-        XCTAssertEqual(wheat.fields.map(\.id), ["n1", "s2", "s10"], "by block, then numerically by name")
-        XCTAssertEqual(wheat.fields.map(\.blockName), ["Блок Север", "Блок Юг", "Блок Юг"])
+    private func field(_ parcel: Parcel, block: String = "Блок") -> TreatmentPlace.Field {
+        TreatmentPlace.Field(parcel: parcel, blockID: "b-\(block)", blockName: block)
     }
 
-    /// Two spellings of one crop — the catalogue's and an import's — are one
-    /// crop, not two identical menu entries each holding part of it.
+    private func total(_ crop: String, _ count: Int) -> ParcelsByCropAPI.CropTotal {
+        .init(cropType: crop, parcelCount: count, areaHaTotal: nil)
+    }
+
+    /// `/parcels/by-crop?crop=` as the server answers it — decoded, as the
+    /// app decodes it, so the fixture is the wire shape.
+    private func answer(_ crop: String, _ parcels: [(id: String, name: String, block: String)]) throws
+        -> ParcelsByCropAPI.CropParcels {
+        let rows = parcels.map { p in
+            #"{"id":"\#(p.id)","name":"\#(p.name)","cropType":"\#(crop)","areaHa":1,"#
+            + #""locationId":"b-\#(p.block)","locationName":"\#(p.block)","geometry":null}"#
+        }
+        let json = #"{"cropType":"\#(crop)","parcels":["# + rows.joined(separator: ",") + "]}"
+        return try JSONDecoder().decode(ParcelsByCropAPI.CropParcels.self, from: Data(json.utf8))
+    }
+
+    /// One crop is one crop however it is spelt: the server returns each
+    /// stored value verbatim, and the picker offers one «Пшеница» holding
+    /// every spelling, its count summed; a blank value is not a crop.
     func testSpellingsOfOneCropAreOneCrop() throws {
-        let b = try block("b1", "Блок")
         let wheatLabel = try XCTUnwrap(CommodityName.freeText("Wheat"))
-        let crops = TreatmentPlace.crops([(b, [parcel("a", "1", crop: "Wheat", ha: 1),
-                                               parcel("c", "2", crop: wheatLabel, ha: 1)])])
-        XCTAssertEqual(crops.count, 1)
-        XCTAssertEqual(crops[0].fields.count, 2)
+        let crops = TreatmentPlace.crops([total("Wheat", 3), total(wheatLabel, 2), total("  ", 9),
+                                          total("Sunflower", 1)])
+        XCTAssertEqual(crops.count, 2, "a blank value was offered, or one crop split by spelling")
+        let wheat = try XCTUnwrap(crops.first { $0.label == wheatLabel })
+        XCTAssertEqual(Set(wheat.values), ["Wheat", wheatLabel], "a spelling would not be asked for")
+        XCTAssertEqual(wheat.parcelCount, 5)
+    }
+
+    /// A value with no catalogue name is shown as stored, never hidden.
+    func testAnOffCatalogueCropIsShownAsStored() {
+        let crops = TreatmentPlace.crops([total("Winter Wheat", 2)])
+        XCTAssertEqual(crops.map(\.label), [CommodityName.freeText("Winter Wheat") ?? "Winter Wheat"])
+        XCTAssertEqual(crops.first?.values, ["Winter Wheat"])
     }
 
     /// Bulgarian order, not code-point order: «люцерна» (л) before «Пшеница»
     /// (П) — code points put every capital first and would reverse them.
     func testCropsAreInBulgarianAlphabeticalOrder() throws {
-        let b = try block("b1", "Блок")
-        let crops = TreatmentPlace.crops([(b, [parcel("a", "1", crop: "Wheat", ha: 1),
-                                               parcel("c", "2", crop: "люцерна", ha: 1)])])
+        let crops = TreatmentPlace.crops([total("Wheat", 1), total("люцерна", 1)])
         XCTAssertEqual(crops.map(\.label), ["люцерна", try XCTUnwrap(CommodityName.freeText("Wheat"))])
     }
 
-    func testTheTotalIsTheChosenParcelsAndSaysWhatItLeftOut() throws {
-        let b = try block("b1", "Блок")
-        let fields = TreatmentPlace.crops([(b, [parcel("a", "1", crop: "Wheat", ha: 1.5),
-                                                parcel("c", "2", crop: "Wheat", ha: nil),
-                                                parcel("d", "3", crop: "Wheat", ha: 2.25)])])[0].fields
+    /// A crop's parcels from every spelling's answer, once each, by block and
+    /// then numerically by name.
+    func testACropsParcelsMergeAcrossSpellingsAndBlocks() throws {
+        let fields = TreatmentPlace.fields([
+            try answer("Wheat", [("s10", "10", "Блок Юг"), ("n1", "1", "Блок Север")]),
+            try answer("wheat", [("s2", "2", "Блок Юг"), ("n1", "1", "Блок Север")]),
+        ])
+        XCTAssertEqual(fields.map(\.id), ["n1", "s2", "s10"], "by block, then numerically; n1 once")
+        XCTAssertEqual(fields.map(\.blockName), ["Блок Север", "Блок Юг", "Блок Юг"])
+    }
+
+    /// The route's outline is read leniently: a `Polygon` is drawn as a
+    /// one-polygon `MultiPolygon`, and an outline this build cannot read costs
+    /// that parcel its shape — never the list.
+    func testTheRoutesOutlinesAreReadLeniently() throws {
+        func one(_ geometry: String) throws -> ParcelsByCropAPI.CropParcel {
+            let json = #"{"id":"p","name":"1","cropType":"Wheat","areaHa":null,"locationId":"b","locationName":"Б","geometry":"#
+                + geometry + "}"
+            return try JSONDecoder().decode(ParcelsByCropAPI.CropParcel.self, from: Data(json.utf8))
+        }
+        let polygon = try one(#"{"type":"Polygon","coordinates":[[[24,42],[24.01,42],[24.01,42.01],[24,42]]]}"#)
+        XCTAssertEqual(polygon.geometry?.type, "MultiPolygon")
+        XCTAssertEqual(polygon.geometry?.coordinates.count, 1)
+        let multi = try one(#"{"type":"MultiPolygon","coordinates":[[[[24,42],[24.01,42],[24.01,42.01],[24,42]]]]}"#)
+        XCTAssertEqual(multi.geometry?.coordinates.count, 1, "positive control")
+        XCTAssertNil(try one(#"{"type":"Point","coordinates":[24,42]}"#).geometry)
+        XCTAssertNil(try one(#"{"type":"Polygon","coordinates":"broken"}"#).geometry, "a bad outline cost the parcel")
+        XCTAssertNil(try one("null").geometry)
+        XCTAssertNil(polygon.areaHa)
+        XCTAssertEqual(polygon.parcel.cropType, "Wheat")
+    }
+
+    func testTheTotalIsTheChosenParcelsAndSaysWhatItLeftOut() {
+        let fields = [field(parcel("a", "1", crop: "Wheat", ha: 1.5)),
+                      field(parcel("c", "2", crop: "Wheat", ha: nil)),
+                      field(parcel("d", "3", crop: "Wheat", ha: 2.25))]
         let total = TreatmentPlace.total(fields)
         XCTAssertEqual(total.area, Area(hectares: 3.75))
         XCTAssertEqual(total.parcels, 3)
@@ -273,15 +307,14 @@ final class TreatmentEntryTests: XCTestCase {
 
     /// A tap inside a field finds it; outside, nothing; where two overlap,
     /// the smaller first.
-    func testATapOnTheMapFindsTheFieldUnderIt() throws {
-        let b = try block("b1", "Блок")
-        let fields = TreatmentPlace.crops([(b, [
-            parcel("big", "1", crop: "Wheat", ha: 40, geometry: square(lon: 24.0, lat: 42.0, side: 0.02)),
-            parcel("small", "2", crop: "Wheat", ha: 2, geometry: square(lon: 24.005, lat: 42.005, side: 0.005)),
-            parcel("none", "3", crop: "Wheat", ha: 1),
-        ])])[0].fields
+    func testATapOnTheMapFindsTheFieldUnderIt() {
+        let fields = [
+            field(parcel("big", "1", crop: "Wheat", ha: 40, geometry: square(lon: 24.0, lat: 42.0, side: 0.02))),
+            field(parcel("small", "2", crop: "Wheat", ha: 2, geometry: square(lon: 24.005, lat: 42.005, side: 0.005))),
+            field(parcel("none", "3", crop: "Wheat", ha: 1)),
+        ]
+        let outlines = TreatmentPlace.outlines(fields)
         let inSmall = CLLocationCoordinate2D(latitude: 42.007, longitude: 24.007)
-        let outlines = TreatmentPlace.outlines([TreatmentPlace.Crop(key: "x", label: "x", fields: fields)])
         XCTAssertEqual(TreatmentPlace.fields(at: inSmall, in: fields, outlines: outlines).map(\.id), ["small", "big"])
         let inBigOnly = CLLocationCoordinate2D(latitude: 42.018, longitude: 24.018)
         XCTAssertEqual(TreatmentPlace.fields(at: inBigOnly, in: fields, outlines: outlines).map(\.id), ["big"])
@@ -289,7 +322,6 @@ final class TreatmentEntryTests: XCTestCase {
         XCTAssertEqual(TreatmentPlace.fields(at: outside, in: fields, outlines: outlines), [])
     }
 
-    /// A hole is outside its field.
     func testAHoleIsNotPartOfTheField() {
         let outer = [[24.0, 42.0], [24.02, 42.0], [24.02, 42.02], [24.0, 42.02], [24.0, 42.0]]
         let hole = [[24.005, 42.005], [24.015, 42.005], [24.015, 42.015], [24.005, 42.015], [24.005, 42.005]]
@@ -305,8 +337,7 @@ final class TreatmentEntryTests: XCTestCase {
     // MARK: - The record
 
     func testTheRecordNeedsAParcelAndCarriesTheStoredName() throws {
-        let b = try block("b1", "Блок")
-        let fields = TreatmentPlace.crops([(b, [parcel("p1", "1", crop: "Wheat", ha: 1)])])[0].fields
+        let fields = [field(parcel("p1", "1", crop: "Wheat", ha: 1))]
         var draft = TreatmentDraft(date: today)
         draft.productText = "  познат препарат "
         draft.pestText = " Листни въшки "
@@ -328,8 +359,7 @@ final class TreatmentEntryTests: XCTestCase {
     }
 
     func testANewPesticideCarriesItsRegistrationAndFertilisingCarriesNoChemicalColumns() throws {
-        let b = try block("b1", "Блок")
-        let fields = TreatmentPlace.crops([(b, [parcel("p1", "1", crop: "Wheat", ha: 1)])])[0].fields
+        let fields = [field(parcel("p1", "1", crop: "Wheat", ha: 1))]
         var spray = TreatmentDraft(date: today)
         spray.productText = "Нов препарат"
         spray.registrationText = " 0123 "
@@ -348,46 +378,53 @@ final class TreatmentEntryTests: XCTestCase {
     }
 }
 
-/// The store reads every block's parcels, and a block it cannot read is
-/// counted rather than silently missing.
+/// The store asks for the crop list, then a crop's parcels — every spelling
+/// of it — and a crop it cannot read wholly is a failure, never a part.
 @MainActor
 final class TreatmentPlaceStoreTests: XCTestCase {
 
-    private func block(_ id: String) throws -> Location {
-        try JSONDecoder().decode(Location.self, from: Data("""
-        {"id":"\(id)","name":"Блок \(id)","description":null,"status":"ACTIVE","capacityTonnes":null}
-        """.utf8))
+    private func answer(_ crop: String, _ ids: [String]) throws -> ParcelsByCropAPI.CropParcels {
+        let rows = ids.map { #"{"id":"\#($0)","name":"\#($0)","cropType":"\#(crop)","areaHa":1,"locationId":"b","locationName":"Блок","geometry":null}"# }
+        let json = #"{"cropType":"\#(crop)","parcels":["# + rows.joined(separator: ",") + "]}"
+        return try JSONDecoder().decode(ParcelsByCropAPI.CropParcels.self, from: Data(json.utf8))
     }
 
-    private func parcels(_ block: String, _ crop: String) -> ParcelsResponse {
-        ParcelsResponse(locationId: block, bounds: nil, parcels: [
-            Parcel(id: "\(block)-1", name: "1", cropType: crop, areaHa: 1, geometry: nil, soilType: nil,
-                   cadastralId: nil, ekatte: nil, hasActiveLease: nil, absentFromImportAt: nil),
-        ])
-    }
-
-    func testABlockThatCannotBeReadIsCounted() async throws {
-        let blocks = [try block("a"), try block("b")]
+    func testACropIsAskedForByEverySpelling() async throws {
+        let wheatLabel = try XCTUnwrap(CommodityName.freeText("Wheat"))
+        let a = try answer("Wheat", ["p1", "p2"])
+        let b = try answer(wheatLabel, ["p3"])
         let store = TreatmentPlaceStore(
-            loadBlocks: { .loaded(blocks, .fresh) },
-            loadParcels: { id in id == "a" ? .loaded(self.parcels("a", "Wheat"), .fresh) : .failed("Няма връзка.") }
+            loadCrops: { .loaded(.init(crops: [.init(cropType: "Wheat", parcelCount: 2, areaHaTotal: 2),
+                                               .init(cropType: wheatLabel, parcelCount: 1, areaHaTotal: 1)]), .fresh) },
+            loadCrop: { value in .loaded(value == "Wheat" ? a : b, .fresh) }
         )
         await store.load()
-        XCTAssertEqual(store.state.value?.map(\.fields.count), [1])
-        XCTAssertEqual(store.outlines.count, 1, "the outlines were not built with the list")
-        XCTAssertEqual(store.unreadBlocks, 1)
+        let crop = try XCTUnwrap(store.state.value?.first)
+        XCTAssertEqual(store.state.value?.count, 1)
+        await store.loadFields(for: crop)
+        XCTAssertEqual(store.fields[crop.key]?.value?.map(\.id).sorted(), ["p1", "p2", "p3"])
+        XCTAssertEqual(store.outlines.count, 3, "the outlines were not built with the parcels")
     }
 
-    func testNoBlockReadIsAFailureNotAnEmptyFarm() async throws {
-        let blocks = [try block("a")]
-        let store = TreatmentPlaceStore(loadBlocks: { .loaded(blocks, .fresh) },
-                                        loadParcels: { _ in .failed("Няма връзка.") })
+    func testACropReadInPartIsAFailure() async throws {
+        let wheatLabel = try XCTUnwrap(CommodityName.freeText("Wheat"))
+        let a = try answer("Wheat", ["p1"])
+        let store = TreatmentPlaceStore(
+            loadCrops: { .loaded(.init(crops: [.init(cropType: "Wheat", parcelCount: 1, areaHaTotal: 1),
+                                               .init(cropType: wheatLabel, parcelCount: 1, areaHaTotal: 1)]), .fresh) },
+            loadCrop: { value in value == "Wheat" ? .loaded(a, .fresh) : .failed("Няма връзка.") }
+        )
         await store.load()
-        XCTAssertEqual(store.state, .failed("Няма връзка."))
+        let crop = try XCTUnwrap(store.state.value?.first)
+        await store.loadFields(for: crop)
+        XCTAssertEqual(store.fields[crop.key], .failed("Няма връзка."),
+                       "a crop shown with part of its parcels reads as the whole crop")
+    }
 
-        let none = TreatmentPlaceStore(loadBlocks: { .failed("Сървърът не отговори.") },
-                                       loadParcels: { _ in .failed("x") })
-        await none.load()
-        XCTAssertEqual(none.state, .failed("Сървърът не отговори."))
+    func testTheCropListFailingIsAFailure() async {
+        let store = TreatmentPlaceStore(loadCrops: { .failed("Сървърът не отговори.") },
+                                        loadCrop: { _ in .failed("x") })
+        await store.load()
+        XCTAssertEqual(store.state, .failed("Сървърът не отговори."))
     }
 }

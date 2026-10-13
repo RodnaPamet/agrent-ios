@@ -65,8 +65,12 @@ struct TreatmentEntryFlow: View {
         // — and from here, so going back from step two does not cancel it.
         .task {
             await place.load()
-            // Chosen for the person when the farm grows one crop.
-            if cropKey == nil, let crops = place.state.value, crops.count == 1 { cropKey = crops[0].key }
+            // Chosen for the person when the farm grows one crop — and its
+            // parcels read now, so they are in hand by «Напред».
+            if cropKey == nil, let crops = place.state.value, crops.count == 1 {
+                cropKey = crops[0].key
+                await place.loadFields(for: crops[0])
+            }
         }
         // A refusal is about what was chosen when it came; a new choice
         // clears it rather than leaving it over a different entry.

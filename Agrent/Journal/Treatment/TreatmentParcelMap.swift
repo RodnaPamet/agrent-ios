@@ -16,7 +16,7 @@ import SwiftUI
 /// every parcel by name with its state, and the bar has the total. That is
 /// the only reason hiding it is right.
 struct TreatmentParcelMap: View {
-    let crop: TreatmentPlace.Crop
+    let fields: [TreatmentPlace.Field]
     let outlines: [String: [MKPolygon]]
     let chosen: Set<String>
     @Binding var camera: MapCameraPosition
@@ -33,7 +33,7 @@ struct TreatmentParcelMap: View {
     }
 
     private var drawn: [Outline] {
-        crop.fields.flatMap { field in
+        fields.flatMap { field in
             let picked = chosen.contains(field.id)
             return (outlines[field.id] ?? []).enumerated().map { index, polygon in
                 Outline(id: "\(field.id)#\(index)", polygon: polygon, picked: picked)
@@ -53,7 +53,7 @@ struct TreatmentParcelMap: View {
             .mapStyle(.hybrid(elevation: .flat, pointsOfInterest: .excludingAll))
             .onTapGesture { point in
                 guard let coordinate = proxy.convert(point, from: .local),
-                      let hit = TreatmentPlace.fields(at: coordinate, in: crop.fields, outlines: outlines).first
+                      let hit = TreatmentPlace.fields(at: coordinate, in: fields, outlines: outlines).first
                 else { return }
                 onToggle(hit.id)
             }

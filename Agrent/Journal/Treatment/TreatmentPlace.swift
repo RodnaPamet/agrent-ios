@@ -18,45 +18,55 @@ enum TreatmentPlace {
         var id: String { parcel.id }
     }
 
-    /// One crop and its parcels.
+    /// One crop as the picker offers it.
     struct Crop: Identifiable, Hashable, Sendable {
-        /// The Bulgarian name, folded — what groups the parcels.
+        /// The Bulgarian name, folded — what groups the stored values.
         let key: String
-        /// In Bulgarian, as everywhere a parcel's crop is shown.
+        /// In Bulgarian, as everywhere a parcel's crop is shown; the stored
+        /// value as it is when no catalogue name exists («Winter Wheat»).
         let label: String
-        let fields: [Field]
+        /// Every stored value with this name — what the parcels are asked by.
+        let values: [String]
+        let parcelCount: Int
         var id: String { key }
     }
 
-    /// The farm's crops from its parcels, in Bulgarian alphabetical order,
-    /// each with its parcels by block and then by name.
-    ///
-    /// A parcel with no crop is not offered: the entry is about a crop, and
-    /// the ДНЕВНИК prints the crop above each field it lists.
+    /// The farm's crops, from `/parcels/by-crop`'s list, in Bulgarian
+    /// alphabetical order.
     ///
     /// Grouped on the BULGARIAN name, case-blind — not on the stored value.
-    /// The farm's crops come in more than one spelling: «Canola» and
-    /// «Rapeseed» are both «Рапица», and «Wheat» and an imported «Пшеница»
-    /// both «Пшеница». Grouped on the stored value, each pair was two
-    /// identical menu entries, each holding part of the crop — and a spray of
-    /// the wheat is a spray of all of it.
-    static func crops(_ blocks: [(Location, [Parcel])]) -> [Crop] {
-        var byKey: [String: (label: String, fields: [Field])] = [:]
-        for (block, parcels) in blocks {
-            for parcel in parcels {
-                guard let raw = parcel.cropType?.trimmingCharacters(in: .whitespacesAndNewlines),
-                      !raw.isEmpty else { continue }
-                let label = CommodityName.freeText(raw) ?? raw
-                let key = label.lowercased()
-                byKey[key, default: (label, [])].fields
-                    .append(Field(parcel: parcel, blockID: block.id, blockName: block.name))
-            }
+    /// The server returns each value verbatim (agri-saas #1746), and the farm
+    /// spells its crops more than one way: «Canola» and «Rapeseed» are both
+    /// «Рапица», «Wheat» and an imported «Пшеница» both «Пшеница». Grouped on
+    /// the stored value, each pair was two identical menu entries, each
+    /// holding part of the crop — and a spray of the wheat is a spray of all
+    /// of it. A blank value is not a crop.
+    static func crops(_ totals: [ParcelsByCropAPI.CropTotal]) -> [Crop] {
+        var byKey: [String: (label: String, values: [String], count: Int)] = [:]
+        for total in totals {
+            let raw = total.cropType.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !raw.isEmpty else { continue }
+            let label = CommodityName.freeText(raw) ?? raw
+            let key = label.lowercased()
+            var entry = byKey[key, default: (label, [], 0)]
+            if !entry.values.contains(raw) { entry.values.append(raw) }
+            entry.count += total.parcelCount
+            byKey[key] = entry
         }
         return byKey
-            .map { key, value in
-                Crop(key: key, label: value.label, fields: value.fields.sorted(by: fieldOrder))
-            }
+            .map { key, value in Crop(key: key, label: value.label, values: value.values, parcelCount: value.count) }
             .sorted { $0.label.compare($1.label, locale: Locale(identifier: "bg_BG")) == .orderedAscending }
+    }
+
+    /// One crop's parcels from the answers for each of its stored values,
+    /// once each, by block and then by name.
+    static func fields(_ answers: [ParcelsByCropAPI.CropParcels]) -> [Field] {
+        var seen = Set<String>()
+        var fields: [Field] = []
+        for parcel in answers.flatMap(\.parcels) where seen.insert(parcel.id).inserted {
+            fields.append(Field(parcel: parcel.parcel, blockID: parcel.locationId, blockName: parcel.locationName))
+        }
+        return fields.sorted(by: fieldOrder)
     }
 
     private static func fieldOrder(_ a: Field, _ b: Field) -> Bool {
@@ -85,9 +95,9 @@ enum TreatmentPlace {
     /// Every parcel's outlines, built ONCE per load: `mapPolygons` builds new
     /// `MKPolygon`s each time, and the map is redrawn on every toggle and
     /// every pan.
-    static func outlines(_ crops: [Crop]) -> [String: [MKPolygon]] {
+    static func outlines(_ fields: [Field]) -> [String: [MKPolygon]] {
         var byID: [String: [MKPolygon]] = [:]
-        for field in crops.flatMap(\.fields) where byID[field.id] == nil {
+        for field in fields where byID[field.id] == nil {
             byID[field.id] = field.parcel.geometry?.mapPolygons ?? []
         }
         return byID
