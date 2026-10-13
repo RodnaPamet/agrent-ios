@@ -205,6 +205,26 @@ extension ValueRow where Label == Text {
 /// A label and a text field the farmer types into, on one row — «Тонове»,
 /// «Количество». The TYPED text is `Palette.Field.text`, not the grey
 /// `LabeledContent` gives a value: it is the farmer's input, not a hint.
+///
+/// ── The defect ──
+///
+/// This was a `LabeledContent`, and beside a text field that takes every
+/// point it is offered, `LabeledContent` gives the label what is left: on
+/// «Цени» (#258) «Уреа (карбамид), €/т» was squeezed to «Уреа (карбамид),…»
+/// at the DEFAULT size, in a row half empty. Letting the label wrap did not
+/// make room for it: the row was sized for a title of one line, then the
+/// title was drawn in two, and «€/т» landed on the «Източник…» note under
+/// the row (owner, on the phone, 2026-10-13). `FieldRowLayoutTests` measures
+/// both.
+///
+/// ── The fix ──
+///
+/// A row of its own, as `MenuPicker` is. The TITLE comes first: it is the
+/// name of what is being typed, and it takes the width it needs. The field
+/// takes the rest, and never less than `fieldRoom` — a price, «1 395,00» —
+/// so a title too long to sit beside that wraps, and the row grows by its
+/// lines. At the accessibility sizes the field goes under its title at the
+/// row's full width, decided from the size, as `AdaptiveRow` does.
 struct FieldRow<Field: View>: View {
     let title: String
     /// What VoiceOver says for the field when the title alone does not tell
@@ -213,6 +233,9 @@ struct FieldRow<Field: View>: View {
     let spoken: String?
     @ViewBuilder var field: Field
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .body) private var fieldRoom: CGFloat = 96
+
     init(_ title: String, spoken: String? = nil, @ViewBuilder field: () -> Field) {
         self.title = title
         self.spoken = spoken
@@ -220,7 +243,17 @@ struct FieldRow<Field: View>: View {
     }
 
     var body: some View {
-        LabeledContent {
+        let stacked = typeSize.isAccessibilitySize
+        // `AnyLayout`, as in `MetaRow`, so the field keeps its identity — and
+        // the keyboard — when the text size changes with the form open.
+        let layout = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
+
+        layout {
+            Text(title)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
             field
                 .foregroundStyle(Palette.Field.text)
                 // The row's title is what the field IS. A field's own title
@@ -228,12 +261,8 @@ struct FieldRow<Field: View>: View {
                 // as its name; Voice Control could not name it at all.
                 .accessibilityLabel(spoken ?? title)
                 .accessibilityInputLabels(A11y.spokenNames(title))
-        } label: {
-            // WRAPS, never cut. The field takes the row's spare width, and a
-            // long title was squeezed to «Уреа (карбамид),…» at the DEFAULT
-            // size on «Цени» (#258): the name of what is being priced, cut.
-            Text(title)
-                .fixedSize(horizontal: false, vertical: true)
+                .frame(minWidth: stacked ? nil : fieldRoom, maxWidth: .infinity,
+                       alignment: stacked ? .leading : .trailing)
         }
     }
 }
