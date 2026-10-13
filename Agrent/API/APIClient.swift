@@ -1096,12 +1096,10 @@ actor APIClient {
     /// sign-in, a 403 that answers late is nobody's, and must not send the
     /// next person to the terms.
     private func markTermsPending(for seen: Tokens) {
-        guard Self.mayCommitRefresh(seen: seen, stored: TokenStore.load()),
-              var tokens = TokenStore.load() else { return }
-        if tokens.termsPending != true {
-            tokens.termsPending = true
-            TokenStore.save(tokens)
-        }
+        // Compared and written under one lock (#289): an Изход between the
+        // check and the write cannot be undone by it.
+        guard TokenStore.update(ifRefreshToken: seen.refreshToken, { $0.termsPending = true }) != nil
+        else { return }
         NotificationCenter.default.post(name: Self.termsPendingNotification, object: nil)
     }
 
@@ -1113,10 +1111,10 @@ actor APIClient {
     /// until it lapses — up to fifteen minutes. Expired here, the very next
     /// request refreshes first and carries a token minted after it.
     func termsAccepted() {
-        guard var tokens = TokenStore.load() else { return }
-        tokens.termsPending = nil
-        tokens.expiresAt = .distantPast
-        TokenStore.save(tokens)
+        TokenStore.updateCurrent {
+            $0.termsPending = nil
+            $0.expiresAt = .distantPast
+        }
     }
 
     // MARK: - The suspension (agrent-ios#283)
@@ -1151,17 +1149,16 @@ actor APIClient {
     /// request was made under — `markTermsPending`'s rule, for its reason: a
     /// refusal that answers after an Изход is nobody's.
     private func markSuspended(for seen: Tokens, saysDeletion: Bool, erasesAt: Date?) {
-        guard let stored = TokenStore.load(),
-              Self.mayCommitRefresh(seen: seen, stored: stored) else { return }
-        let marked = Self.suspending(stored, saysDeletion: saysDeletion, erasesAt: erasesAt)
-        if marked != stored { TokenStore.save(marked) }
+        guard TokenStore.update(ifRefreshToken: seen.refreshToken, {
+            $0 = Self.suspending($0, saysDeletion: saysDeletion, erasesAt: erasesAt)
+        }) != nil else { return }
         NotificationCenter.default.post(name: Self.suspendedNotification, object: nil)
     }
 
     private func liftSuspension(for seen: Tokens) {
-        guard let stored = TokenStore.load(), stored.suspended == true,
-              Self.mayCommitRefresh(seen: seen, stored: stored) else { return }
-        TokenStore.save(Self.lifting(stored))
+        TokenStore.update(ifRefreshToken: seen.refreshToken) {
+            if $0.suspended == true { $0 = Self.lifting($0) }
+        }
     }
 
     /// The account's deletion was cancelled (`DELETE /api/account/deletion`,
@@ -1170,11 +1167,19 @@ actor APIClient {
     /// late write of the pair.
     private func deletionCancelled(for seen: Tokens) {
         deletionCancels &+= 1
-        guard var stored = TokenStore.load(), stored.suspended == true,
-              Self.mayCommitRefresh(seen: seen, stored: stored),
-              stored.suspendedErasesAt != nil else { return }
-        stored.suspendedErasesAt = nil
-        TokenStore.save(stored)
+        TokenStore.update(ifRefreshToken: seen.refreshToken) {
+            if $0.suspended == true { $0.suspendedErasesAt = nil }
+        }
+    }
+
+    /// The new pair a refresh brought, carrying the stored pair's session
+    /// marks — the terms and the suspension. Pure, for the tests.
+    static func rotated(_ stored: Tokens, to fresh: Tokens) -> Tokens {
+        var next = fresh
+        next.termsPending = stored.termsPending
+        next.suspended = stored.suspended
+        next.suspendedErasesAt = stored.suspendedErasesAt
+        return next
     }
 
     static func refreshDecision(seen: Tokens, stored: Tokens?) -> RefreshDecision {
@@ -1355,14 +1360,12 @@ actor APIClient {
                 // meanwhile — Изход, or somebody else signed in — the dead token
                 // is not the one stored, and clearing would sign out the wrong
                 // session.
-                if Self.mayCommitRefresh(seen: seen, stored: TokenStore.load()) {
-                    TokenStore.clear()
-                }
+                TokenStore.clear(ifRefreshToken: seen.refreshToken)
                 throw APIError.notSignedIn
             }
             struct R: Decodable { let accessToken: String; let refreshToken: String; let expiresIn: Int }
             let r = try JSONDecoder().decode(R.self, from: data)
-            var fresh = Tokens(
+            let fresh = Tokens(
                 accessToken: r.accessToken,
                 refreshToken: r.refreshToken,
                 expiresAt: Date().addingTimeInterval(TimeInterval(r.expiresIn))
@@ -1370,20 +1373,19 @@ actor APIClient {
             // NOT saved if the session ended while this was in flight: that
             // would resurrect a signed-out user's tokens. The pair is still
             // returned to this caller, whose request was made under it.
-            if Self.mayCommitRefresh(seen: seen, stored: TokenStore.load()) {
-                // A refresh is the same session, so the terms flag carries
-                // over — as STORED NOW, not as it was when this began: an
-                // acceptance recorded while the request was out must not be
-                // undone by its answer. The suspension's marks likewise.
-                let stored = TokenStore.load()
-                fresh.termsPending = stored?.termsPending
-                fresh.suspended = stored?.suspended
-                fresh.suspendedErasesAt = stored?.suspendedErasesAt
-                TokenStore.save(fresh)
-            } else {
+            //
+            // A refresh is the same session, so the terms flag carries over —
+            // as STORED NOW, not as it was when this began: an acceptance
+            // recorded while the request was out must not be undone by its
+            // answer. The suspension's marks likewise. Compared and written
+            // under one lock (#289).
+            guard let committed = TokenStore.update(ifRefreshToken: seen.refreshToken, {
+                $0 = Self.rotated($0, to: fresh)
+            }) else {
                 Log.auth.info("refresh answered after the session changed, not saved")
+                return fresh
             }
-            return fresh
+            return committed
         }
         refreshTask = task
         return try await task.value
