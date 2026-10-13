@@ -192,6 +192,13 @@ enum A11y {
         static let restoreAccount = spokenNames("Възстанови профила", "Restore account", "Restore profile")
         /// The suspended screen's cancel of the person's own deletion (#283).
         static let cancelDeletion = spokenNames("Отмени изтриването", "Cancel deletion", "Stop deletion")
+        /// «Ново мероприятие» (#293): its first step's way on, the crop at
+        /// the top right of the second, and the parcel list's whole-crop
+        /// choice.
+        static let next = spokenNames("Напред", "Next")
+        static let crop = spokenNames("Култура", "Crop")
+        static let selectAll = spokenNames("Избери всички", "Select all")
+        static let deselectAll = spokenNames("Премахни избора", "Deselect all")
     }
 
     /// Join facts as speech: nils and blanks dropped, comma-separated, one

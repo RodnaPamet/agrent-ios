@@ -45,6 +45,11 @@ import SwiftUI
 ///      or a conflict. Skip and reopen play nothing: the web gives them a
 ///      `tap`, and this vocabulary has no tap. A conflict the DRAIN parks
 ///      plays nothing either — the operator is not looking at it.
+///   6. A treatment recorded from «Ново мероприятие» (`TreatmentEntryFlow`,
+///      agrent-ios#293). Field work, often recorded standing in the field,
+///      and the sheet stays open on its saved screen rather than closing
+///      onto a list that would show the new row. `.warning` for a refusal on
+///      the last step, which keeps the person on it.
 ///
 /// The other writes — a cost, a listing, a journal entry, a product, an
 /// insurance request, a member invitation — close onto a list that shows the

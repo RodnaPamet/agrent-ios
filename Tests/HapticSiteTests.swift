@@ -196,6 +196,7 @@ final class HapticSiteTests: XCTestCase {
             "Agrent/Exchange/ConversationView.swift": 1,      // message sent / refused
             "Agrent/Admin/FarmProfileView.swift": 2,          // page: saved; editor: refused
             "Agrent/Tasks/FieldOperationSection.swift": 1,    // parcel line marked / refused (#138)
+            "Agrent/Journal/Treatment/TreatmentEntryFlow.swift": 1, // treatment recorded / refused (#293)
         ]
         var found: [String: Int] = [:]
         for (path, text) in try appSources() {
@@ -229,6 +230,9 @@ final class HapticSiteTests: XCTestCase {
             // refusal or a conflict on the tap. Never from the drain.
             "Agrent/Tasks/FieldOperationStore.swift mark saved",
             "Agrent/Tasks/FieldOperationStore.swift mark refused",
+            // #293: «Ново мероприятие» recorded, or refused on its last step.
+            "Agrent/Journal/Treatment/TreatmentEntryFlow.swift save saved",
+            "Agrent/Journal/Treatment/TreatmentEntryFlow.swift save refused",
         ]
         let regex = try NSRegularExpression(pattern: #"\w+\.(saved|refused)\(\)"#)
         var found: Set<String> = []

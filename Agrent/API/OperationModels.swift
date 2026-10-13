@@ -61,9 +61,34 @@ struct InputItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
     /// from before the column: then `createdByUserId` decides, as it did.
     var serverIsArchetype: Bool? = nil
 
+    /// The registration a plant protection product carries — its ЗЗР number
+    /// and quarantine period in days — which `/items` already sends. Read for
+    /// «Ново мероприятие», which prefills the quarantine period from it
+    /// (agrent-ios#293). LENIENT, unlike the keys above: a value of the wrong
+    /// type costs this field, never the whole catalogue.
+    var pppRegistrationNo: String? = nil
+    var quarantinePeriodDays: Int? = nil
+
     private enum CodingKeys: String, CodingKey {
         case id, name, category, defaultUnit, createdByUserId
         case serverIsArchetype = "isArchetype"
+        case pppRegistrationNo, quarantinePeriodDays
+    }
+}
+
+extension InputItem {
+    /// The synthesised decoding for the original keys, kept exactly — a
+    /// missing `id` still fails, as it did — plus the two lenient ones.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        category = try c.decode(String.self, forKey: .category)
+        defaultUnit = try c.decodeIfPresent(Unit.self, forKey: .defaultUnit)
+        createdByUserId = try c.decodeIfPresent(String.self, forKey: .createdByUserId)
+        serverIsArchetype = try c.decodeIfPresent(Bool.self, forKey: .serverIsArchetype)
+        pppRegistrationNo = (try? c.decodeIfPresent(String.self, forKey: .pppRegistrationNo)) ?? nil
+        quarantinePeriodDays = (try? c.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)) ?? nil
     }
 }
 
