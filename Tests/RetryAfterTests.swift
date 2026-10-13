@@ -286,6 +286,13 @@ final class RateLimitMessageTests: XCTestCase {
             status: 429, code: "RATE_LIMITED",
             message: "Too many read requests. Retry after 3 seconds."), tooMany)
 
+        // A LOCALISED 429 too (agri-saas #1677): Bulgarian, so it would pass
+        // the message rule, and it carries a count of seconds no line here
+        // keeps current. The 429 rule is what stops it.
+        XCTAssertEqual(UserMessage.httpText(
+            status: 429, code: "RATE_LIMITED",
+            message: "Твърде много заявки. Опитайте след 12 секунди."), tooMany)
+
         // And through `text(for:)`, which is what every screen calls — with
         // the wait on the error, which that static line does not read.
         XCTAssertEqual(UserMessage.text(for: APIClient.APIError.http(
@@ -306,11 +313,12 @@ final class RateLimitMessageTests: XCTestCase {
     }
 
     /// And it is a 429's rule alone. Any other status with an unmapped code
-    /// still shows the server's sentence, which is the ordinary path.
+    /// still shows the server's Bulgarian sentence, which is the ordinary
+    /// path.
     func testOtherStatusesStillFallBackToTheServersSentence() {
         XCTAssertEqual(UserMessage.httpText(
-            status: 400, code: "SOME_FUTURE_CODE", message: "Delta must be non-zero."),
-            "Delta must be non-zero.")
+            status: 400, code: "SOME_FUTURE_CODE", message: "Разликата не може да е нула."),
+            "Разликата не може да е нула.")
     }
 
     /// Up to two minutes the wait-aware line IS the status sentence,

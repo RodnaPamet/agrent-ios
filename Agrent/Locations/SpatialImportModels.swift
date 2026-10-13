@@ -272,8 +272,9 @@ struct ImportJobStatus: Decodable, Equatable, Sendable {
     /// value need not be.
     let jobId: String?
     let state: String
-    /// ENGLISH, whatever the worker threw: a fallback, not copy. Shown only
-    /// for a code this build does not know; see `failureText`.
+    /// Whatever the worker threw, usually English: a fallback, not copy.
+    /// Shown only for a code this build does not know, and only when it is
+    /// Bulgarian; see `failureText`.
     let failedReason: String?
     /// Why the import failed, as a code to say in Bulgarian (agri-saas
     /// #1637). Null unless the job failed, and null for an unexpected crash.
@@ -315,8 +316,8 @@ extension ImportJobStatus {
     ///
     /// 1. A code this build knows: its own sentence, from the numbers.
     /// 2. A code it does not (a newer server): `failedReason`, when it is a
-    ///    sentence. English, but it knows something this build does not, the
-    ///    same trade `UserMessage.httpText` makes.
+    ///    sentence in Bulgarian — `UserMessage.httpText`'s rule, Bulgarian
+    ///    only (owner, 2026-10-13).
     /// 3. No code: an unexpected crash, whose reason is a stack-trace line
     ///    («connect ECONNREFUSED …»), not something to show a farmer. The
     ///    spec suggests `failedReason` there; this app does not.
@@ -325,7 +326,11 @@ extension ImportJobStatus {
             if let known = SpatialJobFailure.text(code: failedCode, params: failedParams?.values ?? [:]) {
                 return known
             }
-            if let reason = failedReason?.recorded, UserMessage.isHumanSentence(reason) { return reason }
+            if let reason = failedReason?.recorded, UserMessage.isBulgarianSentence(reason) { return reason }
+            // A code is the server refusing the FILE on purpose — the one
+            // server fault, `SPATIAL_IMPORT_INTERNAL`, is mapped above — so
+            // not the server's fault, and not worth the same file again.
+            return SpatialJobFailure.notAccepted
         }
         return SpatialJobFailure.serverFault
     }
@@ -337,6 +342,8 @@ extension ImportJobStatus {
 /// sentence missing its numbers still says what went wrong, without them.
 enum SpatialJobFailure {
     static let serverFault = "Импортът не успя заради грешка на сървъра. Опитайте отново по-късно."
+    /// A coded refusal this build has no sentence for, its reason English.
+    static let notAccepted = "Сървърът не прие файла. Проверете го и опитайте с друг."
 
     static func text(code: String, params: [String: String]) -> String? {
         let number = { (key: String) in params[key].flatMap { Int($0) }.map { Num.text(Double($0)) } }

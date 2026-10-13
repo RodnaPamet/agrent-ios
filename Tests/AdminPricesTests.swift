@@ -165,7 +165,9 @@ final class AdminPricesTests: XCTestCase {
     /// without its params it still says something true.
     func testTheDaysRefusalsNameTheCropInBulgarian() {
         func said(_ code: String, _ params: [String: String]? = nil) -> String {
-            UserMessage.httpText(status: 400, code: code, message: "English fallback.", params: params)
+            // A Bulgarian placeholder: an English one falls to the status
+            // line by itself now, sentence of ours or not.
+            UserMessage.httpText(status: 400, code: code, message: "Сървърът каза нещо.", params: params)
         }
         XCTAssertEqual(said("DUPLICATE_COMMODITY", ["commodity": "wheat"]),
                        "Цената на „\(CommodityName.canonical("wheat")!)“ е въведена два пъти за един ден.")
@@ -180,7 +182,8 @@ final class AdminPricesTests: XCTestCase {
         for code in ["DUPLICATE_COMMODITY", "UNKNOWN_COMMODITY", "COMMODITY_NOT_OVERRIDABLE",
                      "OVERRIDE_DENOMINATION_CHANGED"] {
             let bare = said(code)
-            XCTAssertNotEqual(bare, "English fallback.", code)
+            XCTAssertNotEqual(bare, "Сървърът каза нещо.", code)
+            XCTAssertNotEqual(bare, UserMessage.statusText(400), code)
             XCTAssertTrue(bare.hasSuffix("."), code)
             XCTAssertFalse(bare.contains("_"), code)
         }

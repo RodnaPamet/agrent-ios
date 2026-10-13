@@ -31,15 +31,15 @@ final class ArchetypeRefusalTests: XCTestCase {
         XCTAssertFalse(text.contains("sample product"), "the English leaked: \(text)")
     }
 
-    /// The English here is a well-formed sentence, so `isHumanSentence`
-    /// would happily render it. Only the code winning stops that — the
-    /// same distinction `INVALID_TAB_ORDER` turned on.
-    func testTheEnglishWouldOtherwiseHaveBeenShown() {
-        let english = "\"Generic Chlorothalonil 720 SC\" is a sample product, not a registered one."
-        XCTAssertTrue(UserMessage.isHumanSentence(english), "precondition")
-        XCTAssertFalse(
+    /// The code's sentence beats even a BULGARIAN message: it is written
+    /// for this screen. (An English one falls away by itself since the
+    /// owner's Bulgarian-only rule, so it would prove nothing here.)
+    func testTheCodeBeatsTheServersMessage() {
+        let server = "Продуктът е образец."
+        XCTAssertTrue(UserMessage.isBulgarianSentence(server), "precondition")
+        XCTAssertNotEqual(
             UserMessage.httpText(status: 400, code: "PRODUCT_IS_SAMPLE_ARCHETYPE",
-                                 message: english, params: nil).contains("is a sample"))
+                                 message: server, params: nil), server)
     }
 
     /// Missing params must still produce a usable sentence. A refusal that
@@ -81,9 +81,13 @@ final class ArchetypeRefusalTests: XCTestCase {
     func testTheTypedProductRefusalsAreTranslated() {
         for code in ["PRODUCT_NAME_REQUIRED", "DOSE_UNIT_HAS_NO_BASE", "FERTILIZER_EXPECTED",
                      "OPERATION_INPUT_AMBIGUOUS"] {
-            let text = UserMessage.httpText(status: 400, code: code, message: "English sentence here.")
-            XCTAssertNotEqual(text, "English sentence here.", code)
-            XCTAssertTrue(text.unicodeScalars.contains { $0.value >= 0x0400 && $0.value <= 0x04FF }, code)
+            // A Bulgarian placeholder, and the generic 400 ruled out: an
+            // English one would fall to the status line with or without a
+            // sentence of ours, and prove nothing.
+            let placeholder = "Сървърът каза нещо."
+            let text = UserMessage.httpText(status: 400, code: code, message: placeholder)
+            XCTAssertNotEqual(text, placeholder, code)
+            XCTAssertNotEqual(text, UserMessage.statusText(400), code)
         }
         XCTAssertNil(UserMessage.bulgarian["PRODUCT_EXPECTED"], "the server dropped it; so do we")
     }
@@ -105,8 +109,8 @@ final class ArchetypeRefusalTests: XCTestCase {
     func testAnUnknownCodeIgnoresParamsAndFallsBack() {
         XCTAssertEqual(
             UserMessage.httpText(status: 400, code: "SOMETHING_NEW",
-                                 message: "Something specific happened.",
+                                 message: "Случи се нещо конкретно.",
                                  params: ["thing": "x"]),
-            "Something specific happened.")
+            "Случи се нещо конкретно.")
     }
 }

@@ -143,17 +143,19 @@ struct CalculatorRow: Decodable, Equatable, Sendable, Identifiable {
     let netWorthUnavailableParams: [String: String]?
 
     /// What to actually show: Bulgarian when the code is known, the
-    /// server's English when it is not, and nothing when there is no
-    /// refusal at all.
+    /// server's reason when it is Bulgarian, a generic line when it is
+    /// English (owner, 2026-10-13), and nothing when there is no refusal at
+    /// all.
     ///
     /// Never the code itself. An identifier is not a sentence in any
     /// language.
     var refusalText: String? {
-        RefusalText.resolve(
+        guard netWorthUnavailableCode != nil || netWorthUnavailableReason != nil else { return nil }
+        return RefusalText.resolve(
             code: netWorthUnavailableCode,
             params: netWorthUnavailableParams,
             fallback: netWorthUnavailableReason
-        )
+        ) ?? RefusalText.netWorthUnavailable
     }
 
     let netUncertainty: Uncertainty

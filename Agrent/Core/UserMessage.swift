@@ -69,11 +69,22 @@ enum UserMessage {
     ///
     /// 1. A code this app can name in Bulgarian. Best: written for an
     ///    operator, by us, in their language.
-    /// 2. The server's own `message`, when it is a real sentence. The server
-    ///    knows things we do not and the wording is often better than a
-    ///    category — but it is English, so it is second.
+    /// 2. The server's own `message`, when it is a sentence IN BULGARIAN
+    ///    (`isBulgarianSentence`). agri-saas resolves it from the person's
+    ///    own language since #1677, so for a code this build does not know it
+    ///    is the most specific Bulgarian there is.
     /// 3. A sentence derived from the STATUS. Says what kind of failure it
     ///    was and nothing it cannot support.
+    ///
+    /// ── NEVER ENGLISH (owner, 2026-10-13) ──
+    ///
+    /// The second source used to be any real sentence, English included:
+    /// "the server knows things we do not". It also meant ~500 uncoded
+    /// refusals reached a Bulgarian farmer as "Listing not found". The owner
+    /// chose Bulgarian only: an English `message` now falls to the status
+    /// sentence. agri-saas is translating its refusals a surface at a time
+    /// (#1677, still open); each one it translates appears here with no app
+    /// update, and until then the status sentence is what is said.
     ///
     /// A 429 skips the second: its prose is boilerplate, and English. See the
     /// status rule inside.
@@ -111,7 +122,7 @@ enum UserMessage {
         // is boilerplate, and its one real fact — the wait — travels in the
         // header, where `APIClient` reads it.
         if status == 429 { return statusText(429) }
-        if let message, isHumanSentence(message) { return message }
+        if let message, isBulgarianSentence(message) { return message }
         return statusText(status)
     }
 
@@ -221,6 +232,32 @@ enum UserMessage {
         return trimmed != trimmed.uppercased()
     }
 
+    /// A sentence a Bulgarian farmer can read: `isHumanSentence`, with more
+    /// Cyrillic letters than Latin ones in its PROSE (owner, 2026-10-13:
+    /// Bulgarian only).
+    ///
+    /// The two languages quote each other, and what is quoted is a name, in
+    /// either alphabet, that says nothing about the sentence around it:
+    /// `Parcel "Нивата при Долна Митрополия" is archived` is English, and
+    /// «Няма цена за „Roundup Max“.» is Bulgarian. So quoted text — "…",
+    /// „…“, “…”, «…» — is left out of the count. Not single quotes: English
+    /// apostrophes would pair up across a sentence.
+    static func isBulgarianSentence(_ text: String) -> Bool {
+        guard isHumanSentence(text) else { return false }
+        let prose = text.replacingOccurrences(
+            of: #""[^"]*"|„[^“”"]*[“”"]|“[^”]*”|«[^»]*»"#, with: " ", options: .regularExpression)
+        var cyrillic = 0
+        var latin = 0
+        for scalar in prose.unicodeScalars where scalar.properties.isAlphabetic {
+            switch scalar.value {
+            case 0x0400...0x04FF: cyrillic += 1
+            case 0x0041...0x005A, 0x0061...0x007A: latin += 1
+            default: break
+            }
+        }
+        return cyrillic > latin
+    }
+
     /// What the STATUS alone supports, and nothing more.
     ///
     /// No status gets "try again" unless trying again could actually work. A
@@ -253,10 +290,11 @@ enum UserMessage {
     /// Server error codes this app can say in Bulgarian.
     ///
     /// Grows by batch as the server adds codes — the server side is
-    /// migrating ~530 user-facing English messages onto coded errors, and an
-    /// uncoded one still falls through to its English `message`, which is a
-    /// real sentence and a legitimate fallback. This map is additive and
-    /// nothing breaks by being absent from it.
+    /// migrating ~530 user-facing English messages onto coded errors and
+    /// translating them (#1677). A code absent here falls to the server's
+    /// `message` when that is Bulgarian, and to the status sentence when it
+    /// is English (`httpText`). This map is additive and nothing breaks by
+    /// being absent from it.
     ///
     /// NOT a localisation framework. The app has no string catalogue and
     /// every literal in it is hard-coded Bulgarian; this matches that rather
@@ -849,9 +887,9 @@ enum UserMessage {
         // Three refusals that reached the client as `FORBIDDEN` — the token
         // sat in `message` — until agri-saas #1645 made each its own code
         // and gave it an English sentence as `message`. Without a sentence
-        // here that English is what `httpText` would now show, where
-        // «Нямате права» stood before: a regression the server fix would
-        // have caused on this side alone.
+        // here a code would have replaced «Нямате права» with the generic
+        // status line: less specific than the right sentence, which is this
+        // one.
         //
         // A machine operator (MECHANISATOR) is confined to its own work; a
         // person-scoped social route refuses that persona.

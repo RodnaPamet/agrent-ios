@@ -321,13 +321,14 @@ final class TabOrderRefusalTests: XCTestCase {
         XCTAssertLessThan(AppSurface.capacity, 12)
     }
 
-    /// An unrecognised code still falls back to the server's sentence —
-    /// keying on codes must not make unknown refusals silent. Most of the
-    /// API is still uncoded, so this is the common path, not the rare one.
+    /// An unrecognised code still falls back to the server's Bulgarian
+    /// sentence — keying on codes must not make unknown refusals silent.
+    /// Most of the API is still uncoded, so this is the common path, not the
+    /// rare one. (English falls to the status sentence: owner, 2026-10-13.)
     func testAnUnknownCodeStillFallsBackToTheMessage() {
         XCTAssertEqual(
             UserMessage.httpText(status: 400, code: "SOME_FUTURE_CODE",
-                                 message: "Something specific went wrong."),
-            "Something specific went wrong.")
+                                 message: "Нещо конкретно се обърка."),
+            "Нещо конкретно се обърка.")
     }
 }

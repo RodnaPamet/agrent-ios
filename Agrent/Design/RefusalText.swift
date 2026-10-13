@@ -7,9 +7,11 @@ import Foundation
 ///     if (isKnownRefusalCode(code)) return translate(`refusal.${code}`, params)
 ///     return fallbackEnglish
 ///
-/// Translate a code we recognise; fall back to the server's own English
-/// sentence for one we do not. An unknown future code must still say
-/// something rather than nothing.
+/// Translate a code we recognise; for one we do not, fall back to the
+/// server's own sentence — ONLY when it is Bulgarian (owner, 2026-10-13).
+/// The web falls back to English; this app never shows it. A caller with a
+/// refusal and no sentence says its own generic line
+/// (`netWorthUnavailable`, or the fallback it passes).
 ///
 /// ── AND ONE PLACE THIS DELIBERATELY DIVERGES FROM THE WEB ──
 ///
@@ -31,12 +33,16 @@ import Foundation
 /// same in both languages.
 enum RefusalText {
 
+    /// The net worth's refusal when its code is one this build does not know
+    /// and the server's reason is English, or missing.
+    static let netWorthUnavailable = "Нетната стойност не може да се изчисли."
+
     /// Only these keys are substituted. A `{…}` this does not know is left
     /// exactly as written rather than blanked — a sentence with a visible
     /// `{foo}` is reportable, and one silently missing a clause is not.
     static func resolve(code: String?, params: [String: String]?, fallback: String?) -> String? {
         guard let code, let template = UserMessage.bulgarian[code] else {
-            return fallback
+            return fallback.flatMap { UserMessage.isBulgarianSentence($0) ? $0 : nil }
         }
         guard let params, !params.isEmpty else { return template }
 
