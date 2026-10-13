@@ -317,18 +317,17 @@ final class SubscriptionRefusalTests: XCTestCase {
         }
     }
 
-    /// Uncoded on the server: FORBIDDEN, told apart only by the message's
-    /// prefix — and FORBIDDEN alone says «Нямате права».
-    func testAPlanLimitIsNotCalledAMissingRight() {
+    /// A plan limit is said by its CODE, whatever its message says. The prose
+    /// prefix that told it apart before agri-saas #1679 is no longer read
+    /// (agrent-ios#307): the server dropped it, and the wording of a message
+    /// never decides what happened.
+    func testAPlanLimitIsSaidByItsCodeAndNeverByProse() {
+        XCTAssertEqual(UserMessage.httpText(status: 403, code: "PLAN_LIMIT_EXCEEDED",
+                                            message: "FREE plan allows 1 location(s); tenant currently has 1."),
+                       "Достигнат е лимитът на абонаментния план на стопанството.")
+        // The control: the retired prefix under FORBIDDEN is a FORBIDDEN.
         XCTAssertEqual(UserMessage.httpText(status: 403, code: "FORBIDDEN",
                                             message: "plan_limit_exceeded: Your plan allows 1 location."),
-                       "Достигнат е лимитът на абонаментния план на стопанството.")
-        // Positive control: any other FORBIDDEN is still a missing right.
-        XCTAssertEqual(UserMessage.httpText(status: 403, code: "FORBIDDEN", message: "Forbidden"),
-                       "Нямате права за това действие.")
-        // The marker leads the message; mentioned anywhere else, it is not one.
-        XCTAssertEqual(UserMessage.httpText(status: 403, code: "FORBIDDEN",
-                                            message: "Forbidden (see plan_limit_exceeded docs)"),
                        "Нямате права за това действие.")
     }
 

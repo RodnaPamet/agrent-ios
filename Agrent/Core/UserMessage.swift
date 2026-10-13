@@ -93,16 +93,6 @@ enum UserMessage {
         // A sentence about THIS failure, when the server named what went
         // wrong. Only for codes that have one — see `interpolated`.
         if let code, let built = interpolated(code: code, params: params) { return built }
-        // ── THE PLAN LIMIT IS NOT CODED (agrent-ios#241) ──
-        //
-        // agri-saas refuses it with a prose `forbidden()`: a 403 `FORBIDDEN`
-        // whose message LEADS with `plan_limit_exceeded: …`, and that prefix
-        // is the one thing telling it apart. Read before the table, where
-        // FORBIDDEN is «Нямате права» — which would send the farmer to the
-        // owner for a limit that no permission lifts.
-        if code == "FORBIDDEN", let message, message.hasPrefix(planLimitMarker) {
-            return planLimitReached
-        }
         if let code, let known = bulgarian[code] { return known }
         // ── A 429 IS SAID BY STATUS, whatever prose came with it ──
         //
@@ -279,9 +269,6 @@ enum UserMessage {
         default: "Възникна грешка при връзката със сървъра."
         }
     }
-
-    /// The marker leading a plan-limit refusal's message — see `httpText`.
-    static let planLimitMarker = "plan_limit_exceeded"
 
     /// A statement and nothing more, for the reason `PAST_DUE_RESTRICTED`'s
     /// is (agrent-ios#241).
@@ -681,9 +668,10 @@ enum UserMessage {
             "Тази функция е спряна, защото плащането за абонамента на стопанството не е преминало.",
 
         // The plan's other refusals, coded since agri-saas #1679 (agrent-ios
-        // #286). The plan limit was told apart by its message's leading
-        // token only (`planLimitMarker`, read in `httpText` for servers from
-        // before). Under the same 3.1.1 rule as above: no plan picker, no
+        // #286). Before that the plan limit was a bare FORBIDDEN, told apart
+        // by its message's leading token; the server has dropped the token
+        // (agri-saas #1677) and the match on it went with it (#307) — the
+        // code alone decides. Under the same 3.1.1 rule as above: no plan picker, no
         // "upgrade" — and each says what is true of ITS condition, because
         // the five differ in what, if anything, changes it.
         //
