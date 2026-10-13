@@ -22,6 +22,9 @@ struct TreatmentPlaceView: View {
     @Binding var chosen: Set<String>
     let saving: Bool
     let failure: String?
+    /// Reads the crop list again after it failed. The flow's, not the
+    /// store's, because the flow also chooses a farm's only crop.
+    let retryCrops: @MainActor () async -> Void
     let onSave: ([TreatmentPlace.Field]) -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -123,7 +126,10 @@ struct TreatmentPlaceView: View {
             case .loading:
                 Section { ProgressView().pageRow() }
             case .failed(let message):
-                Section { note(message).pageRow() }
+                // Without a retry, a crop list that failed — offline, with
+                // nothing cached — could only be left by cancelling the entry
+                // and losing step one.
+                Section { retryRow(message) { await retryCrops() } }
             case .loaded where crops.isEmpty:
                 Section { note(Self.noCrops).pageRow() }
             case .loaded:
@@ -144,12 +150,7 @@ struct TreatmentPlaceView: View {
             Section { ProgressView().pageRow() } header: { SectionHeader(crop.label) }
         case .failed(let message):
             Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    note(message)
-                    Button("Опитайте отново") { Task { await store.loadFields(for: crop) } }
-                        .font(.footnote)
-                }
-                .pageRow()
+                retryRow(message) { await store.loadFields(for: crop) }
             } header: {
                 SectionHeader(crop.label)
             }
@@ -280,6 +281,15 @@ struct TreatmentPlaceView: View {
 
     private func toggle(_ id: String) {
         if chosen.contains(id) { chosen.remove(id) } else { chosen.insert(id) }
+    }
+
+    private func retryRow(_ message: String, retry: @escaping @MainActor () async -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            note(message)
+            Button("Опитайте отново") { Task { await retry() } }
+                .font(.footnote)
+        }
+        .pageRow()
     }
 
     private func note(_ text: String) -> some View {
