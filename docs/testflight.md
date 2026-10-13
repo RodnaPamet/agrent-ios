@@ -8,16 +8,21 @@ Run workflow) or when a `v*` tag is pushed — never on a PR or a merge.
 
 All in the Apple Developer / App Store Connect account that will own the app.
 
-1. **Register the bundle ID.** developer.apple.com → Certificates, Identifiers &
-   Profiles → Identifiers → **+** → App IDs → App → Explicit, Bundle ID
-   `bg.agrent.app`, description "Agrent". No capabilities need ticking.
+1. **Register the bundle ID and its capabilities.** developer.apple.com →
+   Certificates, Identifiers & Profiles → Identifiers → `bg.agrent.app` (or
+   **+** → App IDs → App → Explicit, Bundle ID `bg.agrent.app`, description
+   "Agrent"). Tick **Sign In with Apple**, **Push Notifications** and
+   **Associated Domains** (#191): `project.yml` declares all three, and a build
+   fails to find a profile until the App ID has them.
 2. **Create the app record.** appstoreconnect.apple.com → Apps → **+** → New App:
    platform iOS, name "Agrent" (must be unique on the store — any variant works
    for TestFlight), primary language Bulgarian, bundle ID `bg.agrent.app`, SKU
    anything (e.g. `agrent-ios`). Without this record every upload is refused.
 3. **Create an API key.** App Store Connect → Users and Access → Integrations →
    App Store Connect API → Team Keys → **+**. Name "GitHub TestFlight", access
-   **App Manager**. Download the `.p8` (Apple lets you download it **once**).
+   **Admin** — App Manager can be refused when Apple signs the export with the
+   cloud-managed certificate (see "If a run fails"). Download the `.p8` (Apple
+   lets you download it **once**).
    Note the **Key ID** beside it and the **Issuer ID** above the table.
 4. **Find the Team ID.** developer.apple.com → Account → Membership details →
    Team ID (10 characters).

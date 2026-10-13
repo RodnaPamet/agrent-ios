@@ -108,11 +108,23 @@ targets:
     # lives on the App ID `bg.agrent.app` in the owner's developer account,
     # enabled by a device build with `-allowProvisioningUpdates` (the owner's
     # choice, 2026-10-08).
+    #
+    # PUSH and LINKS (agrent-ios#191, for #272 and #206). Both need the
+    # capability ticked on the App ID first — Push Notifications and
+    # Associated Domains — or every signed build fails to find a profile.
+    # `aps-environment` is `development` here; an App Store Connect export
+    # re-signs it as `production`. The domain has no
+    # apple-app-site-association file yet (agri-saas serves none), so links
+    # do not open the app until it does; the entitlement costs nothing until
+    # then.
     entitlements:
       path: Agrent/Agrent.entitlements
       properties:
         com.apple.developer.applesignin:
           - Default
+        aps-environment: development
+        com.apple.developer.associated-domains:
+          - applinks:app.agrent.bg
     info:
       path: Agrent/Info.plist
       properties:
