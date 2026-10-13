@@ -421,10 +421,26 @@ final class TreatmentPlaceStoreTests: XCTestCase {
                        "a crop shown with part of its parcels reads as the whole crop")
     }
 
-    func testTheCropListFailingIsAFailure() async {
-        let store = TreatmentPlaceStore(loadCrops: { .failed("Сървърът не отговори.") },
-                                        loadCrop: { _ in .failed("x") })
+    func testTheCropListFailingIsAFailureThatARetryRecovers() async {
+        let reads = Reads()
+        let store = TreatmentPlaceStore(
+            loadCrops: {
+                reads.count += 1
+                return reads.count == 1
+                    ? .failed("Сървърът не отговори.")
+                    : .loaded(.init(crops: [.init(cropType: "Wheat", parcelCount: 1, areaHaTotal: 1)]), .fresh)
+            },
+            loadCrop: { _ in .failed("x") }
+        )
         await store.load()
         XCTAssertEqual(store.state, .failed("Сървърът не отговори."))
+        // Step two's «Опитайте отново».
+        await store.load()
+        XCTAssertEqual(store.state.value?.map(\.values), [["Wheat"]], "a retry after a failed crop list did not load it")
     }
+}
+
+@MainActor
+private final class Reads {
+    var count = 0
 }

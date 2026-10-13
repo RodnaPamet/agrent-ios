@@ -54,7 +54,7 @@ struct TreatmentEntryFlow: View {
             }
             .navigationDestination(for: Step.self) { _ in
                 TreatmentPlaceView(store: place, kind: draft.kind, cropKey: $cropKey, chosen: $chosen,
-                                   saving: saving, failure: failure) { fields in
+                                   saving: saving, failure: failure, retryCrops: { await loadPlace() }) { fields in
                     Task { await save(fields) }
                 }
             }
@@ -63,19 +63,23 @@ struct TreatmentEntryFlow: View {
         .writeFeedback(feedback)
         // The parcels are read as step one opens — usually in hand by «Напред»
         // — and from here, so going back from step two does not cancel it.
-        .task {
-            await place.load()
-            // Chosen for the person when the farm grows one crop — and its
-            // parcels read now, so they are in hand by «Напред».
-            if cropKey == nil, let crops = place.state.value, crops.count == 1 {
-                cropKey = crops[0].key
-                await place.loadFields(for: crops[0])
-            }
-        }
+        .task { await loadPlace() }
         // A refusal is about what was chosen when it came; a new choice
         // clears it rather than leaving it over a different entry.
         .onChange(of: chosen) { _, _ in failure = nil }
         .onChange(of: cropKey) { _, _ in failure = nil }
+    }
+
+    /// The farm's crops — and, when it grows one, that crop chosen for the
+    /// person and its parcels read now, so they are in hand by «Напред». Step
+    /// two's «Опитайте отново» runs this again after a failed read, so a
+    /// retry chooses the lone crop as the first read would have.
+    private func loadPlace() async {
+        await place.load()
+        if cropKey == nil, let crops = place.state.value, crops.count == 1 {
+            cropKey = crops[0].key
+            await place.loadFields(for: crops[0])
+        }
     }
 
     private func save(_ fields: [TreatmentPlace.Field]) async {
