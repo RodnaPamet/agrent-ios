@@ -88,8 +88,16 @@ final class AccountSuspensionTests: XCTestCase {
                       "a suspension is only one screen's error")
         assertMatches(api, #"case 200\.\.<300:\s*if path == MeAPI\.path \{ liftSuspension\(for: tokens\) \}\s*if method == "DELETE", path == AccountDeletionAPI\.path \{ deletionCancelled\(for: tokens\) \}\s*return \(data, http\)"#,
                       "a lifted suspension or a cancelled deletion stays on the pair")
-        assertMatches(api, #"fresh\.suspended = stored\?\.suspended\s*fresh\.suspendedErasesAt = stored\?\.suspendedErasesAt\s*TokenStore\.save\(fresh\)"#,
+        assertMatches(api, #"TokenStore\.update\(ifRefreshToken: seen\.refreshToken, \{\s*\$0 = Self\.rotated\(\$0, to: fresh\)"#,
                       "a token refresh drops the suspension")
+        var marked = Tokens(accessToken: "a", refreshToken: "r", expiresAt: .distantPast, termsPending: true)
+        marked.suspended = true
+        marked.suspendedErasesAt = Date(timeIntervalSince1970: 1)
+        let next = APIClient.rotated(marked, to: Tokens(accessToken: "a2", refreshToken: "r2", expiresAt: .distantFuture))
+        XCTAssertEqual(next.refreshToken, "r2", "positive control: the new pair")
+        XCTAssertEqual(next.suspended, true)
+        XCTAssertEqual(next.suspendedErasesAt, Date(timeIntervalSince1970: 1))
+        XCTAssertEqual(next.termsPending, true)
 
         let auth = try source("Agrent/Auth/AuthClient.swift")
         assertMatches(auth, #"forName: APIClient\.termsPendingNotification, object: nil, queue: \.main"#, "positive control")

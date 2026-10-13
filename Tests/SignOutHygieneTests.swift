@@ -346,34 +346,38 @@ final class SignOutHygieneTests: XCTestCase {
         XCTAssertFalse(APIClient.mayCommitRefresh(seen: a, stored: b),
                        "A's refused refresh clears B's tokens")
 
+        // EVERY late write of the pair compares and writes under ONE lock
+        // (#289): the refresh's commit, the terms mark, the suspension's three
+        // and a refused refresh's clear. A bare `save` or `clear` here would
+        // check the session and write in two steps, and an Изход between them
+        // would be undone.
         let api = read("Agrent/API/APIClient.swift")
-        // Six writes of the pair: the refresh's, the terms flag's two (#193)
-        // and the suspension's three (#283) — each of the STORED pair, and
-        // every one a late answer could make (the refresh, a terms refusal,
-        // a suspension refusal, `/me`'s lift, a stop of the deletion) behind
-        // the session check.
-        XCTAssertEqual(api.components(separatedBy: "TokenStore.save(").count - 1, 6,
-                       "positive control: the writes of the pair are the six known ones")
-        // The suspension's three read the pair once and check THAT read.
-        XCTAssertNotNil(api.range(of: #"guard let stored = TokenStore\.load\(\),\s*Self\.mayCommitRefresh\(seen: seen, stored: stored\) else \{ return \}\s*let marked = Self\.suspending\("#,
-                                  options: .regularExpression),
-                        "a late suspension refusal marks whichever session is stored now")
-        XCTAssertNotNil(api.range(of: #"guard let stored = TokenStore\.load\(\), stored\.suspended == true,\s*Self\.mayCommitRefresh\(seen: seen, stored: stored\) else \{ return \}\s*TokenStore\.save\(Self\.lifting\(stored\)\)"#,
-                                  options: .regularExpression),
-                        "a late /me lifts whichever session is stored now")
-        XCTAssertNotNil(api.range(of: #"guard var stored = TokenStore\.load\(\), stored\.suspended == true,\s*Self\.mayCommitRefresh\(seen: seen, stored: stored\),\s*stored\.suspendedErasesAt != nil else \{ return \}"#,
-                                  options: .regularExpression),
-                        "a late cancel of the deletion writes whichever session is stored now")
-        let guarded = #"if Self\.mayCommitRefresh\(seen: seen, stored: TokenStore\.load\(\)\) \{[^{}]*TokenStore\.%@"#
-        XCTAssertNotNil(api.range(of: String(format: guarded, #"save\(fresh\)"#), options: .regularExpression),
-                        "the refresh saves without checking the session is still its own")
-        XCTAssertNotNil(api.range(of: #"guard Self\.mayCommitRefresh\(seen: seen, stored: TokenStore\.load\(\)\),\s*var tokens = TokenStore\.load\(\) else \{ return \}"#,
-                                  options: .regularExpression),
-                        "a late terms refusal marks whichever session is stored now")
-        XCTAssertNotNil(api.range(of: String(format: guarded, #"clear\(\)"#), options: .regularExpression),
-                        "a refused refresh clears without checking the session is still its own")
-        XCTAssertEqual(api.components(separatedBy: "TokenStore.clear()").count - 1, 1,
-                       "a second, unguarded clear in the refresh path")
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.save(").count - 1, 0,
+                       "a write of the pair outside the compare-and-swap")
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.clear()").count - 1, 0,
+                       "a clear of the pair outside the compare-and-swap")
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.update(ifRefreshToken: seen.refreshToken").count - 1, 5,
+                       "positive control: the refresh, the terms mark and the suspension's three")
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.clear(ifRefreshToken: seen.refreshToken)").count - 1, 1,
+                       "a refused refresh clears whichever session is stored now")
+        XCTAssertEqual(api.components(separatedBy: "TokenStore.updateCurrent").count - 1, 1,
+                       "positive control: the one write that is the current session's by construction")
+
+        // And the lock is the one Изход and a sign-in take.
+        let store = read("Agrent/Auth/TokenStore.swift")
+        XCTAssertNotNil(store.range(of: #"static func save\(_ tokens: Tokens\) \{\s*lock\.withLock"#,
+                                    options: .regularExpression), "a sign-in's save skips the lock")
+        XCTAssertNotNil(store.range(of: #"static func clear\(\) \{\s*lock\.withLock"#,
+                                    options: .regularExpression), "Изход's clear skips the lock")
+
+        // The decision itself, pure: only the session that asked is written.
+        XCTAssertNil(TokenStore.swapped(nil, expected: "ra") { $0.termsPending = true },
+                     "a late answer after Изход resurrected the pair")
+        XCTAssertNil(TokenStore.swapped(b, expected: "ra") { $0.termsPending = true },
+                     "A's late answer wrote B's pair")
+        let written = TokenStore.swapped(a, expected: "ra") { $0.termsPending = true }
+        XCTAssertEqual(written?.after.termsPending, true, "positive control")
+        XCTAssertNil(written?.before.termsPending)
     }
 
     /// `/me` and a bar save that answer after Изход write nothing. No runtime
