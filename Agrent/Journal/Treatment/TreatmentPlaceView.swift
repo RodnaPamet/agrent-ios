@@ -30,7 +30,10 @@ struct TreatmentPlaceView: View {
 
     private var crops: [TreatmentPlace.Crop] { store.state.value ?? [] }
     private var crop: TreatmentPlace.Crop? { crops.first { $0.key == cropKey } }
-    private var chosenFields: [TreatmentPlace.Field] { crop?.fields.filter { chosen.contains($0.id) } ?? [] }
+    /// The chosen crop's parcels, as far as they are loaded.
+    private var fieldsState: LoadState<[TreatmentPlace.Field]>? { cropKey.flatMap { store.fields[$0] } }
+    private var fields: [TreatmentPlace.Field] { fieldsState?.value ?? [] }
+    private var chosenFields: [TreatmentPlace.Field] { fields.filter { chosen.contains($0.id) } }
     private var total: TreatmentPlace.Total { TreatmentPlace.total(chosenFields) }
     private var areaWord: String { kind == .spray ? "Третирана площ" : "Наторена площ" }
 
@@ -41,8 +44,8 @@ struct TreatmentPlaceView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let crop, crop.fields.contains(where: { $0.parcel.isDrawable }) {
-                TreatmentParcelMap(crop: crop, outlines: store.outlines, chosen: chosen,
+            if fields.contains(where: { $0.parcel.isDrawable }) {
+                TreatmentParcelMap(fields: fields, outlines: store.outlines, chosen: chosen,
                                    camera: $camera, onToggle: toggle)
                     .frame(height: mapHeight)
             }
@@ -57,10 +60,21 @@ struct TreatmentPlaceView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { cropMenu }
         }
-        .onChange(of: cropKey, initial: true) { _, _ in
-            // The parcels of the crop that was, are not this crop's.
-            chosen = chosen.filter { id in crop?.fields.contains { $0.id == id } == true }
-            if let crop { camera = .region(MKCoordinateRegion(fitting: crop.fields.map(\.parcel)) ?? .bulgaria) }
+        // The crop's parcels, asked for as it is chosen — and again on a
+        // return, which a cache-first read makes cheap.
+        .task(id: cropKey) {
+            if let crop { await store.loadFields(for: crop) }
+        }
+        .onChange(of: cropKey) { _, _ in
+            // The parcels of the crop that was, are not this crop's. Not on
+            // the first appearance: coming back from step one keeps the
+            // choice.
+            chosen = []
+        }
+        .onChange(of: fields.map(\.id), initial: true) { _, _ in
+            if !fields.isEmpty {
+                camera = .region(MKCoordinateRegion(fitting: fields.map(\.parcel)) ?? .bulgaria)
+            }
         }
         // Said, not only drawn: the refusal replaces the spinner under the
         // cursor, and on a long crop it would otherwise be heard by nobody.
@@ -77,7 +91,9 @@ struct TreatmentPlaceView: View {
     private var cropMenu: some View {
         Menu {
             Picker("Култура", selection: $cropKey) {
-                ForEach(crops) { Text($0.label).tag(String?.some($0.key)) }
+                ForEach(crops) { crop in
+                    Text("\(crop.label) (\(crop.parcelCount))").tag(String?.some(crop.key))
+                }
             }
             .pickerStyle(.inline)
         } label: {
@@ -112,22 +128,43 @@ struct TreatmentPlaceView: View {
                 Section { note(Self.noCrops).pageRow() }
             case .loaded:
                 if let crop {
-                    Section {
-                        // The whole crop, first: a spray of «всичко с
-                        // пшеница» is one tap, not one per field.
-                        selectAllButton(crop).cardRow()
-                        ForEach(crop.fields) { field in row(field) }
-                    } header: {
-                        SectionHeader(crop.label)
-                    } footer: {
-                        SectionFooter(footerText(crop))
-                    }
+                    cropSection(crop)
                 } else {
                     Section { note(Self.chooseCrop).pageRow() }
                 }
             }
         }
         .pageBackground()
+    }
+
+    @ViewBuilder
+    private func cropSection(_ crop: TreatmentPlace.Crop) -> some View {
+        switch fieldsState {
+        case .loading, nil:
+            Section { ProgressView().pageRow() } header: { SectionHeader(crop.label) }
+        case .failed(let message):
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    note(message)
+                    Button("Опитайте отново") { Task { await store.loadFields(for: crop) } }
+                        .font(.footnote)
+                }
+                .pageRow()
+            } header: {
+                SectionHeader(crop.label)
+            }
+        case .loaded:
+            Section {
+                // The whole crop, first: a spray of «всичко с пшеница» is one
+                // tap, not one per field.
+                selectAllButton().cardRow()
+                ForEach(fields) { field in row(field) }
+            } header: {
+                SectionHeader(crop.label)
+            } footer: {
+                SectionFooter(footerText())
+            }
+        }
     }
 
     private func row(_ field: TreatmentPlace.Field) -> some View {
@@ -167,16 +204,16 @@ struct TreatmentPlaceView: View {
         .accessibilityInputLabels([field.parcel.name, "\(field.parcel.name) \(field.blockName)"])
     }
 
-    private func selectAllButton(_ crop: TreatmentPlace.Crop) -> some View {
-        let all = crop.fields.allSatisfy { chosen.contains($0.id) }
+    private func selectAllButton() -> some View {
+        let all = fields.allSatisfy { chosen.contains($0.id) }
         return Button {
             if all {
-                chosen.subtract(crop.fields.map(\.id))
+                chosen.subtract(fields.map(\.id))
             } else {
-                chosen.formUnion(crop.fields.map(\.id))
+                chosen.formUnion(fields.map(\.id))
             }
         } label: {
-            Label(all ? "Премахни избора" : "Избери всички (\(crop.fields.count))",
+            Label(all ? "Премахни избора" : "Избери всички (\(fields.count))",
                   systemImage: all ? "checklist.unchecked" : "checklist.checked")
         }
         .accessibilityInputLabels(all ? A11y.Spoken.deselectAll : A11y.Spoken.selectAll)
@@ -184,9 +221,9 @@ struct TreatmentPlaceView: View {
 
     /// How many are chosen — what the map shows, said where everyone gets it —
     /// and what the list or the total does not include.
-    private func footerText(_ crop: TreatmentPlace.Crop) -> String {
-        var lines = ["Избрани \(chosenFields.count) от \(Plural.bg(crop.fields.count, "парцел", "парцела"))."]
-        let undrawn = crop.fields.filter { !$0.parcel.isDrawable }.count
+    private func footerText() -> String {
+        var lines = ["Избрани \(chosenFields.count) от \(Plural.bg(fields.count, "парцел", "парцела"))."]
+        let undrawn = fields.filter { !$0.parcel.isDrawable }.count
         if undrawn > 0 {
             lines.append(undrawn == 1
                 ? "1 парцел няма очертание и се избира само от списъка."
@@ -196,10 +233,6 @@ struct TreatmentPlaceView: View {
             lines.append(total.withoutArea == 1
                 ? "1 избран парцел е без площ и не е включен в площта."
                 : "\(total.withoutArea) избрани парцела са без площ и не са включени в площта.")
-        }
-        if store.unreadBlocks > 0 {
-            lines.append("Парцелите на " + Plural.bg(store.unreadBlocks, "блок", "блока")
-                         + " не можаха да се заредят и липсват от списъка.")
         }
         return lines.joined(separator: " ")
     }

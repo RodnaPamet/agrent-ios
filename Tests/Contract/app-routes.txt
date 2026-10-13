@@ -69,6 +69,7 @@
 /api/t/{tenantSlug}/locations/{locationId}/parcels/{parcelId}
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import/{jobId}
+/api/t/{tenantSlug}/parcels/by-crop
 /api/t/{tenantSlug}/reports/field-briefing
 /api/t/{tenantSlug}/tasks
 /api/t/{tenantSlug}/tasks/{id}

@@ -196,6 +196,8 @@ final class RouteContractTests: XCTestCase {
             ("FarmRecordAPI.swift", [FarmRecordAPI.path(loc)]),
             ("AdminPricesAPI.swift", [AdminPricesAPI.path, AdminPricesAPI.clearPath("{commodity}")]),
             ("AccountDeletionAPI.swift", [AccountDeletionAPI.path]),
+            // «Ново мероприятие»'s crops and a crop's parcels (#293, agri-saas #1746).
+            ("ParcelsByCropAPI.swift", [ParcelsByCropAPI.path, ParcelsByCropAPI.path(crop: "Wheat")]),
             ("LocationsAPI.swift", [
                 LocationsAPI.listPath,
                 LocationsAPI.parcelsPath(loc),
