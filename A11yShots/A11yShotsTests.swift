@@ -397,6 +397,16 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Цени"].waitForExistence(timeout: 10), "«Цени» did not push its page")
         Thread.sleep(forTimeInterval: 2)
         capture("19-admin-prices", app: app)
+        // «Торове и гориво», below the fold: the long names are here —
+        // «Нафта (дизелово гориво), €/л» takes two lines beside its field at
+        // the default size, and the row must grow by the second one.
+        let diesel = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Нафта")).firstMatch
+        // The last row of a lazy list, eleven rows down: a handful of swipes
+        // at the default size, and many at AX5, where a row fills the screen.
+        for _ in 0..<30 where !(diesel.exists && diesel.isHittable) { app.swipeUp() }
+        XCTAssertTrue(diesel.exists, "«Цени» has no «Нафта» row — admin-price-overrides.json lost its inputs")
+        Thread.sleep(forTimeInterval: 1)
+        capture("19b-admin-prices-inputs", app: app)
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let close = app.navigationBars.buttons["Затвори"]
         XCTAssertTrue(close.waitForExistence(timeout: 10), "«Цени» did not go back to Админ")
