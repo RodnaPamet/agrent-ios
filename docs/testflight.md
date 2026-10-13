@@ -16,8 +16,11 @@ All in the Apple Developer / App Store Connect account that will own the app.
    fails to find a profile until the App ID has them.
 2. **Create the app record.** appstoreconnect.apple.com → Apps → **+** → New App:
    platform iOS, name "Agrent" (must be unique on the store — any variant works
-   for TestFlight), primary language Bulgarian, bundle ID `bg.agrent.app`, SKU
-   anything (e.g. `agrent-ios`). Without this record every upload is refused.
+   for TestFlight), primary language English (U.K.), bundle ID `bg.agrent.app`,
+   SKU anything (e.g. `agrent-ios`). Without this record every upload is refused.
+   Apple's list has no Bulgarian: the primary language is the store listing's
+   only, and English (U.K.) is what the Bulgarian storefront shows. The app's
+   own language is unaffected.
 3. **Create an API key.** App Store Connect → Users and Access → Integrations →
    App Store Connect API → Team Keys → **+**. Name "GitHub TestFlight", access
    **Admin** — App Manager can be refused when Apple signs the export with the
