@@ -74,6 +74,11 @@ import Foundation
 ///     · `PushInbox.shared`          — a tapped notification not yet opened
 ///                                      (#368): A's farm and task, never
 ///                                      opened for B.
+///     · `PushPermission.shared`     — A's Профил switch, as read into memory.
+///                                      A's stored choice stays under A's id,
+///                                      for when A comes back; the iOS
+///                                      permission and the closed card are the
+///                                      phone's and stay too.
 ///
 ///   PURGED, then made unreachable by key:
 ///     · `ResponseCache.shared`      — `removeAll()` here, and every entry is
@@ -166,6 +171,7 @@ enum SessionReset {
         FarmStore.shared.reset()
         PushRegistrar.shared.reset()
         PushInbox.shared.reset()
+        PushPermission.shared.reset()
         // A half-made farm's name does not stay on a shared phone after its
         // person has gone (#197).
         FarmWizardDrafts(defaults: .standard).clear()

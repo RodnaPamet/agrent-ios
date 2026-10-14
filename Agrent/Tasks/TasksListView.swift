@@ -10,6 +10,8 @@ import SwiftUI
 /// what a monthly action is for.
 struct TasksListView: View {
     @State private var store = TasksStore()
+    @State private var permission = PushPermission.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         RoutedStack {
@@ -23,6 +25,12 @@ struct TasksListView: View {
             .navigationTitle("Задачи")
             .appMenu()
             .task { if store.state.value == nil { await store.load() } }
+            // Where iOS stands on notifications, for the card — again on a
+            // return, as the person may have been to Settings (#272).
+            .task { await permission.refresh() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await permission.refresh() } }
+            }
         }
     }
 
@@ -48,6 +56,14 @@ struct TasksListView: View {
 
         case .loaded(let page, _):
             List {
+                // The ask for notifications, beside the tasks they would be
+                // about (owner, 2026-10-14). Gone once answered or closed —
+                // decided HERE, as a row that draws nothing can still leave
+                // a blank one in a List.
+                if permission.showsCard {
+                    PushInviteRow()
+                        .cardRow()
+                }
                 // Said out loud, because a capped list looks exactly like a
                 // complete short one. There is nothing on screen to notice,
                 // which is what makes it worse than an empty list rather
