@@ -552,6 +552,15 @@ returns the PDF's bytes.
 - **Storage:** it is written under complete file protection to a temporary
   folder of its own, which is removed when the sheet closes and on sign-out.
 
+**And on a treatment's own entry (#320, owner 2026-10-14).** A folded
+treatment row (agri-saas #1799) carries its `treatmentGroupId`, which is the
+location-free handle the paragraph above lacked. Its entry screen shows what
+was done, read from the row, and offers «Изтегли PDF» for that treatment
+alone (`GET /journal/treatments/{id}/farm-record`, agri-saas #1822). This is
+the same document as the screen right after a save, and the same storage and
+Quick Look, removed when Quick Look closes. Entries that are not treatments
+still have only the page's per-location PDF.
+
 **Unverified:** no ДНЕВНИК has been downloaded from this app. Under the
 UI-test seam the POST is a 501, so the first real one is the owner's.
 
