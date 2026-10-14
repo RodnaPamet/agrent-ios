@@ -4,6 +4,8 @@ struct CalculatorView: View {
     @State private var store = CalculatorStore()
     @State private var costs = CostsStore()
     @State private var addingCost = false
+    /// Whose role decides whether «Нов разход» is offered.
+    @State private var people = CurrentUserStore.shared
 
     var body: some View {
         RoutedStack {
@@ -44,18 +46,25 @@ struct CalculatorView: View {
     /// moment an operator wants to put something in. A screen that says
     /// "няма какво да се изчисли" and offers no way to change that is a
     /// dead end.
+    ///
+    /// Not to a role that cannot write, though: a reader or an auditor would
+    /// be refused after filling the sheet in (agrent-ios #312). Fails open
+    /// while nobody has said, as every write control does.
+    @ViewBuilder
     private var newCostButton: some View {
-        Button {
-            addingCost = true
-        } label: {
-            Text("Нов разход").frame(maxWidth: .infinity, minHeight: 30)
+        if people.user?.mayWrite ?? true {
+            Button {
+                addingCost = true
+            } label: {
+                Text("Нов разход").frame(maxWidth: .infinity, minHeight: 30)
+            }
+            .prominentButton()
+            .controlSize(.large)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            .solidBar(hairline: .top)
         }
-        .prominentButton()
-        .controlSize(.large)
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
-        .solidBar(hairline: .top)
     }
 
     @ViewBuilder
