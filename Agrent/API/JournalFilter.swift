@@ -18,9 +18,11 @@ import Foundation
 ///
 /// The journal holds only what a person wrote (owner, 2026-10-10, #256): the
 /// entries a task's spray line wrote are hidden from every journal surface,
-/// though not deleted (`includeTaskWritten`, agri-saas). So every entry the
-/// list can return is free-hand, and a facet reaches it through the blocks it
-/// was linked to on «Нов запис» (#254).
+/// though not deleted (`includeTaskWritten`, agri-saas). What the list returns
+/// is free-hand entries, reached by a facet through the blocks they were
+/// linked to on «Нов запис» (#254) — and, since agri-saas #1799, treatments
+/// recorded whole (#293), each folded to ONE row, which the server reaches
+/// through its tasks' blocks.
 ///
 ///     type          the entry's own type
 ///     crop          entries linked (`LogLocation`) to a block with a live
