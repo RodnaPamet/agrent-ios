@@ -84,6 +84,25 @@ final class TreatmentSaveTests: XCTestCase {
         XCTAssertEqual(body["quarantinePeriodDays"] as? Int, 14, "the period typed for THIS entry")
     }
 
+    /// The earliest-harvest date the form shows is the one the ДНЕВНИК will
+    /// print (#310): the server keeps the period sent with the entry and
+    /// prints the treatment's day plus it, so the body must carry exactly the
+    /// period the form computed from — for a product the farm already has,
+    /// whose own period differs.
+    func testTheFormsHarvestDateIsTheOneThePageWillPrint() throws {
+        var known = InputItem(id: "i1", name: "Познат препарат", category: "PESTICIDE", defaultUnit: nil,
+                              createdByUserId: "u1")
+        known.quarantinePeriodDays = 21
+        var draft = spray("Познат препарат")
+        draft.registrationText = ""
+        draft.quarantineText = "7"
+        let body = try json(TreatmentAPI.Body(record(draft, catalogue: [known])))
+        let days = try XCTUnwrap(body["quarantinePeriodDays"] as? Int)
+        XCTAssertEqual(days, 7, "the period typed for this entry, not the product's 21")
+        let printed = Calendar(identifier: .gregorian).date(byAdding: .day, value: days, to: draft.date)
+        XCTAssertEqual(draft.earliestHarvest, printed)
+    }
+
     func testFertilisingGoesByTheFertiliserNameAndCarriesNoChemicalColumn() throws {
         var draft = spray("Амониева селитра")
         draft.kind = .fertilize

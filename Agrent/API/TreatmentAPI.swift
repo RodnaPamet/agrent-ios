@@ -48,13 +48,16 @@ enum TreatmentAPI {
         let parcelIds: [String]
         let productName: String?
         let fertilizerName: String?
-        /// Both read by the server only when the name has to CREATE a plant
+        /// Read by the server only when the name has to CREATE a plant
         /// protection product, and ignored on a match: an operation never
-        /// rewrites a stored registration. So the period typed for a product
-        /// the farm already has is NOT recorded — the ДНЕВНИК prints the
-        /// product's own — until the server keeps one per entry (agri-saas
-        /// #1775). Sent all the same, so that day needs no new build.
+        /// rewrites a stored registration.
         let pppRegistrationNo: String?
+        /// The period AS IT APPLIED ON THE DAY, kept on every line this
+        /// treatment records (agri-saas #1775), for a product the farm has as
+        /// much as for a new one — so the ДНЕВНИК prints the period typed
+        /// here, and the earliest-harvest date from it, even after the
+        /// product's own period changes. A new product also takes it as its
+        /// registration; a known one is not rewritten.
         let quarantinePeriodDays: Int?
         let targetNote: String?
         let doseValue: Decimal
