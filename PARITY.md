@@ -564,6 +564,53 @@ still have only the page's per-location PDF.
 **Unverified:** no ДНЕВНИК has been downloaded from this app. Under the
 UI-test seam the POST is a 501, so the first real one is the owner's.
 
+### Matched — «Нов запис» with no signal waits in the outbox (#324, owner 2026-10-14)
+
+**The web** submits the treatment through its outbox (`useOfflineSync().submit`,
+agri-saas #1841, on the owner's ruling "queue the treatment"). The outbox id
+is minted before the first attempt and is the `Idempotency-Key`, so it is the
+handle. A queued treatment is an optimistic row with no document until it is
+delivered.
+
+**iOS** tries the save live. When that fails in a way a later send can fix
+(no signal, 5xx, 408, 429), it keeps the entry in the outbox under the key
+it went out under, which is the handle. It does the same on a 426, which
+waits for the updated app, as a queued spray does. The owner chose this on
+2026-10-14, asked directly. The facts:
+
+- **What it is:** a third kind of queued row (`PendingOperation.treatment`).
+  It replays `POST /journal/treatments` to the farm it was made on. A 201
+  holding fewer parcels than were sent is not a delivery: the row stays,
+  and the same key writes the rest (agri-saas #1765).
+- **Step three:** says «Мероприятието чака изпращане.» with no «Изтегли PDF»,
+  since the server has no pages for a handle it has not seen.
+- **The journal:** shows the farm's kept treatments in a section above the
+  entries, under any filter. A delivered one leaves the queue, the list is
+  read again, and the server's row with its document takes its place. One
+  the reload already holds under the same handle is not shown twice.
+- **One divergence in the save's path:** the phone does not queue while an
+  earlier save under a different key is unsettled and the server can't be
+  asked about it. Sending the changed entry could record the treatment twice
+  (`TreatmentAttempt`), so the error stays on screen as before.
+- **Cached reads, where the two differ:** the phone's `ResponseCache` keeps
+  step two's crops and parcels (`/parcels/by-crop`) and the form's product
+  and unit lists. They have no age limit: an entry stays until the 8 MB
+  budget, an iOS purge or sign-out, so a form opened with no signal is
+  usable. The web writes only `/journal`, `/farm-tasks`, `/locations` and
+  `/exchange/listings` to disk (`PERSISTABLE_PATHS` in
+  `src/lib/swr/persistent-cache.ts`, dropped after 24 hours), so it cannot
+  open step two with no signal. Its queue covers signal lost mid-form,
+  while the reads are still in memory. Filed as agri-saas #1845, with the
+  two open choices: how old such reads may be, and what a farmer is told
+  about it. The phone does not say how old the list is, as no screen has
+  since #70. A parcel deleted in the meantime comes back
+  `REFERENCE_NOT_IN_TENANT` on replay. The row is then kept as refused,
+  with the server's sentence.
+
+**Unverified:** no treatment has been queued on a device. The check is
+airplane mode → «Нов запис» → save → close the app → signal back → open
+it: one entry in the journal, with its PDF.
+
 ### Gap 6 — the list is capped at 50 with no paging — CLOSED 2026-09-22
 
 Cursor paging with an explicit "Покажи още", and the header count now

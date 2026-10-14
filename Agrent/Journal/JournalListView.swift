@@ -11,6 +11,19 @@ struct JournalListView: View {
     @State private var filterOptions = JournalFilterOptions()
     /// Whose role decides whether «Нов запис» is offered.
     @State private var people = CurrentUserStore.shared
+    /// Treatments kept on the phone, shown above the entries (#324).
+    @State private var outbox = OutboxStore.shared
+
+    private var waiting: [PendingOperation] {
+        JournalStore.waiting(in: outbox.pending, farm: FarmPath.openSlug, listed: store.entries)
+    }
+
+    /// Every kept treatment, on any farm. One leaving the queue was
+    /// delivered — a refusal stays — so the list is read again, and the
+    /// server's row, with its document, takes its place.
+    private var queuedTreatments: Set<String> {
+        Set(outbox.pending.filter { $0.treatment != nil }.map(\.id))
+    }
 
     var body: some View {
         RoutedStack {
@@ -86,6 +99,10 @@ struct JournalListView: View {
                 }
             }
             .task { if store.state.value == nil { await store.load() } }
+            .onChange(of: queuedTreatments) { before, after in
+                guard !before.subtracting(after).isEmpty else { return }
+                Task { await store.load() }
+            }
         }
     }
 
@@ -116,6 +133,8 @@ struct JournalListView: View {
 
     @ViewBuilder
     private var content: some View {
+        // Read once per render: three cases and the section ask it.
+        let waiting = waiting
         switch store.state {
         case .loading:
             ProgressView("Зареждане…")
@@ -127,7 +146,7 @@ struct JournalListView: View {
         // A filtered no-result is not an empty diary, and saying the wrong
         // one is a claim about the farm's records rather than about the
         // filter. The web's words (`journal.filteredEmpty*`).
-        case .loaded(let entries, _) where entries.isEmpty && store.filter.isActive:
+        case .loaded(let entries, _) where entries.isEmpty && waiting.isEmpty && store.filter.isActive:
             EmptyState(
                 "Няма записи, отговарящи на филтрите",
                 icon: "line.3.horizontal.decrease.circle",
@@ -136,7 +155,7 @@ struct JournalListView: View {
                 Button("Изчисти филтрите") { Task { await store.clearFilters() } }
             }
 
-        case .loaded(let entries, _) where entries.isEmpty:
+        case .loaded(let entries, _) where entries.isEmpty && waiting.isEmpty:
             EmptyState(
                 "Няма записи",
                 icon: "book.closed",
@@ -145,6 +164,7 @@ struct JournalListView: View {
 
         case .loaded(let entries, _):
             List {
+                waitingSection(waiting)
                 // THE COUNT MOVED HERE from the in-content header, which
                 // went with Борса's shape. It is a section header, so it
                 // scrolls with the rows and cannot be dragged the way a
@@ -176,6 +196,23 @@ struct JournalListView: View {
             .listStyle(.plain)
             .pageBackground()
             .refreshable { await PullToRefresh.bounded { await store.load() } }
+        }
+    }
+
+    /// What has not reached the server yet, above what has: the person's
+    /// own unsent work is the first thing they look for after saving with
+    /// no signal (#324). Absent when nothing waits, which is almost always.
+    @ViewBuilder
+    private func waitingSection(_ waiting: [PendingOperation]) -> some View {
+        if !waiting.isEmpty {
+            Section(titled: "Още не са на сървъра") {
+                ForEach(waiting) { item in
+                    if let treatment = item.treatment {
+                        QueuedTreatmentRow(item: item, treatment: treatment)
+                            .pageRow()
+                    }
+                }
+            }
         }
     }
 

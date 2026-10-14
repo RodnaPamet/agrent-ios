@@ -7,7 +7,8 @@ import SwiftUI
 ///   2. «Напред»: the crop at the top right, its parcels on a map and in a
 ///      list, the treated ones ticked (`TreatmentPlaceView`).
 ///   3. «Запази»: saved, with «Изтегли PDF» — the ДНЕВНИК pages for this
-///      entry alone (`TreatmentSavedView`).
+///      entry alone (`TreatmentSavedView`). With no signal, kept on the
+///      phone and sent later, under the same key (#324).
 ///
 /// Modelled on PRZ's «Добавяне на мероприятие» (owner, 2026-10-13): spraying
 /// and fertilising, done work only. It REPLACES the journal's free-form
@@ -110,6 +111,16 @@ struct TreatmentEntryFlow: View {
                           cropLabel: kept.cropLabel, changeLost: changeLost)
             // The saved screen replaces the steps: there is no going back to
             // edit what is already recorded.
+            path = []
+            onSaved()
+        case .queued(let kept, let afterUpdate):
+            // Kept, and on its way (#324): the same screen, saying it waits.
+            // No going back to edit it either — it is in the outbox under
+            // its key, and a changed entry would be a second treatment. The
+            // journal behind the sheet shows it waiting.
+            feedback.saved()
+            saved = .init(handle: kept.key, record: kept.record, fields: kept.fields,
+                          cropLabel: kept.cropLabel, waiting: afterUpdate ? .update : .signal)
             path = []
             onSaved()
         case .failed(let text):

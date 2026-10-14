@@ -35,6 +35,19 @@ import Foundation
 /// the drain parks as a `conflict` for the operator, never as refused and
 /// never as sent (#138; the web does the same in `use-offline-sync.ts`).
 ///
+/// ── And the treatment, since agrent-ios#324 ──
+///
+///   - a «Нов запис» TREATMENT (`POST /journal/treatments`), saved with no
+///     signal. `treatment` says what it is; `locationID` and `lineMark` are
+///     nil.
+///
+/// Its licence is the create's, made stronger: the route's `Idempotency-Key`
+/// IS the treatment's handle (agri-saas #1758), so the row's id is the
+/// handle the journal will know it by, and a replay under it is answered
+/// with the treatment already recorded, and finishes one recorded in part
+/// (agri-saas #1765). The owner chose it (2026-10-14) once the web queued
+/// its own (agri-saas #1841).
+///
 /// An exchange MESSAGE is not queued either, although its send honours a
 /// key and a replay would be safe on the server (#114). Safe is not the
 /// question: a line of a negotiation arriving hours after it was typed, into
@@ -153,6 +166,14 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
     /// theirs). Optional, for the same on-disk reason as `lineMark`.
     var conflict: Conflict? = nil
 
+    /// Present on a «Нов запис» treatment, absent on every other row (#324).
+    ///
+    /// OPTIONAL, for the reason `ownerUserID` gives: rows already on disk
+    /// have no such key, and a non-optional field would hide every one of
+    /// them. Its presence is what says "a treatment", as `lineMark`'s says
+    /// "a mark".
+    var treatment: QueuedTreatment? = nil
+
     /// Which line a queued mark sets, and the version it was SEEN at.
     struct LineMark: Codable, Equatable, Sendable {
         let taskID: String
@@ -211,16 +232,41 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    /// Where a replay goes, for the two kinds.
+    /// A queued treatment as the journal shows it while it waits (#324): the
+    /// facts its row is read for, so the screen need not decode the request
+    /// body. The PAYLOAD is what is sent; this only names it.
+    struct QueuedTreatment: Codable, Equatable, Sendable {
+        /// The wire kind, `SPRAY` or `FERTILIZE`. A string, so a value this
+        /// build cannot name is still a row the queue can read.
+        let kind: String
+        let productName: String
+        /// The DAY, as the body sends it (`BgDate.isoDay`).
+        let occurredOn: String
+        /// Parcels sent. A delivery that holds fewer is not a delivery
+        /// (`OutboxStore.delivered`).
+        let parcelCount: Int
+        /// The known parcels' area. nil when none had one.
+        let areaHa: Double?
+        let blockNames: [String]
+
+        var treatmentKind: TreatmentDraft.Kind? { TreatmentDraft.Kind(rawValue: kind) }
+        var day: Date? { BgDate.parseISODay(occurredOn) }
+        var area: Area? { areaHa.map(Area.init(hectares:)) }
+    }
+
+    /// Where a replay goes, for the three kinds.
     enum Target: Equatable, Sendable {
         case create(locationID: String)
         case mark(LineMark)
+        case treatment(QueuedTreatment)
     }
 
-    /// nil only for a row with neither — which nothing in this app writes,
-    /// and which the drain then refuses rather than guessing a route for.
+    /// nil only for a row with none of them — which nothing in this app
+    /// writes, and which the drain then refuses rather than guessing a route
+    /// for.
     var target: Target? {
         if let lineMark { return .mark(lineMark) }
+        if let treatment { return .treatment(treatment) }
         if let locationID { return .create(locationID: locationID) }
         return nil
     }
@@ -248,6 +294,31 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
             parcelSummary: summary, payload: payload, createdAt: now,
             attempts: 0, lastAttemptAt: nil, lastError: reason,
             lineMark: mark
+        )
+    }
+
+    /// A treatment for the outbox (#324).
+    ///
+    /// The id is the treatment's HANDLE — the key its live save went out
+    /// under, never a new one. A save whose answer was lost may already be
+    /// on the server under it, and a new key would record it a second time.
+    static func treatment(
+        handle: String,
+        _ treatment: QueuedTreatment,
+        ownerUserID: String,
+        farm: String? = nil,
+        payload: Data,
+        reason: String?,
+        at now: Date = Date()
+    ) -> PendingOperation {
+        let kind = treatment.treatmentKind?.label ?? treatment.kind
+        return PendingOperation(
+            id: handle, locationID: nil, ownerUserID: ownerUserID, tenantSlug: farm,
+            parcelSummary: "\(treatment.productName) · \(kind) · "
+                + Plural.bg(treatment.parcelCount, "парцел", "парцела"),
+            payload: payload, createdAt: now,
+            attempts: 0, lastAttemptAt: nil, lastError: reason,
+            treatment: treatment
         )
     }
 }
@@ -312,8 +383,15 @@ actor PendingOperations {
     /// the reply was unreadable. Queueing it would be safe (the key
     /// dedupes) but it would show a farmer a pending row for work already
     /// done, which is a different lie from the one this prevents.
+    ///
+    /// A treatment the server holds on FEWER parcels than were sent
+    /// (`TreatmentAttempt.Shortfall`) is worth retrying, and only by the
+    /// same key: a replay of it writes the missing lines and nothing else
+    /// (agri-saas #1765). Refusing it would leave part of a treatment off
+    /// the register under a banner saying the server declined it.
     nonisolated static func isWorthRetrying(_ error: Error) -> Bool {
         if error is URLError { return true }
+        if error is TreatmentAttempt.Shortfall { return true }
         if case APIClient.APIError.http(let status, _, _, _, _) = error {
             return status >= 500 || status == 408 || status == 429
         }

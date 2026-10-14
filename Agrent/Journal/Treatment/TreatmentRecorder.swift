@@ -100,6 +100,10 @@ struct TreatmentAttempt: Equatable, Sendable {
         /// Recorded. `changeLost` when what the server kept is an EARLIER
         /// save, without what the person changed after it.
         case saved(Sent, changeLost: Bool)
+        /// Not answered, and kept on the phone to be sent under its own key
+        /// (#324): with no signal, or — `afterUpdate` — from a build the
+        /// server has retired, for the updated app to send.
+        case queued(Sent, afterUpdate: Bool)
         case failed(String)
     }
 
@@ -138,6 +142,16 @@ struct TreatmentAttempt: Equatable, Sendable {
     ///
     /// The same entry pressed again needs none of this: it goes out under the
     /// same key, and the server answers with what it already has.
+    ///
+    /// ── Kept on the phone when the server cannot be reached (#324) ──
+    ///
+    /// The entry's OWN send failing in a way a later send can fix — no
+    /// signal, a 5xx, a 408, a 429, or a 426 for the updated app — puts it in
+    /// the outbox under its own key, and the press ends there. Never while
+    /// an earlier save under ANOTHER key is still unsettled: settling it
+    /// needs the server, and sending the changed entry without that answer
+    /// could record the treatment twice. Then, as before, the error stays on
+    /// screen and «Запази» asks again.
     mutating func save(_ record: TreatmentRecord, fields: [TreatmentPlace.Field], cropLabel: String?,
                        entered draft: TreatmentDraft, with recorder: TreatmentRecorder) async -> Outcome {
         let entry = Sent(key: key(for: draft, parcels: fields.map(\.id)),
@@ -155,13 +169,42 @@ struct TreatmentAttempt: Equatable, Sendable {
                     return .saved(earlier, changeLost: earlier.record != record)
                 }
             }
-            try await send(entry, with: recorder)
-            return .saved(entry, changeLost: false)
         } catch let short as Shortfall {
             return .failed(short.text)
         } catch {
             return .failed(UserMessage.text(for: error))
         }
+        do {
+            try await send(entry, with: recorder)
+            return .saved(entry, changeLost: false)
+        } catch let short as Shortfall {
+            return .failed(short.text)
+        } catch {
+            if Self.mayWait(error), await recorder.keep(entry, after: error) {
+                unsettled = nil
+                return .queued(entry, afterUpdate: Self.waitsForUpdate(error))
+            }
+            return .failed(UserMessage.text(for: error))
+        }
+    }
+
+    /// May an entry whose save failed this way wait in the outbox? Only when
+    /// a later send can land it: the retry policy's failures
+    /// (`PendingOperations.isWorthRetrying`), and a 426 — the build turned
+    /// away unread, so the updated app sends it as it stands, as the spray
+    /// sheet keeps one (`ParcelOperationSheet.QueueOffer`). A refusal will be
+    /// a refusal tomorrow and stays on screen, where it can be corrected.
+    ///
+    /// A short answer is not here: it arrives as a 201, and the person is
+    /// asked to press again, which finishes it at once.
+    static func mayWait(_ error: Error) -> Bool {
+        if error is Shortfall { return false }
+        return waitsForUpdate(error) || PendingOperations.isWorthRetrying(error)
+    }
+
+    static func waitsForUpdate(_ error: Error) -> Bool {
+        if case APIClient.APIError.clientTooOld = error { return true }
+        return false
     }
 
     private mutating func send(_ entry: Sent, with recorder: TreatmentRecorder) async throws {
@@ -209,4 +252,8 @@ protocol TreatmentRecorder: Sendable {
     func landing(of handle: String) async throws -> TreatmentLanding
     /// The ДНЕВНИК pages for one treatment, as a local PDF for Quick Look.
     func document(forTreatment handle: String) async throws -> URL
+    /// Keeps an entry the server could not be reached with, to be sent under
+    /// its own key once it can be (#324). Says whether it is now on the
+    /// phone; when it is not, the save's error is what the person sees.
+    func keep(_ entry: TreatmentAttempt.Sent, after error: Error) async -> Bool
 }

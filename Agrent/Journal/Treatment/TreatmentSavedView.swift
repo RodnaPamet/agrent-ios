@@ -14,6 +14,27 @@ struct TreatmentSavedView: View {
         /// (`TreatmentAttempt.save`). Said, because the screen below shows
         /// the entry as it was recorded, not as they last saw it.
         var changeLost = false
+        /// Not on the server yet: kept on the phone, and sent under `handle`
+        /// once it can be (#324). nil once the server has answered.
+        var waiting: Waiting? = nil
+    }
+
+    /// Why a kept entry has not gone yet, and what sends it.
+    enum Waiting: Equatable {
+        /// No signal, or a server that could not answer: the outbox sends it.
+        case signal
+        /// A build the server has retired (426): the updated app sends it.
+        case update
+
+        /// What happens to it next. The update's names the update, not a
+        /// connection: signal will not send it, as the spray sheet's
+        /// «Запази за по-късно» says of a record it keeps on a 426.
+        var note: String {
+            switch self {
+            case .signal: "Записът остава на телефона и се изпраща автоматично, когато има връзка."
+            case .update: "Записът остава на телефона и се изпраща след обновяване на приложението."
+            }
+        }
     }
 
     static let changeLostNote = "Мероприятието беше записано още при първия опит. "
@@ -21,6 +42,10 @@ struct TreatmentSavedView: View {
 
     /// Under «Изтегли PDF» here and on the entry's own screen (#320).
     static let documentNote = "Страниците от ДНЕВНИКА на БАБХ само с това мероприятие."
+
+    /// Where the pages are, for an entry the server does not have yet: its
+    /// handle names nothing there until it arrives (#324).
+    static let documentLaterNote = "ДНЕВНИКЪТ в PDF се изтегля от записа в дневника, след като бъде изпратен."
 
     let saved: Saved
     let recorder: TreatmentRecorder
@@ -49,11 +74,14 @@ struct TreatmentSavedView: View {
     var body: some View {
         PageForm {
             Section {
-                Label("Мероприятието е записано.", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(Palette.success)
+                headline
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityFocused($focus, equals: .title)
+                if let waiting = saved.waiting {
+                    Text(waiting.note)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if saved.changeLost {
                     Label(Self.changeLostNote, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(Palette.warning)
@@ -73,21 +101,14 @@ struct TreatmentSavedView: View {
             } footer: {
                 SectionFooter(withoutAreaNote)
             }
-            Section {
-                Button {
-                    Task { await download() }
-                } label: {
-                    if generating {
-                        ProgressView().frame(maxWidth: .infinity)
-                            .accessibilityLabel("Изготвяне на PDF")
-                    } else {
-                        Label("Изтегли PDF", systemImage: "doc.richtext").frame(maxWidth: .infinity)
-                    }
+            if saved.waiting != nil {
+                Section {
+                    Text(Self.documentLaterNote)
+                        .foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .disabled(generating)
-                .accessibilityInputLabels(A11y.spokenNames("Изтегли PDF", "Изтегли", "Download PDF", "Download"))
-            } footer: {
-                SectionFooter(Self.documentNote)
+            } else {
+                documentSection
             }
             if let failure {
                 Section {
@@ -97,7 +118,7 @@ struct TreatmentSavedView: View {
                 }
             }
         }
-        .inlineTitle("Записано")
+        .inlineTitle(saved.waiting == nil ? "Записано" : "Запазено")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Готово", action: onDone)
@@ -115,6 +136,38 @@ struct TreatmentSavedView: View {
             // where it landed.
             try? await Task.sleep(for: .milliseconds(600))
             focus = saved.changeLost ? .note : .title
+        }
+    }
+
+    /// Recorded, or kept on the phone: the second is not drawn as a success,
+    /// since nothing is on the register yet, nor as a warning, since nothing
+    /// is wrong — the outbox banner's own icon for work on its way.
+    @ViewBuilder
+    private var headline: some View {
+        if saved.waiting == nil {
+            Label("Мероприятието е записано.", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(Palette.success)
+        } else {
+            Label("Мероприятието чака изпращане.", systemImage: "tray.and.arrow.up")
+        }
+    }
+
+    private var documentSection: some View {
+        Section {
+            Button {
+                Task { await download() }
+            } label: {
+                if generating {
+                    ProgressView().frame(maxWidth: .infinity)
+                        .accessibilityLabel("Изготвяне на PDF")
+                } else {
+                    Label("Изтегли PDF", systemImage: "doc.richtext").frame(maxWidth: .infinity)
+                }
+            }
+            .disabled(generating)
+            .accessibilityInputLabels(A11y.spokenNames("Изтегли PDF", "Изтегли", "Download PDF", "Download"))
+        } footer: {
+            SectionFooter(Self.documentNote)
         }
     }
 

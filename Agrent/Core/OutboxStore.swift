@@ -126,8 +126,27 @@ final class OutboxStore {
             // `alreadyApplied`, and anybody else's change since answers 409,
             // which the drain parks as a conflict (#138).
             _ = try await APIClient.shared.patchRaw(path, body: item.payload, ifMatch: seenVersion)
+        case .treatment(let path, let handle, let parcels):
+            // The handle, every time (#324): the treatment's own key, which
+            // the server answers with what it holds, and finishes if that is
+            // part of it.
+            let answer = try await APIClient.shared.postRaw(path, body: item.payload, idempotencyKey: handle)
+            try delivered(answer, handle: handle, parcels: parcels)
         case nil:
             throw Unsendable()
+        }
+    }
+
+    /// Is a treatment's 201 the whole treatment? It is not while the server
+    /// holds fewer parcels than were sent: the row stays, and the next pass
+    /// sends the same key, which writes the rest (`PendingOperations
+    /// .isWorthRetrying`). The live save says the same to the person
+    /// (`TreatmentAttempt`). An answer that cannot be read is a delivery, as
+    /// it is live (`TreatmentAPI.receipt`): the treatment is on the register.
+    nonisolated static func delivered(_ answer: Data, handle: String, parcels: Int) throws {
+        let receipt = TreatmentAPI.receipt(from: answer, key: handle)
+        if let count = receipt.parcelCount, count < parcels {
+            throw TreatmentAttempt.Shortfall(recorded: count, sent: parcels)
         }
     }
 
@@ -140,6 +159,9 @@ final class OutboxStore {
         /// `PATCH`, guarded by the version the operator SAW — never a key,
         /// since the route reads none.
         case mark(path: String, seenVersion: Int)
+        /// `POST`, keyed by the row's id, which is the treatment's handle,
+        /// and delivered only once the server holds every parcel sent.
+        case treatment(path: String, handle: String, parcels: Int)
     }
 
     /// To the FARM THE ROW WAS MADE ON, not the one open now — see
@@ -153,6 +175,9 @@ final class OutboxStore {
             return .mark(path: FieldOperationAPI.linePath(taskID: mark.taskID, lineID: mark.lineID,
                                                           tenant: item.tenant),
                          seenVersion: mark.seenVersion)
+        case .treatment(let treatment):
+            return .treatment(path: TreatmentAPI.recordPath(tenant: item.tenant), handle: item.id,
+                              parcels: treatment.parcelCount)
         case nil:
             return nil
         }
