@@ -15,6 +15,8 @@ final class PushRegistrationTests: XCTestCase {
     private final class Sent {
         var calls: [String] = []
         var refuse: Set<String> = []
+        /// The person's farms, changeable mid-test as a new sign-in changes them.
+        var farms = ["ferma-1"]
     }
 
     private func registrar(_ sent: Sent, farms: @escaping @MainActor () -> [String]) -> PushRegistrar {
@@ -116,15 +118,14 @@ final class PushRegistrationTests: XCTestCase {
     /// the next person registers it with their own farms.
     func testIzhodForgetsTheFarmsButKeepsTheToken() async {
         let sent = Sent()
-        var farms = ["ferma-1"]
-        let push = registrar(sent) { farms }
+        let push = registrar(sent) { sent.farms }
         await push.adopt(token).value
 
         push.reset()
         XCTAssertEqual(push.registered, [])
         XCTAssertEqual(push.deviceToken, hex)
 
-        farms = ["ferma-9"]
+        sent.farms = ["ferma-9"]
         await push.sync()
         XCTAssertEqual(sent.calls, ["ferma-1 000810", "ferma-9 000810"])
     }
