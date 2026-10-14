@@ -29,7 +29,8 @@ struct TreatmentEntryFlow: View {
     @State private var saved: TreatmentSavedView.Saved?
     @State private var feedback = WriteFeedback()
 
-    /// The save's `Idempotency-Key` — see `TreatmentAttempt`.
+    /// The save's `Idempotency-Key`, and an earlier save not yet answered —
+    /// see `TreatmentAttempt`.
     @State private var attempt = TreatmentAttempt()
 
     enum Step: Hashable { case place }
@@ -92,21 +93,27 @@ struct TreatmentEntryFlow: View {
                 ?? "Изберете поне един парцел."
             return
         }
-        let key = attempt.key(for: draft, parcels: fields.map(\.id))
         saving = true
         failure = nil
         defer { saving = false }
-        do {
-            let id = try await recorder.record(record, idempotencyKey: key)
+        // On a copy: a mutating call cannot stay open on the view's own
+        // state across an `await`.
+        var attempt = attempt
+        let outcome = await attempt.save(
+            record, fields: fields, cropLabel: place.state.value?.first { $0.key == cropKey }?.label,
+            entered: draft, with: recorder)
+        self.attempt = attempt
+        switch outcome {
+        case .saved(let kept, let changeLost):
             feedback.saved()
-            saved = .init(entryID: id, record: record, fields: fields,
-                          cropLabel: place.state.value?.first { $0.key == cropKey }?.label)
+            saved = .init(handle: kept.key, record: kept.record, fields: kept.fields,
+                          cropLabel: kept.cropLabel, changeLost: changeLost)
             // The saved screen replaces the steps: there is no going back to
             // edit what is already recorded.
             path = []
             onSaved()
-        } catch {
-            failure = UserMessage.text(for: error)
+        case .failed(let text):
+            failure = text
             feedback.refused()
         }
     }
