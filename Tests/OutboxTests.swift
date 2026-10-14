@@ -170,7 +170,8 @@ final class PendingOperationTests: XCTestCase {
 
     /// The outbox carries FIELD WORK and nothing else: field-operation
     /// creates, and — since agrent-ios#138, DELIBERATELY — the marks on a
-    /// field operation's parcel lines. This asserts the app has no way to
+    /// field operation's parcel lines, and since #324 the treatments
+    /// «Нов запис» records. This asserts the app has no way to
     /// queue anything else, and the reasons differ per route — which is why
     /// the loop below no longer states one reason for all of them.
     ///
@@ -186,9 +187,21 @@ final class PendingOperationTests: XCTestCase {
     /// (`OfflineFieldPanel`, `use-offline-sync.ts:495`). The lock's tests are
     /// in `OutboxLineMarkTests` below.
     ///
-    /// The builders the outbox may name are held EXACTLY, so a third write
+    /// ── What #324 added, and why it may be queued ──
+    ///
+    /// `POST /journal/treatments`, «Нов запис» saved with no signal — the
+    /// owner's choice (2026-10-14), after the web queued its own (agri-saas
+    /// #1841). Its licence is the create's, made stronger: the route's
+    /// `Idempotency-Key` IS the treatment's handle, so a replay is answered
+    /// with the treatment already recorded and finishes one recorded in part
+    /// (agri-saas #1765), and the row's id is the key the live save went out
+    /// under, never a new one. It is a field record like the other two: done
+    /// work, on parcels, for the ДНЕВНИК. The drain's tests are in
+    /// `OutboxTreatmentTests` below.
+    ///
+    /// The builders the outbox may name are held EXACTLY, so a fourth write
     /// joining the queue has to come through this test and argue its case
-    /// here, as this one did.
+    /// here, as these did.
     ///
     ///   - the exchange listing and the inquiry honour no `Idempotency-Key`
     ///     and have no natural key. A replay puts a second offer on a public
@@ -226,7 +239,8 @@ final class PendingOperationTests: XCTestCase {
         let builder = try? NSRegularExpression(pattern: #"\b[A-Z]\w*API\.\w+Path\b"#)
         let named = Set((builder?.matches(in: code, range: NSRange(code.startIndex..., in: code)) ?? [])
             .compactMap { Range($0.range, in: code).map { String(code[$0]) } })
-        XCTAssertEqual(named, ["LocationsAPI.operationsPath", "FieldOperationAPI.linePath"],
+        XCTAssertEqual(named, ["LocationsAPI.operationsPath", "FieldOperationAPI.linePath",
+                               "TreatmentAPI.recordPath"],
                        "the outbox can replay a write nobody argued for here")
 
         for forbidden in ["listingsPath", "inquiriesPath", "createListing"] {

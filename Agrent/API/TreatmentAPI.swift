@@ -23,9 +23,16 @@ import Foundation
 /// Never sent from development, CI or the screenshot harness: it writes a
 /// farm's legal register.
 enum TreatmentAPI {
-    private static var base: String { "\(FarmPath.root)/journal/treatments" }
+    private static var base: String { recordPath(tenant: FarmPath.openSlug) }
 
     static var recordPath: String { base }
+
+    /// The save's path on a farm named explicitly: a queued treatment's,
+    /// which goes to the farm it was made on whichever is open when it is
+    /// sent (#324; `PendingOperation.tenantSlug`).
+    static func recordPath(tenant: String?) -> String {
+        "\(FarmPath.root(for: tenant))/journal/treatments"
+    }
 
     /// The handle sits in the PATH. It is the phone's own key and names
     /// nobody — see `JournalAPI.path` on what a URL may carry.
@@ -185,5 +192,54 @@ struct LiveTreatmentRecorder: TreatmentRecorder {
 
     func document(forTreatment handle: String) async throws -> URL {
         try await TreatmentAPI.document(forTreatment: handle)
+    }
+
+    /// Into the outbox, under the entry's own key (#324).
+    ///
+    /// ── The answer it failed with is the outbox's answer too ──
+    ///
+    /// The live save and the drain post to the same route from the same
+    /// build on the same budget, as the spray sheet's save and its queue do
+    /// (`ParcelOperationSheet.queueForLater`). A 429 closes the outbox's
+    /// pause before the row joins it, so the next foreground does not spend
+    /// a request to be told the same thing; a 426 tells the outbox this
+    /// build is retired, so its banner says the entry waits for the update.
+    ///
+    /// ── Said to be kept only once it is on disk ──
+    ///
+    /// `PendingOperations.enqueue` cannot throw — it logs — so the row is
+    /// read back. A screen saying «чака изпращане» over an entry that is not
+    /// there would be the one lie this path exists to prevent. Nobody known
+    /// to be signed in keeps nothing either: a row must name whose it is
+    /// (`PendingOperation.ownerUserID`), and the save's error stays on
+    /// screen instead.
+    ///
+    /// ── The farm is read before anything is awaited ──
+    ///
+    /// The row goes back to the farm the entry was made on, which is the one
+    /// open while its sheet was. `OutboxStore.enqueue` would otherwise stamp
+    /// whichever farm is open once the encoding returns. With none open the
+    /// row would have nowhere to go, so it is not kept.
+    @MainActor
+    func keep(_ entry: TreatmentAttempt.Sent, after error: Error) async -> Bool {
+        guard let farm = FarmPath.openSlug, let owner = SessionIdentity.shared.userID,
+              let body = try? await APIClient.shared.encodeBody(TreatmentAPI.Body(entry.record))
+        else { return false }
+        let outbox = OutboxStore.shared
+        outbox.pause.absorb(error)
+        outbox.absorbClientTooOld(error)
+        let total = TreatmentPlace.total(entry.fields)
+        let blocks = entry.fields.reduce(into: [String]()) { names, field in
+            if !names.contains(field.blockName) { names.append(field.blockName) }
+        }
+        let row = PendingOperation.treatment(
+            handle: entry.key,
+            .init(kind: entry.record.kind.rawValue, productName: entry.record.productName,
+                  occurredOn: BgDate.isoDay(entry.record.date), parcelCount: entry.record.parcelIDs.count,
+                  areaHa: total.withoutArea < total.parcels ? total.area.wireHectares : nil,
+                  blockNames: blocks),
+            ownerUserID: owner, farm: farm, payload: body, reason: UserMessage.text(for: error))
+        await outbox.enqueue(row)
+        return await PendingOperations.shared.row(entry.key) != nil
     }
 }

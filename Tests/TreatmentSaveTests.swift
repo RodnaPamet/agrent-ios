@@ -181,12 +181,20 @@ final class TreatmentSaveTests: XCTestCase {
         }
 
         private(set) var calls: [Call] = []
+        /// The keys of the entries kept on the phone (#324), apart from
+        /// `calls`: keeping is the phone's, not the server's.
+        private(set) var kept: [String] = []
         private var records: [Result<Int?, Error>]
         private var landings: [Result<TreatmentLanding, Error>]
+        /// Whether the outbox takes an entry — false by default, so a failed
+        /// save stays on screen as it did before #324.
+        private let keeps: Bool
 
-        init(records: [Result<Int?, Error>] = [], landings: [Result<TreatmentLanding, Error>] = []) {
+        init(records: [Result<Int?, Error>] = [], landings: [Result<TreatmentLanding, Error>] = [],
+             keeps: Bool = false) {
             self.records = records
             self.landings = landings
+            self.keeps = keeps
         }
 
         func record(_ record: TreatmentRecord, idempotencyKey: String) async throws -> TreatmentReceipt {
@@ -202,6 +210,11 @@ final class TreatmentSaveTests: XCTestCase {
         }
 
         func document(forTreatment handle: String) async throws -> URL { throw URLError(.unsupportedURL) }
+
+        func keep(_ entry: TreatmentAttempt.Sent, after error: Error) async -> Bool {
+            kept.append(entry.key)
+            return keeps
+        }
     }
 
     private func press(_ attempt: inout TreatmentAttempt, _ draft: TreatmentDraft,
@@ -380,6 +393,95 @@ final class TreatmentSaveTests: XCTestCase {
         _ = try await press(&fresh, spray("Втори"), on: local)
         calls = await local.calls
         XCTAssertFalse(calls.contains { if case .landing = $0 { true } else { false } })
+    }
+
+    // MARK: - Kept on the phone (#324)
+
+    /// No signal: the entry goes into the outbox under ITS key — the one the
+    /// failed save went out under — and the press ends there.
+    func testNoSignalKeepsTheEntryUnderItsOwnKey() async throws {
+        let server = Server(records: [.failure(URLError(.notConnectedToInternet))], keeps: true)
+        var attempt = TreatmentAttempt()
+        let key = attempt.key
+        let outcome = try await press(&attempt, spray(), on: server)
+
+        guard case .queued(let kept, afterUpdate: false) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertEqual(kept.key, key)
+        XCTAssertEqual(kept.record.productName, "Нов препарат")
+        let keys = await server.kept
+        XCTAssertEqual(keys, [key], "a new key would record a landed save twice")
+        XCTAssertNil(attempt.unsettled)
+    }
+
+    /// A server that could not answer is the same, and a retired build keeps
+    /// it for the updated app, as the spray sheet keeps one.
+    func testAServerErrorIsKeptAndARetiredBuildKeepsItForTheUpdate() async throws {
+        var attempt = TreatmentAttempt()
+        let unwell = Server(records: [.failure(APIClient.APIError.http(status: 503, code: nil, message: nil))],
+                            keeps: true)
+        let first = try await press(&attempt, spray(), on: unwell)
+        guard case .queued(_, afterUpdate: false) = first else { return XCTFail("\(first)") }
+
+        var fresh = TreatmentAttempt()
+        let retired = Server(records: [.failure(APIClient.APIError.clientTooOld)], keeps: true)
+        let second = try await press(&fresh, spray(), on: retired)
+        guard case .queued(_, afterUpdate: true) = second else { return XCTFail("\(second)") }
+    }
+
+    /// A refusal will be a refusal tomorrow: it stays on screen, where it can
+    /// be corrected, and is never kept. So does a short answer, which a press
+    /// finishes at once.
+    func testARefusalAndAShortAnswerAreNotKept() async throws {
+        let refused = APIClient.APIError.http(status: 400, code: "TREATMENT_DATE_IN_FUTURE", message: nil)
+        let server = Server(records: [.failure(refused), .success(1)], keeps: true)
+        var attempt = TreatmentAttempt()
+        let first = try await press(&attempt, spray(), on: server)
+        XCTAssertEqual(first, .failed(TreatmentDraft.Problem.futureDate.text))
+
+        var fresh = TreatmentAttempt()
+        let second = try await press(&fresh, spray(), on: server)
+        XCTAssertEqual(second, .failed(TreatmentAttempt.Shortfall(recorded: 1, sent: 2).text))
+        let keys = await server.kept
+        XCTAssertTrue(keys.isEmpty, "\(keys)")
+    }
+
+    /// THE DUPLICATE IT MUST NOT CAUSE. An earlier save under another key is
+    /// unsettled and the server cannot be asked about it: nothing is kept,
+    /// since the changed entry may be a second record of a treatment already
+    /// on the register. Once the earlier one is known not to have landed, the
+    /// changed one may wait like any other.
+    func testNothingIsKeptWhileAnEarlierSaveIsUnsettled() async throws {
+        let refused = APIClient.APIError.http(status: 400, code: "TREATMENT_DATE_IN_FUTURE", message: nil)
+        let server = Server(records: [.failure(refused), .failure(URLError(.notConnectedToInternet))],
+                            landings: [.failure(URLError(.notConnectedToInternet)), .success(.nothing)],
+                            keeps: true)
+        var attempt = TreatmentAttempt()
+        let earlier = attempt.key
+        _ = try await press(&attempt, spray("Първи"), on: server)
+
+        let blocked = try await press(&attempt, spray("Втори"), on: server)
+        XCTAssertEqual(blocked, .failed(UserMessage.text(for: URLError(.notConnectedToInternet))))
+        var keys = await server.kept
+        XCTAssertTrue(keys.isEmpty, "kept beside an earlier save nobody could ask about")
+        XCTAssertEqual(attempt.unsettled?.key, earlier)
+
+        let outcome = try await press(&attempt, spray("Втори"), on: server)
+        guard case .queued(let kept, afterUpdate: false) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertNotEqual(kept.key, earlier)
+        keys = await server.kept
+        XCTAssertEqual(keys, [kept.key])
+    }
+
+    /// An entry the outbox could not take — nobody known to be signed in, or
+    /// a disk that would not write — is not said to be kept: the error stays
+    /// on screen, and the entry is still the unanswered one «Запази» retries.
+    func testAnEntryThatCannotBeKeptStaysOnScreen() async throws {
+        let server = Server(records: [.failure(URLError(.timedOut))], keeps: false)
+        var attempt = TreatmentAttempt()
+        let key = attempt.key
+        let outcome = try await press(&attempt, spray(), on: server)
+        XCTAssertEqual(outcome, .failed(UserMessage.text(for: URLError(.timedOut))))
+        XCTAssertEqual(attempt.unsettled?.key, key)
     }
 
     func testOnlyWhatNeverReachedTheServerLeavesNothing() {

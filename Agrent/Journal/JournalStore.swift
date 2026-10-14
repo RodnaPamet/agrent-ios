@@ -100,6 +100,28 @@ final class JournalStore {
         }
     }
 
+    /// The treatments kept on the phone that the journal shows above its
+    /// entries (#324): this person's (`OutboxStore.pending` holds no one
+    /// else's), made on the farm open NOW, and not already in the list.
+    ///
+    /// ── Not already in the list ──
+    ///
+    /// A save whose answer was lost is kept, but it may have landed: then the
+    /// reload behind the sheet brings the server's row, under the same
+    /// handle, while the outbox still holds the copy that will be answered
+    /// with it. Shown twice, one treatment reads as two on a register.
+    ///
+    /// ── Under every filter ──
+    ///
+    /// The person's own unsent work is not an entry the server filtered, and
+    /// hiding it under «Филтри» reads as lost.
+    nonisolated static func waiting(in pending: [PendingOperation], farm: String?,
+                                    listed: [LogEntry]) -> [PendingOperation] {
+        guard let farm else { return [] }
+        let handles = Set(listed.compactMap { $0.treatment?.treatmentGroupId })
+        return pending.filter { $0.treatment != nil && $0.tenantSlug == farm && !handles.contains($0.id) }
+    }
+
     /// The next page, appended.
     ///
     /// NOT cached. `CachedResource` keys on the path, so every page would
