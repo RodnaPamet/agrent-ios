@@ -16,8 +16,10 @@ final class TaskCloseTests: XCTestCase {
         return try await WorkItemAPI.decodeDetail(from: try JSONSerialization.data(withJSONObject: json))
     }
 
-    private func me(_ role: String?, id: String = "usr_me") -> CurrentUser {
-        CurrentUser(id: id, name: nil, email: nil, role: role)
+    /// A person as the server describes them: a role, and its tier.
+    private func me(_ role: String?, id: String = "usr_me", canWrite: Bool? = nil) -> CurrentUser {
+        CurrentUser(id: id, name: nil, email: nil, role: role,
+                    permissions: canWrite.map(CurrentUser.Permissions.init))
     }
 
     // MARK: - Who
@@ -26,12 +28,12 @@ final class TaskCloseTests: XCTestCase {
     /// and only while CLOSED is still a move the task can make.
     func testTheAssigneeOrAWriterMayCloseAnOpenTask() async throws {
         let open = try await task()
-        XCTAssertTrue(TaskCloseRules.mayClose(open, me: me("OWNER")))
-        XCTAssertTrue(TaskCloseRules.mayClose(open, me: me("MECHANISATOR", id: "usr_fixture_operator")),
+        XCTAssertTrue(TaskCloseRules.mayClose(open, me: me("OWNER", canWrite: true)))
+        XCTAssertTrue(TaskCloseRules.mayClose(open, me: me("MECHANISATOR", id: "usr_fixture_operator", canWrite: false)),
                       "the assigned mechanisator closes their own task")
-        XCTAssertFalse(TaskCloseRules.mayClose(open, me: me("MECHANISATOR")),
+        XCTAssertFalse(TaskCloseRules.mayClose(open, me: me("MECHANISATOR", canWrite: false)),
                        "a mechanisator who is not the assignee")
-        XCTAssertFalse(TaskCloseRules.mayClose(open, me: me("READER")))
+        XCTAssertFalse(TaskCloseRules.mayClose(open, me: me("READER", canWrite: false)))
         XCTAssertFalse(TaskCloseRules.mayClose(open, me: nil), "nobody before /me answers")
         for status in ["CLOSED", "CANCELED"] {
             let finished = try await task(status: status)

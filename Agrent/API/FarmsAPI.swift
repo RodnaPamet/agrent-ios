@@ -35,6 +35,15 @@ enum FarmsAPI {
         /// server has none configured (agri-saas #1587 v1.1). Optional, so a
         /// server from before it, and a fixture without it, read as false.
         var isPlatform: Bool? = nil
+        /// The server's permission tier IN THAT FARM (agri-saas #1787) — what
+        /// `/api/auth/me` cannot say for any farm but the oldest. Advisory:
+        /// it decides which write controls are drawn (`CurrentUser.mayWrite`).
+        ///
+        /// LENIENT, unlike the rest of the row: a tier this build cannot read
+        /// costs the tier, which then fails open, never the row — and a row
+        /// that failed would fail the whole list, which closes nothing but
+        /// refreshes nothing either. Absent on a server from before it.
+        var permissions: CurrentUser.Permissions? = nil
     }
 
     /// The envelope. `farms[0]` is the OLDEST membership — the same farm
@@ -131,5 +140,21 @@ enum FarmsAPI {
     static func checkEik(_ eik: String) async throws -> EikVerdict {
         struct Body: Encodable { let eik: String }
         return try await APIClient.shared.post(eikCheckPath, body: Body(eik: eik), as: EikVerdict.self)
+    }
+}
+
+extension FarmsAPI.Membership {
+    private enum CodingKeys: String, CodingKey { case slug, name, role, isPlatform, permissions }
+
+    /// The original keys exactly as strictly as before the tier — a row
+    /// without its slug, name or role still fails the list — and the tier
+    /// leniently, for the reason on `permissions`.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slug = try c.decode(String.self, forKey: .slug)
+        name = try c.decode(String.self, forKey: .name)
+        role = try c.decode(String.self, forKey: .role)
+        isPlatform = try c.decodeIfPresent(Bool.self, forKey: .isPlatform)
+        permissions = (try? c.decodeIfPresent(CurrentUser.Permissions.self, forKey: .permissions)) ?? nil
     }
 }

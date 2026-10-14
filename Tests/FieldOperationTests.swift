@@ -156,26 +156,23 @@ final class CurrentUserTests: XCTestCase {
         XCTAssertNil(me.name)
     }
 
-    /// The write gate. `createFieldOperation` requires ROLE_ORDER >= 3;
-    /// MECHANISATOR is 1 and an operator's job is completion, not
-    /// creation.
-    func testOnlyWritingRolesAreOfferedTheSheet() {
-        for role in ["OWNER", "ADMIN", "EDITOR"] {
-            XCTAssertTrue(
-                CurrentUser(id: "u", name: nil, email: nil, role: role)
-                    .mayCreateOperations, role)
-        }
-        for role in ["MECHANISATOR", "READER", "AUDITOR"] {
-            XCTAssertFalse(
-                CurrentUser(id: "u", name: nil, email: nil, role: role)
-                    .mayCreateOperations, role)
+    /// The write gate is the server's `canWrite` (#312): the sheet follows
+    /// the tier, whatever the role says — so a role whose level moves on the
+    /// server moves here without a build.
+    func testTheServersTierDecidesWhoIsOfferedTheSheet() {
+        for role in ["OWNER", "EDITOR", "READER", "MECHANISATOR"] {
+            for canWrite in [true, false] {
+                XCTAssertEqual(
+                    CurrentUser(id: "u", name: nil, email: nil, role: role,
+                                permissions: .init(canWrite: canWrite)).mayCreateOperations,
+                    canWrite, "\(role) told \(canWrite)")
+            }
         }
     }
 
-    /// FAILS OPEN. `role` is the oldest membership's, so it may not be
-    /// the role here — and hiding a button from somebody who could have
-    /// used it is worse than showing one the server refuses with a
-    /// sentence they can read.
+    /// FAILS OPEN with no tier: hiding a button from somebody who could have
+    /// used it is worse than showing one the server refuses with a sentence
+    /// they can read.
     func testAnUnknownOrAbsentRoleStillSeesTheControl() {
         XCTAssertTrue(CurrentUser(id: "u", name: nil, email: nil, role: nil)
             .mayCreateOperations)

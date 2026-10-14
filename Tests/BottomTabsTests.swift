@@ -282,8 +282,10 @@ final class OperatorRoleTests: XCTestCase {
         XCTAssertFalse(me("AUDITOR").isOperator)
         XCTAssertFalse(me("OWNER").isOperator)
         XCTAssertFalse(me(nil).isOperator)
-        // …while still being refused the write, which is a separate gate.
-        XCTAssertFalse(me("READER").mayCreateOperations)
+        // …while still being refused the write, which is a separate gate:
+        // the server's tier, not the role (#312).
+        XCTAssertFalse(CurrentUser(id: "u", name: nil, email: nil, role: "READER",
+                                   permissions: .init(canWrite: false)).mayCreateOperations)
     }
 }
 

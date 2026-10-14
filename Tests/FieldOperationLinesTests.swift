@@ -270,30 +270,34 @@ final class LineMarkWireTests: XCTestCase {
 
 final class FieldOperationRulesTests: XCTestCase {
 
-    private func me(_ role: String?, id: String = "usr_me") -> CurrentUser {
-        CurrentUser(id: id, name: nil, email: nil, role: role)
+    /// A person as the server describes them: a role, and its tier.
+    private func me(_ role: String?, id: String = "usr_me", canWrite: Bool? = nil) -> CurrentUser {
+        CurrentUser(id: id, name: nil, email: nil, role: role,
+                    permissions: canWrite.map(CurrentUser.Permissions.init))
     }
 
     /// The route's rule: `canWrite`, or the job's assignee without it.
     func testWhoMayMark() {
         for role in ["OWNER", "ADMIN", "EDITOR"] {
-            XCTAssertTrue(FieldOperationRules.mayMark(me: me(role), assigneeUserID: "someone_else"), role)
+            XCTAssertTrue(FieldOperationRules.mayMark(me: me(role, canWrite: true), assigneeUserID: "someone_else"), role)
         }
         for role in ["MECHANISATOR", "READER", "AUDITOR"] {
-            XCTAssertFalse(FieldOperationRules.mayMark(me: me(role), assigneeUserID: "someone_else"),
+            XCTAssertFalse(FieldOperationRules.mayMark(me: me(role, canWrite: false), assigneeUserID: "someone_else"),
                            "\(role) may not mark a colleague's job")
-            XCTAssertTrue(FieldOperationRules.mayMark(me: me(role), assigneeUserID: "usr_me"),
+            XCTAssertTrue(FieldOperationRules.mayMark(me: me(role, canWrite: false), assigneeUserID: "usr_me"),
                           "the assigned \(role) may mark their own job")
         }
-        XCTAssertFalse(FieldOperationRules.mayMark(me: me("MECHANISATOR"), assigneeUserID: nil),
+        XCTAssertFalse(FieldOperationRules.mayMark(me: me("MECHANISATOR", canWrite: false), assigneeUserID: nil),
                        "an unassigned job is not the operator's")
     }
 
-    /// FAILS OPEN on a role this build does not know — the house pattern —
-    /// and CLOSED with nobody known: a queued mark needs an owner.
+    /// FAILS OPEN with no tier — the house pattern, whatever the role says
+    /// (#312) — and CLOSED with nobody known: a queued mark needs an owner.
     func testTheGateFailsOpenOnARoleAndClosedOnNobody() {
         XCTAssertTrue(FieldOperationRules.mayMark(me: me(nil), assigneeUserID: nil))
         XCTAssertTrue(FieldOperationRules.mayMark(me: me("SOMETHING_NEW"), assigneeUserID: nil))
+        XCTAssertTrue(FieldOperationRules.mayMark(me: me("READER"), assigneeUserID: nil),
+                      "a role alone is not a tier: the copied ladder is gone")
         XCTAssertFalse(FieldOperationRules.mayMark(me: nil, assigneeUserID: "usr_me"))
     }
 

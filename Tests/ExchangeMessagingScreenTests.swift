@@ -107,28 +107,28 @@ final class MessagingLabelTests: XCTestCase {
 
 final class MessagingGatingTests: XCTestCase {
 
-    private func user(_ role: String?) -> CurrentUser {
-        CurrentUser(id: "u1", name: nil, email: nil, role: role)
+    private func user(_ role: String?, canWrite: Bool? = nil) -> CurrentUser {
+        CurrentUser(id: "u1", name: nil, email: nil, role: role,
+                    permissions: canWrite.map(CurrentUser.Permissions.init))
     }
 
-    /// `assertCanWrite` is ROLE_ORDER >= 3. Unknown fails OPEN — the server
-    /// refuses, and its refusal is rendered.
-    func testWritesAreOfferedToTheRolesThatCanWrite() {
+    /// `assertCanWrite`, as the server's tier for the open farm says it
+    /// (#312). Not told fails OPEN — the server refuses, and its refusal is
+    /// rendered, naming the role.
+    func testWritesAreOfferedToWhomTheServerSaysMayWrite() {
         XCTAssertTrue(MessagingPolicy.mayWrite(nil), "unknown user fails open")
-        XCTAssertTrue(MessagingPolicy.mayWrite(user("OWNER")))
-        XCTAssertTrue(MessagingPolicy.mayWrite(user("ADMIN")))
-        XCTAssertTrue(MessagingPolicy.mayWrite(user("EDITOR")))
-        XCTAssertTrue(MessagingPolicy.mayWrite(user(nil)), "no role fails open")
-        XCTAssertTrue(MessagingPolicy.mayWrite(user("SOMETHING_NEW")), "a new role fails open")
-        XCTAssertFalse(MessagingPolicy.mayWrite(user("READER")))
-        XCTAssertFalse(MessagingPolicy.mayWrite(user("auditor")), "case-insensitive")
-        XCTAssertFalse(MessagingPolicy.mayWrite(user("MECHANISATOR")))
+        XCTAssertTrue(MessagingPolicy.mayWrite(user("OWNER", canWrite: true)))
+        XCTAssertFalse(MessagingPolicy.mayWrite(user("READER", canWrite: false)))
+        XCTAssertFalse(MessagingPolicy.mayWrite(user("MECHANISATOR", canWrite: false)))
+        XCTAssertTrue(MessagingPolicy.mayWrite(user(nil)), "no tier fails open")
+        XCTAssertTrue(MessagingPolicy.mayWrite(user("READER")), "a role alone is not a tier")
     }
 
-    /// One list, not two: field operations and messaging gate identically.
+    /// One answer, not two: field operations and messaging gate identically.
     func testFieldOperationsAndMessagingAgree() {
-        for role in ["OWNER", "READER", "AUDITOR", "MECHANISATOR", "EDITOR", nil] {
-            XCTAssertEqual(user(role).mayCreateOperations, user(role).mayWrite, "\(role ?? "nil")")
+        for canWrite in [true, false, nil] {
+            XCTAssertEqual(user("EDITOR", canWrite: canWrite).mayCreateOperations,
+                           user("EDITOR", canWrite: canWrite).mayWrite, "\(String(describing: canWrite))")
         }
     }
 
