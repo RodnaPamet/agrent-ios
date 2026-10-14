@@ -324,6 +324,19 @@ enum UserMessage {
             // quoted: anything else is not a length.
             guard let max = params?["max"], Int(max) != nil else { return nil }
             return "Името на стопанството е твърде дълго — до \(max) знака."
+        case "WRITE_FORBIDDEN_FOR_ROLE":
+            // The person's role in THIS farm may not change records — a
+            // reader, an auditor or a machine operator — and `params.role`
+            // says which (agri-saas #1767). Only an administrator of the farm
+            // can give another role, so unlike `MODULE_DISABLED` without its
+            // reason, this one may send them there. The role is named in
+            // Bulgarian or not at all: a role this build does not know falls
+            // to the table's sentence, which names none.
+            guard let raw = params?["role"], let role = MembershipRole(rawValue: raw), role != .unknown else {
+                return nil
+            }
+            return "С роля «\(role.label)» в това стопанство не можете да променяте записи. "
+                 + "Друга роля може да Ви даде администратор на стопанството."
         case "REFERENCE_NOT_IN_TENANT":
             // One code for anything chosen that is not this farm's (agri-saas
             // #1740), and `params.reference` says which list held it. On
@@ -593,6 +606,11 @@ enum UserMessage {
         // visible to the farm's owner. Worth knowing before anything here
         // grows a retry.
         "FORBIDDEN": "Нямате права за това действие.",
+        // Coded since agri-saas #1767, where it was a bare FORBIDDEN with an
+        // English message: a role that cannot change records. The role is
+        // named when it can be (`interpolated`).
+        "WRITE_FORBIDDEN_FOR_ROLE":
+            "Ролята Ви в това стопанство не позволява промени. Друга роля може да Ви даде администратор на стопанството.",
 
         // ── The middleware's own 403s (agri-saas `src/middleware.ts`) ──
         //
