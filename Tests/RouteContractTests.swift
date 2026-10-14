@@ -139,14 +139,13 @@ final class RouteContractTests: XCTestCase {
     /// its read by handle (#293), drafted against agri-saas #1758's spec
     /// while that PR was open, came off with the refresh from its merge. The
     /// draft merged only once `/api/health` carried #1758.
-    private static let pendingServerRoutes: [String: String] = [
-        // «Изтегли PDF» on a saved treatment (#293), agri-saas #1822 — off
-        // this list by the refresh that brings it in. «Нов запис» opens the
-        // treatment form with it, so the draft merges only once
-        // `/api/health` carries #1822.
-        "/api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/farm-record":
-            "agri-saas #1822: the ДНЕВНИК for one treatment, for #293",
-    ]
+    ///
+    /// Empty again from agri-saas main 98ce46b: «Изтегли PDF» on a saved
+    /// treatment (#293), built against agri-saas #1822 while that PR was
+    /// open, came off with the refresh after its merge. «Нов запис» opened
+    /// the treatment form only once `/api/health` carried #1822 (765fc4020,
+    /// 2026-10-14).
+    private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
