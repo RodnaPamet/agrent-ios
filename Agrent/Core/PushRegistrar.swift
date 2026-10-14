@@ -34,9 +34,18 @@ final class PushRegistrar {
     /// new token both empty it.
     private(set) var registered: Set<String> = []
 
-    /// Farms with a registration on its way, so two overlapping `sync`s do
-    /// not both send one.
-    private var sending: Set<String> = []
+    /// Registrations on their way, so two overlapping `sync`s do not both
+    /// send one. Keyed by token and session as well as farm: the token is the
+    /// phone's and the same across people, so a marker of A's still in
+    /// flight must not stand in for B's registration — nor an old token's
+    /// for a new one.
+    private struct Sending: Hashable {
+        let farm: String
+        let token: String
+        let epoch: Int
+    }
+
+    private var sending: Set<Sending> = []
 
     private let register: @MainActor (_ token: String, _ farm: String) async throws -> Void
     private let farms: @MainActor () -> [String]
@@ -93,8 +102,14 @@ final class PushRegistrar {
     func sync() async {
         guard let token = deviceToken else { return }
         let epoch = SessionEpoch.current
-        for farm in farms() where !registered.contains(farm) && !sending.contains(farm) {
-            sending.insert(farm)
+        for farm in farms() {
+            // Again on every pass, because each pass awaits: a person who
+            // signed out while the last farm was sent is not registered with
+            // the rest of their farms under whoever is signed in now.
+            guard SessionEpoch.isCurrent(epoch), token == deviceToken else { return }
+            let marker = Sending(farm: farm, token: token, epoch: epoch)
+            guard !registered.contains(farm), !sending.contains(marker) else { continue }
+            sending.insert(marker)
             do {
                 try await register(token, farm)
                 // Not if the session ended, or the token changed, while it
@@ -105,7 +120,7 @@ final class PushRegistrar {
             } catch {
                 Log.auth.info("push register not sent: \(Log.summary(for: error), privacy: .public)")
             }
-            sending.remove(farm)
+            sending.remove(marker)
         }
     }
 
@@ -116,7 +131,7 @@ final class PushRegistrar {
     /// never made answers 200 all the same (`deleteMany`).
     func farewell(accessToken: String?) -> PushFarewell? {
         guard let deviceToken, let accessToken, !accessToken.isEmpty else { return nil }
-        let all = registered.union(sending).union(farms())
+        let all = registered.union(sending.map(\.farm)).union(farms())
         guard !all.isEmpty else { return nil }
         return PushFarewell(deviceToken: deviceToken, farms: all.sorted(), accessToken: accessToken)
     }

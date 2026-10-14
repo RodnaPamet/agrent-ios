@@ -144,6 +144,41 @@ final class PushRegistrationTests: XCTestCase {
         XCTAssertEqual(push.registered, [], "a registration from the old session was kept")
     }
 
+    /// A person who signs out while one farm is being registered is not
+    /// registered with the rest of their farms afterwards.
+    func testIzhodMidwayStopsTheRemainingFarms() async {
+        let sent = Sent()
+        let push = PushRegistrar(
+            register: { _, farm in
+                sent.calls.append(farm)
+                SessionEpoch.advance()
+            },
+            farms: { ["ferma-1", "ferma-2", "ferma-3"] }
+        )
+        await push.adopt(token).value
+        XCTAssertEqual(sent.calls, ["ferma-1"], "the old session's farms went on being registered")
+    }
+
+    /// A new token that arrives while the old one is being registered is
+    /// registered too — the old one's marker does not stand in for it.
+    func testANewTokenIsNotSkippedForAnOldOneInFlight() async {
+        final class Late { var push: PushRegistrar? }
+        let sent = Sent(), late = Late()
+        let fresh = Data(repeating: 0xff, count: 32)
+        let push = PushRegistrar(
+            register: { token, _ in
+                sent.calls.append(String(token.prefix(6)))
+                // iOS hands over a new token while the first is on its way.
+                if sent.calls.count == 1 { await late.push?.adopt(fresh).value }
+            },
+            farms: { ["ferma-1"] }
+        )
+        late.push = push
+        await push.adopt(token).value
+        XCTAssertEqual(sent.calls, ["000810", "ffffff"])
+        XCTAssertEqual(push.registered, ["ferma-1"])
+    }
+
     /// This suite runs on a simulator, which is exactly where nothing may be
     /// registered: it would write real rows from a development machine.
     func testNothingRegistersFromASimulator() {
