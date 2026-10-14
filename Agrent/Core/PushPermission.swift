@@ -128,9 +128,14 @@ final class PushPermission {
     }
 
     /// The switch turned off: this phone leaves the person's farms.
-    func turnOff() async {
+    ///
+    /// Off at ONCE, and the removals after: a switch whose state waits on a
+    /// request springs back under the person's finger and then moves again.
+    @discardableResult
+    func turnOff() -> Task<Void, Never> {
         remember(switchedOff: true)
-        await registrar().withdraw()
+        let registrar = registrar()
+        return Task { await registrar.withdraw() }
     }
 
     /// Профил's button, once iOS has been told no.
