@@ -48,8 +48,12 @@ enum TreatmentAPI {
         let parcelIds: [String]
         let productName: String?
         let fertilizerName: String?
-        /// Read by the server only when the name has to CREATE a plant
-        /// protection product, and ignored on a match.
+        /// Both read by the server only when the name has to CREATE a plant
+        /// protection product, and ignored on a match: an operation never
+        /// rewrites a stored registration. So the period typed for a product
+        /// the farm already has is NOT recorded — the ДНЕВНИК prints the
+        /// product's own — until the server keeps one per entry (agri-saas
+        /// #1775). Sent all the same, so that day needs no new build.
         let pppRegistrationNo: String?
         let quarantinePeriodDays: Int?
         let targetNote: String?
@@ -142,8 +146,11 @@ struct TreatmentReceipt: Equatable, Sendable {
 enum TreatmentLanding: Equatable, Sendable {
     /// 404 `TREATMENT_NOT_FOUND`: nothing was recorded under it.
     case nothing
-    /// Recorded, on this many parcels.
+    /// Recorded in full: every one of this many parcels has its ДНЕВНИК
+    /// entry.
     case landed(parcelCount: Int)
-    /// Begun and not finished. The same key sent again finishes it.
+    /// Recorded in part — a block not written, or lines written and not yet
+    /// marked done, which is what puts them on the register. The same key
+    /// sent again finishes the rest.
     case half
 }

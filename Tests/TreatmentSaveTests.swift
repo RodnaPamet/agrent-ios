@@ -116,8 +116,11 @@ final class TreatmentSaveTests: XCTestCase {
     }
 
     func testTheSummaryIsLandedOrHalf() throws {
-        let landed = #"{"treatmentGroupId":"h","parcelCount":3,"taskIds":["t"],"occurredOn":"2026-10-13","complete":true}"#
-        let half = #"{"treatmentGroupId":"h","parcelCount":0,"taskIds":["t"],"occurredOn":null,"complete":false}"#
+        let landed = #"{"treatmentGroupId":"h","parcelCount":3,"completedCount":3,"taskIds":["t"],"#
+            + #""occurredOn":"2026-10-13","complete":true}"#
+        // Three lines written, one marked done: on the register in part.
+        let half = #"{"treatmentGroupId":"h","parcelCount":3,"completedCount":1,"taskIds":["t"],"#
+            + #""occurredOn":"2026-10-13","complete":false}"#
         XCTAssertEqual(try TreatmentAPI.landing(from: Data(landed.utf8)), .landed(parcelCount: 3))
         XCTAssertEqual(try TreatmentAPI.landing(from: Data(half.utf8)), .half)
     }
@@ -125,7 +128,7 @@ final class TreatmentSaveTests: XCTestCase {
     /// `complete` is never guessed: without it the answer is a failure, not
     /// "landed" and not "half".
     func testASummaryWithoutCompleteIsNotRead() {
-        let body = Data(#"{"treatmentGroupId":"h","parcelCount":3,"taskIds":[]}"#.utf8)
+        let body = Data(#"{"treatmentGroupId":"h","parcelCount":3,"completedCount":3,"taskIds":[]}"#.utf8)
         XCTAssertThrowsError(try TreatmentAPI.landing(from: body)) { XCTAssertTrue($0 is DecodingError) }
     }
 
