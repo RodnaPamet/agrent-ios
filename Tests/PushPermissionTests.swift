@@ -136,8 +136,9 @@ final class PushPermissionTests: XCTestCase {
         XCTAssertTrue(push.isOn)
 
         phone.sent = []
-        await push.turnOff()
-        XCTAssertFalse(push.isOn)
+        let removal = push.turnOff()
+        XCTAssertFalse(push.isOn, "the switch waited on the server to move")
+        await removal.value
         XCTAssertEqual(phone.sent, ["-ferma-1", "-ferma-2"])
         XCTAssertEqual(registrar.registered, [])
         XCTAssertTrue(push.storedSwitchedOff, "the registrar would register again at the next launch")

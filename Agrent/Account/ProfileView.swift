@@ -206,7 +206,7 @@ struct ProfileView: View {
         Binding(
             get: { permission.isOn },
             set: { on in
-                Task { if on { await permission.turnOn() } else { await permission.turnOff() } }
+                if on { Task { await permission.turnOn() } } else { permission.turnOff() }
             }
         )
     }
