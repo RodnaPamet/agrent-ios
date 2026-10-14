@@ -502,7 +502,7 @@ final class A11yShotsTests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
             capture("01f-journal-treatment-pdf", app: app)
         }
-        goBack(app, to: "Дневник")
+        goBack(app, to: "Земеделски дневник")
     }
 
     // MARK: - «Култура» (agrent-ios#245)
