@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 
 /// One diary entry, in full.
@@ -27,6 +28,13 @@ import SwiftUI
 /// confirmation — is a decision to take deliberately, in its own change, not
 /// a button to add because the endpoint happened to exist.
 ///
+/// ── A treatment, and its ДНЕВНИК again (#320) ──
+///
+/// A folded treatment's row carries what was done — product, dose, period,
+/// parcels — so those are shown from it, still without a fetch. Its PDF is
+/// the one read here, and only on a tap: the screen right after a save is
+/// not the only time a farmer needs the page an inspector asks for.
+///
 /// ── Layout ──
 ///
 /// Everything is a full-width row in one vertical stack. The list's own
@@ -37,12 +45,26 @@ import SwiftUI
 /// with anything else and there is no reflow to get wrong.
 struct JournalDetailView: View {
     let entry: LogEntry
+    var recorder: TreatmentRecorder = LiveTreatmentRecorder()
+
+    @State private var generating = false
+    @State private var failure: String?
+    @State private var document: URL?
+
+    /// The treatment this entry stands for — nil for an entry folded to
+    /// itself, whose object says only that it is none.
+    private var treatment: JournalTreatment? {
+        entry.treatment.flatMap { $0.isTreatment ? $0 : nil }
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 facts
+                if let handle = treatment?.treatmentGroupId?.recorded {
+                    documentAction(handle)
+                }
                 notes
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -50,6 +72,18 @@ struct JournalDetailView: View {
             .padding(.vertical, 16)
         }
         .inlineTitle("Запис")
+        .quickLookPreview($document)
+        // Removed when Quick Look closes, not on this screen's
+        // `onDisappear`, which fires under the full-screen preview
+        // (`FarmRecordAPI.removeGenerated`).
+        .onChange(of: document) { _, now in
+            if now == nil { FarmRecordAPI.removeGenerated() }
+        }
+        // Said, not only drawn: the button under the cursor came back.
+        .onChange(of: failure) { _, now in
+            guard let now else { return }
+            AccessibilityNotification.Announcement(now).post()
+        }
     }
 
     // MARK: - Header
@@ -93,6 +127,103 @@ struct JournalDetailView: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if let treatment {
+                treatmentFacts(treatment)
+            }
+        }
+    }
+
+    /// What was done, each fact only when the row has it: a fertilising has
+    /// no pest and no period, and a «—» would read as one left blank.
+    @ViewBuilder
+    private func treatmentFacts(_ treatment: JournalTreatment) -> some View {
+        let kind = treatment.treatmentKind
+        if let product = treatment.productName?.recorded {
+            LabelledFact(label: kind?.inputLabel ?? "Продукт") { factText(product) }
+        }
+        if let dose = treatment.doseText {
+            LabelledFact(label: "Доза") {
+                factText(dose).accessibilityLabel(treatment.doseSpoken ?? dose)
+            }
+        }
+        if let pest = treatment.targetNote?.recorded {
+            LabelledFact(label: "Вредител") { factText(pest) }
+        }
+        if let technique = ApplicationTechnique.display(treatment.applicationTechnique) {
+            LabelledFact(label: "Техника") { factText(technique) }
+        }
+        if let days = treatment.quarantinePeriodDays {
+            LabelledFact(label: "Карантинен срок") { factText(Plural.bg(days, "ден", "дни")) }
+        }
+        if let harvest = treatment.earliestHarvest {
+            LabelledFact(label: "Най-ранна дата за прибиране") { factText(BgDate.full(harvest)) }
+        }
+        LabelledFact(label: "Парцели") {
+            factText(Plural.bg(treatment.parcelCount, "парцел", "парцела"))
+        }
+        if let area = treatment.area {
+            LabelledFact(label: kind == .fertilize ? "Наторена площ" : "Третирана площ") {
+                factText(area.text).accessibilityLabel(area.spoken)
+            }
+        }
+        if !treatment.blockNames.isEmpty {
+            LabelledFact(label: treatment.blockNames.count == 1 ? "Блок" : "Блокове") {
+                factText(treatment.blockNames.joined(separator: ", "))
+            }
+        }
+    }
+
+    private func factText(_ text: String) -> some View {
+        Text(text)
+            .font(.body)
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - The treatment's ДНЕВНИК
+
+    private func documentAction(_ handle: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                Task { await download(handle) }
+            } label: {
+                if generating {
+                    ProgressView().frame(maxWidth: .infinity)
+                        .accessibilityLabel("Изготвяне на PDF")
+                } else {
+                    Label("Изтегли PDF", systemImage: "doc.richtext").frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(generating)
+            .accessibilityInputLabels(A11y.spokenNames("Изтегли PDF", "Изтегли", "Download PDF", "Download"))
+
+            Text(TreatmentSavedView.documentNote)
+                .font(.footnote)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let failure {
+                Text(failure)
+                    .font(.body)
+                    .foregroundStyle(Palette.error)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func download(_ handle: String) async {
+        guard !generating else { return }
+        generating = true
+        failure = nil
+        defer { generating = false }
+        do {
+            document = try await recorder.document(forTreatment: handle)
+        } catch {
+            failure = UserMessage.text(for: error)
         }
     }
 

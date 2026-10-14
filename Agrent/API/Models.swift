@@ -169,8 +169,8 @@ struct LogEntry: Codable, Identifiable, Equatable, Sendable {
 /// Every field is optional, and a value of the wrong shape reads as absent
 /// rather than throwing: the Дневник is the launch screen, and one odd
 /// treatment must not empty it — the rule `LogEntry`'s nullable title and
-/// date already follow. Only the fields a row shows are read; the rest of
-/// the server's object waits for the screen that needs it.
+/// date already follow. Only the fields the row and the entry's screen
+/// (`JournalDetailView`, #320) show are read.
 struct JournalTreatment: Codable, Equatable, Sendable {
     var treatmentGroupId: String?
     var productName: String?
@@ -182,15 +182,37 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// `YYYY-MM-DD`, from the quarantine period captured ON THE DAY (#1775).
     /// Null when no period was captured — never the treatment day itself.
     var earliestHarvestOn: String?
+    /// The task's operation type: `SPRAY` or `FERTILIZE` for a treatment,
+    /// which is the `kind` its write sent.
+    var kind: String?
+    /// A NUMBER on this route (`Number(line.doseValue)`), read through
+    /// `WireDecimal` all the same, so neither shape costs the row.
+    var doseValue: Decimal?
+    /// The unit's SYMBOL, `л/дка` — not its name.
+    var doseUnit: String?
+    var targetNote: String?
+    /// The slug — see `ApplicationTechnique`.
+    var applicationTechnique: String?
+    /// The period as it applied ON THE DAY (#1775), the one the ДНЕВНИК prints.
+    var quarantinePeriodDays: Int?
 
     init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
-         totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil) {
+         totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil,
+         kind: String? = nil, doseValue: Decimal? = nil, doseUnit: String? = nil,
+         targetNote: String? = nil, applicationTechnique: String? = nil,
+         quarantinePeriodDays: Int? = nil) {
         self.treatmentGroupId = treatmentGroupId
         self.productName = productName
         self.parcelCount = parcelCount
         self.totalAreaHa = totalAreaHa
         self.blockNames = blockNames
         self.earliestHarvestOn = earliestHarvestOn
+        self.kind = kind
+        self.doseValue = doseValue
+        self.doseUnit = doseUnit
+        self.targetNote = targetNote
+        self.applicationTechnique = applicationTechnique
+        self.quarantinePeriodDays = quarantinePeriodDays
     }
 
     init(from decoder: any Decoder) throws {
@@ -201,6 +223,12 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         totalAreaHa = (try? c?.decodeIfPresent(Double.self, forKey: .totalAreaHa)) ?? nil
         blockNames = (try? c?.decodeIfPresent([String].self, forKey: .blockNames)) ?? []
         earliestHarvestOn = (try? c?.decodeIfPresent(String.self, forKey: .earliestHarvestOn)) ?? nil
+        kind = (try? c?.decodeIfPresent(String.self, forKey: .kind)) ?? nil
+        doseValue = ((try? c?.decodeIfPresent(WireDecimal.self, forKey: .doseValue)) ?? nil)?.value
+        doseUnit = (try? c?.decodeIfPresent(String.self, forKey: .doseUnit)) ?? nil
+        targetNote = (try? c?.decodeIfPresent(String.self, forKey: .targetNote)) ?? nil
+        applicationTechnique = (try? c?.decodeIfPresent(String.self, forKey: .applicationTechnique)) ?? nil
+        quarantinePeriodDays = (try? c?.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)) ?? nil
     }
 
     /// A row that stands for parcels, rather than an entry folded to itself.
@@ -215,5 +243,37 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     var area: Area? { totalAreaHa.map(Area.init(hectares:)) }
 
     var earliestHarvest: Date? { earliestHarvestOn.flatMap(BgDate.parseISODay) }
+
+    /// Spraying or fertilising, when the row says which.
+    var treatmentKind: TreatmentDraft.Kind? { kind.flatMap(TreatmentDraft.Kind.init(rawValue:)) }
+
+    /// «1,5 л/дка». Nil without a dose, so the fact is left out rather than
+    /// shown as a «0» nobody set a boom to. Up to the column's four places,
+    /// trailing zeros dropped, as `OperationLine.doseText` reads it.
+    var doseText: String? {
+        guard let doseValue else { return nil }
+        let number = doseValue.formatted(
+            .number.precision(.fractionLength(0...4)).grouping(.automatic).locale(BgDate.locale))
+        guard let unit = doseUnit?.recorded else { return number }
+        return "\(number) \(unit)"
+    }
+
+    /// The dose as VoiceOver should say it: the unit's NAME, which the row
+    /// does not carry — only the symbol, which is spelled letter by letter.
+    /// A unit outside the four is said as its symbol, never left out.
+    var doseSpoken: String? {
+        guard let text = doseText, let unit = doseUnit?.recorded,
+              let name = Self.rateUnitNames[unit] else { return doseText }
+        return text.replacingOccurrences(of: unit, with: name)
+    }
+
+    /// `/units?measure=RATE`: every unit a treatment's dose is entered in,
+    /// by symbol (Tests/Fixtures/units-rate.json has them as served).
+    static let rateUnitNames = [
+        "л/дка": "литра на декар",
+        "кг/дка": "килограма на декар",
+        "мл/дка": "милилитра на декар",
+        "г/дка": "грама на декар",
+    ]
 }
 

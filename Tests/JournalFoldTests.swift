@@ -80,4 +80,53 @@ final class JournalFoldTests: XCTestCase {
         XCTAssertEqual(JournalRow.spokenTreatment(rows[1].treatment).count, 0)
         XCTAssertEqual(JournalRow.spokenTreatment(nil).count, 0)
     }
+
+    // MARK: - The entry's own screen (#320)
+
+    /// The facts the entry's screen shows arrive from the row, read leniently
+    /// like the rest: a dose sent as a string reads, one that is not a number
+    /// is no dose.
+    func testATreatmentsFactsArriveForItsScreen() async throws {
+        let rows = try await JournalAPI.decodeList(from: page).entries
+        let spray = try XCTUnwrap(rows[0].treatment)
+        XCTAssertEqual(spray.treatmentKind, .spray)
+        XCTAssertEqual(spray.doseText, "1,5 л/дка")
+        XCTAssertEqual(spray.quarantinePeriodDays, 14)
+        XCTAssertNil(spray.targetNote)
+        XCTAssertNil(spray.applicationTechnique)
+
+        let odd = Data("""
+        {"rows": [
+          {"id": "le_6", "type": "INPUT_APPLICATION", "status": "DONE", "occurredAt": null,
+           "treatment": {"treatmentGroupId": "tg_6", "kind": "FERTILIZE", "parcelCount": 2,
+                         "doseValue": "2.25", "doseUnit": "кг/дка", "applicationTechnique": "spreader",
+                         "quarantinePeriodDays": null, "targetNote": "  "}},
+          {"id": "le_7", "type": "INPUT_APPLICATION", "status": "DONE", "occurredAt": null,
+           "treatment": {"treatmentGroupId": "tg_7", "kind": "MOW", "parcelCount": 1,
+                         "doseValue": "много", "doseUnit": "л/дка"}}
+        ], "nextCursor": null}
+        """.utf8)
+        let more = try await JournalAPI.decodeList(from: odd).entries
+        let fertilising = try XCTUnwrap(more[0].treatment)
+        XCTAssertEqual(fertilising.treatmentKind, .fertilize)
+        XCTAssertEqual(fertilising.doseText, "2,25 кг/дка")
+        XCTAssertEqual(ApplicationTechnique.display(fertilising.applicationTechnique), "Разпръсквач на тор")
+        XCTAssertNil(fertilising.quarantinePeriodDays)
+        XCTAssertNil(fertilising.targetNote?.recorded, "a blank note is no note")
+
+        let unknown = try XCTUnwrap(more[1].treatment)
+        XCTAssertNil(unknown.treatmentKind, "an operation that is no treatment has no kind to label")
+        XCTAssertNil(unknown.doseText, "a dose that is not a number is no dose — never «0»")
+    }
+
+    /// The dose is spoken with the unit's name: the symbol is spelled letter
+    /// by letter. A unit outside the four is still said, as its symbol, and a
+    /// dose without a unit is the number alone.
+    func testTheDoseIsSpokenWithTheUnitsName() {
+        XCTAssertEqual(JournalTreatment(doseValue: 1.5, doseUnit: "л/дка").doseSpoken, "1,5 литра на декар")
+        XCTAssertEqual(JournalTreatment(doseValue: 250, doseUnit: "мл/дка").doseSpoken, "250 милилитра на декар")
+        XCTAssertEqual(JournalTreatment(doseValue: 3, doseUnit: "т/ха").doseSpoken, "3 т/ха")
+        XCTAssertEqual(JournalTreatment(doseValue: 0.25, doseUnit: nil).doseText, "0,25")
+        XCTAssertNil(JournalTreatment(doseUnit: "л/дка").doseSpoken)
+    }
 }

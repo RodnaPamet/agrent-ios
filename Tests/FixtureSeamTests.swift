@@ -37,7 +37,8 @@ import XCTest
 ///
 ///   - `journal-list` carries a `type` this build does not know, which
 ///     `LogEntryType` must render as «Друг вид» rather than failing the whole
-///     list (see its header — six cases against the server's ten);
+///     list (see its header — six cases against the server's ten) — and a
+///     folded treatment (agri-saas #1799) for the entry's screen (#320);
 ///   - `tasks-list` row 2 has `key: null` and `severity: null`, the two
 ///     nullable fields `WorkItemSummary` documents as having been declared
 ///     non-optional once;
