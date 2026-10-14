@@ -4,11 +4,20 @@ import SwiftUI
 /// Step three: saved, and the entry's ДНЕВНИК pages one tap away.
 struct TreatmentSavedView: View {
     struct Saved: Equatable {
-        let entryID: String
+        /// The treatment's handle: the key its save went out under.
+        let handle: String
         let record: TreatmentRecord
         let fields: [TreatmentPlace.Field]
         let cropLabel: String?
+        /// What the server kept is an earlier save, whose answer never
+        /// arrived — without what the person changed after it
+        /// (`TreatmentAttempt.save`). Said, because the screen below shows
+        /// the entry as it was recorded, not as they last saw it.
+        var changeLost = false
     }
+
+    static let changeLostNote = "Мероприятието беше записано още при първия опит. "
+        + "Промените след него не са записани."
 
     let saved: Saved
     let recorder: TreatmentRecorder
@@ -17,7 +26,11 @@ struct TreatmentSavedView: View {
     @State private var generating = false
     @State private var failure: String?
     @State private var document: URL?
-    @AccessibilityFocusState private var titleFocused: Bool
+    @AccessibilityFocusState private var focus: Landing?
+
+    /// Where VoiceOver lands: the title, or the note when a change was lost
+    /// — it opens with what was recorded and is the thing to hear.
+    private enum Landing { case title, note }
 
     private var total: TreatmentPlace.Total { TreatmentPlace.total(saved.fields) }
 
@@ -37,7 +50,13 @@ struct TreatmentSavedView: View {
                     .foregroundStyle(Palette.success)
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
-                    .accessibilityFocused($titleFocused)
+                    .accessibilityFocused($focus, equals: .title)
+                if saved.changeLost {
+                    Label(Self.changeLostNote, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityFocused($focus, equals: .note)
+                }
             }
             Section {
                 ValueRow("Вид") { Text(saved.record.kind.label) }
@@ -92,7 +111,7 @@ struct TreatmentSavedView: View {
             // The steps were swapped out under VoiceOver's cursor; this says
             // where it landed.
             try? await Task.sleep(for: .milliseconds(600))
-            titleFocused = true
+            focus = saved.changeLost ? .note : .title
         }
     }
 
@@ -102,7 +121,7 @@ struct TreatmentSavedView: View {
         failure = nil
         defer { generating = false }
         do {
-            document = try await recorder.document(forEntry: saved.entryID)
+            document = try await recorder.document(forTreatment: saved.handle)
         } catch {
             failure = UserMessage.text(for: error)
         }

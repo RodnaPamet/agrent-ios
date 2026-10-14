@@ -134,7 +134,16 @@ final class RouteContractTests: XCTestCase {
     /// served it, came off with the refresh from the merge that brought
     /// `/api/auth/native/mfa` in. Its PR merged only once `/api/health`
     /// carried #1649.
-    private static let pendingServerRoutes: [String: String] = [:]
+    ///
+    /// From 2026-10-14: «Ново мероприятие»'s save and its read by handle
+    /// (#293), built against agri-saas #1758's spec while that PR is open.
+    /// Nothing calls either yet — `TreatmentRecorder` has no live recorder
+    /// until the list and the ДНЕВНИК for one treatment are served too — so
+    /// no request reaches a route that is not there.
+    private static let pendingServerRoutes: [String: String] = [
+        "/api/t/{tenantSlug}/journal/treatments": "agri-saas #1758, open",
+        "/api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}": "agri-saas #1758, open",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -176,6 +185,8 @@ final class RouteContractTests: XCTestCase {
             ("SessionReset.swift", [SessionRevocation.path]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
+            // «Ново мероприятие»'s save and its read by handle (#293).
+            ("TreatmentAPI.swift", [TreatmentAPI.recordPath, TreatmentAPI.treatmentPath("{treatmentGroupId}")]),
             ("ExchangeAPI.swift", [
                 ExchangeAPI.listingsPath,
                 ExchangeAPI.listingsPath(ExchangeQuery(text: "q", minTonnes: 1, maxTonnes: 2, cursor: "c")),
@@ -358,6 +369,25 @@ final class RouteContractTests: XCTestCase {
                                      pending: pending).0, "pending (allowlisted)")
         XCTAssertEqual(Self.classify("/api/auth/native/nope", in: Inventory(sha: "x", routes: []),
                                      pending: pending).0, "ABSENT")
+    }
+
+    /// «Ново мероприятие»'s routes are pending on the ground that nothing
+    /// calls them: the save writes a farm's legal register, and the journal
+    /// can neither show nor print what it would write until the list and the
+    /// ДНЕВНИК for one treatment are served too (#293). Held here for as long
+    /// as they are pending, so the list's reason cannot stop being true
+    /// unnoticed; it lapses with the entries.
+    func testNothingCallsThePendingTreatmentRoutes() throws {
+        guard Self.pendingServerRoutes.keys.contains(where: { $0.hasSuffix("/journal/treatments") }) else { return }
+        let calls = ["TreatmentAPI.record(", "TreatmentAPI.landing(of"]
+        let own = try Self.read("Agrent/API/TreatmentAPI.swift")
+        XCTAssertTrue(own.contains("static func record(") && own.contains("static func landing(of"),
+                      "positive control: the calls this looks for no longer exist under these names")
+        let callers = try Self.appSources().filter { file in
+            let source = try Self.read(file)
+            return calls.contains { source.contains($0) }
+        }
+        XCTAssertEqual(callers, [], "a pending route is called from \(callers)")
     }
 
     /// The #130 path itself, pinned. If this ever matches, the matcher has

@@ -324,6 +324,15 @@ enum UserMessage {
             // quoted: anything else is not a length.
             guard let max = params?["max"], Int(max) != nil else { return nil }
             return "Името на стопанството е твърде дълго — до \(max) знака."
+        case "REFERENCE_NOT_IN_TENANT":
+            // One code for anything chosen that is not this farm's (agri-saas
+            // #1740), and `params.reference` says which list held it. On
+            // «Ново мероприятие» that is the parcels: one removed on the web
+            // after the phone read them. Any other list is the table's
+            // sentence, which names none.
+            return params?["reference"] == "parcels"
+                ? "Някой от избраните парцели вече не е в това стопанство. Проверете избора и опитайте отново."
+                : nil
         case "PRODUCT_IS_SAMPLE_ARCHETYPE":
             guard let product = params?["product"], !product.isEmpty else {
                 return "Операцията използва образцов продукт, а не регистриран. "
@@ -652,6 +661,26 @@ enum UserMessage {
         // The dose picker offers only rate units (`?measure=RATE`); this is
         // the server's backstop should one not be a quantity per area.
         "DOSE_UNIT_HAS_NO_BASE": "Мерната единица на дозата трябва да е количество на площ — например л/дка или кг/дка.",
+
+        // ── «Ново мероприятие» (agrent-ios#293, agri-saas #1740) ──
+        //
+        // The form asks for a date, not in the future, and at least one
+        // parcel before the request, so the first three mean its rule and
+        // the server's have drifted. One way they can: the server reads
+        // «today» off the farm's clock and the phone off its own, so a phone
+        // in a later time zone is told its own today is the future — and the
+        // form's sentence still says what to do.
+        "TREATMENT_DATE_INVALID": "Датата на мероприятието не е валидна. Изберете я отново.",
+        "TREATMENT_DATE_IN_FUTURE": TreatmentDraft.Problem.futureDate.text,
+        "TREATMENT_NO_PARCELS": "Изберете поне един парцел.",
+        "REFERENCE_NOT_IN_TENANT": "Нещо от избраното вече не е в това стопанство. Проверете избора и опитайте отново.",
+        // The operation write underneath, on this route and the spray
+        // sheet's. Both send a name and a dose always, so these are the
+        // server's backstop — and had only its English until now.
+        "PRODUCT_DOSE_REQUIRED": "Въведете дозата на препарата.",
+        "FERTILIZER_DOSE_REQUIRED": "Въведете дозата на тора.",
+        "PRODUCT_NOT_FOUND": "Препаратът не е намерен. Може да е изтрит.",
+        "FERTILIZER_NOT_FOUND": "Торът не е намерен. Може да е изтрит.",
 
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "
