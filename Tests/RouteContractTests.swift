@@ -180,6 +180,8 @@ final class RouteContractTests: XCTestCase {
             // retired it would leave every uploaded avatar on initials.
             ("AccountAvatar.swift", ["/api/account/avatar/{userId}"]),
             ("SessionReset.swift", [SessionRevocation.path]),
+            // This phone's APNs token, per farm (#272).
+            ("PushAPI.swift", [PushAPI.subscriptionsPath(in: "{tenantSlug}")]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
             // «Ново мероприятие»'s save and its read by handle (#293).

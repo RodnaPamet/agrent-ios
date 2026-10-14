@@ -64,6 +64,13 @@ import Foundation
 ///                                      the phone under A's id (`FarmMemory`),
 ///                                      for when A signs back in — it names a
 ///                                      farm A belongs to, never B's data.
+///     · `PushRegistrar.shared`      — which of A's farms this phone is
+///                                      registered with for push (#272). The
+///                                      token itself is the PHONE's and is
+///                                      kept; B registers it with B's farms.
+///                                      The server's rows for A are removed by
+///                                      the `DELETE`s `AuthClient.signOut`
+///                                      sends ahead of the revoke.
 ///
 ///   PURGED, then made unreachable by key:
 ///     · `ResponseCache.shared`      — `removeAll()` here, and every entry is
@@ -154,6 +161,7 @@ enum SessionReset {
         FeatureFlags.shared.reset()
         AccountAvatarStore.shared.reset()
         FarmStore.shared.reset()
+        PushRegistrar.shared.reset()
         // A half-made farm's name does not stay on a shared phone after its
         // person has gone (#197).
         FarmWizardDrafts(defaults: .standard).clear()
@@ -264,16 +272,26 @@ enum SessionRevocation {
     ///
     /// `refreshToken` is read by the caller BEFORE the local clear — after
     /// it, the Keychain has nothing left to read.
+    ///
+    /// `farewell`, when there is one, is this phone's push registrations
+    /// (#272), removed FIRST and awaited inside the detached task: the revoke
+    /// ends the session the access token belongs to, and the server refuses
+    /// a revoked session's access token at once, so a removal sent after it
+    /// would answer 401 and leave the person's rows behind. Both go through
+    /// `send`, so a test sees their order.
     @discardableResult
     static func revokeThisDevice(
         refreshToken: String?,
+        unregistering farewell: PushFarewell? = nil,
         send: @escaping @Sendable (URLRequest) async throws -> Int = SessionRevocation.sendOnce
     ) -> Task<Void, Never>? {
         // Nothing to present (a refused refresh already cleared it), or an
         // empty string the route would answer 400 to: no request at all.
+        // Nor a removal — its bearer was cleared with the same pair.
         guard let refreshToken, !refreshToken.isEmpty else { return nil }
         let req = request(refreshToken: refreshToken)
         return Task.detached(priority: .utility) {
+            await farewell?.send(using: send)
             do {
                 let status = try await send(req)
                 // The status and nothing else: a 200 says nothing about

@@ -179,6 +179,13 @@ final class FarmStore {
         return nil
     }
 
+    /// Every farm this person is known to belong to: the list once it has
+    /// been read, the open farm before then. What this phone registers for
+    /// push with (#272).
+    var memberSlugs: [String] {
+        farms?.map(\.slug) ?? activeFarm.map { [$0.slug] } ?? []
+    }
+
     @ObservationIgnored private let identity: SessionIdentity
     @ObservationIgnored private let memory: FarmMemory
     @ObservationIgnored private let mirror: ActiveFarm

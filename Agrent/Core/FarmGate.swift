@@ -72,6 +72,9 @@ struct FarmGate: View {
             }
         }
         .task {
+            // This phone's push token, on every signed-in launch (#272) —
+            // `PushRegistrar` registers it with each farm once iOS answers.
+            PushRegistrar.shared.start()
             await farms.resolve()
             // A gate that went away while `/me` was asked (an Изход) does not
             // start the next person's list under the old session's task.
@@ -84,6 +87,11 @@ struct FarmGate: View {
         }
         // The menu names the farm; `/me` can name the one seeded by slug.
         .onChange(of: me.user?.tenant) { _, tenant in farms.adoptName(from: tenant) }
+        // A farm this person has joined or created since the token was
+        // registered gets it too.
+        .onChange(of: farms.memberSlugs) {
+            Task { await PushRegistrar.shared.sync() }
+        }
         // The farm list on every RETURN to the app — here, in every state,
         // rather than in the tabs, which only a person with a farm has:
         // «Нямате стопанство» learns of an invitation accepted on the web,

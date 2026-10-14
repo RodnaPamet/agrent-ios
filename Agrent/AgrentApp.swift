@@ -3,6 +3,8 @@ import SwiftUI
 
 @main
 struct AgrentApp: App {
+    /// The APNs token arrives only through an application delegate (#272).
+    @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
     @State private var auth = AuthClient()
     /// Watched for one thing here: a pending account deletion, which takes a
     /// signed-in session to the recovery screen (#281).
