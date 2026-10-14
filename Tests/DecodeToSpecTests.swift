@@ -40,10 +40,6 @@ final class DecodeToSpecTests: XCTestCase {
         XCTAssertNotNil(slice.entries[1].occurredAt, "positive control: a dated row still has its date")
     }
 
-    func testAnUnknownStatusIsNeverOfferedForWriting() {
-        XCTAssertEqual(CreateLogEntry(type: .activity, title: "x").status, .done)
-    }
-
     // MARK: - A task's detail
 
     /// `severity`, `priority` and `createdByUserId` are nullable in the spec.

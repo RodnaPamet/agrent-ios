@@ -141,34 +141,4 @@ final class JournalStore {
             loadMoreError = UserMessage.text(for: error)
         }
     }
-
-    /// The key is minted ONCE here and survives every retry of this create, so
-    /// a lost response cannot produce two diary rows for one operator action.
-    func create(_ draft: CreateLogEntry) async throws {
-        let key = UUID().uuidString
-        let saved = try await JournalAPI.create(draft, idempotencyKey: key)
-
-        // Keep whatever freshness the list already had. A create succeeding
-        // does NOT mean the list caught up with the server — it means we know
-        // about one more row than we did. Promoting the list to .fresh here
-        // would quietly drop a staleness warning the operator still needs.
-        //
-        // Not shown under a filter it does not meet (`JournalFilter.admits`):
-        // that row would vanish on the next refresh, which reads as a lost
-        // entry. It is saved either way; clearing the filter shows it.
-        // Under a crop filter the phone cannot tell; the server can. Asked
-        // without holding the sheet open, because the entry is saved either
-        // way, and the list's own guards drop the answer if the filter moves.
-        guard filter.decidesLocally else {
-            Task { await load() }
-            return
-        }
-        guard filter.admits(saved, linkedTo: draft.locationIds ?? []) else { return }
-        if case .loaded(var rows, let freshness) = state {
-            rows.insert(saved, at: 0)
-            state = .loaded(rows, freshness)
-        } else {
-            state = .loaded([saved], .fresh)
-        }
-    }
 }

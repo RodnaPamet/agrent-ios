@@ -673,13 +673,6 @@ actor APIClient {
         try encoder.encode(body)
     }
 
-    /// POST a body that is ALREADY ENCODED.
-    ///
-    /// For the outbox. A queued operation stores the bytes it was recorded
-    /// as, not a model to re-encode — so an app update that renames a
-    /// field or changes a default cannot alter what the farmer actually
-    /// wrote down before sending it. The recorded intent goes out as
-    /// recorded.
     /// POST a JSON body whose answer is a DOCUMENT, not JSON — the БАБХ
     /// ДНЕВНИК as PDF bytes (#246). Returned as received, with the file name
     /// the server gave in `Content-Disposition`, if it gave one; on the
@@ -688,6 +681,15 @@ actor APIClient {
         let (data, http) = try await sendWithResponse(
             path: path, method: "POST", body: try encoder.encode(body),
             idempotencyKey: nil, session: documentSession)
+        return (data, Self.fileName(contentDisposition: http.value(forHTTPHeaderField: "Content-Disposition")))
+    }
+
+    /// GET a DOCUMENT — the ДНЕВНИК for one treatment (#293), whose only
+    /// input is the handle in its path. As `postForDocument` answers, on the
+    /// same session.
+    func getForDocument(_ path: String) async throws -> (data: Data, fileName: String?) {
+        let (data, http) = try await sendWithResponse(
+            path: path, method: "GET", body: nil, idempotencyKey: nil, session: documentSession)
         return (data, Self.fileName(contentDisposition: http.value(forHTTPHeaderField: "Content-Disposition")))
     }
 
@@ -714,6 +716,13 @@ actor APIClient {
         return last
     }
 
+    /// POST a body that is ALREADY ENCODED.
+    ///
+    /// For the outbox. A queued operation stores the bytes it was recorded
+    /// as, not a model to re-encode — so an app update that renames a
+    /// field or changes a default cannot alter what the farmer actually
+    /// wrote down before sending it. The recorded intent goes out as
+    /// recorded.
     func postRaw(_ path: String, body: Data, idempotencyKey: String) async throws -> Data {
         try await send(path: path, method: "POST", body: body,
                        idempotencyKey: idempotencyKey)

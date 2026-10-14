@@ -699,6 +699,11 @@ enum UserMessage {
         "FERTILIZER_DOSE_REQUIRED": "Въведете дозата на тора.",
         "PRODUCT_NOT_FOUND": "Препаратът не е намерен. Може да е изтрит.",
         "FERTILIZER_NOT_FOUND": "Торът не е намерен. Може да е изтрит.",
+        // «Изтегли PDF» on a saved treatment (agri-saas #1822): the server
+        // holds no recorded line under the handle, so there are no ДНЕВНИК
+        // pages to give. The read by handle answers this code too, and reads
+        // it as "nothing landed" itself — it never reaches a person there.
+        "TREATMENT_NOT_FOUND": "Мероприятието не е намерено на сървъра. Може да е изтрито.",
 
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "

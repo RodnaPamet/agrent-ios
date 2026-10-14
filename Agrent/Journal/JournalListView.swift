@@ -67,8 +67,15 @@ struct JournalListView: View {
                     .accessibilityInputLabels(A11y.Spoken.farmRecord)
                 }
             }
-            .sheet(isPresented: $composing) {
-                NewEntryView(store: store, preselected: store.filter.block.map { [$0] } ?? [])
+            // «Нов запис» is the two-step treatment record (#293). The saved
+            // entry comes back from the server folded into one row, which
+            // the phone cannot build itself, so the list is read again
+            // behind the sheet. The ДНЕВНИК it may have downloaded goes when
+            // the sheet does.
+            .sheet(isPresented: $composing, onDismiss: FarmRecordAPI.removeGenerated) {
+                TreatmentEntryFlow(recorder: LiveTreatmentRecorder()) {
+                    Task { await store.load() }
+                }
             }
             .sheet(isPresented: $exportingRecord, onDismiss: FarmRecordAPI.removeGenerated) {
                 FarmRecordSheet()

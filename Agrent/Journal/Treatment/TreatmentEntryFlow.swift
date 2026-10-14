@@ -10,8 +10,8 @@ import SwiftUI
 ///      entry alone (`TreatmentSavedView`).
 ///
 /// Modelled on PRZ's «Добавяне на мероприятие» (owner, 2026-10-13): spraying
-/// and fertilising, done work only, replacing the journal's free-form
-/// «Нов запис» once the server can keep it — see `TreatmentRecorder`.
+/// and fertilising, done work only. It REPLACES the journal's free-form
+/// «Нов запис»; the entries that form wrote stay readable.
 struct TreatmentEntryFlow: View {
     let recorder: TreatmentRecorder
     /// The journal refreshes behind the sheet once an entry is saved.

@@ -64,6 +64,7 @@
 /api/t/{tenantSlug}/journal
 /api/t/{tenantSlug}/journal/treatments
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}
+/api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/farm-record
 /api/t/{tenantSlug}/locations
 /api/t/{tenantSlug}/locations/{locationId}/farm-record
 /api/t/{tenantSlug}/locations/{locationId}/operations

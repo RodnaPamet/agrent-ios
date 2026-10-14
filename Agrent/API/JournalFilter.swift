@@ -20,9 +20,9 @@ import Foundation
 /// entries a task's spray line wrote are hidden from every journal surface,
 /// though not deleted (`includeTaskWritten`, agri-saas). What the list returns
 /// is free-hand entries, reached by a facet through the blocks they were
-/// linked to on «Нов запис» (#254) — and, since agri-saas #1799, treatments
-/// recorded whole (#293), each folded to ONE row, which the server reaches
-/// through its tasks' blocks.
+/// linked to on the old «Нов запис» (#254) — and, since agri-saas #1799,
+/// treatments recorded whole by today's (#293), each folded to ONE row,
+/// which the server reaches through its tasks' blocks.
 ///
 ///     type          the entry's own type
 ///     crop          entries linked (`LogLocation`) to a block with a live
@@ -139,36 +139,6 @@ struct JournalFilter: Equatable, Sendable {
         if let from { parts.append("occurredFrom=" + URLEscape.queryValue(BgDate.isoInstant(from))) }
         if let to { parts.append("occurredTo=" + URLEscape.queryValue(BgDate.isoInstant(to))) }
         return parts.joined(separator: "&")
-    }
-
-    // MARK: - An entry the phone just wrote
-
-    /// Whether an entry this phone has just written belongs on the filtered
-    /// list. `JournalStore.create` puts it at the top only when it does.
-    /// Otherwise the operator would see a row the server would never return
-    /// for this filter, and it would vanish on the next refresh.
-    ///
-    /// The phone writes free-hand entries, linked only to the blocks chosen
-    /// on «Нов запис» (`blockIDs`, #254). The block filter matches a linked
-    /// block. Type and period are checked the way the server checks them.
-    ///
-    /// A crop is the one facet the phone cannot judge: it matches through
-    /// what grows on the linked blocks, which the phone does not hold beside
-    /// the entry. So `decidesLocally` is false under a crop filter, and the
-    /// store asks the server again rather than guessing either way.
-    var decidesLocally: Bool { crop == nil }
-
-    func admits(_ entry: LogEntry, linkedTo blockIDs: [String] = [],
-                now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        if crop != nil { return false }
-        if let block, !blockIDs.contains(block.id) { return false }
-        if let type, entry.type != type { return false }
-        let (from, to) = bounds(now: now, calendar: calendar)
-        guard from != nil || to != nil else { return true }
-        guard let at = entry.occurredAt else { return false }
-        if let from, at < from { return false }
-        if let to, at > to { return false }
-        return true
     }
 
     // MARK: - Said back to the reader

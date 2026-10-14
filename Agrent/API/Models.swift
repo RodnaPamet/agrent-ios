@@ -58,9 +58,8 @@ enum LogEntryType: String, Codable, CaseIterable, Identifiable, Sendable, Lenien
     /// A value this build does not know.
     ///
     /// The raw value is one the server will reject on a create, which is
-    /// the point: it can be READ and never written. `NewEntryView` filters
-    /// it out of the picker, and `selectable` is the list to use anywhere
-    /// else a type is chosen rather than displayed.
+    /// the point: it can be READ and never written. `selectable` is the
+    /// list to use anywhere a type is chosen rather than displayed.
     case unknown = "__UNKNOWN__"
 
     static var unknownCase: LogEntryType { .unknown }
@@ -218,15 +217,3 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     var earliestHarvest: Date? { earliestHarvestOn.flatMap(BgDate.parseISODay) }
 }
 
-struct CreateLogEntry: Encodable, Sendable {
-    var type: LogEntryType
-    var status: LogEntryStatus = .done
-    var title: String
-    var notes: String?
-    var occurredAt: Date?
-    /// The blocks the entry is about (#254). These are `LogLocation` links,
-    /// the only path by which a hand-written entry reaches the Дневник's
-    /// «Блок» filter. Nil when none is chosen, and then left out, so an
-    /// unlinked entry's body is the one the app always sent.
-    var locationIds: [String]?
-}

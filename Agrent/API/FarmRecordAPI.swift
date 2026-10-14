@@ -36,7 +36,11 @@ enum FarmRecordAPI {
     /// The name the file is written under: the server's, or the fallback —
     /// and always ending `.pdf`, because Quick Look reads the type off it.
     static func fileName(_ served: String?, for request: Request) -> String {
-        let name = served ?? fallbackName(request)
+        fileName(served, fallback: fallbackName(request))
+    }
+
+    static func fileName(_ served: String?, fallback: String) -> String {
+        let name = served ?? fallback
         return name.lowercased().hasSuffix(".pdf") ? name : name + ".pdf"
     }
 
@@ -57,19 +61,24 @@ enum FarmRecordAPI {
         }
     }
 
-    /// Generated, checked to BE a PDF, and written where Quick Look can open
-    /// it. The ДНЕВНИК names the farm's producer, so it is written under
+    static func generate(locationID: String, from: Date, to: Date) async throws -> URL {
+        let request = Request(from: BgDate.isoDay(from), to: BgDate.isoDay(to))
+        let (data, served) = try await APIClient.shared.postForDocument(path(locationID), body: request)
+        return try keep(data, named: fileName(served, for: request))
+    }
+
+    /// Checked to BE a PDF, and written where Quick Look can open it — the
+    /// per-block register and one treatment's pages (`TreatmentAPI`) alike.
+    /// The ДНЕВНИК names the farm's producer, so it is written under
     /// complete protection, in a folder of its own that holds only the
     /// latest one — emptied before each, and removed when the sheet closes
     /// (`removeGenerated`). A copy the person shares or saves is theirs; this
     /// one is never the app's to keep.
-    static func generate(locationID: String, from: Date, to: Date) async throws -> URL {
-        let request = Request(from: BgDate.isoDay(from), to: BgDate.isoDay(to))
-        let (data, served) = try await APIClient.shared.postForDocument(path(locationID), body: request)
+    static func keep(_ data: Data, named name: String) throws -> URL {
         guard isPDF(data) else { throw Failure.notAPDF }
         removeGenerated()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let file = directory.appendingPathComponent(fileName(served, for: request))
+        let file = directory.appendingPathComponent(name)
         try data.write(to: file, options: [.atomic, .completeFileProtection])
         return file
     }
