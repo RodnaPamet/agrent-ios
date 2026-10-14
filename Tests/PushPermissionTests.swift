@@ -29,7 +29,8 @@ final class PushPermissionTests: XCTestCase {
         var asked = 0
         var settingsOpened = 0
         var sent: [String] = []
-        var userID: String? = "usr_a"
+        /// Who is signed in, changed the way the app changes it.
+        let identity = SessionIdentity(load: { "usr_a" }, save: { _ in })
     }
 
     private func permission(_ phone: Phone) -> (PushPermission, PushRegistrar) {
@@ -41,7 +42,7 @@ final class PushPermissionTests: XCTestCase {
         )
         let permission = PushPermission(
             defaults: defaults,
-            identity: SessionIdentity(load: { phone.userID }, save: { _ in }),
+            identity: phone.identity,
             readStatus: { phone.status },
             ask: {
                 phone.asked += 1
@@ -143,12 +144,13 @@ final class PushPermissionTests: XCTestCase {
 
         // Изход, and someone else signs in on the same phone.
         push.reset()
-        phone.userID = "usr_b"
+        phone.identity.clear()
+        phone.identity.adopt("usr_b")
         await push.refresh()
         XCTAssertTrue(push.isOn, "the last person's off silenced the next one")
 
         // And the first person, back, is still off.
-        phone.userID = "usr_a"
+        phone.identity.adopt("usr_a")
         await push.refresh()
         XCTAssertFalse(push.isOn)
     }
