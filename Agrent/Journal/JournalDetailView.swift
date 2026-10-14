@@ -1,4 +1,3 @@
-import QuickLook
 import SwiftUI
 
 /// One diary entry, in full.
@@ -45,11 +44,6 @@ import SwiftUI
 /// with anything else and there is no reflow to get wrong.
 struct JournalDetailView: View {
     let entry: LogEntry
-    var recorder: TreatmentRecorder = LiveTreatmentRecorder()
-
-    @State private var generating = false
-    @State private var failure: String?
-    @State private var document: URL?
 
     /// The treatment this entry stands for — nil for an entry folded to
     /// itself, whose object says only that it is none.
@@ -63,7 +57,7 @@ struct JournalDetailView: View {
                 header
                 facts
                 if let handle = treatment?.treatmentGroupId?.recorded {
-                    documentAction(handle)
+                    TreatmentDocumentAction(handle: handle)
                 }
                 notes
             }
@@ -72,18 +66,6 @@ struct JournalDetailView: View {
             .padding(.vertical, 16)
         }
         .inlineTitle("Запис")
-        .quickLookPreview($document)
-        // Removed when Quick Look closes, not on this screen's
-        // `onDisappear`, which fires under the full-screen preview
-        // (`FarmRecordAPI.removeGenerated`).
-        .onChange(of: document) { _, now in
-            if now == nil { FarmRecordAPI.removeGenerated() }
-        }
-        // Said, not only drawn: the button under the cursor came back.
-        .onChange(of: failure) { _, now in
-            guard let now else { return }
-            AccessibilityNotification.Announcement(now).post()
-        }
     }
 
     // MARK: - Header
@@ -178,52 +160,6 @@ struct JournalDetailView: View {
             .font(.body)
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)
-    }
-
-    // MARK: - The treatment's ДНЕВНИК
-
-    private func documentAction(_ handle: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                Task { await download(handle) }
-            } label: {
-                if generating {
-                    ProgressView().frame(maxWidth: .infinity)
-                        .accessibilityLabel("Изготвяне на PDF")
-                } else {
-                    Label("Изтегли PDF", systemImage: "doc.richtext").frame(maxWidth: .infinity)
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .disabled(generating)
-            .accessibilityInputLabels(A11y.spokenNames("Изтегли PDF", "Изтегли", "Download PDF", "Download"))
-
-            Text(TreatmentSavedView.documentNote)
-                .font(.footnote)
-                .foregroundStyle(Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let failure {
-                Text(failure)
-                    .font(.body)
-                    .foregroundStyle(Palette.error)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func download(_ handle: String) async {
-        guard !generating else { return }
-        generating = true
-        failure = nil
-        defer { generating = false }
-        do {
-            document = try await recorder.document(forTreatment: handle)
-        } catch {
-            failure = UserMessage.text(for: error)
-        }
     }
 
     // MARK: - Notes
