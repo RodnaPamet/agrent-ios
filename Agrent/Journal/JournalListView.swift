@@ -9,6 +9,8 @@ struct JournalListView: View {
     @State private var filtering = false
     /// The blocks and crops the filter offers, read once for this screen.
     @State private var filterOptions = JournalFilterOptions()
+    /// Whose role decides whether «Нов запис» is offered.
+    @State private var people = CurrentUserStore.shared
 
     var body: some View {
         RoutedStack {
@@ -87,7 +89,10 @@ struct JournalListView: View {
     /// and this is the action an operator performs standing in a field.
     @ViewBuilder
     private var newEntryButton: some View {
-        if store.state.value != nil {
+        // Not to a role that cannot write — a reader or an auditor would be
+        // refused after typing the entry (agrent-ios #312). Fails open while
+        // nobody has said, as every write control does (`CurrentUser.mayWrite`).
+        if store.state.value != nil, people.user?.mayWrite ?? true {
             Button {
                 composing = true
             } label: {

@@ -133,8 +133,28 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         let slug: String
     }
 
+    /// The server's permission tier for the membership `role` came from
+    /// (agri-saas #1768, #1781): `computePermissions(role)` as it ships, of
+    /// which the app reads one value. ADVISORY, like `role`: it decides what
+    /// to offer, and `assertCanWrite` still decides the write.
+    ///
+    /// For the OLDEST membership, as `role` is — `/me` has no farm in its
+    /// path. So `inFarm` drops it when it puts another farm's role in place:
+    /// a tier is a function of a role, and the other farm's role has its own,
+    /// which the farm list does not send yet (agrent-ios #312).
+    ///
+    /// Lenient: absent, null or unreadable is nil — "not told", never "may
+    /// not write" — so a server from before the field takes no control away.
+    let permissions: Permissions?
+
+    struct Permissions: Decodable, Equatable, Sendable {
+        let canWrite: Bool
+    }
+
     private enum Outer: String, CodingKey { case user, featureFlags, tenant }
-    private enum Inner: String, CodingKey { case id, name, email, role, bottomTabOrder, avatarUrl, deletion }
+    private enum Inner: String, CodingKey {
+        case id, name, email, role, bottomTabOrder, avatarUrl, deletion, permissions
+    }
 
     init(from decoder: Decoder) throws {
         let outer = try decoder.container(keyedBy: Outer.self)
@@ -146,6 +166,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.bottomTabOrder = try user.decodeIfPresent([String].self, forKey: .bottomTabOrder)
         self.avatarUrl = (try? user.decodeIfPresent(String.self, forKey: .avatarUrl)) ?? nil
         self.deletion = (try? user.decodeIfPresent(Deletion.self, forKey: .deletion)) ?? nil
+        self.permissions = (try? user.decodeIfPresent(Permissions.self, forKey: .permissions)) ?? nil
         self.featureFlags = (try? outer.decodeIfPresent([String: Bool].self, forKey: .featureFlags)) ?? nil
         // Lenient like the flags: a tenant block that will not decode costs a
         // first sign-in its starting farm (it is asked to choose), never the
@@ -199,8 +220,10 @@ struct CurrentUser: Decodable, Equatable, Sendable {
 
     var mayCreateOperations: Bool { mayWrite }
 
-    /// The server's `canWrite` — `ROLE_ORDER >= 3` — as far as `role` knows,
-    /// failing open for the reasons above.
+    /// The server's `canWrite`: its own answer when it has given one for the
+    /// role in force (`permissions`), and otherwise its ladder — `ROLE_ORDER
+    /// >= 3` — as far as `role` knows, failing open for the reasons above.
+    /// The ladder goes once the farm list carries each farm's tier (#312).
     ///
     /// Named for what it is rather than for the first screen that needed it:
     /// exchange messaging gates the same way (open, send, close, block,
@@ -208,14 +231,16 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// `assertCanRead`), and a second copy of this list would be a second
     /// place for a new role to be forgotten.
     var mayWrite: Bool {
-        switch role?.uppercased() {
+        if let permissions { return permissions.canWrite }
+        return switch role?.uppercased() {
         case "MECHANISATOR", "READER", "AUDITOR": false
         default: true
         }
     }
 
     /// This person as they stand in ONE farm: `role` replaced by their role
-    /// there, when it is known. Everything else is the person's own.
+    /// there, when it is known, and the server's tier dropped with the role it
+    /// was for. Everything else is the person's own.
     func inFarm(role farmRole: String?) -> CurrentUser {
         guard let farmRole, farmRole != role else { return self }
         return CurrentUser(id: id, name: name, email: email, role: farmRole,
@@ -225,7 +250,8 @@ struct CurrentUser: Decodable, Equatable, Sendable {
 
     init(id: String, name: String?, email: String?, role: String?,
          bottomTabOrder: [String]? = nil, featureFlags: [String: Bool]? = nil,
-         avatarUrl: String? = nil, tenant: Tenant? = nil, deletion: Deletion? = nil) {
+         avatarUrl: String? = nil, tenant: Tenant? = nil, deletion: Deletion? = nil,
+         permissions: Permissions? = nil) {
         self.id = id
         self.name = name
         self.email = email
@@ -235,6 +261,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.avatarUrl = avatarUrl
         self.tenant = tenant
         self.deletion = deletion
+        self.permissions = permissions
     }
 }
 
@@ -516,7 +543,8 @@ final class CurrentUserStore {
         guard let held = answered, held.deletion != nil else { return }
         answered = CurrentUser(id: held.id, name: held.name, email: held.email, role: held.role,
                                bottomTabOrder: held.bottomTabOrder, featureFlags: held.featureFlags,
-                               avatarUrl: held.avatarUrl, tenant: held.tenant, deletion: nil)
+                               avatarUrl: held.avatarUrl, tenant: held.tenant, deletion: nil,
+                               permissions: held.permissions)
         guard let scope = CacheScope.current(for: MeAPI.path, identity: identity) else { return }
         let key = ResponseCache.key(scope: scope, pathAndQuery: MeAPI.path)
         Task { await ResponseCache.shared.remove(key) }

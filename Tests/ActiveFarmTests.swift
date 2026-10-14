@@ -602,4 +602,47 @@ final class FarmRoleTests: XCTestCase {
         XCTAssertEqual(there.bottomTabOrder, oldest.bottomTabOrder)
         XCTAssertEqual(oldest.inFarm(role: nil), oldest)
     }
+
+    // MARK: - The server's permission tier (#312, agri-saas #1768)
+
+    private func meAnswering(role: String, permissions: String?) throws -> CurrentUser {
+        let tier = permissions.map { #","permissions":\#($0)"# } ?? ""
+        let json = #"{"user":{"id":"usr_1","role":"\#(role)"\#(tier)},"tenant":null}"#
+        return try JSONDecoder().decode(CurrentUser.self, from: Data(json.utf8))
+    }
+
+    /// The server's own `canWrite` wins over the ladder copied here — in both
+    /// directions, so a role whose level moves on the server moves here too.
+    func testTheServersTierDecidesWhoIsOfferedAWrite() throws {
+        let tier = #"{"canRead":true,"canWrite":%@,"canAdmin":false,"canAudit":false,"canExport":false}"#
+        let editorRefused = try meAnswering(role: "EDITOR", permissions: tier.replacingOccurrences(of: "%@", with: "false"))
+        XCTAssertEqual(editorRefused.permissions, .init(canWrite: false))
+        XCTAssertFalse(editorRefused.mayWrite, "the ladder said yes; the server said no")
+        let readerAllowed = try meAnswering(role: "READER", permissions: tier.replacingOccurrences(of: "%@", with: "true"))
+        XCTAssertTrue(readerAllowed.mayWrite, "the ladder said no; the server said yes")
+        XCTAssertTrue(readerAllowed.mayCreateOperations)
+    }
+
+    /// Not told is not "no": absent, null or unreadable leaves the ladder
+    /// deciding, as before the field — and costs nothing else of `/me`.
+    func testWithoutTheTierTheLadderStillDecides() throws {
+        for permissions in [nil, "null", #"{"canWrite":"yes"}"#, "[]"] {
+            let reader = try meAnswering(role: "READER", permissions: permissions)
+            XCTAssertNil(reader.permissions, permissions ?? "absent")
+            XCTAssertFalse(reader.mayWrite)
+            XCTAssertEqual(reader.id, "usr_1")
+            XCTAssertTrue(try meAnswering(role: "EDITOR", permissions: permissions).mayWrite)
+        }
+    }
+
+    /// `/me`'s tier is its OLDEST membership's, as its role is. Another
+    /// farm's role brings no tier, so the server's answer is dropped and the
+    /// ladder speaks for the open farm; the same role keeps it.
+    func testAnotherFarmsRoleDropsTheOldestMembershipsTier() throws {
+        let owner = try meAnswering(role: "OWNER", permissions: #"{"canRead":true,"canWrite":true,"canAdmin":true,"canAudit":true,"canExport":true}"#)
+        let readerHere = owner.inFarm(role: "READER")
+        XCTAssertNil(readerHere.permissions)
+        XCTAssertFalse(readerHere.mayWrite, "the oldest farm's write tier leaked into a farm where they read")
+        XCTAssertEqual(owner.inFarm(role: "OWNER").permissions, owner.permissions)
+    }
 }
