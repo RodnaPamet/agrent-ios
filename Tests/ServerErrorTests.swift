@@ -336,6 +336,33 @@ final class SubscriptionRefusalTests: XCTestCase {
     /// for one release, and next in the reader's language (agri-saas #1677).
     /// The code decides either way, so neither change on the server's side
     /// can turn a limit into «Нямате права».
+    /// A role that cannot change records is named in Bulgarian, with the
+    /// one person who can change it — and never as the server's English or
+    /// the role's wire name.
+    func testAWriteRefusedForTheRoleNamesTheRole() {
+        let english = "You do not have permission to modify records in this context."
+        let reader = UserMessage.httpText(status: 403, code: "WRITE_FORBIDDEN_FOR_ROLE", message: english,
+                                          params: ["role": "READER"])
+        XCTAssertTrue(reader.contains("«Читател»"), reader)
+        XCTAssertTrue(reader.contains("администратор"), reader)
+        XCTAssertTrue(UserMessage.httpText(status: 403, code: "WRITE_FORBIDDEN_FOR_ROLE", message: english,
+                                           params: ["role": "MECHANISATOR"]).contains("«Механизатор»"))
+        XCTAssertTrue(UserMessage.httpText(status: 403, code: "WRITE_FORBIDDEN_FOR_ROLE", message: english,
+                                           params: ["role": "AUDITOR"]).contains("«Одитор»"))
+
+        let generic = UserMessage.httpText(status: 403, code: "WRITE_FORBIDDEN_FOR_ROLE", message: english)
+        XCTAssertNotEqual(generic, UserMessage.statusText(403), "the code has its own sentence")
+        for unknown in ["SUPERVISOR", "UNKNOWN", ""] {
+            let text = UserMessage.httpText(status: 403, code: "WRITE_FORBIDDEN_FOR_ROLE", message: english,
+                                            params: ["role": unknown])
+            XCTAssertEqual(text, generic, "an unknown role \(unknown) is not quoted")
+        }
+        for text in [reader, generic] {
+            XCTAssertTrue(UserMessage.isBulgarianSentence(text), text)
+            XCTAssertFalse(text.contains("READER") || text.contains("permission"), text)
+        }
+    }
+
     func testThePlansRefusalsAreSaidByCode() {
         let refusals: [(code: String, legacy: String, params: [String: String])] = [
             ("PLAN_LIMIT_EXCEEDED", "plan_limit_exceeded: FREE plan allows 1 location(s); tenant currently has 1.",
