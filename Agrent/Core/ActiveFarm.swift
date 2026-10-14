@@ -25,17 +25,25 @@ struct Farm: Codable, Equatable, Hashable, Sendable {
     /// checks on every request. nil until the list has said, and on a farm
     /// remembered before it said: no.
     let isPlatform: Bool?
+    /// The server's permission tier here (agri-saas #1787), from the same row
+    /// and for the same reason as `isPlatform`. Remembered with the farm, like
+    /// `role`, so an offline launch offers this farm's writes and not the
+    /// oldest membership's. nil until the list has said, and on a farm
+    /// remembered before it said — which fails open (`CurrentUser.mayWrite`).
+    let permissions: CurrentUser.Permissions?
 
-    init(slug: String, name: String?, role: String? = nil, isPlatform: Bool? = nil) {
+    init(slug: String, name: String?, role: String? = nil, isPlatform: Bool? = nil,
+         permissions: CurrentUser.Permissions? = nil) {
         self.slug = slug
         self.name = name
         self.role = role
         self.isPlatform = isPlatform
+        self.permissions = permissions
     }
 
     init(_ membership: FarmsAPI.Membership) {
         self.init(slug: membership.slug, name: membership.name, role: membership.role,
-                  isPlatform: membership.isPlatform)
+                  isPlatform: membership.isPlatform, permissions: membership.permissions)
     }
 
     /// Whether to offer Админ → «Цени»: the platform farm, to its owner or
@@ -177,7 +185,7 @@ final class FarmStore {
     @ObservationIgnored private let loadMe: @MainActor () async -> CurrentUser?
     @ObservationIgnored private let loadFarms: @MainActor () async throws -> [FarmsAPI.Membership]
     @ObservationIgnored private let onFarmChange: @MainActor () -> Void
-    @ObservationIgnored private let adoptRole: @MainActor (String?) -> Void
+    @ObservationIgnored private let adoptRole: @MainActor (Farm?) -> Void
 
     /// False under the UI-test seam, which never writes a person's memory.
     @ObservationIgnored private var remembers = true
@@ -200,7 +208,9 @@ final class FarmStore {
         loadMe: @escaping @MainActor () async -> CurrentUser? = { await CurrentUserStore.shared.load() },
         loadFarms: @escaping @MainActor () async throws -> [FarmsAPI.Membership] = { try await FarmsAPI.farms() },
         onFarmChange: @escaping @MainActor () -> Void = { FarmStore.resetFarmState() },
-        adoptRole: @escaping @MainActor (String?) -> Void = { CurrentUserStore.shared.adoptRoleHere($0) }
+        adoptRole: @escaping @MainActor (Farm?) -> Void = {
+            CurrentUserStore.shared.adoptRoleHere($0?.role, permissions: $0?.permissions)
+        }
     ) {
         self.identity = identity
         self.memory = memory
@@ -251,8 +261,8 @@ final class FarmStore {
         if let tenant = me.tenant {
             // `/me`'s role is the role on that SAME membership — one row,
             // `take: 1`, read for both — so the first farm opens with the
-            // right one before any list has been read.
-            activate(Farm(slug: tenant.slug, name: tenant.name, role: me.role))
+            // right one before any list has been read. Its tier too.
+            activate(Farm(slug: tenant.slug, name: tenant.name, role: me.role, permissions: me.permissions))
         } else {
             state = .none
         }
@@ -281,7 +291,7 @@ final class FarmStore {
         }
         // Before the state moves, so the tabs `FarmGate` builds for this farm
         // are built on this farm's role.
-        adoptRole(farm.role)
+        adoptRole(farm)
         state = .active(farm)
     }
 
@@ -306,7 +316,8 @@ final class FarmStore {
     func adoptName(from tenant: CurrentUser.Tenant?) {
         guard let tenant, let farm = activeFarm, farm.slug == tenant.slug,
               farm.name != tenant.name else { return }
-        activate(Farm(slug: farm.slug, name: tenant.name, role: farm.role, isPlatform: farm.isPlatform))
+        activate(Farm(slug: farm.slug, name: tenant.name, role: farm.role, isPlatform: farm.isPlatform,
+                      permissions: farm.permissions))
     }
 
     /// Read this person's farms, and square the open farm with them.

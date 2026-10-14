@@ -139,15 +139,16 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// to offer, and `assertCanWrite` still decides the write.
     ///
     /// For the OLDEST membership, as `role` is — `/me` has no farm in its
-    /// path. So `inFarm` drops it when it puts another farm's role in place:
-    /// a tier is a function of a role, and the other farm's role has its own,
-    /// which the farm list does not send yet (agrent-ios #312).
+    /// path. So `inFarm` replaces it with the open farm's own, from the farm
+    /// list (agri-saas #1787), and drops it when another farm's role arrives
+    /// without one: a tier is a function of a role (agrent-ios #312).
     ///
     /// Lenient: absent, null or unreadable is nil — "not told", never "may
     /// not write" — so a server from before the field takes no control away.
     let permissions: Permissions?
 
-    struct Permissions: Decodable, Equatable, Sendable {
+    /// Codable, because a remembered `Farm` carries its own (`ActiveFarm`).
+    struct Permissions: Codable, Equatable, Hashable, Sendable {
         let canWrite: Bool
     }
 
@@ -174,31 +175,6 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.tenant = (try? outer.decodeIfPresent(Tenant.self, forKey: .tenant)) ?? nil
     }
 
-    /// May this person create a field operation?
-    ///
-    /// ── This gates an AFFORDANCE, never an action ──
-    ///
-    /// The server decides: `createFieldOperation` calls `assertCanWrite`,
-    /// and `canWrite` is `ROLE_ORDER >= 3`. MECHANISATOR is 1, so an
-    /// operator cannot create one — their job is COMPLETION, not creation
-    /// (`/my-work`, marking assigned parcels done). The path allowlist
-    /// letting `/locations/:id/operations` through is not the same as the
-    /// write succeeding; there are two gates and this is the second.
-    ///
-    /// ── FAILS OPEN, deliberately ──
-    ///
-    /// Until the farm list has said, `role` comes from the OLDEST
-    /// membership, so for anyone in two tenants it may not be their role
-    /// HERE. An unrecognised or absent role therefore shows the control and
-    /// lets the server refuse. The spec's advice for a role it has not met is
-    /// "the least privilege"; that is advice for deciding access, and this
-    /// decides only what to offer.
-    ///
-    /// Hiding a button from somebody who could have used it is worse than
-    /// showing one that might be refused: the refusal is a sentence they
-    /// can read and report, the absence is a feature they conclude does
-    /// not exist. The server is the authority either way, and its refusal
-    /// is rendered.
     /// A MECHANISATOR, as far as `role` knows — the open farm's role once the
     /// farm list has said it, the OLDEST membership's until then.
     ///
@@ -209,43 +185,63 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// anything else is not a tab this person has — it is a tab that
     /// errors.
     ///
-    /// Only MECHANISATOR. READER and AUDITOR are refused *writes* by
-    /// `mayCreateOperations`, and whether the same path lockdown applies
-    /// to them is not something this app has been told. Extending a rule
-    /// past what was verified is how a screen gets taken away from
-    /// somebody who could have used it.
+    /// Only MECHANISATOR. READER and AUDITOR are refused *writes*
+    /// (`mayWrite`), and whether the same path lockdown applies to them is
+    /// not something this app has been told. Extending a rule past what was
+    /// verified is how a screen gets taken away from somebody who could have
+    /// used it.
     var isOperator: Bool { Self.isOperator(role: role) }
 
     static func isOperator(role: String?) -> Bool { role?.uppercased() == "MECHANISATOR" }
 
+    /// May this person create a field operation? The same question as
+    /// `mayWrite`: `createFieldOperation` calls `assertCanWrite`. An operator
+    /// cannot — their job is COMPLETION (`/my-work`), and the path allowlist
+    /// letting `/locations/:id/operations` through is not the write
+    /// succeeding.
     var mayCreateOperations: Bool { mayWrite }
 
-    /// The server's `canWrite`: its own answer when it has given one for the
-    /// role in force (`permissions`), and otherwise its ladder — `ROLE_ORDER
-    /// >= 3` — as far as `role` knows, failing open for the reasons above.
-    /// The ladder goes once the farm list carries each farm's tier (#312).
+    /// Whether to OFFER a write: the server's own `canWrite` for the open
+    /// farm (agri-saas #1768) — never whether one is allowed. `assertCanWrite`
+    /// decides that, and a refusal after a role changed under a held answer
+    /// is said by `WRITE_FORBIDDEN_FOR_ROLE`, naming the role.
+    ///
+    /// ── Told, not worked out (#312) ──
+    ///
+    /// This used to be the server's role ladder copied here — MECHANISATOR,
+    /// READER and AUDITOR may not write — which drifts the moment a role's
+    /// level moves there. The tier now comes from the farm list's row for the
+    /// open farm (`inFarm`), or `/me`'s while the open farm's role is the one
+    /// `/me` answered for.
+    ///
+    /// ── FAILS OPEN when not told ──
+    ///
+    /// Hiding a button from somebody who could have used it is worse than
+    /// showing one that might be refused: the refusal is a sentence they can
+    /// read and report, the absence is a feature they conclude does not
+    /// exist. So no tier — a server from before it, a farm remembered before
+    /// it, the moments before the list answers — offers the write, and the
+    /// server's refusal is rendered.
     ///
     /// Named for what it is rather than for the first screen that needed it:
     /// exchange messaging gates the same way (open, send, close, block,
     /// unblock and retract are `assertCanWrite`; reading and marking read are
-    /// `assertCanRead`), and a second copy of this list would be a second
-    /// place for a new role to be forgotten.
-    var mayWrite: Bool {
-        if let permissions { return permissions.canWrite }
-        return switch role?.uppercased() {
-        case "MECHANISATOR", "READER", "AUDITOR": false
-        default: true
-        }
-    }
+    /// `assertCanRead`).
+    var mayWrite: Bool { permissions?.canWrite ?? true }
 
     /// This person as they stand in ONE farm: `role` replaced by their role
-    /// there, when it is known, and the server's tier dropped with the role it
-    /// was for. Everything else is the person's own.
-    func inFarm(role farmRole: String?) -> CurrentUser {
-        guard let farmRole, farmRole != role else { return self }
-        return CurrentUser(id: id, name: name, email: email, role: farmRole,
+    /// there, when it is known, and the tier with it — the farm's own when
+    /// the farm list sent one. `/me`'s tier stays only while the role it was
+    /// computed for is still the role in force; another farm's role without
+    /// a tier of its own leaves none. Everything else is the person's own.
+    func inFarm(role farmRole: String?, permissions farmTier: Permissions? = nil) -> CurrentUser {
+        let roleHere = farmRole ?? role
+        let tierHere = farmTier ?? (roleHere == role ? permissions : nil)
+        guard roleHere != role || tierHere != permissions else { return self }
+        return CurrentUser(id: id, name: name, email: email, role: roleHere,
                            bottomTabOrder: bottomTabOrder, featureFlags: featureFlags,
-                           avatarUrl: avatarUrl, tenant: tenant, deletion: deletion)
+                           avatarUrl: avatarUrl, tenant: tenant, deletion: deletion,
+                           permissions: tierHere)
     }
 
     init(id: String, name: String?, email: String?, role: String?,
@@ -296,9 +292,11 @@ final class CurrentUserStore {
     /// `/me` as it answered: its `role` is the OLDEST membership's.
     private var answered: CurrentUser?
 
-    /// This person's role in the open farm; nil while nothing has said, and
-    /// then `/me`'s stands. Written by `FarmStore` alone — `adoptRoleHere`.
+    /// This person's role in the open farm, and the server's tier for it;
+    /// nil while nothing has said, and then `/me`'s stand. Written by
+    /// `FarmStore` alone — `adoptRoleHere`.
     private var roleHere: String?
+    private var tierHere: CurrentUser.Permissions?
     /// ONE slot for `load()` and `refresh()` alike: whichever started first is
     /// the request, and the other awaits it. Two slots would mean two `/me`s
     /// racing to write `user` and the flags, and the later ANSWER — not the
@@ -520,15 +518,16 @@ final class CurrentUserStore {
     /// whole `/me` would put back a bar order saved since `/me` answered. And
     /// told even before `/me` has answered: a remembered MECHANISATOR's
     /// offline launch then draws their own tabs, not tabs that 403.
-    func adoptRoleHere(_ role: String?) {
-        guard role != roleHere else { return }
+    func adoptRoleHere(_ role: String?, permissions: CurrentUser.Permissions? = nil) {
+        guard role != roleHere || permissions != tierHere else { return }
         roleHere = role
+        tierHere = permissions
         adoptOperator(CurrentUser.isOperator(role: user?.role ?? role))
     }
 
     /// `/me`'s answer as it stands in the open farm.
     private func here(_ answer: CurrentUser?) -> CurrentUser? {
-        answer?.inFarm(role: roleHere)
+        answer?.inFarm(role: roleHere, permissions: tierHere)
     }
 
     /// The server cancelled this person's deletion (`AuthClient.restoreAccount`)
@@ -567,7 +566,7 @@ final class CurrentUserStore {
             // `load()` another screen started that the launch coalesced
             // onto. Same answer, same moment, one place. As it stands in the
             // open farm: the operator's tab set is a farm's, not the oldest's.
-            adoptTabs(resolved.inFarm(role: roleHere))
+            adoptTabs(resolved.inFarm(role: roleHere, permissions: tierHere))
         }
         answered = resolved
         if let freshFlags { flags.adopt(freshFlags) }
@@ -579,6 +578,7 @@ final class CurrentUserStore {
     func clear() {
         answered = nil
         roleHere = nil
+        tierHere = nil
         inFlight = nil
     }
 

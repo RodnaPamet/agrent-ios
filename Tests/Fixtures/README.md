@@ -302,6 +302,12 @@ always is). The second is invented, with the fixture person as a
 `MECHANISATOR`, so Профил shows a list with a tick, two roles and a farm to
 switch to.
 
+Each row carries `permissions`, the server's tier for that farm (agri-saas
+#1787), with the values `computePermissions` gives its role: OWNER all true;
+MECHANISATOR `canRead` only. The open farm's tier decides which write controls
+are drawn (agrent-ios #312), so the first row's must stay `canWrite: true` or
+every screenshot loses its write buttons.
+
 The first entry must stay slug `agrent`: `FarmStore` CLOSES an open farm the
 list does not have, and under the seam the open farm is always `agrent`.
 
