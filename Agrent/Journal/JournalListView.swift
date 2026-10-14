@@ -234,6 +234,14 @@ struct JournalRow: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
+            // A folded treatment (agri-saas #1799) says how much it covered,
+            // where, and when its crop may be harvested — the three facts a
+            // register row is read for, and none of them in the entry's own
+            // title, which names one parcel of many.
+            if let treatment = entry.treatment, treatment.isTreatment {
+                treatmentLines(treatment)
+            }
+
             AdaptiveRow { chip; dateAndStatus }
         }
         .padding(.vertical, 6)
@@ -252,7 +260,42 @@ struct JournalRow: View {
             entry.type.label,
             entry.occurredAt.map(BgDate.full) ?? LogEntry.noDate,
             entry.status == .planned ? entry.status.label : nil,
-        ]))
+        ] + Self.spokenTreatment(entry.treatment)))
+    }
+
+    /// The treatment's facts in words — «декара», never the «дка» a screen
+    /// shows, which VoiceOver spells out letter by letter (see `Area`).
+    static func spokenTreatment(_ treatment: JournalTreatment?) -> [String?] {
+        guard let treatment, treatment.isTreatment else { return [] }
+        return [
+            Plural.bg(treatment.parcelCount, "парцел", "парцела"),
+            treatment.area?.spoken,
+            treatment.blockNames.isEmpty ? nil : treatment.blockNames.joined(separator: ", "),
+            treatment.earliestHarvest.map { "\(Self.harvestLabel) \(BgDate.full($0))" },
+        ]
+    }
+
+    static let harvestLabel = "Най-ранно прибиране"
+
+    private func treatmentLines(_ treatment: JournalTreatment) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            MetaRow {
+                Text(Plural.bg(treatment.parcelCount, "парцел", "парцела"))
+                if let area = treatment.area {
+                    MetaSeparator()
+                    Text(area.text)
+                }
+            }
+            if !treatment.blockNames.isEmpty {
+                Text(treatment.blockNames.joined(separator: ", "))
+            }
+            if let harvest = treatment.earliestHarvest {
+                Text("\(Self.harvestLabel): \(BgDate.dayMonth(harvest))")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(Palette.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var chip: some View {

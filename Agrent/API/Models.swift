@@ -140,13 +140,82 @@ struct LogEntry: Codable, Identifiable, Equatable, Sendable {
     /// Optimistic-concurrency counter. The server bumps it on every write and
     /// a replayed edit must send the version it SAW — see README, "Writes".
     var version: Int?
+    /// The treatment this row STANDS FOR, when it is one (agri-saas #1799).
+    /// The ДНЕВНИК list folds a treatment's one-entry-per-parcel into a
+    /// single row, which keeps an entry's shape and carries the treatment
+    /// here. Nil from every read that does not fold, and from an older server.
+    var treatment: JournalTreatment? = nil
 
     /// The entry's title, or a word saying it has none — never a blank line
     /// where a farmer looks for what the record is.
-    var displayTitle: String { title?.recorded ?? Self.untitled }
+    ///
+    /// A folded treatment is titled by its PRODUCT. The entry under it is
+    /// titled «{product} — {parcel}» for the one parcel that entry was
+    /// written for, and on a row that stands for thirty parcels that names
+    /// one of them as if it were the whole treatment.
+    var displayTitle: String {
+        if let product = treatment?.foldedProduct { return product }
+        return title?.recorded ?? Self.untitled
+    }
 
     static let untitled = "Без заглавие"
     static let noDate = "Без дата"
+}
+
+/// A folded ДНЕВНИК row's treatment (agri-saas #1799, `listJournalEntries`):
+/// what the row shows beside an entry's own fields.
+///
+/// ── Never the reason a list fails ──
+///
+/// Every field is optional, and a value of the wrong shape reads as absent
+/// rather than throwing: the Дневник is the launch screen, and one odd
+/// treatment must not empty it — the rule `LogEntry`'s nullable title and
+/// date already follow. Only the fields a row shows are read; the rest of
+/// the server's object waits for the screen that needs it.
+struct JournalTreatment: Codable, Equatable, Sendable {
+    var treatmentGroupId: String?
+    var productName: String?
+    /// Lines across every block. 0 for an entry that is no treatment — the
+    /// server folds such an entry to itself and still sends this object.
+    var parcelCount: Int
+    var totalAreaHa: Double?
+    var blockNames: [String]
+    /// `YYYY-MM-DD`, from the quarantine period captured ON THE DAY (#1775).
+    /// Null when no period was captured — never the treatment day itself.
+    var earliestHarvestOn: String?
+
+    init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
+         totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil) {
+        self.treatmentGroupId = treatmentGroupId
+        self.productName = productName
+        self.parcelCount = parcelCount
+        self.totalAreaHa = totalAreaHa
+        self.blockNames = blockNames
+        self.earliestHarvestOn = earliestHarvestOn
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try? decoder.container(keyedBy: CodingKeys.self)
+        treatmentGroupId = (try? c?.decodeIfPresent(String.self, forKey: .treatmentGroupId)) ?? nil
+        productName = (try? c?.decodeIfPresent(String.self, forKey: .productName)) ?? nil
+        parcelCount = (try? c?.decodeIfPresent(Int.self, forKey: .parcelCount)) ?? 0
+        totalAreaHa = (try? c?.decodeIfPresent(Double.self, forKey: .totalAreaHa)) ?? nil
+        blockNames = (try? c?.decodeIfPresent([String].self, forKey: .blockNames)) ?? []
+        earliestHarvestOn = (try? c?.decodeIfPresent(String.self, forKey: .earliestHarvestOn)) ?? nil
+    }
+
+    /// A row that stands for parcels, rather than an entry folded to itself.
+    var isTreatment: Bool { parcelCount > 0 }
+
+    /// The product, when this row is a treatment and names one.
+    var foldedProduct: String? {
+        guard isTreatment else { return nil }
+        return productName?.recorded
+    }
+
+    var area: Area? { totalAreaHa.map(Area.init(hectares:)) }
+
+    var earliestHarvest: Date? { earliestHarvestOn.flatMap(BgDate.parseISODay) }
 }
 
 struct CreateLogEntry: Encodable, Sendable {
