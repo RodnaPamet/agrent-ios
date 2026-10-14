@@ -67,6 +67,14 @@ enum PushAPI {
         )
     }
 
+    /// Remove this phone from `farm` while signed in — the person switched
+    /// notifications off in Профил. Изход's removal is `removalRequest`.
+    static func unregister(_ deviceToken: String, from farm: String) async throws {
+        _ = try await APIClient.shared.deleteReturningData(
+            subscriptionsPath(in: farm), body: Registration(deviceToken: deviceToken)
+        )
+    }
+
     /// The removal as a pure value, so its method, bearer and body are
     /// testable with no network.
     ///
