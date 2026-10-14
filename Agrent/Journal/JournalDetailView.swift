@@ -27,6 +27,13 @@ import SwiftUI
 /// confirmation — is a decision to take deliberately, in its own change, not
 /// a button to add because the endpoint happened to exist.
 ///
+/// ── A treatment, and its ДНЕВНИК again (#320) ──
+///
+/// A folded treatment's row carries what was done — product, dose, period,
+/// parcels — so those are shown from it, still without a fetch. Its PDF is
+/// the one read here, and only on a tap: the screen right after a save is
+/// not the only time a farmer needs the page an inspector asks for.
+///
 /// ── Layout ──
 ///
 /// Everything is a full-width row in one vertical stack. The list's own
@@ -38,11 +45,20 @@ import SwiftUI
 struct JournalDetailView: View {
     let entry: LogEntry
 
+    /// The treatment this entry stands for — nil for an entry folded to
+    /// itself, whose object says only that it is none.
+    private var treatment: JournalTreatment? {
+        entry.treatment.flatMap { $0.isTreatment ? $0 : nil }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 facts
+                if let handle = treatment?.treatmentGroupId?.recorded {
+                    TreatmentDocumentAction(handle: handle)
+                }
                 notes
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -93,7 +109,57 @@ struct JournalDetailView: View {
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if let treatment {
+                treatmentFacts(treatment)
+            }
         }
+    }
+
+    /// What was done, each fact only when the row has it: a fertilising has
+    /// no pest and no period, and a «—» would read as one left blank. The
+    /// product is the screen's title already (`displayTitle`), so it is not
+    /// said a second time.
+    @ViewBuilder
+    private func treatmentFacts(_ treatment: JournalTreatment) -> some View {
+        let kind = treatment.treatmentKind
+        if let dose = treatment.doseText {
+            LabelledFact(label: "Доза") {
+                factText(dose).accessibilityLabel(treatment.doseSpoken ?? dose)
+            }
+        }
+        if let pest = treatment.targetNote?.recorded {
+            LabelledFact(label: "Вредител") { factText(pest) }
+        }
+        if let technique = ApplicationTechnique.display(treatment.applicationTechnique) {
+            LabelledFact(label: "Техника") { factText(technique) }
+        }
+        if let days = treatment.quarantinePeriodDays {
+            LabelledFact(label: "Карантинен срок") { factText(Plural.bg(days, "ден", "дни")) }
+        }
+        if let harvest = treatment.earliestHarvest {
+            LabelledFact(label: "Най-ранна дата за прибиране") { factText(BgDate.full(harvest)) }
+        }
+        LabelledFact(label: "Парцели") {
+            factText(Plural.bg(treatment.parcelCount, "парцел", "парцела"))
+        }
+        if let area = treatment.area {
+            LabelledFact(label: kind == .fertilize ? "Наторена площ" : "Третирана площ") {
+                factText(area.text).accessibilityLabel(area.spoken)
+            }
+        }
+        if !treatment.blockNames.isEmpty {
+            LabelledFact(label: treatment.blockNames.count == 1 ? "Блок" : "Блокове") {
+                factText(treatment.blockNames.joined(separator: ", "))
+            }
+        }
+    }
+
+    private func factText(_ text: String) -> some View {
+        Text(text)
+            .font(.body)
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: - Notes

@@ -116,6 +116,7 @@ final class A11yShotsTests: XCTestCase {
             case "09a-crop-costs": captureCropCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "01c-journal-filter": captureJournalFilter(app)
+            case "01e-journal-treatment": captureJournalTreatment(app)
             case "17-new-entry": captureNewEntryForm(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "18-operation-typed-product":
@@ -139,6 +140,7 @@ final class A11yShotsTests: XCTestCase {
         assertFixtureWorld(app)
         captureFarmRecordSheet(app)
         captureJournalFilter(app)
+        captureJournalTreatment(app)
         captureNewEntryForm(app)
 
         // ── The screens reached from the menu, done BEFORE Локации ──
@@ -462,6 +464,45 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(clear.waitForExistence(timeout: 5), "the summary row has no «Изчисти филтрите»")
         clear.tap()
         XCTAssertTrue(summary.waitForNonExistence(timeout: 15), "«Изчисти филтрите» left the filter on")
+    }
+
+    // MARK: - A treatment's own screen (agrent-ios#320)
+
+    /// Дневник → `journal-list.json`'s folded treatment: what was done, and
+    /// «Изтегли PDF» — which is NOT tapped, as no fixture answers a PDF.
+    /// The row and the back button are the only taps.
+    private func captureJournalTreatment(_ app: XCUIApplication) {
+        // By its product: a folded treatment is titled by it, and the row
+        // speaks one sentence that starts with its title.
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Тестов хербицид"))
+            .firstMatch
+        // UP first: `assertFixtureWorld` left the list at its foot, and the
+        // treatment is its second row, which a lazy List may not have built.
+        var swipes = 0
+        while !row.waitForExistence(timeout: swipes == 0 ? 10 : 3), swipes < 6 {
+            if swipes < 4 { app.swipeDown() } else { app.swipeUp() }
+            swipes += 1
+        }
+        XCTAssertTrue(row.exists, "Дневник has no treatment row — journal-list.json's second row")
+        row.tap()
+
+        // The dose is the signal the row's treatment decoded into the screen.
+        let dose = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "литра на декар"))
+            .firstMatch
+        XCTAssertTrue(dose.waitForExistence(timeout: 10), "the entry opened without its treatment")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01e-journal-treatment", app: app)
+
+        let pdf = app.buttons["Изтегли PDF"]
+        XCTAssertTrue(pdf.waitForExistence(timeout: 5), "the treatment offers no «Изтегли PDF»")
+        if UIApplication.shared.preferredContentSizeCategory.isAccessibilityCategory {
+            XCTAssertTrue(scrollWhollyIntoView(pdf, in: app), "the page would not scroll «Изтегли PDF» into view")
+            Thread.sleep(forTimeInterval: 1)
+            capture("01f-journal-treatment-pdf", app: app)
+        }
+        goBack(app, to: "Земеделски дневник")
     }
 
     // MARK: - «Култура» (agrent-ios#245)

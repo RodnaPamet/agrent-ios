@@ -10,6 +10,34 @@
       "version": 3
     },
     {
+      "id": "log_fixture_treatment",
+      "type": "INPUT_APPLICATION",
+      "status": "DONE",
+      "title": "Тестов хербицид — Парцел 4",
+      "notes": null,
+      "occurredAt": "2026-09-16T00:00:00.000Z",
+      "version": 1,
+      "treatment": {
+        "treatmentGroupId": "tg_fixture_1",
+        "occurredOn": "2026-09-16",
+        "kind": "SPRAY",
+        "productName": "Тестов хербицид",
+        "parcelCount": 3,
+        "totalAreaHa": 4.2,
+        "blockNames": [
+          "Блок 2",
+          "Блок 5"
+        ],
+        "doseValue": 0.15,
+        "doseUnit": "л/дка",
+        "targetNote": "Широколистни плевели",
+        "applicationTechnique": "boom",
+        "quarantinePeriodDays": 30,
+        "earliestHarvestOn": "2026-10-16",
+        "recordedInDiary": true
+      }
+    },
+    {
       "id": "log_fixture_2",
       "type": "ACTIVITY",
       "status": "DONE",

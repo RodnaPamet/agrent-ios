@@ -19,6 +19,9 @@ struct TreatmentSavedView: View {
     static let changeLostNote = "Мероприятието беше записано още при първия опит. "
         + "Промените след него не са записани."
 
+    /// Under «Изтегли PDF» here and on the entry's own screen (#320).
+    static let documentNote = "Страниците от ДНЕВНИКА на БАБХ само с това мероприятие."
+
     let saved: Saved
     let recorder: TreatmentRecorder
     let onDone: () -> Void
@@ -84,7 +87,7 @@ struct TreatmentSavedView: View {
                 .disabled(generating)
                 .accessibilityInputLabels(A11y.spokenNames("Изтегли PDF", "Изтегли", "Download PDF", "Download"))
             } footer: {
-                SectionFooter("Страниците от ДНЕВНИКА на БАБХ само с това мероприятие.")
+                SectionFooter(Self.documentNote)
             }
             if let failure {
                 Section {
