@@ -135,13 +135,12 @@ struct JournalDetailView: View {
     }
 
     /// What was done, each fact only when the row has it: a fertilising has
-    /// no pest and no period, and a «—» would read as one left blank.
+    /// no pest and no period, and a «—» would read as one left blank. The
+    /// product is the screen's title already (`displayTitle`), so it is not
+    /// said a second time.
     @ViewBuilder
     private func treatmentFacts(_ treatment: JournalTreatment) -> some View {
         let kind = treatment.treatmentKind
-        if let product = treatment.productName?.recorded {
-            LabelledFact(label: kind?.inputLabel ?? "Продукт") { factText(product) }
-        }
         if let dose = treatment.doseText {
             LabelledFact(label: "Доза") {
                 factText(dose).accessibilityLabel(treatment.doseSpoken ?? dose)
