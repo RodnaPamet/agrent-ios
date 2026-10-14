@@ -518,7 +518,7 @@ the owner's (agri-saas's typed-name contract, merged after this was built).
 
 Web `journal` (1785, `apiPost`/`apiPatch`) + `journal/[id]` (904,
 `apiDelete`) · iOS `Journal/JournalListView.swift` (126) +
-`NewEntryView.swift` (76)
+`NewEntryView.swift` (76; replaced by `Treatment/TreatmentEntryFlow.swift`, #293)
 
 ### Gap 5 — there is no entry detail — CLOSED 2026-09-22
 

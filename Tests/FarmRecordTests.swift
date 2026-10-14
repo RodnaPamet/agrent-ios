@@ -42,6 +42,27 @@ final class FarmRecordTests: XCTestCase {
         XCTAssertEqual(FarmRecordAPI.fileName("register", for: request), "register.pdf")
     }
 
+    /// One treatment's pages fall back to the name the server gives them.
+    func testATreatmentsFileFallsBackToItsOwnName() {
+        XCTAssertEqual(FarmRecordAPI.fileName(nil, fallback: "dnevnik-h1.pdf"), "dnevnik-h1.pdf")
+        XCTAssertEqual(FarmRecordAPI.fileName("served", fallback: "dnevnik-h1.pdf"), "served.pdf")
+    }
+
+    /// Both ДНЕВНИК documents are kept one way: only a PDF, only the latest,
+    /// and gone with the sheet.
+    func testOnlyTheLatestPDFIsKeptAndTheSheetTakesItAway() throws {
+        defer { FarmRecordAPI.removeGenerated() }
+        XCTAssertThrowsError(try FarmRecordAPI.keep(Data(#"{"ok":true}"#.utf8), named: "x.pdf")) {
+            XCTAssertEqual($0 as? FarmRecordAPI.Failure, .notAPDF)
+        }
+        let first = try FarmRecordAPI.keep(Data("%PDF-1.7\n1".utf8), named: "first.pdf")
+        let second = try FarmRecordAPI.keep(Data("%PDF-1.7\n2".utf8), named: "second.pdf")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.path), "an earlier ДНЕВНИК was kept")
+        XCTAssertEqual(try Data(contentsOf: second), Data("%PDF-1.7\n2".utf8))
+        FarmRecordAPI.removeGenerated()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: second.path))
+    }
+
     /// A 200 that is not a PDF is refused rather than written as one.
     func testOnlyAPDFIsAPDF() {
         XCTAssertTrue(FarmRecordAPI.isPDF(Data("%PDF-1.7\n…".utf8)))

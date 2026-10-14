@@ -929,9 +929,10 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
     }
 
-    /// «Нов запис», the most-used of the app's ten `Form`s (#156), opened
-    /// and CANCELLED — «Създай» stays untouched, and is disabled on an empty
-    /// title anyway.
+    /// «Нов запис», the most-used of the app's `Form`s (#156) — since #293
+    /// step one of the treatment record — opened and CANCELLED. «Напред»
+    /// stays untouched, and nothing is saved before step two's «Запази»
+    /// anyway.
     private func captureNewEntryForm(_ app: XCUIApplication) {
         let open = app.buttons["Нов запис"]
         guard open.waitForExistence(timeout: 5) else {
@@ -941,9 +942,9 @@ final class A11yShotsTests: XCTestCase {
         open.tap()
         let cancel = app.buttons["Отказ"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 10), "«Нов запис» did not present its form")
-        // Two seconds, not one: «Блокове» (#254) waits on locations-list.json.
-        // Not awaited by name, because at AX5 the section is below the fold
-        // and a lazy form has not built its rows yet.
+        // Two seconds, not one: the product field waits on items.json and the
+        // dose on units-rate.json. Not awaited by name, because at AX5 they
+        // are below the fold and a lazy form has not built its rows yet.
         Thread.sleep(forTimeInterval: 2)
         capture("17-new-entry", app: app)
         cancel.tap()

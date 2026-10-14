@@ -53,7 +53,7 @@ enum LocationsAPI {
     /// honour `Idempotency-Key`, so a replay produces one operation. The
     /// key is minted ONCE by the caller and reused across attempts; a new
     /// key per attempt defeats the dedupe entirely, which is the same rule
-    /// `JournalAPI.create` records.
+    /// `TreatmentAttempt` records.
     /// Where a field operation is posted. Named so the outbox can replay
     /// to the same place without reconstructing it from a literal — and
     /// given the farm, because a queued row goes to the farm it was made on,

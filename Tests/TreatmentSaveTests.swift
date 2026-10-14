@@ -117,6 +117,14 @@ final class TreatmentSaveTests: XCTestCase {
         XCTAssertTrue(specRequired.isSubset(of: Set(body.keys)))
     }
 
+    /// The ДНЕВНИК for one treatment hangs off its handle, in the PATH —
+    /// never a query, which iOS writes to the device log.
+    func testTheTreatmentsPDFIsUnderItsHandle() {
+        XCTAssertTrue(TreatmentAPI.documentPath("h 1").hasSuffix("/journal/treatments/h%201/farm-record"),
+                      TreatmentAPI.documentPath("h 1"))
+        XCTAssertFalse(TreatmentAPI.documentPath("h1").contains("?"))
+    }
+
     // MARK: - The answers
 
     func testTheReceiptIsTheHandleAndTheCount() {
@@ -411,6 +419,15 @@ final class TreatmentSaveTests: XCTestCase {
         }
         XCTAssertEqual(UserMessage.httpText(status: 400, code: "TREATMENT_DATE_IN_FUTURE", message: english),
                        TreatmentDraft.Problem.futureDate.text, "the form's own sentence")
+    }
+
+    /// «Изтегли PDF» after a save: the server holds nothing under the handle.
+    /// The read by handle swallows this code; the PDF route says it.
+    func testATreatmentWithNothingToPrintIsSaidInBulgarian() {
+        let text = UserMessage.httpText(status: 404, code: "TREATMENT_NOT_FOUND",
+                                        message: "No treatment was recorded under that handle.")
+        XCTAssertNotEqual(text, UserMessage.statusText(404))
+        XCTAssertTrue(UserMessage.isBulgarianSentence(text), text)
     }
 
     /// `params.reference` says which list held the stranger. Parcels are

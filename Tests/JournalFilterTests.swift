@@ -138,67 +138,6 @@ final class JournalFilterTests: XCTestCase {
         XCTAssertNil(to)
     }
 
-    // MARK: - An entry the phone just wrote
-
-    private func entry(_ type: LogEntryType, at iso: String?) -> LogEntry {
-        LogEntry(id: "e1", type: type, status: .done, title: "t", notes: nil,
-                 occurredAt: iso.flatMap(BgDate.parseInstant), version: 0)
-    }
-
-    func testEverythingIsAdmittedWithNoFilter() {
-        let filter = JournalFilter(now: now, calendar: sofia)
-        XCTAssertTrue(filter.admits(entry(.activity, at: nil), now: now, calendar: sofia))
-    }
-
-    /// The phone writes free-hand entries: no operation line, no block link.
-    /// The server's crop and block filters can never return one.
-    func testACropOrABlockRulesOutAFreeHandEntry() {
-        var filter = JournalFilter(now: now, calendar: sofia)
-        filter.crop = .init(label: "Пшеница", values: ["Wheat"])
-        XCTAssertFalse(filter.admits(entry(.activity, at: "2026-10-09T08:00:00.000Z"), now: now, calendar: sofia))
-        filter.crop = nil
-        filter.block = .init(id: "loc_1", name: "Северен")
-        XCTAssertFalse(filter.admits(entry(.activity, at: "2026-10-09T08:00:00.000Z"), now: now, calendar: sofia))
-    }
-
-    /// An entry linked to the filtered block on «Нов запис» (#254) is one
-    /// the server returns through `LogLocation`, so it stays on the list.
-    func testABlockFilterAdmitsAnEntryLinkedToThatBlock() {
-        var filter = JournalFilter(now: now, calendar: sofia)
-        filter.block = .init(id: "loc_1", name: "Северен")
-        let written = entry(.activity, at: "2026-10-09T08:00:00.000Z")
-        XCTAssertTrue(filter.admits(written, linkedTo: ["loc_2", "loc_1"], now: now, calendar: sofia))
-        XCTAssertFalse(filter.admits(written, linkedTo: ["loc_2"], now: now, calendar: sofia))
-        // A crop still rules it out: a link is not an operation line.
-        filter.crop = .init(label: "Пшеница", values: ["Wheat"])
-        XCTAssertFalse(filter.admits(written, linkedTo: ["loc_1"], now: now, calendar: sofia))
-    }
-
-    /// A crop matches through what grows on the linked blocks (agri-saas
-    /// #1560), which the phone does not hold beside an entry. It does not
-    /// guess; the store asks the server again.
-    func testOnlyACropFilterIsLeftToTheServer() {
-        var filter = JournalFilter(now: now, calendar: sofia)
-        XCTAssertTrue(filter.decidesLocally)
-        filter.type = .seeding
-        filter.block = .init(id: "loc_1", name: "Северен")
-        filter.period = .last30Days
-        XCTAssertTrue(filter.decidesLocally)
-        filter.crop = .init(label: "Пшеница", values: ["Wheat"])
-        XCTAssertFalse(filter.decidesLocally)
-    }
-
-    func testTypeAndPeriodAreCheckedAsTheServerChecksThem() {
-        var filter = JournalFilter(now: now, calendar: sofia)
-        filter.type = .seeding
-        filter.period = .last30Days
-        XCTAssertTrue(filter.admits(entry(.seeding, at: "2026-10-09T08:00:00.000Z"), now: now, calendar: sofia))
-        XCTAssertFalse(filter.admits(entry(.harvest, at: "2026-10-09T08:00:00.000Z"), now: now, calendar: sofia))
-        XCTAssertFalse(filter.admits(entry(.seeding, at: "2026-08-01T08:00:00.000Z"), now: now, calendar: sofia))
-        // An entry with no date is outside any period.
-        XCTAssertFalse(filter.admits(entry(.seeding, at: nil), now: now, calendar: sofia))
-    }
-
     // MARK: - The crops on offer
 
     /// Two spellings, one name, both sent: the server matches exactly.

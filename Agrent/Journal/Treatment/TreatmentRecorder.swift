@@ -193,16 +193,13 @@ struct TreatmentAttempt: Equatable, Sendable {
     }
 }
 
-/// Where a treatment is saved and its ДНЕВНИК pages come from.
+/// Where a treatment is saved and its ДНЕВНИК pages come from: the server
+/// (`LiveTreatmentRecorder`), or a test's script.
 ///
-/// ── No live one yet ──
-///
-/// The save and the read by handle are `TreatmentAPI`'s (agri-saas #1740).
-/// The ДНЕВНИК limited to one treatment has no route yet, and the journal's
-/// list does not show a treatment as one row. The screens are built against
-/// this, and «Нов запис» opens them once all three are live — until then the
-/// journal keeps its old form, so nothing on the phone writes a record it
-/// can neither show nor print.
+/// «Нов запис» opens these screens only now that all three are served — the
+/// save and the read by handle (agri-saas #1758), the list showing a
+/// treatment as one row (#1799), and the ДНЕВНИК for one treatment (#1822) —
+/// so the phone writes no record it can neither show nor print.
 protocol TreatmentRecorder: Sendable {
     /// Saves the record under its key, which is the treatment's handle from
     /// then on. The key is minted once per entry and reused on a retry, so a

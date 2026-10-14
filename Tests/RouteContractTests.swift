@@ -138,9 +138,15 @@ final class RouteContractTests: XCTestCase {
     /// Empty again from agri-saas main 96d695d: «Ново мероприятие»'s save and
     /// its read by handle (#293), drafted against agri-saas #1758's spec
     /// while that PR was open, came off with the refresh from its merge. The
-    /// draft merged only once `/api/health` carried #1758 — and nothing calls
-    /// either route yet (`testNothingSavesATreatmentYet`).
-    private static let pendingServerRoutes: [String: String] = [:]
+    /// draft merged only once `/api/health` carried #1758.
+    private static let pendingServerRoutes: [String: String] = [
+        // «Изтегли PDF» on a saved treatment (#293), agri-saas #1822 — off
+        // this list by the refresh that brings it in. «Нов запис» opens the
+        // treatment form with it, so the draft merges only once
+        // `/api/health` carries #1822.
+        "/api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/farm-record":
+            "agri-saas #1822: the ДНЕВНИК for one treatment, for #293",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -185,7 +191,8 @@ final class RouteContractTests: XCTestCase {
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
             // «Ново мероприятие»'s save and its read by handle (#293).
-            ("TreatmentAPI.swift", [TreatmentAPI.recordPath, TreatmentAPI.treatmentPath("{treatmentGroupId}")]),
+            ("TreatmentAPI.swift", [TreatmentAPI.recordPath, TreatmentAPI.treatmentPath("{treatmentGroupId}"),
+                                    TreatmentAPI.documentPath("{treatmentGroupId}")]),
             ("ExchangeAPI.swift", [
                 ExchangeAPI.listingsPath,
                 ExchangeAPI.listingsPath(ExchangeQuery(text: "q", minTonnes: 1, maxTonnes: 2, cursor: "c")),
@@ -368,31 +375,6 @@ final class RouteContractTests: XCTestCase {
                                      pending: pending).0, "pending (allowlisted)")
         XCTAssertEqual(Self.classify("/api/auth/native/nope", in: Inventory(sha: "x", routes: []),
                                      pending: pending).0, "ABSENT")
-    }
-
-    /// «Ново мероприятие»'s save is built and NOT wired (#293): it writes a
-    /// farm's legal register, and three things have to be true before a
-    /// person can reach it —
-    ///
-    ///   - the journal's list shows a treatment as one row, and
-    ///   - the ДНЕВНИК for one treatment can be downloaded, or the phone
-    ///     writes a record it can neither show nor print; and
-    ///   - the quarantine period the form shows is the one the page prints
-    ///     (#310).
-    ///
-    /// So nothing in the app calls the two routes. Wiring «Нов запис» is the
-    /// change that deletes this test, and it should be able to say all three
-    /// hold.
-    func testNothingSavesATreatmentYet() throws {
-        let calls = ["TreatmentAPI.record(", "TreatmentAPI.landing(of"]
-        let own = try Self.read("Agrent/API/TreatmentAPI.swift")
-        XCTAssertTrue(own.contains("static func record(") && own.contains("static func landing(of"),
-                      "positive control: the calls this looks for no longer exist under these names")
-        let callers = try Self.appSources().filter { file in
-            let source = try Self.read(file)
-            return calls.contains { source.contains($0) }
-        }
-        XCTAssertEqual(callers, [], "«Ново мероприятие» is saved from \(callers)")
     }
 
     /// The #130 path itself, pinned. If this ever matches, the matcher has

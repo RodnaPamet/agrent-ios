@@ -33,6 +33,13 @@ enum TreatmentAPI {
         "\(base)/\(URLEscape.segment(handle))"
     }
 
+    /// The ДНЕВНИК pages for one treatment (agri-saas #1822): the per-block
+    /// register's document, limited to this treatment's rows across every
+    /// block it touched.
+    static func documentPath(_ handle: String) -> String {
+        "\(treatmentPath(handle))/farm-record"
+    }
+
     /// The request body (`RecordDiaryTreatment`).
     ///
     /// BY NAME, never by id, as the spray sheet sends it (#237): the server
@@ -125,6 +132,14 @@ enum TreatmentAPI {
         return summary.complete ? .landed(parcelCount: summary.parcelCount) : .half
     }
 
+    /// The treatment's ДНЕВНИК pages, kept as the per-block register is
+    /// (`FarmRecordAPI.keep`): bytes inline, checked for `%PDF`, removed when
+    /// the sheet closes. A GET, and a pure read — the server files nothing.
+    static func document(forTreatment handle: String) async throws -> URL {
+        let (data, served) = try await APIClient.shared.getForDocument(documentPath(handle))
+        return try FarmRecordAPI.keep(data, named: FarmRecordAPI.fileName(served, fallback: "dnevnik-\(handle).pdf"))
+    }
+
     /// Only the route's OWN 404. One without the code is a server that does
     /// not have the route, or a farm it will not show: it says nothing about
     /// the treatment, and read as "nothing landed" it would let a second one
@@ -156,4 +171,19 @@ enum TreatmentLanding: Equatable, Sendable {
     /// marked done, which is what puts them on the register. The same key
     /// sent again finishes the rest.
     case half
+}
+
+/// The recorder «Нов запис» opens with: the server, through `TreatmentAPI`.
+struct LiveTreatmentRecorder: TreatmentRecorder {
+    func record(_ record: TreatmentRecord, idempotencyKey: String) async throws -> TreatmentReceipt {
+        try await TreatmentAPI.record(record, idempotencyKey: idempotencyKey)
+    }
+
+    func landing(of handle: String) async throws -> TreatmentLanding {
+        try await TreatmentAPI.landing(of: handle)
+    }
+
+    func document(forTreatment handle: String) async throws -> URL {
+        try await TreatmentAPI.document(forTreatment: handle)
+    }
 }

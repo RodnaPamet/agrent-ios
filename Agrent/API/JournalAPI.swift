@@ -84,15 +84,6 @@ enum JournalAPI {
         )
         return JournalSlice(entries: page.items, nextCursor: page.nextCursor)
     }
-
-    /// `idempotencyKey` is generated once by the CALLER and reused across
-    /// retries of the same logical create. Generating it here would mint a new
-    /// one per attempt and defeat the dedupe entirely.
-    static func create(_ entry: CreateLogEntry, idempotencyKey: String) async throws -> LogEntry {
-        try await APIClient.shared.post(
-            base, body: entry, as: LogEntry.self, idempotencyKey: idempotencyKey
-        )
-    }
 }
 
 /// One page of the journal, plus the way to ask for the next.

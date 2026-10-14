@@ -107,7 +107,7 @@ extension WorkItemAPI {
     /// the second attempt a different request and breaks idempotency at
     /// exactly the moment it is needed. The caller mints the resolution ONCE
     /// alongside the key, and both are held across retries — the same rule
-    /// as `JournalAPI.create`, for the same reason.
+    /// as `TreatmentAttempt`, for the same reason.
     ///
     /// ── No If-Match ──
     ///
