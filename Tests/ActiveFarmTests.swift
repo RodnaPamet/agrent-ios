@@ -99,6 +99,22 @@ final class FarmStoreTests: XCTestCase {
         XCTAssertEqual(asks, 0, "a remembered farm waited on /me")
     }
 
+    /// What push registers with (#272): the open farm before the list has
+    /// been read, then every farm on the list — not only the open one, or a
+    /// person would hear nothing from their other farms.
+    func testThePushFarmsAreTheOpenOneThenTheWholeList() async {
+        let farms = store(identity: identity(nil), answer: me("usr_b", tenant: ("ferma-1", "Ферма 1")),
+                          list: FarmList([[member("ferma-1", "Ферма 1", "OWNER"),
+                                           member("ferma-2", "Ферма 2", "MECHANISATOR")]]))
+        XCTAssertEqual(farms.memberSlugs, [], "nothing is known before /me")
+        await farms.resolve()
+        XCTAssertEqual(farms.memberSlugs, ["ferma-1"], "the open farm, before any list")
+        await farms.refreshFarms()
+        XCTAssertEqual(farms.memberSlugs, ["ferma-1", "ferma-2"])
+        farms.reset()
+        XCTAssertEqual(farms.memberSlugs, [], "Изход leaves farms to register with")
+    }
+
     /// A first sign-in on this phone starts at `/me`'s farm and remembers it
     /// — with `/me`'s role, which is the role on that same membership.
     func testAFirstSignInStartsAtMesFarm() async {

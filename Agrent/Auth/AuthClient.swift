@@ -762,6 +762,10 @@ final class AuthClient: NSObject {
         // Read BEFORE the local clear, for the revoke below: `endSession`
         // deletes the Keychain item, and after it there is nothing to send.
         let refreshToken = TokenStore.load()?.refreshToken
+        // And this phone's push registrations with the person's farms (#272),
+        // with the access token their removal needs — gone after the clear
+        // too, as `PushRegistrar.reset` forgets the farms.
+        let farewell = PushRegistrar.shared.farewell(accessToken: TokenStore.load()?.accessToken)
 
         // ── LOCAL FIRST, AND WHOLE ──
         //
@@ -780,7 +784,10 @@ final class AuthClient: NSObject {
         // nothing. After the local clear and never awaited, so the network
         // can neither delay nor undo the sign-out — see `SessionRevocation`,
         // including what "this device's session" can reach in Safari.
-        SessionRevocation.revokeThisDevice(refreshToken: refreshToken)
+        //
+        // The push removals go first, inside the same detached task: a
+        // revoked session's access token is refused at once.
+        SessionRevocation.revokeThisDevice(refreshToken: refreshToken, unregistering: farewell)
 
         pendingCode = nil
         codeError = nil
