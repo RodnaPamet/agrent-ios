@@ -1037,9 +1037,17 @@ of 2026-10-15 no web screen calls the brand routes (#1884).
   closes. The phone draws no QR of its own: the server keeps one encoder,
   so a printed code and an on-screen one can't differ. The server refuses
   the card for a page that isn't published, and the phone says why.
-- **Not publishing (owner):** consent needs the web's text and its
-  version, and there is none yet. The section says publishing waits for
-  it.
+- **Publishing, with the web's consent (owner):** «Публикувай» asks for
+  consent to the web's text first: agri-saas #1895, version v2 (v2 is the
+  owner's review of v1). The phone holds that text word for word, pinned
+  by a hash in the tests. The farm agrees with a switch, and the button
+  stays disabled until it's on. The phone then records consent and
+  publishes, as two calls in that order, as the web does. If publishing
+  is then refused, the consent stands and the page stays private. A farm
+  that already agreed to v2 publishes straight away. One that agreed to
+  another version is told the text changed and asked again. When the web
+  moves to v3, the phone's copy follows: text and version together.
+  Taking the page down never asks.
 - **Oblast:** one of the 28 Bulgarian names the server uses for regions
   (`BulgarianRegion.names`), the form its tests and farm search use
   («Добрич»). The web's editor should store the same names, or a search by
@@ -1049,8 +1057,8 @@ of 2026-10-15 no web screen calls the brand routes (#1884).
 - **Admin data, so not cached:** the draft is read on every open, and with
   no signal the page says it couldn't load.
 
-**Unverified:** nothing has been saved, claimed or withdrawn from this app,
-and no card has been printed (it needs a published page). The flag is off,
+**Unverified:** nothing has been saved, claimed, consented to, published or
+withdrawn from this app, and no card has been printed. The flag is off,
 and the first real write is the owner's.
 
 ### Ahead of the web — «Ферми», the farm directory (#323, owner 2026-10-15)

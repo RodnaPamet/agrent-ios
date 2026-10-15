@@ -753,6 +753,11 @@ enum UserMessage {
         // web in between: the page taken down, the name cleared.
         "FARM_BRAND_HANDLE_REQUIRED": "Първо изберете адрес на страницата.",
         "FARM_BRAND_DISPLAY_NAME_REQUIRED": "Първо попълнете името, което страницата показва.",
+        // Publishing without a recorded consent. The phone asks for it first
+        // unless the farm agreed to this text already, so this is the server
+        // knowing better than the draft the phone read.
+        "FARM_BRAND_CONSENT_REQUIRED":
+            "Публикуването изисква съгласие. Натиснете «Публикувай» отново и потвърдете текста.",
         "FARM_BRAND_NOT_PUBLISHED":
             "Страницата не е публикувана. Карта за печат се прави само за публикувана страница, "
             + "иначе отпечатаният адрес няма да се отваря.",

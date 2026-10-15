@@ -13,12 +13,11 @@ import SwiftUI
 ///
 /// ── What it does and doesn't do ──
 ///
-/// It edits the five fields, claims the web address, and for a published
-/// page shares the link, opens the server's A6 card to print (P6.7) and
-/// takes the page down. It does NOT publish. Publishing needs a recorded consent to a
-/// versioned text, the owner chose the web's text for the phone, and the
-/// web doesn't have one yet. The section says so instead of offering a
-/// button that can only be refused (`FARM_BRAND_CONSENT_REQUIRED`).
+/// It edits the five fields, claims the web address, publishes, and for a
+/// published page shares the link, opens the server's A6 card to print
+/// (P6.7) and takes the page down. Publishing asks for consent to the web's
+/// text first, unless the farm has agreed to that version already
+/// (`PublishConsentSheet`). Taking the page down never asks.
 ///
 /// ── Never cached ──
 ///
@@ -38,6 +37,9 @@ struct PublicProfileView: View {
     @State private var choosingAddress = false
     @State private var confirmingWithdraw = false
     @State private var withdrawing = false
+    @State private var publishing = false
+    @State private var askingConsent = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var printingCard = false
     /// The A6 card while Quick Look shows it.
     @State private var card: URL?
@@ -86,6 +88,12 @@ struct PublicProfileView: View {
         .sheet(isPresented: $choosingAddress) {
             PublicAddressSheet(current: draft?.handle, published: draft?.published ?? false) { claim in
                 note = Self.claimedNote(claim)
+                await load()
+            }
+        }
+        .sheet(isPresented: $askingConsent) {
+            PublishConsentSheet(stale: PublishingConsent.isStale(draft)) { published in
+                if published { note = Self.publishedNote }
                 await load()
             }
         }
@@ -229,10 +237,25 @@ struct PublicProfileView: View {
         } else {
             Section {
                 Text("Страницата не е публикувана.")
+                Button {
+                    startPublishing()
+                } label: {
+                    if publishing {
+                        ProgressView().accessibilityLabel("Публикуване")
+                    } else if typeSize.isAccessibilitySize {
+                        // One long word: beside the globe at AX5 it broke
+                        // «Публикува / й».
+                        Text("Публикувай")
+                    } else {
+                        Label("Публикувай", systemImage: "globe")
+                    }
+                }
+                .disabled(Self.missingForPublishing(draft) != nil || publishing)
+                .accessibilityInputLabels(A11y.spokenNames("Публикувай", "Publish"))
             } header: {
                 SectionHeader("Публикуване")
             } footer: {
-                SectionFooter(Self.publishLater)
+                SectionFooter(Self.publishingFooter(draft))
             }
         }
     }
@@ -245,6 +268,32 @@ struct PublicProfileView: View {
         } catch {
             phase = .failed(UserMessage.text(for: error))
         }
+    }
+
+    /// Straight to the server when the farm agreed to this text already, as
+    /// the web does. Otherwise the consent is asked for first.
+    private func startPublishing() {
+        guard PublishingConsent.isCurrent(draft) else {
+            askingConsent = true
+            return
+        }
+        Task { await publish() }
+    }
+
+    private func publish() async {
+        publishing = true
+        failure = nil
+        defer { publishing = false }
+        do {
+            try await FarmBrandAPI.publish()
+            note = Self.publishedNote
+        } catch {
+            failure = UserMessage.text(for: error)
+        }
+        // Either way: a refusal can mean the draft read here was out of date
+        // (`FARM_BRAND_CONSENT_REQUIRED`), and the next tap must see the
+        // server's record to ask for consent.
+        await load()
     }
 
     private func withdraw() async {
@@ -281,13 +330,33 @@ struct PublicProfileView: View {
     static let notFilled = "не е попълнено"
     static let addressAbout = "Връзката, на която се отваря страницата. Един адрес е на едно стопанство."
     static let addressAfterSave = "Адрес може да се избере, след като профилът бъде запазен."
-    static let publishLater = "Публикуването ще стане възможно, когато е готов текстът на съгласието, "
-        + "което се дава преди публикуване."
+    static let publishedNote = "Страницата е публикувана."
     static let publishedState = "Страницата е публикувана"
     static let cardAbout = "Картата за печат е PDF с името на стопанството, адреса на страницата "
         + "и QR код към нея, за раздаване на пазара или в стопанството."
     static let savedNote = "Профилът е запазен."
     static let withdrawnNote = "Страницата вече не е публикувана."
+
+    /// What the server would refuse publishing for, said before the tap
+    /// (`FARM_BRAND_HANDLE_REQUIRED`, `FARM_BRAND_DISPLAY_NAME_REQUIRED`); nil
+    /// when nothing is missing. In the server's order: a draft, an address,
+    /// a name.
+    nonisolated static func missingForPublishing(_ draft: FarmBrandDraft?) -> String? {
+        guard let draft else { return "Публикуването става възможно, след като профилът бъде запазен." }
+        if draft.handle?.recorded == nil { return "Преди публикуване изберете адрес." }
+        if draft.displayName?.recorded == nil { return "Преди публикуване попълнете името." }
+        return nil
+    }
+
+    /// Under «Публикувай»: what's missing, else when the farm agreed to this
+    /// text, else that the text comes first.
+    nonisolated static func publishingFooter(_ draft: FarmBrandDraft?) -> String {
+        if let missing = missingForPublishing(draft) { return missing }
+        if PublishingConsent.isCurrent(draft), let at = draft?.consentedAt {
+            return PublishingConsent.recorded(at)
+        }
+        return "Преди страницата да стане публична, ще бъде показан текстът на съгласието."
+    }
 
     nonisolated static func claimedNote(_ claim: HandleClaim) -> String {
         let address = PublicProfileLink.displayAddress(handle: claim.handle)

@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 @testable import Agrent
 
@@ -133,7 +134,8 @@ final class FarmBrandTests: XCTestCase {
     /// What publishing and the A6 card need first, said in Bulgarian, and
     /// naming neither: the same two codes refuse both (agri-saas #1910).
     func testTheCardsRefusalsAreSaidInBulgarian() {
-        for code in ["FARM_BRAND_HANDLE_REQUIRED", "FARM_BRAND_DISPLAY_NAME_REQUIRED", "FARM_BRAND_NOT_PUBLISHED"] {
+        for code in ["FARM_BRAND_HANDLE_REQUIRED", "FARM_BRAND_DISPLAY_NAME_REQUIRED", "FARM_BRAND_NOT_PUBLISHED",
+                     "FARM_BRAND_CONSENT_REQUIRED"] {
             let text = UserMessage.httpText(status: 400, code: code, message: "Publish the farm profile first.")
             XCTAssertNotEqual(text, UserMessage.statusText(400), code)
             XCTAssertTrue(UserMessage.isBulgarianSentence(text), "\(code): \(text)")
@@ -188,6 +190,91 @@ final class FarmBrandTests: XCTestCase {
         XCTAssertEqual(names.first, "Благоевград")
         XCTAssertEqual(FarmBrandLimits.oblasts(keeping: "Добрич"), names)
         XCTAssertEqual(FarmBrandLimits.oblasts(keeping: "област Добрич").first, "област Добрич")
+    }
+
+    // MARK: - Publishing
+
+    /// The web's text and version, word for word (owner, 2026-10-15). The
+    /// hash is of agri-saas 87a90fa's `admin.publicProfile.consentBody`: a
+    /// word changed here without a new version would record agreement to a
+    /// text nobody was shown under that name.
+    func testTheConsentIsTheWebsTextAtItsVersion() {
+        XCTAssertEqual(PublishingConsent.version, "v2")
+        let hash = SHA256.hash(data: Data(PublishingConsent.body.utf8)).map { String(format: "%02x", $0) }.joined()
+        XCTAssertEqual(hash, "1d2f6a5a4a4c56d9e82ac61603da43040b75f25b6e6c1cd8211cfe440ce3708f",
+                       "the consent text changed: copy the web's text AND its version together")
+        XCTAssertTrue(PublishingConsent.body.contains("ЕГН"), "positive control: it is the consent text")
+    }
+
+    /// Only an agreement to THIS version counts. One to another text, or a
+    /// time with no version, asks again, and says the text changed.
+    func testOnlyAnAgreementToThisVersionCounts() throws {
+        let at = try XCTUnwrap(BgDate.parseInstant("2026-10-15T09:00:00.000Z"))
+        let current = FarmBrandDraft(handle: "pobeda", displayName: "Тестово", consentedAt: at, consentTextVersion: "v2")
+        let older = FarmBrandDraft(handle: "pobeda", displayName: "Тестово", consentedAt: at, consentTextVersion: "v1")
+        let unversioned = FarmBrandDraft(handle: "pobeda", displayName: "Тестово", consentedAt: at)
+        let never = FarmBrandDraft(handle: "pobeda", displayName: "Тестово")
+        XCTAssertTrue(PublishingConsent.isCurrent(current))
+        XCTAssertFalse(PublishingConsent.isStale(current))
+        for draft in [older, unversioned] {
+            XCTAssertFalse(PublishingConsent.isCurrent(draft))
+            XCTAssertTrue(PublishingConsent.isStale(draft))
+        }
+        XCTAssertFalse(PublishingConsent.isCurrent(never))
+        XCTAssertFalse(PublishingConsent.isStale(never), "never agreed is not «обновен»")
+        XCTAssertFalse(PublishingConsent.isCurrent(nil))
+
+        let recorded = PublishingConsent.recorded(at)
+        // The year's «г.» follows a narrow no-break space, as `BgDate` writes it.
+        XCTAssertTrue(recorded.hasPrefix("Съгласието е записано на 15 октомври 2026"), recorded)
+        XCTAssertTrue(recorded.hasSuffix("г."), recorded)
+        XCTAssertFalse(recorded.hasSuffix(".."), recorded)
+        XCTAssertTrue(UserMessage.isBulgarianSentence(recorded), recorded)
+    }
+
+    func testTheDraftReadsTheConsentVersion() throws {
+        let json = #"{"handle":"pobeda","consentedAt":"2026-10-15T09:00:00.000Z","consentTextVersion":"v2"}"#
+        let draft = try XCTUnwrap(FarmBrandAPI.decodeDraft(from: Data(json.utf8)))
+        XCTAssertEqual(draft.consentTextVersion, "v2")
+        XCTAssertNotNil(draft.consentedAt)
+        let odd = try XCTUnwrap(FarmBrandAPI.decodeDraft(from: Data(#"{"consentTextVersion":2}"#.utf8)))
+        XCTAssertNil(odd.consentTextVersion, "an odd field costs only itself")
+    }
+
+    /// What the server would refuse, said before the tap and in its order;
+    /// with nothing missing, the footer says when the farm agreed or that
+    /// the text comes first.
+    func testPublishingSaysWhatIsMissingFirst() throws {
+        XCTAssertNotNil(PublicProfileView.missingForPublishing(nil))
+        let noAddress = PublicProfileView.missingForPublishing(FarmBrandDraft(displayName: "Тестово"))
+        XCTAssertEqual(noAddress, "Преди публикуване изберете адрес.")
+        let noName = PublicProfileView.missingForPublishing(FarmBrandDraft(handle: "pobeda", displayName: "  "))
+        XCTAssertEqual(noName, "Преди публикуване попълнете името.")
+        XCTAssertNil(PublicProfileView.missingForPublishing(FarmBrandDraft(handle: "pobeda", displayName: "Тестово")))
+
+        let at = try XCTUnwrap(BgDate.parseInstant("2026-10-15T09:00:00.000Z"))
+        let agreed = FarmBrandDraft(handle: "pobeda", displayName: "Тестово", consentedAt: at, consentTextVersion: "v2")
+        XCTAssertEqual(PublicProfileView.publishingFooter(agreed), PublishingConsent.recorded(at))
+        let fresh = PublicProfileView.publishingFooter(FarmBrandDraft(handle: "pobeda", displayName: "Тестово"))
+        XCTAssertTrue(fresh.contains("съгласието"), fresh)
+        for text in [noAddress, noName, fresh] {
+            XCTAssertTrue(UserMessage.isBulgarianSentence(text ?? ""), text ?? "nil")
+        }
+    }
+
+    /// The record says a person was shown the text and agreed, so the
+    /// confirm button is disabled until the switch is on — read from the
+    /// source, since a disabled state has no runtime hook outside a UI test.
+    func testTheConsentButtonWaitsForTheSwitch() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let sheet = try String(contentsOf: root.appendingPathComponent("Agrent/Admin/PublishConsentSheet.swift"),
+                               encoding: .utf8)
+        XCTAssertTrue(sheet.contains("struct PublishConsentSheet"), "positive control")
+        XCTAssertTrue(sheet.contains(".disabled(!agreed || sending)"))
+        XCTAssertTrue(sheet.contains("guard agreed, !sending else { return }"))
+        let consent = try XCTUnwrap(sheet.range(of: "FarmBrandAPI.consent(textVersion: PublishingConsent.version)"))
+        let publish = try XCTUnwrap(sheet.range(of: "FarmBrandAPI.publish()"))
+        XCTAssertLessThan(consent.lowerBound, publish.lowerBound, "consent is recorded before the page goes public")
     }
 
     // MARK: - Where it's offered
