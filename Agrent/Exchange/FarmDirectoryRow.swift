@@ -5,6 +5,8 @@ import SwiftUI
 struct FarmDirectoryRow: View {
     let hit: FarmDirectoryHit
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
@@ -25,10 +27,15 @@ struct FarmDirectoryRow: View {
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             // Where a tap goes: out to a page, not into a screen of the app.
-            Image(systemName: "arrow.up.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.secondaryText)
-                .accessibilityHidden(true)
+            // Not at accessibility sizes, as `MetaSeparator`'s dot isn't: its
+            // column broke the farm's name mid-word at AX5 («Синтетич / но»,
+            // A11yShots, 2026-10-15). VoiceOver has the hint either way.
+            if !typeSize.isAccessibilitySize {
+                Image(systemName: "arrow.up.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.secondaryText)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
