@@ -7,5 +7,9 @@
   "crops": ["пшеница", "слънчоглед", "рапица"],
   "published": true,
   "indexable": false,
+  "hideTagline": false,
+  "hideAbout": false,
+  "hideOblast": true,
+  "hideCrops": false,
   "consentedAt": "2026-10-01T09:00:00.000Z"
 }

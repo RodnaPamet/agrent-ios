@@ -75,6 +75,13 @@ enum FarmBrandAPI {
         _ = try await APIClient.shared.put(publicationPath, body: ["published": true], as: SaveAnswer.self)
     }
 
+    /// Shows or withholds one field on the public page, the text staying
+    /// stored (agri-saas #1933). Sends only that field's flag: an omitted
+    /// flag is untouched, so one switch can't disturb another, or the text.
+    static func setShown(_ field: HideableField, _ shown: Bool) async throws {
+        _ = try await APIClient.shared.put(draftPath, body: [field.flag: !shown], as: SaveAnswer.self)
+    }
+
     /// Takes the page down. Never refused for an incomplete draft: a farm must
     /// always be able to withdraw (agri-saas #1871).
     static func withdraw() async throws {
@@ -126,6 +133,8 @@ struct FarmBrandDraft: Decodable, Equatable, Sendable {
     var consentedAt: Date?
     /// Which text `consentedAt` was an agreement to (`PublishingConsent`).
     var consentTextVersion: String?
+    /// The fields the public page withholds, their text still here.
+    var hidden: Set<HideableField> = []
 
     init(handle: String? = nil, displayName: String? = nil, tagline: String? = nil, about: String? = nil,
          oblast: String? = nil, crops: [String] = [], published: Bool = false, consentedAt: Date? = nil,
@@ -143,6 +152,7 @@ struct FarmBrandDraft: Decodable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case handle, displayName, tagline, about, oblast, crops, published, consentedAt, consentTextVersion
+        case hideTagline, hideAbout, hideOblast, hideCrops
     }
 
     init(from decoder: any Decoder) throws {
@@ -157,6 +167,37 @@ struct FarmBrandDraft: Decodable, Equatable, Sendable {
         consentedAt = ((try? c.decodeIfPresent(String.self, forKey: .consentedAt)) ?? nil)
             .flatMap(BgDate.parseInstant)
         consentTextVersion = (try? c.decodeIfPresent(String.self, forKey: .consentTextVersion)) ?? nil
+        // Absent, from a server before #1933, reads as shown: that is what
+        // such a server does with every field.
+        let flags: [(HideableField, CodingKeys)] = [
+            (.tagline, .hideTagline), (.about, .hideAbout), (.oblast, .hideOblast), (.crops, .hideCrops),
+        ]
+        hidden = Set(flags.compactMap { field, key in
+            ((try? c.decodeIfPresent(Bool.self, forKey: key)) ?? nil) == true ? field : nil
+        })
+    }
+}
+
+/// A field the public page can withhold without losing its text (P6.6,
+/// agri-saas #1933). The name and the address have none: both are what a
+/// published page needs, so a published farm can't hide them.
+///
+/// Hidden looks exactly like unset to a visitor. The server makes sure of
+/// that, so the page can't reveal that something is withheld.
+enum HideableField: String, CaseIterable, Sendable {
+    case tagline, about, oblast, crops
+
+    /// The wire flag: `hideTagline`, `hideAbout`, `hideOblast`, `hideCrops`.
+    var flag: String { "hide" + rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
+
+    /// As the page's facts name it.
+    var label: String {
+        switch self {
+        case .tagline: "Кратко описание"
+        case .about: "За стопанството"
+        case .oblast: "Област"
+        case .crops: "Култури"
+        }
     }
 }
 

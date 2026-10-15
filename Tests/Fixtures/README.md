@@ -316,7 +316,9 @@ which loads from the real host, outside the seam.
 (`GET /farm-brand`, agri-saas #1815): every field filled, an address, and
 `published: true`, so the page shows «Публикуване» with «Сподели»,
 «Карта за печат (A6)» and «Спри публикуването». The address is the one
-`farm-directory.json` lists the farm under.
+`farm-directory.json` lists the farm under. `hideOblast` is true (agri-saas
+#1933), so the facts show one field marked «Не се показва публично» and its
+switch is off under «Показва се публично».
 
 A11yShots taps none of the three. The card is a GET below this path with
 no fixture (`NO_FIXTURE`), and withdrawing is a write.

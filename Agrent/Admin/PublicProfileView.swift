@@ -39,6 +39,7 @@ struct PublicProfileView: View {
     @State private var withdrawing = false
     @State private var publishing = false
     @State private var askingConsent = false
+    @State private var savingVisibility = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var printingCard = false
     /// The A6 card while Quick Look shows it.
@@ -129,32 +130,77 @@ struct PublicProfileView: View {
 
         Section {
             fact("Име", draft?.displayName)
-            fact("Кратко описание", draft?.tagline)
-            fact("За стопанството", draft?.about)
-            fact("Област", draft?.oblast)
-            fact("Култури", draft.map { $0.crops.joined(separator: ", ") })
+            fact(HideableField.tagline.label, draft?.tagline, hidden: draft?.hidden.contains(.tagline) == true)
+            fact(HideableField.about.label, draft?.about, hidden: draft?.hidden.contains(.about) == true)
+            fact(HideableField.oblast.label, draft?.oblast, hidden: draft?.hidden.contains(.oblast) == true)
+            fact(HideableField.crops.label, draft.map { $0.crops.joined(separator: ", ") },
+                 hidden: draft?.hidden.contains(.crops) == true)
         } header: {
             SectionHeader("Какво показва страницата")
         } footer: {
             SectionFooter(Self.about)
         }
 
+        if let draft { visibilitySection(draft) }
         addressSection(draft)
         publicationSection(draft)
     }
 
     /// One fact, its label above it, and «—» for one not filled in, so the
-    /// row still says what's missing.
-    private func fact(_ label: String, _ value: String?) -> some View {
+    /// row still says what's missing. A hidden one says so under its text:
+    /// the section claims to show what the page shows, and the page leaves
+    /// it out.
+    private func fact(_ label: String, _ value: String?, hidden: Bool = false) -> some View {
         let shown = value?.recorded
         return VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.footnote).foregroundStyle(Palette.secondaryText)
-            Text(shown ?? "—").foregroundStyle(.primary)
+            Text(shown ?? "—").foregroundStyle(hidden ? Palette.secondaryText : .primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
+            if hidden {
+                Label(Self.hiddenNote, systemImage: "eye.slash")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(A11y.sentence([label, shown ?? Self.notFilled]))
+        .accessibilityLabel(Self.factSentence(label, shown, hidden: hidden))
+    }
+
+    // MARK: - Visibility
+
+    /// «Показва се публично», a switch per field that can be withheld, ON
+    /// meaning visible, as on the web (agri-saas #1933). Each saves at once
+    /// and sends only its own flag. Shown once there's a draft: before that
+    /// there's nothing stored to withhold.
+    private func visibilitySection(_ draft: FarmBrandDraft) -> some View {
+        Section {
+            ForEach(HideableField.allCases, id: \.self) { field in
+                // Soft hyphens: beside its switch at AX5 the label broke
+                // «стопанст / вото». VoiceOver hears the plain words.
+                Toggle(isOn: shownBinding(field, in: draft)) {
+                    Text(SoftHyphens.display(field.label))
+                }
+                .accessibilityLabel(field.label)
+                .disabled(savingVisibility)
+                    .accessibilityInputLabels(A11y.spokenNames(field.label))
+            }
+        } header: {
+            SectionHeader("Показва се публично")
+        } footer: {
+            SectionFooter(Self.visibilityAbout)
+        }
+    }
+
+    /// The switch reads the draft and writes through `setShown`. The draft
+    /// changes at once, so the switch doesn't spring back while the server
+    /// answers, and is read again either way.
+    private func shownBinding(_ field: HideableField, in draft: FarmBrandDraft) -> Binding<Bool> {
+        Binding(
+            get: { !draft.hidden.contains(field) },
+            set: { shown in Task { await setShown(field, shown) } }
+        )
     }
 
     // MARK: - Address
@@ -270,6 +316,21 @@ struct PublicProfileView: View {
         }
     }
 
+    private func setShown(_ field: HideableField, _ shown: Bool) async {
+        guard !savingVisibility, case .ready(var current?) = phase else { return }
+        savingVisibility = true
+        failure = nil
+        defer { savingVisibility = false }
+        if shown { current.hidden.remove(field) } else { current.hidden.insert(field) }
+        phase = .ready(current)
+        do {
+            try await FarmBrandAPI.setShown(field, shown)
+        } catch {
+            failure = UserMessage.text(for: error)
+        }
+        await load()
+    }
+
     /// Straight to the server when the farm agreed to this text already, as
     /// the web does. Otherwise the consent is asked for first.
     private func startPublishing() {
@@ -327,7 +388,16 @@ struct PublicProfileView: View {
 
     static let about = "Страница на стопанството, която всеки може да отвори, без да има профил в Agrent. "
         + "Показва само попълненото тук."
-    static let notFilled = "не е попълнено"
+    nonisolated static let notFilled = "не е попълнено"
+    static let hiddenNote = "Не се показва публично."
+    static let visibilityAbout = "Изключеното поле не се показва на страницата, но текстът му остава записан "
+        + "и се връща, щом го включите отново."
+
+    /// What VoiceOver hears for a fact: its label, its value or that it's
+    /// empty, and that the page leaves it out.
+    nonisolated static func factSentence(_ label: String, _ value: String?, hidden: Bool) -> String {
+        A11y.sentence([label, value ?? notFilled] + (hidden ? ["не се показва публично"] : []))
+    }
     static let addressAbout = "Връзката, на която се отваря страницата. Един адрес е на едно стопанство."
     static let addressAfterSave = "Адрес може да се избере, след като профилът бъде запазен."
     static let publishedNote = "Страницата е публикувана."
