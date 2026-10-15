@@ -592,20 +592,28 @@ waits for the updated app, as a queued spray does. The owner chose this on
   earlier save under a different key is unsettled and the server can't be
   asked about it. Sending the changed entry could record the treatment twice
   (`TreatmentAttempt`), so the error stays on screen as before.
-- **Cached reads, where the two differ:** the phone's `ResponseCache` keeps
-  step two's crops and parcels (`/parcels/by-crop`) and the form's product
-  and unit lists. They have no age limit: an entry stays until the 8 MB
-  budget, an iOS purge or sign-out, so a form opened with no signal is
-  usable. The web writes only `/journal`, `/farm-tasks`, `/locations` and
-  `/exchange/listings` to disk (`PERSISTABLE_PATHS` in
-  `src/lib/swr/persistent-cache.ts`, dropped after 24 hours), so it cannot
-  open step two with no signal. Its queue covers signal lost mid-form,
-  while the reads are still in memory. Filed as agri-saas #1845, with the
-  two open choices: how old such reads may be, and what a farmer is told
-  about it. The phone does not say how old the list is, as no screen has
-  since #70. A parcel deleted in the meantime comes back
-  `REFERENCE_NOT_IN_TENANT` on replay. The row is then kept as refused,
-  with the server's sentence.
+- **Cached reads, where the two differ (owner 2026-10-15, both asked
+  directly):** both clients now open the form with no signal. They differ
+  in how old the lists may be.
+  - **The phone** (`ResponseCache`) keeps step two's crops and parcels
+    (`/parcels/by-crop`) and the form's product and unit lists with no age
+    limit. An entry stays until the 8 MB budget, an iOS purge or sign-out.
+    **Kept that way on the owner's choice**, as every other cached screen
+    is. So a phone opens the form after days without signal.
+  - **The web** persists the same four reads since agri-saas #1890 (#1845),
+    geometry included. It drops its whole bucket after 24 hours, the owner
+    having declined a longer window. After a day without signal it opens
+    the form empty.
+  - **ETags:** since #1890 the three reads that lacked one (`/items`,
+    `/units`, `/parcels/by-crop`) answer with one, so the web's
+    revalidation is a 304. The phone sends no `If-None-Match` (`APIClient`;
+    there has been no HTTP cache since #134). Every online read is the full
+    body, which for `/parcels/by-crop` is up to 5000 parcel geometries.
+    Filed as #329.
+  - **What a farmer is told:** neither client says how old the lists are.
+    The phone has said nothing since #70.
+  - **A parcel deleted meanwhile** comes back `REFERENCE_NOT_IN_TENANT` on
+    replay. The row is then kept as refused, with the server's sentence.
 - **A treatment an administrator abandoned (#326, agri-saas #1860/#1869):**
   a row that keeps coming back short is resent under its handle, which is
   how a passing cause gets finished. When the cause doesn't pass, an ADMIN
