@@ -56,8 +56,9 @@ final class CacheFirstTests: XCTestCase {
                       "a failure can overwrite cached content already published")
     }
 
-    /// Staleness stays visible. The first publish is marked stale with the
-    /// time it was fetched, and every screen using this carries StaleBanner.
+    /// The first publish is marked stale with the time it was fetched.
+    /// Nothing shows that age since the band went (`StateViews.swift`), but
+    /// the state stays truthful.
     func testTheFirstPublishIsMarkedStale() {
         let s = source("Agrent/Core/CachedResource.swift")
         XCTAssertTrue(s.contains(".stale(since: hit.fetchedAt)"),

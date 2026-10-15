@@ -15,9 +15,9 @@ import SwiftUI
 /// here is already in hand when the row is tapped. A `GET /journal/:id` on
 /// push would add a spinner, a failure mode and an empty state to data that
 /// cannot be missing. The cost is that an entry edited elsewhere since the
-/// last list load shows the older text — which is the same staleness the list
-/// itself carries, and `StaleBanner` above it already says so. If freshness
-/// ever has to be exact here, the endpoint exists.
+/// last list load shows the older text, which is the same staleness the list
+/// itself carries. If freshness ever has to be exact here, the endpoint
+/// exists.
 ///
 /// The one read is a treatment's progress (`UnfinishedTreatmentSection`,
 /// #326): whether every parcel it was sent for reached the register, which

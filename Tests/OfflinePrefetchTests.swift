@@ -9,8 +9,8 @@ import XCTest
 /// `CachedResource` writes the cache only after a successful fetch — so
 /// the data was fetched at the exact moment signal is least likely.
 ///
-/// This is a source check for the same reason the `StaleBanner` one is:
-/// the failure is that somebody deletes the warm call or adds a new piece
+/// This is a source check because the failure is that somebody deletes
+/// the warm call or adds a new piece
 /// of field-critical reference data without warming it, and neither is
 /// visible to a runtime assertion.
 final class OfflinePrefetchTests: XCTestCase {
