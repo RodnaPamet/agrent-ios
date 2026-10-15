@@ -177,8 +177,13 @@ struct PublicProfileView: View {
     private func visibilitySection(_ draft: FarmBrandDraft) -> some View {
         Section {
             ForEach(HideableField.allCases, id: \.self) { field in
-                Toggle(field.label, isOn: shownBinding(field, in: draft))
-                    .disabled(savingVisibility)
+                // Soft hyphens: beside its switch at AX5 the label broke
+                // «стопанст / вото». VoiceOver hears the plain words.
+                Toggle(isOn: shownBinding(field, in: draft)) {
+                    Text(SoftHyphens.display(field.label))
+                }
+                .accessibilityLabel(field.label)
+                .disabled(savingVisibility)
                     .accessibilityInputLabels(A11y.spokenNames(field.label))
             }
         } header: {
