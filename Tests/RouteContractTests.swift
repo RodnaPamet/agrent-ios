@@ -241,7 +241,7 @@ final class RouteContractTests: XCTestCase {
             // agrent-ios #323: the farm's public profile, as its admins edit it.
             ("FarmBrandAPI.swift", [
                 FarmBrandAPI.draftPath, FarmBrandAPI.handlePath,
-                FarmBrandAPI.publicationPath, FarmBrandAPI.consentPath,
+                FarmBrandAPI.publicationPath, FarmBrandAPI.consentPath, FarmBrandAPI.shareCardPath,
             ]),
             // agrent-ios #323: the directory of published farms, anonymous.
             ("FarmDirectoryAPI.swift", [

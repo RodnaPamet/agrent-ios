@@ -30,6 +30,7 @@ enum FarmBrandAPI {
     static var handlePath: String { "\(draftPath)/handle" }
     static var publicationPath: String { "\(draftPath)/publication" }
     static var consentPath: String { "\(draftPath)/consent" }
+    static var shareCardPath: String { "\(draftPath)/share-card" }
 
     /// The flag every P6 surface is behind.
     static let flag = "social.public-profile"
@@ -65,6 +66,24 @@ enum FarmBrandAPI {
     /// always be able to withdraw (agri-saas #1871).
     static func withdraw() async throws {
         _ = try await APIClient.shared.put(publicationPath, body: ["published": false], as: SaveAnswer.self)
+    }
+
+    /// The A6 card to print (P6.7, agri-saas #1910): the public name, the
+    /// address and a QR code to it, as a PDF the server draws. Served only
+    /// for a PUBLISHED farm (`FARM_BRAND_NOT_PUBLISHED`): a printed address
+    /// that doesn't open would outlive any fix.
+    ///
+    /// Kept as the ДНЕВНИК is (`FarmRecordAPI.keep`): checked for `%PDF`
+    /// and removed when Quick Look closes. The card holds nothing private,
+    /// but one folder and one clean-up is simpler than a second of each.
+    /// The server names the file after the farm; the fallback is the address.
+    static func shareCard(handle: String) async throws -> URL {
+        let (data, served) = try await APIClient.shared.getForDocument(shareCardPath)
+        return try FarmRecordAPI.keep(data, named: FarmRecordAPI.fileName(served, fallback: shareCardFallbackName(handle)))
+    }
+
+    static func shareCardFallbackName(_ handle: String) -> String {
+        "\(handle)-karta.pdf"
     }
 
     /// The alternatives a taken address was refused with: up to three,
