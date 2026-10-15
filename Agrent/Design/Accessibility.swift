@@ -182,6 +182,8 @@ enum A11y {
         /// A list's filter button, Борса's and the Дневник's (#252). Its
         /// name stays the same when a filter is on; that state is its value.
         static let filters = spokenNames("Филтри", "Filters")
+        /// Борса's «Ферми», the directory of published farms (#323).
+        static let farms = spokenNames("Ферми", "Farms")
         /// The filter sheet's «Покажи»: show the list the filter describes.
         static let show = spokenNames("Покажи", "Show")
         static let signOut = spokenNames("Изход", "Sign out")

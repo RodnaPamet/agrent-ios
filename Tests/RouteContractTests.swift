@@ -243,6 +243,11 @@ final class RouteContractTests: XCTestCase {
                 FarmBrandAPI.draftPath, FarmBrandAPI.handlePath,
                 FarmBrandAPI.publicationPath, FarmBrandAPI.consentPath,
             ]),
+            // agrent-ios #323: the directory of published farms, anonymous.
+            ("FarmDirectoryAPI.swift", [
+                FarmDirectoryAPI.path,
+                FarmDirectoryAPI.searchPath(FarmDirectoryQuery(text: "q", oblast: "o", crop: "c")),
+            ]),
             ("AdminAPI.swift", [
                 AdminAPI.membersPath, AdminAPI.invitesPath, AdminAPI.farmProfilePath,
                 AdminAPI.invitePath,

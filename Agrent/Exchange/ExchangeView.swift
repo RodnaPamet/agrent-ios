@@ -22,6 +22,7 @@ struct ExchangeView: View {
     @State private var inbox = ExchangeInboxStore()
     @State private var unread = ExchangeUnreadStore.shared
     @State private var posting = false
+    @State private var flags = FeatureFlags.shared
 
     /// Remembered per user, and the LIST is the default. The map answers
     /// "where are the offers"; the list answers "what is on offer", and
@@ -51,6 +52,20 @@ struct ExchangeView: View {
                             Button { posting = true } label: {
                                 Label("Нова обява", systemImage: "plus")
                             }
+                        }
+                    }
+                    // The farm directory (#323), on every section: it's
+                    // about who trades here, not about one list. Hidden
+                    // while the server hides it (`FarmDirectoryAPI`).
+                    if flags.isOn(FarmBrandAPI.flag) {
+                        // Primary, not secondary: on a phone a secondary
+                        // item folds into a «…» menu, and the owner asked for
+                        // a button on the bar.
+                        ToolbarItem(placement: .primaryAction) {
+                            NavigationLink(value: AppRoute.farmDirectory) {
+                                Label("Ферми", systemImage: "house.and.flag")
+                            }
+                            .accessibilityInputLabels(A11y.Spoken.farms)
                         }
                     }
                 }
