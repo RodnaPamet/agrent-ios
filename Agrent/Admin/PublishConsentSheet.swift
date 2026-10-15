@@ -27,6 +27,7 @@ struct PublishConsentSheet: View {
     @State private var sending = false
     @State private var failure: String?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         NavigationStack {
@@ -43,13 +44,7 @@ struct PublishConsentSheet: View {
                     Text(PublishingConsent.body)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Section {
-                    Toggle(isOn: $agreed) {
-                        Text(PublishingConsent.agree).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .disabled(sending)
-                    .accessibilityInputLabels(A11y.spokenNames("Съгласен", "Прочетох", "Agree"))
-                }
+                Section { agreement }
                 if let failure {
                     Section {
                         Text(failure).foregroundStyle(Palette.error).fixedSize(horizontal: false, vertical: true)
@@ -84,6 +79,27 @@ struct PublishConsentSheet: View {
                 guard let now else { return }
                 AccessibilityNotification.Announcement(now).post()
             }
+        }
+    }
+
+    /// The sentence beside its switch, and above it at the accessibility
+    /// sizes: beside, the switch left it a column too narrow for
+    /// «страницата», which broke mid-word. `AnyLayout`, so the switch keeps
+    /// its identity when the text size changes with the sheet open.
+    /// VoiceOver hears the sentence once, as the switch's own label.
+    private var agreement: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
+            Text(PublishingConsent.agree)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityHidden(true)
+            Toggle(PublishingConsent.agree, isOn: $agreed)
+                .labelsHidden()
+                .disabled(sending)
+                .accessibilityInputLabels(A11y.spokenNames("Съгласен", "Прочетох", "Agree"))
         }
     }
 

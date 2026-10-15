@@ -39,6 +39,7 @@ struct PublicProfileView: View {
     @State private var withdrawing = false
     @State private var publishing = false
     @State private var askingConsent = false
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var printingCard = false
     /// The A6 card while Quick Look shows it.
     @State private var card: URL?
@@ -241,6 +242,10 @@ struct PublicProfileView: View {
                 } label: {
                     if publishing {
                         ProgressView().accessibilityLabel("Публикуване")
+                    } else if typeSize.isAccessibilitySize {
+                        // One long word: beside the globe at AX5 it broke
+                        // «Публикува / й».
+                        Text("Публикувай")
                     } else {
                         Label("Публикувай", systemImage: "globe")
                     }
