@@ -77,7 +77,7 @@ actor ResponseCache {
 
     /// `fetchedAt` is the file's modification date, so the age shown on screen
     /// is the age of the bytes rather than a timestamp we remembered to write.
-    func read(_ key: String) -> (data: Data, fetchedAt: Date)? {
+    func read(_ key: String) -> (data: Data, fetchedAt: Date, etag: String?)? {
         let url = fileURL(key)
         guard let data = try? Data(contentsOf: url),
               let attributes = try? fileManager.attributesOfItem(atPath: url.path),
@@ -87,10 +87,25 @@ actor ResponseCache {
             return nil
         }
         Log.cache.debug("hit \(data.count, privacy: .public)B")
-        return (data, fetchedAt)
+        return (data, fetchedAt, Self.etag(at: url))
     }
 
-    func write(_ key: String, _ data: Data) {
+    /// The `ETag` the entry's body came with, without reading the body: what
+    /// a revalidation sends as `If-None-Match` (agrent-ios#329).
+    func etag(_ key: String) -> String? {
+        Self.etag(at: fileURL(key))
+    }
+
+    /// A 304: the server has just confirmed the entry, so its age restarts.
+    /// The modification date is "last successful fetch" for the age shown on
+    /// screen and for eviction order alike, and a confirmation is one.
+    func confirm(_ key: String, at date: Date = Date()) {
+        try? fileManager.setAttributes([.modificationDate: date], ofItemAtPath: fileURL(key).path)
+    }
+
+    /// `etag` is the response's own: kept with this body and replaced with it,
+    /// so it can never vouch for bytes it didn't come with.
+    func write(_ key: String, _ data: Data, etag: String? = nil) {
         do {
             try fileManager.createDirectory(
                 at: directory,
@@ -101,6 +116,7 @@ actor ResponseCache {
                 to: fileURL(key),
                 options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
             )
+            Self.setEtag(etag, at: fileURL(key))
             Log.cache.debug("wrote \(data.count, privacy: .public)B")
             evictIfOverBudget(keeping: key)
         } catch {
@@ -173,6 +189,47 @@ actor ResponseCache {
 
     private func fileURL(_ key: String) -> URL {
         directory.appendingPathComponent(key, isDirectory: false)
+    }
+
+    // MARK: - The ETag (agrent-ios#329)
+    //
+    // An extended attribute on the entry's own file rather than a second
+    // file beside it. Eviction, `remove` and the sign-out purge then take it
+    // with the body. A file of its own would be counted, sorted and evicted
+    // separately, and could outlive the bytes it vouches for. An entry
+    // written before this has no attribute, so it sends no `If-None-Match`.
+
+    private static let etagAttribute = "bg.agrent.etag"
+
+    /// An ETag is a short quoted token. Anything longer than this is not one,
+    /// and isn't read.
+    private static let etagLimit = 512
+
+    private static func etag(at url: URL) -> String? {
+        url.withUnsafeFileSystemRepresentation { path -> String? in
+            guard let path else { return nil }
+            let size = getxattr(path, etagAttribute, nil, 0, 0, 0)
+            guard size > 0, size <= etagLimit else { return nil }
+            var bytes = [UInt8](repeating: 0, count: size)
+            guard getxattr(path, etagAttribute, &bytes, size, 0, 0) == size else { return nil }
+            return String(bytes: bytes, encoding: .utf8)
+        }
+    }
+
+    /// Set, or removed when the response carried none. Removed explicitly
+    /// rather than trusting the atomic write to start from a bare file: an
+    /// old tag left on a new body would earn a 304 for bytes the server
+    /// never sent.
+    private static func setEtag(_ etag: String?, at url: URL) {
+        url.withUnsafeFileSystemRepresentation { path in
+            guard let path else { return }
+            if let etag, !etag.isEmpty, etag.utf8.count <= etagLimit {
+                let bytes = Array(etag.utf8)
+                _ = setxattr(path, etagAttribute, bytes, bytes.count, 0, 0)
+            } else {
+                _ = removexattr(path, etagAttribute, 0)
+            }
+        }
     }
 }
 

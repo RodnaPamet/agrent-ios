@@ -110,4 +110,85 @@ final class ResponseCacheTests: XCTestCase {
             ResponseCache.key(scope: CacheScope(userID: "a", tenant: "bc"), pathAndQuery: "p")
         )
     }
+
+    // MARK: - The ETag (agrent-ios#329)
+
+    /// A body keeps the ETag it came with, readable without the body.
+    func testAnEntryKeepsItsETag() async {
+        let (cache, _) = makeCache(budget: 10_000)
+        await cache.write("a", payload(10), etag: #"W/"abc123""#)
+        let tag = await cache.etag("a")
+        XCTAssertEqual(tag, #"W/"abc123""#)
+        let hit = await cache.read("a")
+        XCTAssertEqual(hit?.etag, #"W/"abc123""#)
+        await cache.removeAll()
+    }
+
+    /// A new body without an ETag must not inherit the old one: that tag
+    /// would earn a 304 for bytes the server never sent.
+    func testABodyWithoutAnETagClearsTheOldOne() async {
+        let (cache, _) = makeCache(budget: 10_000)
+        await cache.write("a", payload(10), etag: #""v1""#)
+        await cache.write("a", payload(20))
+        let tag = await cache.etag("a")
+        XCTAssertNil(tag)
+        await cache.write("a", payload(30), etag: #""v3""#)
+        let replaced = await cache.etag("a")
+        XCTAssertEqual(replaced, #""v3""#)
+        await cache.removeAll()
+    }
+
+    /// Removing the entry takes its tag with it; a miss has none, and an
+    /// entry written before ETags existed has none either.
+    func testNoEntryNoETag() async {
+        let (cache, _) = makeCache(budget: 10_000)
+        await cache.write("a", payload(10), etag: #""v1""#)
+        await cache.remove("a")
+        let removed = await cache.etag("a")
+        XCTAssertNil(removed)
+        let absent = await cache.etag("never")
+        XCTAssertNil(absent)
+        await cache.write("old", payload(10))
+        let old = await cache.read("old")
+        XCTAssertNotNil(old)
+        XCTAssertNil(old?.etag)
+        await cache.removeAll()
+    }
+
+    /// A 304 restarts the entry's age, and changes nothing else.
+    func testAConfirmationRestartsTheAge() async throws {
+        let (cache, _) = makeCache(budget: 10_000)
+        await cache.write("a", payload(10), etag: #""v1""#)
+        let then = Date(timeIntervalSince1970: 1_800_000_000)
+        await cache.confirm("a", at: then)
+        let before = await cache.read("a")
+        XCTAssertEqual(try XCTUnwrap(before?.fetchedAt).timeIntervalSince1970, then.timeIntervalSince1970, accuracy: 1)
+        let now = Date()
+        await cache.confirm("a", at: now)
+        let after = await cache.read("a")
+        XCTAssertEqual(try XCTUnwrap(after?.fetchedAt).timeIntervalSince1970, now.timeIntervalSince1970, accuracy: 1)
+        XCTAssertEqual(after?.data.count, 10)
+        XCTAssertEqual(after?.etag, #""v1""#)
+        await cache.removeAll()
+    }
+
+    /// The request side, read from the source: there is no URLProtocol seam
+    /// in `Tests/`. The cache's entry tag goes out as `If-None-Match`, the
+    /// response's tag is stored with its body, and a 304 the entry can't
+    /// answer asks again without one.
+    func testTheCacheRevalidatesWithItsETag() throws {
+        func source(_ path: String) throws -> String {
+            let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            return try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        }
+        let resource = try source("Agrent/Core/CachedResource.swift")
+        XCTAssertTrue(resource.contains("enum CachedResource"), "positive control")
+        XCTAssertTrue(resource.contains("ResponseCache.shared.etag(key)"))
+        XCTAssertTrue(resource.contains("conditionalData(for: pathAndQuery, ifNoneMatch: tag)"))
+        XCTAssertTrue(resource.contains("write(key, data, etag: etag)"))
+        XCTAssertTrue(resource.contains("load(pathAndQuery, conditional: false, decode: decode)"))
+        let client = try source("Agrent/API/APIClient.swift")
+        XCTAssertTrue(client.contains(#"forHTTPHeaderField: "If-None-Match")"#))
+        XCTAssertTrue(client.contains(#"http.value(forHTTPHeaderField: "ETag")"#))
+    }
 }
