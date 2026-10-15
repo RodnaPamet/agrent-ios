@@ -1014,11 +1014,12 @@ and they win over the API, for every farm, until cleared. Server: agri-saas
 the owner creates the platform farm and `PLATFORM_TENANT_SLUG` names it; the
 owner makes the first entry. The web console is agri-saas's.
 
-### Ahead of the web — «Публичен профил» (#323, owner 2026-10-15)
+### «Публичен профил» (#323, owner 2026-10-15)
 
-**The phone has an editor the web doesn't have yet.** The owner chose to
-build it now, behind the flag. The web's editor is agri-saas #1815, and as
-of 2026-10-15 no web screen calls the brand routes (#1884).
+**The phone and the web each have an editor.** The owner chose to build the
+phone's now, behind the flag. The web's is agri-saas #1815, shipped in
+#1895 and extended in #1930, #1933 and #1939. Both clients write the same
+draft, so a field saved on one shows on the other.
 
 - **Where:** Админ → «Публичен профил», right after «Стопанство». Shown
   only when `social.public-profile` is on for the person. The server
@@ -1057,10 +1058,15 @@ of 2026-10-15 no web screen calls the brand routes (#1884).
   Taking the page down never asks.
 - **Oblast:** one of the 28 Bulgarian names the server uses for regions
   (`BulgarianRegion.names`), the form its tests and farm search use
-  («Добрич»). The web's editor should store the same names, or a search by
-  oblast will miss farms saved from the other client.
+  («Добрич»). The web's editor takes free text instead (up to 80
+  characters), and the directory matches oblast exactly. So a farm that
+  types «Добричка» on the web is missing from the phone's «Добрич» filter.
+  Raised on agri-saas #1909 (2026-10-16); the fix is the web's.
 - **Not on the phone:** `indexable` (the search-engine toggle, agri-saas
-  #1873) and the live preview. Neither was in the owner's choice.
+  #1873) and the web's live preview (agri-saas #1939, which renders the
+  real page's markup from unsaved edits). Neither was in the owner's choice.
+  On the phone, «Какво показва страницата» lists the facts as they'll
+  appear, and a published page opens in the app.
 - **Admin data, so not cached:** the draft is read on every open, and with
   no signal the page says it couldn't load.
 
