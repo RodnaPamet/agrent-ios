@@ -621,9 +621,10 @@ waits for the updated app, as a queued spray does. The owner chose this on
   410 `TREATMENT_ABANDONED`, instead of writing the whole treatment again
   under it. The phone refuses the row with a Bulgarian sentence saying an
   administrator stopped it and that a new entry is the way to record the
-  work. The web's outbox takes any 2xx as delivered and never resends a
-  short one, so it neither finishes a partial treatment nor meets this
-  refusal (agri-saas is filing that difference).
+  work. Since agri-saas #1870 (#1892, live 2026-10-15) the web's outbox
+  resends a short treatment too, under the same key, and silently, as the
+  phone does (owner ruling, asked explicitly there). So both clients meet
+  the 410 the same way.
 - **A treatment the server can't finish (#326, owner 2026-10-15, asked
   directly):** the phone says so, and an ADMIN ends it from the phone.
   - A queued row notes each short answer.
@@ -637,8 +638,9 @@ waits for the updated app, as a queued spray does. The owner chose this on
   - Everyone else is told only an administrator can.
   - The abandon also drops the phone's own copy, so nothing resends it.
   - **The web:** has no button for the abandon as of 2026-10-15; the route
-    is API-only. Its outbox never resends a short treatment either, so a
-    web farmer sees the server's row with fewer parcels and no note.
+    is API-only. Its outbox now resends a short treatment (#1870), but says
+    nothing about it: a web farmer sees the server's row with fewer parcels
+    and no note.
 
 **Unverified:** no treatment has been queued on a device. The check is
 airplane mode → «Нов запис» → save → close the app → signal back → open
