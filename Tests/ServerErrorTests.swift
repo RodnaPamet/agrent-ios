@@ -331,11 +331,6 @@ final class SubscriptionRefusalTests: XCTestCase {
                        "Нямате права за това действие.")
     }
 
-    /// The plan's refusals as codes (agri-saas #1679, agrent-ios #286), as
-    /// they arrive: still leading their `message` with the old English token
-    /// for one release, and next in the reader's language (agri-saas #1677).
-    /// The code decides either way, so neither change on the server's side
-    /// can turn a limit into «Нямате права».
     /// A role that cannot change records is named in Bulgarian, with the
     /// one person who can change it — and never as the server's English or
     /// the role's wire name.
@@ -363,6 +358,47 @@ final class SubscriptionRefusalTests: XCTestCase {
         }
     }
 
+    /// The admin and audit refusals from inside a route the role may use
+    /// (agri-saas #1779) name the role the same way, say who the operation is
+    /// for, and stay apart from the Edge's ADMIN_REQUIRED, which shuts the
+    /// whole route. The server's own Bulgarian for them quotes the wire name
+    /// — «(EDITOR)» — so the phone's sentence has to win over it.
+    func testAnAdminOrAuditRefusalNamesTheRoleAndWhoItIsFor() {
+        let serverBulgarian = "Вашата роля в това стопанство (EDITOR) не позволява административни действия. "
+            + "Помолете администратор на стопанството да промени ролята Ви."
+        let admin = UserMessage.httpText(status: 403, code: "ADMIN_FORBIDDEN_FOR_ROLE", message: serverBulgarian,
+                                         params: ["role": "EDITOR"])
+        XCTAssertTrue(admin.contains("«Редактор»"), admin)
+        XCTAssertTrue(admin.contains("само за администратор"), admin)
+        let audit = UserMessage.httpText(status: 403, code: "AUDIT_FORBIDDEN_FOR_ROLE",
+                                         message: "You do not have permission to perform audit actions in this context.",
+                                         params: ["role": "MECHANISATOR"])
+        XCTAssertTrue(audit.contains("«Механизатор»"), audit)
+        XCTAssertTrue(audit.contains("одитор"), audit)
+
+        let edge = UserMessage.httpText(status: 403, code: "ADMIN_REQUIRED", message: "Admin access required")
+        for code in ["ADMIN_FORBIDDEN_FOR_ROLE", "AUDIT_FORBIDDEN_FOR_ROLE"] {
+            let generic = UserMessage.httpText(status: 403, code: code, message: serverBulgarian)
+            XCTAssertNotEqual(generic, edge, "\(code) is not the Edge's refusal")
+            XCTAssertNotEqual(generic, UserMessage.statusText(403), "\(code) has its own sentence")
+            for unknown in ["SUPERVISOR", "UNKNOWN", ""] {
+                XCTAssertEqual(UserMessage.httpText(status: 403, code: code, message: serverBulgarian,
+                                                    params: ["role": unknown]),
+                               generic, "an unknown role \(unknown) is not quoted")
+            }
+            XCTAssertTrue(UserMessage.isBulgarianSentence(generic), generic)
+        }
+        for text in [admin, audit] {
+            XCTAssertTrue(UserMessage.isBulgarianSentence(text), text)
+            XCTAssertFalse(text.contains("EDITOR") || text.contains("MECHANISATOR") || text.contains("permission"), text)
+        }
+    }
+
+    /// The plan's refusals as codes (agri-saas #1679, agrent-ios #286), as
+    /// they arrive: still leading their `message` with the old English token
+    /// for one release, and next in the reader's language (agri-saas #1677).
+    /// The code decides either way, so neither change on the server's side
+    /// can turn a limit into «Нямате права».
     func testThePlansRefusalsAreSaidByCode() {
         let refusals: [(code: String, legacy: String, params: [String: String])] = [
             ("PLAN_LIMIT_EXCEEDED", "plan_limit_exceeded: FREE plan allows 1 location(s); tenant currently has 1.",
