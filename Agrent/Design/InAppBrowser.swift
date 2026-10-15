@@ -17,7 +17,9 @@ struct InAppBrowser: UIViewControllerRepresentable {
 
     /// Safari's view takes only http and https, and raises on anything else.
     /// A caller checks first, so a bad link becomes nothing rather than a crash.
-    static func opens(_ url: URL) -> Bool {
+    /// `nonisolated`: a representable is the main actor's, and this is a pure
+    /// check on a value that the tests call directly.
+    nonisolated static func opens(_ url: URL) -> Bool {
         ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
