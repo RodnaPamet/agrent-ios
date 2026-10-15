@@ -154,6 +154,8 @@ final class RouteContractTests: XCTestCase {
         "AppSurface.swift": "web page routes, not API paths",
         // The web's privacy notice, opened in Safari from «Изтрий профила».
         "DeleteAccountView.swift": "the web's /privacy page, not an API path",
+        // A farm's public page (#323), opened in Safari and shared.
+        "PublicProfileLink.swift": "the public page /f/{handle}, not an API path",
     ]
 
     // MARK: - Every path the app builds
@@ -235,6 +237,11 @@ final class RouteContractTests: XCTestCase {
             ("FieldOperationAPI.swift", [
                 FieldOperationAPI.detailPath("{taskId}"),
                 FieldOperationAPI.linePath(taskID: "{taskId}", lineID: "{lineId}"),
+            ]),
+            // agrent-ios #323: the farm's public profile, as its admins edit it.
+            ("FarmBrandAPI.swift", [
+                FarmBrandAPI.draftPath, FarmBrandAPI.handlePath,
+                FarmBrandAPI.publicationPath, FarmBrandAPI.consentPath,
             ]),
             ("AdminAPI.swift", [
                 AdminAPI.membersPath, AdminAPI.invitesPath, AdminAPI.farmProfilePath,

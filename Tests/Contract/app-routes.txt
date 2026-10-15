@@ -52,6 +52,10 @@
 /api/t/{tenantSlug}/exchange/threads/{threadId}/close
 /api/t/{tenantSlug}/exchange/threads/{threadId}/messages
 /api/t/{tenantSlug}/exchange/threads/{threadId}/read
+/api/t/{tenantSlug}/farm-brand
+/api/t/{tenantSlug}/farm-brand/consent
+/api/t/{tenantSlug}/farm-brand/handle
+/api/t/{tenantSlug}/farm-brand/publication
 /api/t/{tenantSlug}/field-operations/{taskId}
 /api/t/{tenantSlug}/field-operations/{taskId}/parcels/{lineId}
 /api/t/{tenantSlug}/grain/calculator

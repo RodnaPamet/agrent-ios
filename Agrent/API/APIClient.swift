@@ -263,7 +263,40 @@ actor APIClient {
             struct Details: Decodable {
                 let currentVersion: Int?
                 let expectedVersion: Int?
+                /// A taken web address's alternatives (`FARM_HANDLE_TAKEN`,
+                /// agri-saas #1865): a list of strings, which `params` can't
+                /// hold. Each field is read on its own, so none of them can
+                /// cost the others.
+                var suggestions: [String]? = nil
+
+                private enum CodingKeys: String, CodingKey { case currentVersion, expectedVersion, suggestions }
+
+                init(currentVersion: Int?, expectedVersion: Int?, suggestions: [String]? = nil) {
+                    self.currentVersion = currentVersion
+                    self.expectedVersion = expectedVersion
+                    self.suggestions = suggestions
+                }
+
+                init(from decoder: any Decoder) throws {
+                    let c = try decoder.container(keyedBy: CodingKeys.self)
+                    currentVersion = (try? c.decodeIfPresent(Int.self, forKey: .currentVersion)) ?? nil
+                    expectedVersion = (try? c.decodeIfPresent(Int.self, forKey: .expectedVersion)) ?? nil
+                    suggestions = (try? c.decodeIfPresent([String].self, forKey: .suggestions)) ?? nil
+                }
             }
+
+            /// Where `details.suggestions` travels in `params`, one per line.
+            ///
+            /// ── Why in `params` ──
+            ///
+            /// `APIError.http` carries `params` and nothing else of the
+            /// envelope, and twenty-two places match on its five values, so
+            /// a sixth is a change to all of them for one route's list. A
+            /// handle is `[a-z0-9-]` once normalised, so a newline can't be
+            /// part of one. An empty string is an empty list, which the
+            /// server sends when it has nothing to suggest. That is still an
+            /// answer, unlike a missing key.
+            static let suggestionsKey = "suggestions"
             let code: String?
             let message: String?
             let details: Details?
@@ -327,8 +360,12 @@ actor APIClient {
                     }
                 }
                 let object = try container.decode(Object.self)
+                var params = object.params?.values
+                if let suggestions = object.details?.suggestions {
+                    params = (params ?? [:]).merging([Self.suggestionsKey: suggestions.joined(separator: "\n")]) { own, _ in own }
+                }
                 self.init(code: object.code, message: object.message,
-                          details: object.details, params: object.params?.values)
+                          details: object.details, params: params)
             }
 
             /// `params`, each value a string or a number, as text. `120`
