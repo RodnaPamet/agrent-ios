@@ -19,6 +19,7 @@
 /api/me/farms
 /api/me/news-preferences
 /api/public/eik-check
+/api/public/farms
 /api/t/{tenantSlug}/admin/farm-profile
 /api/t/{tenantSlug}/admin/invites
 /api/t/{tenantSlug}/admin/market-prices/overrides

@@ -33,6 +33,8 @@ enum AppRoute: Hashable, Sendable {
     /// The name rides along so the header isn't blank while the archive
     /// loads — see `ParcelHistoryView.parcelName`.
     case parcelHistory(parcelID: String, parcelName: String)
+    /// «Ферми», the published farms (#323). Carries nothing: it's one list.
+    case farmDirectory
 
     func hash(into hasher: inout Hasher) {
         switch self {
@@ -42,6 +44,7 @@ enum AppRoute: Hashable, Sendable {
         case .task(let summary): hasher.combine("task"); hasher.combine(summary.id)
         case .location(let location): hasher.combine("location"); hasher.combine(location.id)
         case .parcelHistory(let parcelID, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
+        case .farmDirectory: hasher.combine("farmDirectory")
         }
     }
 
@@ -50,7 +53,7 @@ enum AppRoute: Hashable, Sendable {
     var home: AppSurface {
         switch self {
         case .journalEntry: .journal
-        case .listing, .conversation: .exchange
+        case .listing, .conversation, .farmDirectory: .exchange
         case .task: .tasks
         case .location: .locations
         case .parcelHistory: .farmRisk
@@ -70,6 +73,7 @@ enum AppRoute: Hashable, Sendable {
         case .location(let location): ParcelMapView(location: location)
         case .parcelHistory(let parcelID, let parcelName):
             ParcelHistoryView(parcelID: parcelID, parcelName: parcelName)
+        case .farmDirectory: FarmDirectoryView()
         }
     }
 }

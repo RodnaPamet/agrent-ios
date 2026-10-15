@@ -126,6 +126,9 @@ enum FixtureCatalogue {
         // first crop, as `NewCostView` asks for it. Without the query this is
         // the overhead payload, which is `costs-defaults` on the path alone.
         (CostsAPI.cropDefaultsPath("WHEAT"), "costs-defaults-crop"),
+        // agrent-ios#323: «Ферми» as it opens, unfiltered. A search or a
+        // filter is another question, and `NO_FIXTURE` is its true answer.
+        (FarmDirectoryAPI.searchPath(FarmDirectoryQuery()), "farm-directory"),
     ]) { $0 }
 
     /// Routes matched on the path alone.

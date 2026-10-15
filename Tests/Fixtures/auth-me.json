@@ -14,6 +14,7 @@
     "slug": "agrent"
   },
   "featureFlags": {
-    "social.farm-registration": true
+    "social.farm-registration": true,
+    "social.public-profile": true
   }
 }

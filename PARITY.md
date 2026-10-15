@@ -1046,6 +1046,29 @@ of 2026-10-15 no web screen calls the brand routes (#1884).
 **Unverified:** nothing has been saved, claimed or withdrawn from this app.
 The flag is off, and the first real write is the owner's.
 
+### Ahead of the web — «Ферми», the farm directory (#323, owner 2026-10-15)
+
+**The phone lists the published farms; the web has no directory screen.**
+The server's directory is `GET /api/public/farms` (P6.8, agri-saas #1817,
+live since 12.31.0). It's anonymous and behind the same flag.
+
+- **Where (owner):** a «Ферми» button on Борса's bar, on every section,
+  shown only when `social.public-profile` is on.
+- **A farm opens as its web page (owner):** `/f/{handle}` in Safari's view
+  inside the app. The server has no JSON read of one farm's page, so a
+  native screen would have had no description.
+- **Search and filters:** a name search on submit (the server matches
+  Cyrillic, and Latin through the name's transliteration); oblast from the
+  28 names; crop from the crops the answers carried. A fixed crop list
+  can't be offered: the server matches a crop exactly, case included,
+  against what each farm typed (agri-saas #1909).
+- **At most 50, no paging:** the server's bound. A full answer says to
+  narrow by oblast or crop.
+- **Not cached:** a farm that withdraws leaves the directory at once.
+
+**Unverified:** no published farm has been listed. The flag is off and no
+farm can publish yet (consent, above).
+
 ### Haptics — since 2026-10-06 (agri-saas#1193 P2.8)
 
 Web `src/lib/haptics.ts` (Vibration API; Android browsers only — iOS Safari
