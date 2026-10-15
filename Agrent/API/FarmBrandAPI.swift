@@ -18,13 +18,13 @@ import Foundation
 /// a draft they can't edit. The editor sits in Администрация, behind the
 /// same gate.
 ///
-/// ── No publishing yet (owner, 2026-10-15) ──
+/// ── Publishing asks for consent first (owner, 2026-10-15) ──
 ///
 /// Publishing needs a recorded consent to a specific text, sent with that
 /// text's version (`/farm-brand/consent`). The owner chose the web's wording
-/// and version for the phone, and the web has none yet. So the phone edits,
-/// claims an address and withdraws, and doesn't publish. `consentPath` is
-/// here for the route guard and for the day the text exists.
+/// and version for the phone, which the web has had since agri-saas #1895
+/// (`PublishingConsent`). Consent and publication are two calls, in that
+/// order, as on the web.
 enum FarmBrandAPI {
     static var draftPath: String { "\(FarmPath.root)/farm-brand" }
     static var handlePath: String { "\(draftPath)/handle" }
@@ -60,6 +60,19 @@ enum FarmBrandAPI {
     /// lower-cased — and the answer's `handle` is the one to show.
     static func claim(handle: String) async throws -> HandleClaim {
         try await APIClient.shared.put(handlePath, body: ["handle": handle], as: HandleClaim.self)
+    }
+
+    /// Records that the person agreed to the consent text of `textVersion`.
+    /// Its own call, never part of a save: it records that someone was shown
+    /// a text and agreed, which a save of other fields can't claim.
+    static func consent(textVersion: String) async throws {
+        _ = try await APIClient.shared.put(consentPath, body: ["textVersion": textVersion], as: SaveAnswer.self)
+    }
+
+    /// Makes the page public. The server refuses it without an address, a
+    /// name or a recorded consent, each with its own code.
+    static func publish() async throws {
+        _ = try await APIClient.shared.put(publicationPath, body: ["published": true], as: SaveAnswer.self)
     }
 
     /// Takes the page down. Never refused for an incomplete draft: a farm must
@@ -111,9 +124,12 @@ struct FarmBrandDraft: Decodable, Equatable, Sendable {
     var crops: [String]
     var published: Bool
     var consentedAt: Date?
+    /// Which text `consentedAt` was an agreement to (`PublishingConsent`).
+    var consentTextVersion: String?
 
     init(handle: String? = nil, displayName: String? = nil, tagline: String? = nil, about: String? = nil,
-         oblast: String? = nil, crops: [String] = [], published: Bool = false, consentedAt: Date? = nil) {
+         oblast: String? = nil, crops: [String] = [], published: Bool = false, consentedAt: Date? = nil,
+         consentTextVersion: String? = nil) {
         self.handle = handle
         self.displayName = displayName
         self.tagline = tagline
@@ -122,10 +138,11 @@ struct FarmBrandDraft: Decodable, Equatable, Sendable {
         self.crops = crops
         self.published = published
         self.consentedAt = consentedAt
+        self.consentTextVersion = consentTextVersion
     }
 
     private enum CodingKeys: String, CodingKey {
-        case handle, displayName, tagline, about, oblast, crops, published, consentedAt
+        case handle, displayName, tagline, about, oblast, crops, published, consentedAt, consentTextVersion
     }
 
     init(from decoder: any Decoder) throws {
@@ -139,6 +156,7 @@ struct FarmBrandDraft: Decodable, Equatable, Sendable {
         published = (try? c.decodeIfPresent(Bool.self, forKey: .published)) ?? false
         consentedAt = ((try? c.decodeIfPresent(String.self, forKey: .consentedAt)) ?? nil)
             .flatMap(BgDate.parseInstant)
+        consentTextVersion = (try? c.decodeIfPresent(String.self, forKey: .consentTextVersion)) ?? nil
     }
 }
 
