@@ -35,6 +35,9 @@ struct FarmDirectoryView: View {
             ToolbarItem(placement: .primaryAction) { filterMenu }
         }
         .task { if store.state.value == nil { await store.load() } }
+        // A filter choice searches at once: there is no field to submit.
+        // One watcher for both, so clearing the two loads once.
+        .onChange(of: [store.query.oblast, store.query.crop]) { Task { await store.load() } }
         .sheet(item: $page) { page in
             InAppBrowser(url: page.url).ignoresSafeArea()
         }
@@ -58,7 +61,7 @@ struct FarmDirectoryView: View {
                     message: "Никоя ферма не отговаря на търсенето."
                 ) {
                     if store.query.isFiltered {
-                        Button("Изчисти филтрите") { Task { await store.clearFilters() } }
+                        Button("Изчисти филтрите", action: store.clearFilters)
                     }
                 }
             } else {
@@ -110,15 +113,15 @@ struct FarmDirectoryView: View {
         Menu {
             // Submenus, not inline lists: 28 oblasts inline would push the
             // crops off the bottom of the menu.
-            Picker("Област", selection: filter(\.oblast)) {
+            Picker("Област", selection: $store.query.oblast) {
                 Text("Всички").tag(String?.none)
-                ForEach(FarmBrandLimits.oblasts(keeping: store.query.oblast), id: \.self) {
+                ForEach(Self.oblasts, id: \.self) {
                     Text($0).tag(Optional($0))
                 }
             }
             .pickerStyle(.menu)
             if !store.knownCrops.isEmpty {
-                Picker("Култура", selection: filter(\.crop)) {
+                Picker("Култура", selection: $store.query.crop) {
                     Text("Всички").tag(String?.none)
                     ForEach(store.knownCrops, id: \.self) { Text($0).tag(Optional($0)) }
                 }
@@ -126,7 +129,7 @@ struct FarmDirectoryView: View {
             }
             if store.query.isFiltered {
                 Divider()
-                Button("Изчисти филтрите") { Task { await store.clearFilters() } }
+                Button("Изчисти филтрите", action: store.clearFilters)
             }
         } label: {
             Label(
@@ -143,16 +146,9 @@ struct FarmDirectoryView: View {
         .accessibilityInputLabels(A11y.Spoken.filters)
     }
 
-    /// A filter choice searches at once: there is no field to submit.
-    private func filter(_ key: WritableKeyPath<FarmDirectoryQuery, String?>) -> Binding<String?> {
-        Binding(
-            get: { store.query[keyPath: key] },
-            set: { value in
-                store.query[keyPath: key] = value
-                Task { await store.load() }
-            }
-        )
-    }
+    /// The 28 names the editor offers, in Bulgarian order. Sorted once, not
+    /// on every redraw of the bar.
+    private static let oblasts = FarmBrandLimits.oblasts(keeping: nil)
 }
 
 /// The page a tap opened. A type of its own because `sheet(item:)` needs an

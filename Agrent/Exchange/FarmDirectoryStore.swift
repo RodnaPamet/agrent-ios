@@ -43,10 +43,10 @@ final class FarmDirectoryStore {
         }
     }
 
-    func clearFilters() async {
+    /// The screen reloads on the change, as for any other filter choice.
+    func clearFilters() {
         query.oblast = nil
         query.crop = nil
-        await load()
     }
 
     private func remember(_ hits: [FarmDirectoryHit]) {
