@@ -75,8 +75,15 @@ actor ResponseCache {
             .joined()
     }
 
-    /// `fetchedAt` is the file's modification date, so the age shown on screen
-    /// is the age of the bytes rather than a timestamp we remembered to write.
+    /// `fetchedAt` is the file's modification date: the age of the bytes
+    /// rather than a timestamp we remembered to write.
+    ///
+    /// The device's clock sets it after the response has arrived, so the
+    /// data is older than it says by one round trip. Nothing waits on it:
+    /// every load still asks the server (with the ETag), so the error never
+    /// keeps old data on screen. A cache that skipped the network while an
+    /// entry was young enough would have to date it from the response
+    /// instead, which is the bug agri-saas #1946 fixed in the web's lists.
     func read(_ key: String) -> (data: Data, fetchedAt: Date, etag: String?)? {
         let url = fileURL(key)
         guard let data = try? Data(contentsOf: url),
@@ -97,8 +104,8 @@ actor ResponseCache {
     }
 
     /// A 304: the server has just confirmed the entry, so its age restarts.
-    /// The modification date is "last successful fetch" for the age shown on
-    /// screen and for eviction order alike, and a confirmation is one.
+    /// The modification date is "last successful fetch" for `.stale(since:)`
+    /// and for eviction order alike, and a confirmation is one.
     func confirm(_ key: String, at date: Date = Date()) {
         try? fileManager.setAttributes([.modificationDate: date], ofItemAtPath: fileURL(key).path)
     }

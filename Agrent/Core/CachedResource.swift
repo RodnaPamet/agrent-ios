@@ -36,9 +36,9 @@ enum CachedResource {
     /// publish lands in well under a second and the first is invisible. On
     /// no connection the first is the whole answer.
     ///
-    /// The staleness is not hidden — every screen that uses this carries
-    /// `StaleBanner`, and the first publish is marked `.stale` with the
-    /// time it was fetched. The reader is told what they are looking at.
+    /// The first publish is marked `.stale` with the time it was fetched.
+    /// No screen shows that age any more: the band went on the owner's
+    /// instruction (`StateViews.swift`). The state still says it.
     ///
     /// The network result is published even when it FAILS, so a genuine
     /// error still reaches the screen — but only after the cached data has

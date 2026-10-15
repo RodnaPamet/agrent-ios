@@ -9,30 +9,10 @@ import Foundation
 /// three-day-old field record is a regulatory problem, not a UX one.
 enum Freshness: Equatable, Sendable {
     case fresh
+    /// `since` is when the bytes were written on this phone, after the
+    /// response arrived (`ResponseCache.read`). See there for why that's
+    /// close enough.
     case stale(since: Date)
-
-    /// "преди 5 минути", or nil when the data came straight off the network.
-    ///
-    /// Forced to bg_BG rather than the device locale: every other string on
-    /// these screens is Bulgarian, and this one is glued to them. The device
-    /// here reports en-BG, which would otherwise render
-    /// "данни отпреди 5 minutes ago".
-    var ageDescription: String? {
-        guard case .stale(let since) = self else { return nil }
-
-        // Under a minute — or ahead of us, which clock skew between the file
-        // system and the device can produce — the formatter renders a FUTURE
-        // tense: "след 0 секунди", "in 0 seconds". Observed on screen. Data
-        // read off disk is by definition not from the future, so anything
-        // that recent is described in fixed words instead.
-        let elapsed = Date().timeIntervalSince(since)
-        guard elapsed >= 60 else { return "преди малко" }
-
-        let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "bg_BG")
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: since, relativeTo: Date())
-    }
 }
 
 /// What a screen is showing, and how much to trust it.
