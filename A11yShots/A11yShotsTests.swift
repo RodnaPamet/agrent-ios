@@ -127,6 +127,9 @@ final class A11yShotsTests: XCTestCase {
             case "06-news": captureNews(app)
             case "16-profile": captureProfile(app)
             case "17-farm-wizard": captureFarmWizard(app)
+            case "09d-farm-directory":
+                openTheExchange(app)
+                captureFarmDirectory(app)
             default: XCTFail("A11Y_ONLY=\(only) names no capture this suite can run alone")
             }
             return
@@ -910,6 +913,7 @@ final class A11yShotsTests: XCTestCase {
         capture("09-exchange", app: app)
         captureExchangeMap(app)
         captureMyListings(app)
+        captureFarmDirectory(app)
 
         captureListingWithMessageParty(app)
         captureInboxAndConversation(app)
@@ -929,6 +933,35 @@ final class A11yShotsTests: XCTestCase {
             goBack(app, to: "Борса")
             dismissSheet(app, named: "Борса")
         }
+    }
+
+    /// Борса as a tab, for a capture run alone; the full walk opens it in
+    /// `captureExchangeAndMessaging`, tab or menu.
+    private func openTheExchange(_ app: XCUIApplication) {
+        let tab = labelled("Борса", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Борса» in the tab bar")
+        tab.tap()
+        XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20), "Борса showed nothing")
+    }
+
+    /// «Ферми» (`farm-directory.json`), pushed from Борса's bar (#323): a
+    /// farm's name, tagline, oblast and crops, the long row wrapping at AX
+    /// sizes. A GET only. No farm is tapped: its page is the real web's,
+    /// loaded outside the seam. Popped back to Борса at once.
+    private func captureFarmDirectory(_ app: XCUIApplication) {
+        let farms = app.buttons["Ферми"]
+        guard farms.waitForExistence(timeout: 5) else {
+            XCTFail("no «Ферми» on Борса's bar — is social.public-profile on in auth-me.json?")
+            return
+        }
+        farms.tap()
+        // A row is one element whose label is its spoken sentence, which
+        // starts with the farm's name.
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Синтетично стопанство"))
+        XCTAssertTrue(row.firstMatch.waitForExistence(timeout: 10),
+                      "«Ферми» showed no farms — farm-directory.json did not load")
+        capture("09d-farm-directory", app: app)
+        goBack(app, to: "Борса")
     }
 
     /// «Моите обяви» (`exchange-my-listings.json`), the seller's own rows:

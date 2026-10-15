@@ -133,6 +133,8 @@ final class FixtureSeamTests: XCTestCase {
             (TrendsAPI.newsPath(.all), "trends-news"),
             // #231: the topics' feed, the catalogue and the choices.
             (TrendsAPI.newsPath(tags: ["subsidies", "wheat"], query: nil, cursor: nil), "trends-news-mine"),
+            // #323: «Ферми» unfiltered.
+            (FarmDirectoryAPI.searchPath(FarmDirectoryQuery()), "farm-directory"),
             (TrendsAPI.newsTagsPath, "trends-news-tags"),
             (NewsPreferencesAPI.path, "news-preferences"),
             // agrent-ios#138 — the field-operation task and its lines.
@@ -450,6 +452,8 @@ final class FixtureSeamTests: XCTestCase {
         ("me-farms", { _ = try await FarmsAPI.decodeFarms(from: $0) }),
         // agrent-ios#258.
         ("admin-price-overrides", { _ = try await APIClient.shared.decode($0, as: AdminPricesAPI.Overrides.self) }),
+        // agrent-ios#323.
+        ("farm-directory", { _ = try FarmDirectoryAPI.decodeHits(from: $0) }),
     ]
 
     /// A MISSING FIXTURE IS A FAILURE, NOT A SKIP.

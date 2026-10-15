@@ -293,6 +293,22 @@ photograph «Добави стопанство» and the wizard's first steps
 (`ONLY=17-farm-wizard`). It never taps «Готово»: that would create a real
 farm. Under the seam it would get a 501, but the suite doesn't rely on that.
 
+It also turns `social.public-profile` on (agrent-ios#323), so Борса's bar
+has «Ферми» and Админ has «Публичен профил». A11yShots photographs «Ферми»
+(`ONLY=09d-farm-directory`) and nothing in Админ's profile screens.
+
+## `farm-directory.json`: «Ферми», the published farms (agrent-ios#323)
+
+**Synthetic.** Three invented farms in the directory's shape
+(`GET /api/public/farms`, a bare array, agri-saas #1817): one plain, one
+with a long tagline and seven crops (for how a row wraps at AX sizes, and
+with «Пшеница» capitalised beside «пшеница» elsewhere, since the crop
+filter keeps the case), and one with only a name. Answers the unfiltered
+first load only; a search or a filter is `NO_FIXTURE`.
+
+A11yShots never taps a farm: a farm opens its web page in Safari's view,
+which loads from the real host, outside the seam.
+
 ## `me-farms.json`: the fixture person's farms (agrent-ios#179, stage 3)
 
 **Synthetic.** Two farms, oldest first as the contract orders them. The first
