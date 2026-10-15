@@ -215,6 +215,10 @@ final class TreatmentSaveTests: XCTestCase {
             kept.append(entry.key)
             return keeps
         }
+
+        // The entry's screen, not the save: never reached from these tests.
+        func progress(of handle: String) async throws -> TreatmentProgress? { throw URLError(.unsupportedURL) }
+        func abandon(_ handle: String) async throws { throw URLError(.unsupportedURL) }
     }
 
     private func press(_ attempt: inout TreatmentAttempt, _ draft: TreatmentDraft,
@@ -530,6 +534,24 @@ final class TreatmentSaveTests: XCTestCase {
                                         message: "No treatment was recorded under that handle.")
         XCTAssertNotEqual(text, UserMessage.statusText(404))
         XCTAssertTrue(UserMessage.isBulgarianSentence(text), text)
+    }
+
+    /// agrent-ios#326: the handle an administrator abandoned. Said in
+    /// Bulgarian rather than as the 410's status sentence, and never kept: a
+    /// refusal, so the form doesn't queue it.
+    func testAnAbandonedTreatmentIsSaidInBulgarianAndNotKept() async throws {
+        let gone = APIClient.APIError.http(status: 410, code: "TREATMENT_ABANDONED",
+                                           message: "This treatment was abandoned by an administrator.")
+        let text = UserMessage.text(for: gone)
+        XCTAssertNotEqual(text, UserMessage.statusText(410))
+        XCTAssertTrue(UserMessage.isBulgarianSentence(text), text)
+
+        let server = Server(records: [.failure(gone)], keeps: true)
+        var attempt = TreatmentAttempt()
+        let outcome = try await press(&attempt, spray(), on: server)
+        XCTAssertEqual(outcome, .failed(text))
+        let keys = await server.kept
+        XCTAssertTrue(keys.isEmpty, "\(keys)")
     }
 
     /// `params.reference` says which list held the stranger. Parcels are

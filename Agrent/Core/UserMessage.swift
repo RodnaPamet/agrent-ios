@@ -704,6 +704,20 @@ enum UserMessage {
         // pages to give. The read by handle answers this code too, and reads
         // it as "nothing landed" itself — it never reaches a person there.
         "TREATMENT_NOT_FOUND": "Мероприятието не е намерено на сървъра. Може да е изтрито.",
+        // A resend under the handle of a treatment an administrator abandoned
+        // because it could not be finished (agri-saas #1869, agrent-ios#326):
+        // a 410, and the row is never sent again. Mostly met by an outbox row
+        // that kept coming back short, whose copy is the only one left, so the
+        // sentence says what became of it and what to do if the work still
+        // belongs in the register: a new entry, which goes out under a new key.
+        "TREATMENT_ABANDONED":
+            "Администратор прекрати това мероприятие, защото не можеше да бъде записано докрай. "
+            + "Ако работата трябва да е в дневника, направете нов запис.",
+        // The abandon met a treatment that finished meanwhile (agri-saas
+        // #1860): it's a full register record now, which the abandon never
+        // touches. The server's message sends the person to the journal's
+        // own delete, which the phone doesn't offer, so it isn't repeated.
+        "TREATMENT_COMPLETE": "Мероприятието вече е записано изцяло, затова не може да бъде прекратено.",
 
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "

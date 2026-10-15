@@ -145,6 +145,156 @@ final class OutboxTreatmentTests: XCTestCase {
         XCTAssertEqual(refused?.lastError, UserMessage.text(for: refusal))
     }
 
+    /// agrent-ios#326. A row that kept coming back short is abandoned by an
+    /// administrator. The server no longer resumes the handle, and without
+    /// its 410 the next send would write the whole treatment again
+    /// (agri-saas #1869). So the 410 refuses the row, says so in Bulgarian,
+    /// and no later pass sends that handle again.
+    func testAnAbandonedTreatmentIsRefusedAndNeverSentAgain() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire)
+        let gone = APIClient.APIError.http(status: 410, code: "TREATMENT_ABANDONED",
+                                           message: "This treatment was abandoned by an administrator.")
+        var answers: [Error] = [TreatmentAttempt.Shortfall(recorded: 1, sent: 3), gone]
+        wire.answer = { _ in throw answers.isEmpty ? gone : answers.removeFirst() }
+        let item = row()
+        await outbox.enqueue(item)
+
+        await outbox.flush()
+        await outbox.flush()
+        let refused = await queue.all().first
+        XCTAssertEqual(refused?.isRefused, true)
+        XCTAssertEqual(refused?.lastError, UserMessage.text(for: gone))
+        XCTAssertTrue(UserMessage.isBulgarianSentence(refused?.lastError ?? ""), refused?.lastError ?? "nil")
+
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.map(\.id), [item.id, item.id], "an abandoned handle went out again")
+    }
+
+    /// #326. Each short answer is noted on the row, and one that holds no
+    /// more than the last says resending has stopped getting further.
+    func testAShortAnswerIsNotedAndAStallIsSeen() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire)
+        var answers: [Error] = [TreatmentAttempt.Shortfall(recorded: 1, sent: 3),
+                                TreatmentAttempt.Shortfall(recorded: 2, sent: 3),
+                                TreatmentAttempt.Shortfall(recorded: 2, sent: 3)]
+        wire.answer = { _ in if !answers.isEmpty { throw answers.removeFirst() } }
+        await outbox.enqueue(row())
+
+        await outbox.flush()
+        var kept = await queue.all().first?.treatment
+        XCTAssertEqual(kept?.recorded, 1)
+        XCTAssertEqual(kept?.stalled, false)
+        XCTAssertEqual(kept?.partialText, "Записан 1 от 3 парцела. Останалите се изпращат отново.")
+
+        await outbox.flush()
+        kept = await queue.all().first?.treatment
+        XCTAssertEqual(kept?.recorded, 2)
+        XCTAssertEqual(kept?.stalled, false, "two more parcels is progress")
+
+        await outbox.flush()
+        kept = await queue.all().first?.treatment
+        XCTAssertEqual(kept?.stalled, true)
+        XCTAssertEqual(kept?.partialText, "Записани 2 от 3 парцела. Останалите не могат да бъдат записани.")
+        let refused = await queue.all().first?.isRefused
+        XCTAssertEqual(refused, false, "still resent: the server may yet finish it")
+    }
+
+    /// A row from before #326 has neither note, and says it is waiting.
+    func testARowWithoutAShortAnswerSaysNothingOfOne() {
+        XCTAssertNil(facts.partialText)
+        XCTAssertNil(facts.recorded)
+    }
+
+    /// The abandon, apart from its screen: the server's, then the phone's
+    /// copy, so nothing sends the handle again.
+    private actor Abandoner: TreatmentRecorder {
+        private let answer: Error?
+        private(set) var abandoned: [String] = []
+        init(_ answer: Error? = nil) { self.answer = answer }
+
+        func abandon(_ handle: String) async throws {
+            abandoned.append(handle)
+            if let answer { throw answer }
+        }
+
+        func record(_ record: TreatmentRecord, idempotencyKey: String) async throws -> TreatmentReceipt {
+            throw URLError(.unsupportedURL)
+        }
+        func landing(of handle: String) async throws -> TreatmentLanding { throw URLError(.unsupportedURL) }
+        func document(forTreatment handle: String) async throws -> URL { throw URLError(.unsupportedURL) }
+        func keep(_ entry: TreatmentAttempt.Sent, after error: Error) async -> Bool { false }
+        func progress(of handle: String) async throws -> TreatmentProgress? { nil }
+    }
+
+    func testAnAbandonForgetsThePhonesCopy() async {
+        let queue = makeQueue(), outbox = makeOutbox(queue, Wire())
+        let item = row()
+        await outbox.enqueue(item)
+        let server = Abandoner()
+
+        let outcome = await TreatmentAbandon.run(item.id, with: server, outbox: outbox)
+        XCTAssertEqual(outcome, .abandoned)
+        let asked = await server.abandoned
+        XCTAssertEqual(asked, [item.id])
+        let left = await queue.all()
+        XCTAssertTrue(left.isEmpty, "the phone would send an abandoned handle again")
+        XCTAssertTrue(outbox.pending.isEmpty)
+    }
+
+    /// Abandoned already, from the web or another phone: the server holds
+    /// nothing under the handle, which is the end this was for.
+    func testAnAbandonAlreadyDoneElsewhereCountsAsDone() async {
+        let queue = makeQueue(), outbox = makeOutbox(queue, Wire())
+        let item = row()
+        await outbox.enqueue(item)
+        let gone = APIClient.APIError.http(status: 404, code: "TREATMENT_NOT_FOUND", message: nil)
+
+        let outcome = await TreatmentAbandon.run(item.id, with: Abandoner(gone), outbox: outbox)
+        XCTAssertEqual(outcome, .abandoned)
+        let left = await queue.all()
+        XCTAssertTrue(left.isEmpty)
+    }
+
+    /// Finished meanwhile, or refused: said in Bulgarian, and the phone's
+    /// copy stays, since the treatment does.
+    func testATreatmentThatWasNotAbandonedKeepsItsRow() async {
+        let queue = makeQueue(), outbox = makeOutbox(queue, Wire())
+        let item = row()
+        await outbox.enqueue(item)
+        for refusal in [APIClient.APIError.http(status: 409, code: "TREATMENT_COMPLETE", message: "This treatment is fully recorded."),
+                        APIClient.APIError.http(status: 403, code: "FORBIDDEN", message: "You do not have permission.")] {
+            let outcome = await TreatmentAbandon.run(item.id, with: Abandoner(refusal), outbox: outbox)
+            guard case .failed(let text) = outcome else { return XCTFail("\(outcome)") }
+            XCTAssertTrue(UserMessage.isBulgarianSentence(text), text)
+            XCTAssertNotEqual(text, UserMessage.statusText(409))
+        }
+        let left = await queue.all()
+        XCTAssertEqual(left.map(\.id), [item.id])
+    }
+
+    /// What the confirmation says goes: the whole treatment, and the
+    /// entries already on the register by count.
+    func testTheConfirmationNamesWhatGoes() {
+        let some = TreatmentAbandon.confirmationText(completed: 2)
+        XCTAssertTrue(some.contains("2 парцела"), some)
+        XCTAssertTrue(UserMessage.isBulgarianSentence(some), some)
+        let one = TreatmentAbandon.confirmationText(completed: 1)
+        XCTAssertTrue(one.contains("1 парцел,"), one)
+        let none = TreatmentAbandon.confirmationText(completed: 0)
+        XCTAssertFalse(none.contains("0"), none)
+        XCTAssertTrue(UserMessage.isBulgarianSentence(none), none)
+        XCTAssertTrue(UserMessage.isBulgarianSentence(TreatmentAbandon.askAnAdministrator))
+    }
+
+    /// The server's counts, read strictly: they decide whether the abandon,
+    /// which removes ДНЕВНИК entries, is offered at all.
+    func testProgressIsReadStrictly() throws {
+        let body = #"{"treatmentGroupId":"h-1","parcelCount":3,"completedCount":2,"taskIds":["t1"],"occurredOn":null,"complete":false}"#
+        XCTAssertEqual(try TreatmentAPI.progress(from: Data(body.utf8)),
+                       TreatmentProgress(parcelCount: 3, completedCount: 2, complete: false))
+        XCTAssertThrowsError(try TreatmentAPI.progress(from: Data(#"{"parcelCount":3,"complete":false}"#.utf8)))
+    }
+
     // MARK: - The journal
 
     private func entry(handle: String?) -> LogEntry {
@@ -168,5 +318,21 @@ final class OutboxTreatmentTests: XCTestCase {
         XCTAssertEqual(waiting.map(\.id), [here.id])
         XCTAssertTrue(JournalStore.waiting(in: [here], farm: nil, listed: []).isEmpty,
                       "with no farm open, no farm's treatments are this one's")
+    }
+
+    /// The server's row stands in for a treatment that came back short, so
+    /// that row is where the rest is said to be missing: this farm's, and
+    /// only those with a short answer noted.
+    func testTheJournalFindsThisFarmsShortTreatments() {
+        var short = row(handle: "h-short")
+        short.treatment?.cameBackShort(recorded: 2)
+        var elsewhere = row(handle: "h-elsewhere", farm: "other-farm")
+        elsewhere.treatment?.cameBackShort(recorded: 1)
+        let waiting = row(handle: "h-waiting")
+
+        let found = JournalStore.partial(in: [short, elsewhere, waiting], farm: "test-farm")
+        XCTAssertEqual(Set(found.keys), ["h-short"])
+        XCTAssertEqual(found["h-short"]?.recorded, 2)
+        XCTAssertTrue(JournalStore.partial(in: [short], farm: nil).isEmpty)
     }
 }

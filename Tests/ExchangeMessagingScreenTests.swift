@@ -109,7 +109,7 @@ final class MessagingGatingTests: XCTestCase {
 
     private func user(_ role: String?, canWrite: Bool? = nil) -> CurrentUser {
         CurrentUser(id: "u1", name: nil, email: nil, role: role,
-                    permissions: canWrite.map(CurrentUser.Permissions.init))
+                    permissions: canWrite.map { CurrentUser.Permissions(canWrite: $0) })
     }
 
     /// `assertCanWrite`, as the server's tier for the open farm says it

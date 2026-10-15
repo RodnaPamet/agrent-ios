@@ -122,6 +122,21 @@ final class JournalStore {
         return pending.filter { $0.treatment != nil && $0.tenantSlug == farm && !handles.contains($0.id) }
     }
 
+    /// This farm's kept treatments that came back short, by handle (#326).
+    /// The server's row stands in for such a treatment in the list (`waiting`
+    /// leaves it out), so the server's row is where the rest is said to be
+    /// missing. It counts the ДНЕВНИК entries, and on its own reads like a
+    /// treatment sent for fewer parcels.
+    nonisolated static func partial(in pending: [PendingOperation],
+                                    farm: String?) -> [String: PendingOperation.QueuedTreatment] {
+        guard let farm else { return [:] }
+        return pending.reduce(into: [:]) { found, row in
+            if row.tenantSlug == farm, let treatment = row.treatment, treatment.recorded != nil {
+                found[row.id] = treatment
+            }
+        }
+    }
+
     /// The next page, appended.
     ///
     /// NOT cached. `CachedResource` keys on the path, so every page would

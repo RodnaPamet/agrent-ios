@@ -273,7 +273,7 @@ final class FieldOperationRulesTests: XCTestCase {
     /// A person as the server describes them: a role, and its tier.
     private func me(_ role: String?, id: String = "usr_me", canWrite: Bool? = nil) -> CurrentUser {
         CurrentUser(id: id, name: nil, email: nil, role: role,
-                    permissions: canWrite.map(CurrentUser.Permissions.init))
+                    permissions: canWrite.map { CurrentUser.Permissions(canWrite: $0) })
     }
 
     /// The route's rule: `canWrite`, or the job's assignee without it.

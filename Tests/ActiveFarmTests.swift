@@ -632,7 +632,7 @@ final class FarmRoleTests: XCTestCase {
     func testTheServersTierDecidesWhoIsOfferedAWrite() throws {
         let tier = #"{"canRead":true,"canWrite":%@,"canAdmin":false,"canAudit":false,"canExport":false}"#
         let editorRefused = try meAnswering(role: "EDITOR", permissions: tier.replacingOccurrences(of: "%@", with: "false"))
-        XCTAssertEqual(editorRefused.permissions, .init(canWrite: false))
+        XCTAssertEqual(editorRefused.permissions, .init(canWrite: false, canAdmin: false))
         XCTAssertFalse(editorRefused.mayWrite, "an editor the server says may not write")
         let readerAllowed = try meAnswering(role: "READER", permissions: tier.replacingOccurrences(of: "%@", with: "true"))
         XCTAssertTrue(readerAllowed.mayWrite, "a reader the server says may write")
@@ -669,6 +669,23 @@ final class FarmRoleTests: XCTestCase {
                        "the farm's own tier wins even where the role agrees")
     }
 
+    /// The administrator's tier offers the abandon of an unfinished treatment
+    /// (#326). The server's `canAdmin` decides. A tier written before the
+    /// field, by an older build remembering its farm, still reads, and
+    /// offers it: not told is not "no", as for the write.
+    func testTheServersTierDecidesWhoIsOfferedTheAbandon() throws {
+        let tier = #"{"canRead":true,"canWrite":true,"canAdmin":%@,"canAudit":false,"canExport":false}"#
+        let editor = try meAnswering(role: "EDITOR", permissions: tier.replacingOccurrences(of: "%@", with: "false"))
+        XCTAssertFalse(editor.mayAdmin, "an editor the server says may not administer")
+        let admin = try meAnswering(role: "ADMIN", permissions: tier.replacingOccurrences(of: "%@", with: "true"))
+        XCTAssertTrue(admin.mayAdmin)
+
+        let older = try JSONDecoder().decode(CurrentUser.Permissions.self, from: Data(#"{"canWrite":true}"#.utf8))
+        XCTAssertNil(older.canAdmin, "a remembered tier without the field")
+        XCTAssertTrue(editor.inFarm(role: "EDITOR", permissions: older).mayAdmin, "not told offers it")
+        XCTAssertTrue(try meAnswering(role: "READER", permissions: nil).mayAdmin, "no tier at all offers it")
+    }
+
     // MARK: - The farm list's tier (agri-saas #1787)
 
     private func farms(_ rows: String) async throws -> [FarmsAPI.Membership] {
@@ -684,8 +701,9 @@ final class FarmRoleTests: XCTestCase {
             + #"{"slug":"b","name":"Б","role":"READER","permissions":{"canRead":true,"canWrite":false,"canAdmin":false,"canAudit":false,"canExport":false}},"#
             + #"{"slug":"c","name":"В","role":"EDITOR","permissions":"tier"},"#
             + #"{"slug":"d","name":"Г","role":"EDITOR"}"#)
-        XCTAssertEqual(rows.map(\.permissions), [.init(canWrite: true), .init(canWrite: false), nil, nil])
-        XCTAssertEqual(Farm(rows[1]).permissions, .init(canWrite: false), "the farm keeps its row's tier")
+        XCTAssertEqual(rows.map(\.permissions),
+                       [.init(canWrite: true, canAdmin: true), .init(canWrite: false, canAdmin: false), nil, nil])
+        XCTAssertEqual(Farm(rows[1]).permissions, .init(canWrite: false, canAdmin: false), "the farm keeps its row's tier")
 
         do {
             _ = try await farms(#"{"slug":"x","name":"Х","permissions":{"canWrite":true}}"#)

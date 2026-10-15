@@ -9,7 +9,7 @@ import SwiftUI
 /// was recorded and never WHAT. On a register the ДНЕВНИК PDF is generated
 /// from, that is the difference between a list and a record.
 ///
-/// ── Why this fetches nothing ──
+/// ── Why this fetches (almost) nothing ──
 ///
 /// The list endpoint returns whole `LogEntry` values, so every field shown
 /// here is already in hand when the row is tapped. A `GET /journal/:id` on
@@ -19,6 +19,11 @@ import SwiftUI
 /// itself carries, and `StaleBanner` above it already says so. If freshness
 /// ever has to be exact here, the endpoint exists.
 ///
+/// The one read is a treatment's progress (`UnfinishedTreatmentSection`,
+/// #326): whether every parcel it was sent for reached the register, which
+/// the row can't say. It adds no spinner and no empty state. Until it
+/// answers, and if it can't, the screen is what it was.
+///
 /// ── Why it is read-only ──
 ///
 /// The server offers PUT/PATCH, DELETE, /restore and /purge on an entry. None
@@ -26,6 +31,11 @@ import SwiftUI
 /// register, and which of them belongs on a phone — and behind what
 /// confirmation — is a decision to take deliberately, in its own change, not
 /// a button to add because the endpoint happened to exist.
+///
+/// One such decision was taken (owner, 2026-10-15): an administrator may
+/// abandon a treatment the server can't finish, from here
+/// (`UnfinishedTreatmentSection`). That is the treatment route's own DELETE,
+/// for incomplete treatments only. An entry's DELETE stays off the phone.
 ///
 /// ── A treatment, and its ДНЕВНИК again (#320) ──
 ///
@@ -57,6 +67,7 @@ struct JournalDetailView: View {
                 header
                 facts
                 if let handle = treatment?.treatmentGroupId?.recorded {
+                    UnfinishedTreatmentSection(handle: handle)
                     TreatmentDocumentAction(handle: handle)
                 }
                 notes
