@@ -16,6 +16,7 @@ struct ListingDetailView: View {
     @State private var flags = FeatureFlags.shared
     /// The seller's farm page, while it's open.
     @State private var farmPage: InAppPage?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         List {
@@ -62,7 +63,13 @@ struct ListingDetailView: View {
                             Button {
                                 farmPage = page
                             } label: {
-                                Label("Страницата на стопанството", systemImage: "arrow.up.right.square")
+                                // Without its icon at the accessibility sizes,
+                                // where beside one «Страницата» breaks mid-word.
+                                if typeSize.isAccessibilitySize {
+                                    Text("Страницата на стопанството")
+                                } else {
+                                    Label("Страницата на стопанството", systemImage: "arrow.up.right.square")
+                                }
                             }
                             .accessibilityHint("Отваря публичната страница на стопанството.")
                             .accessibilityInputLabels(A11y.spokenNames("Страницата на стопанството", "Farm page"))
