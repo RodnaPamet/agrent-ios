@@ -13,6 +13,9 @@ struct ListingDetailView: View {
     /// stack doesn't.
     @State private var isShown = false
     @State private var user = CurrentUserStore.shared
+    @State private var flags = FeatureFlags.shared
+    /// The seller's farm page, while it's open.
+    @State private var farmPage: InAppPage?
 
     var body: some View {
         List {
@@ -49,7 +52,22 @@ struct ListingDetailView: View {
                     Section(titled: "Описание") { Text(description) }
                 }
                 if let seller = listing.sellerDisplayName, !seller.isEmpty {
-                    Section(titled: "Продавач") { Text(seller) }
+                    Section(titled: "Продавач") {
+                        Text(seller)
+                        // A listing published as the farm (P6.7): the name is
+                        // the farm's verified one, and its page opens here as
+                        // «Ферми» opens it. Behind the same flag, because
+                        // `/f/` answers only while the flag is on.
+                        if flags.isOn(FarmBrandAPI.flag), let page = InAppPage.farm(handle: listing.farmHandle) {
+                            Button {
+                                farmPage = page
+                            } label: {
+                                Label("Страницата на стопанството", systemImage: "arrow.up.right.square")
+                            }
+                            .accessibilityHint("Отваря публичната страница на стопанството.")
+                            .accessibilityInputLabels(A11y.spokenNames("Страницата на стопанството", "Farm page"))
+                        }
+                    }
                 }
 
                 Section {
@@ -83,6 +101,7 @@ struct ListingDetailView: View {
         .inlineTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
         .onAppear { isShown = true }
         .onDisappear { isShown = false }
+        .sheet(item: $farmPage) { InAppBrowser(url: $0.url).ignoresSafeArea() }
     }
 
     /// PARITY GAP 7. «Message the other party» — the ONLY action on another

@@ -60,6 +60,17 @@ struct ExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     /// The only marker separating your listings from every other tenant's.
     let isOwn: Bool
 
+    /// The seller's farm page when the listing is published as the farm and
+    /// the farm's page is public (P6.7, agri-saas #1922), else nil. Then
+    /// `sellerDisplayName` is that farm's VERIFIED name, not typed text.
+    ///
+    /// Resolved by the server on every read, never stored: a farm that
+    /// renames its address or takes its page down changes this on every
+    /// listing at once. nil covers "never attributed" and "withdrawn since",
+    /// and both mean there's no page to open. A `var` with a default so the
+    /// tests' listings, written before it, stay as they were.
+    var farmHandle: String? = nil
+
     /// Parsed with an EXPLICIT wire locale. `Decimal(string:)` without one
     /// is a hazard: the wire uses `.` regardless of the device, and a
     /// locale that groups with `.` reads "12.5" as 125 — a factor of ten,

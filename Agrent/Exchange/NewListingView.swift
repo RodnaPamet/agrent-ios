@@ -33,6 +33,8 @@ struct NewListingView: View {
     @State private var sellerDisplayName = ""
     @State private var sellerContact = ""
     @State private var hasExpiry = false
+    @State private var publishAsFarm = false
+    @State private var flags = FeatureFlags.shared
     @State private var expiresAt = Date().addingTimeInterval(60 * 60 * 24 * 30)
 
     @State private var sending = false
@@ -86,7 +88,8 @@ struct NewListingView: View {
             //
             // So: the instant. `BgDate.isoDay` still decides WHICH DAY, in the
             // device's zone, because that is the part a seller picked.
-            expiresAt: hasExpiry ? "\(BgDate.isoDay(expiresAt))T00:00:00.000Z" : nil
+            expiresAt: hasExpiry ? "\(BgDate.isoDay(expiresAt))T00:00:00.000Z" : nil,
+            publishAsFarm: flags.isOn(FarmBrandAPI.flag) && publishAsFarm ? true : nil
         )
     }
 
@@ -175,6 +178,22 @@ struct NewListingView: View {
                     }
                 }
 
+                // P6.7, behind the flag every P6 surface is behind. Always
+                // enabled, as on the web: whether the farm's page is public
+                // takes an admin-only read, and a member who can post may not
+                // have it. The server takes the choice either way and shows
+                // it once the page is public, so the footer carries the
+                // condition instead of the switch.
+                if flags.isOn(FarmBrandAPI.flag) {
+                    Section {
+                        Toggle("Публикувай от името на стопанството", isOn: $publishAsFarm)
+                            .accessibilityInputLabels(A11y.spokenNames(
+                                "Публикувай от името на стопанството", "От името на стопанството", "Publish as farm"))
+                    } footer: {
+                        SectionFooter(Self.publishAsFarmNote)
+                    }
+                }
+
                 Section {
                     Toggle("Срок на валидност", isOn: $hasExpiry)
                     if hasExpiry {
@@ -209,6 +228,11 @@ struct NewListingView: View {
             .interactiveDismissDisabled(sending)
         }
     }
+
+    /// The web's words (`exchange.publishAsFarmConsent`, agri-saas #1922).
+    static let publishAsFarmNote = "Офертата се показва с публичното име на стопанството и с връзка към "
+        + "страницата му. Прилага се само докато страницата на стопанството е публична — ако я оттеглите, "
+        + "офертата отново става анонимна."
 
     @ViewBuilder
     private func failureView(_ failure: Failure) -> some View {

@@ -32,3 +32,17 @@ struct InAppBrowser: UIViewControllerRepresentable {
 
     func updateUIViewController(_ browser: SFSafariViewController, context: Context) {}
 }
+
+/// The page a tap opened, for `sheet(item:)`, which needs an identity that
+/// `URL` doesn't have.
+struct InAppPage: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+
+    /// A farm's public page (`/f/{handle}`), or nil for no handle or a link
+    /// Safari's view wouldn't open.
+    static func farm(handle: String?) -> InAppPage? {
+        guard let handle, let url = PublicProfileLink.url(handle: handle), InAppBrowser.opens(url) else { return nil }
+        return InAppPage(url: url)
+    }
+}
