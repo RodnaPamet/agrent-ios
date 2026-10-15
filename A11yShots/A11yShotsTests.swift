@@ -131,6 +131,9 @@ final class A11yShotsTests: XCTestCase {
             case "09d-farm-directory":
                 openTheExchange(app)
                 captureFarmDirectory(app)
+            case "13-listing-message-party":
+                openTheExchange(app)
+                captureListingWithMessageParty(app)
             default: XCTFail("A11Y_ONLY=\(only) names no capture this suite can run alone")
             }
             return
