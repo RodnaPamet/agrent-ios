@@ -8,7 +8,7 @@ struct FarmDirectoryRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(hit.displayName).font(.headline)
                 if let tagline = hit.tagline {
@@ -25,15 +25,17 @@ struct FarmDirectoryRow: View {
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
             // Where a tap goes: out to a page, not into a screen of the app.
             // Not at accessibility sizes, as `MetaSeparator`'s dot isn't: its
             // column broke the farm's name mid-word at AX5 («Синтетич / но»,
-            // A11yShots, 2026-10-15). VoiceOver has the hint either way.
+            // A11yShots, 2026-10-15). Its gap goes with it, so the name has
+            // the row's whole width. VoiceOver has the hint either way.
             if !typeSize.isAccessibilitySize {
                 Image(systemName: "arrow.up.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Palette.secondaryText)
+                    .padding(.leading, 8)
                     .accessibilityHidden(true)
             }
         }
