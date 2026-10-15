@@ -324,18 +324,28 @@ enum UserMessage {
             // quoted: anything else is not a length.
             guard let max = params?["max"], Int(max) != nil else { return nil }
             return "Името на стопанството е твърде дълго — до \(max) знака."
-        case "WRITE_FORBIDDEN_FOR_ROLE":
-            // The person's role in THIS farm may not change records — a
-            // reader, an auditor or a machine operator — and `params.role`
-            // says which (agri-saas #1767). Only an administrator of the farm
-            // can give another role, so unlike `MODULE_DISABLED` without its
-            // reason, this one may send them there. The role is named in
-            // Bulgarian or not at all: a role this build does not know falls
-            // to the table's sentence, which names none.
+        case "WRITE_FORBIDDEN_FOR_ROLE", "ADMIN_FORBIDDEN_FOR_ROLE", "AUDIT_FORBIDDEN_FOR_ROLE":
+            // The person's role in THIS farm may not do this — change records
+            // (agri-saas #1767), or an operation that needs an administrator
+            // or an auditor (#1779) — and `params.role` says which role. Only
+            // an administrator of the farm can give another role, so unlike
+            // `MODULE_DISABLED` without its reason, this one may send them
+            // there. The role is named in Bulgarian or not at all: a role this
+            // build does not know falls to the table's sentence, which names
+            // none. The server's own Bulgarian for #1779 quotes the wire name
+            // («(EDITOR)»), which is why these are said here.
             guard let raw = params?["role"], let role = MembershipRole(rawValue: raw), role != .unknown else {
                 return nil
             }
-            return "С роля «\(role.label)» в това стопанство не можете да променяте записи. "
+            // «това действие» for the two from #1779: the route itself was
+            // open to the role (the Edge's ADMIN_REQUIRED says that one), so
+            // the screen they are on is theirs and only this operation is not.
+            let refused = switch code {
+            case "ADMIN_FORBIDDEN_FOR_ROLE": "извършите това действие — то е само за администратор"
+            case "AUDIT_FORBIDDEN_FOR_ROLE": "извършите това действие — то е за одитор или администратор"
+            default: "променяте записи"
+            }
+            return "С роля «\(role.label)» в това стопанство не можете да \(refused). "
                  + "Друга роля може да Ви даде администратор на стопанството."
         case "REFERENCE_NOT_IN_TENANT":
             // One code for anything chosen that is not this farm's (agri-saas
@@ -611,6 +621,15 @@ enum UserMessage {
         // named when it can be (`interpolated`).
         "WRITE_FORBIDDEN_FOR_ROLE":
             "Ролята Ви в това стопанство не позволява промени. Друга роля може да Ви даде администратор на стопанството.",
+        // Coded since agri-saas #1779: an operation inside a route the role
+        // may use, which needs an administrator (or, for the audit one, an
+        // auditor). Not the Edge's ADMIN_REQUIRED below, which shuts the
+        // whole route: telling an editor «това е достъпно само за
+        // администратор» about a screen they are looking at would be false.
+        "ADMIN_FORBIDDEN_FOR_ROLE":
+            "Това действие е само за администратор на стопанството. Друга роля може да Ви даде администратор на стопанството.",
+        "AUDIT_FORBIDDEN_FOR_ROLE":
+            "Това действие е за одитор или администратор на стопанството. Друга роля може да Ви даде администратор на стопанството.",
 
         // ── The middleware's own 403s (agri-saas `src/middleware.ts`) ──
         //
