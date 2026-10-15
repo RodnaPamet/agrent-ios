@@ -605,9 +605,11 @@ waits for the updated app, as a queued spray does. The owner chose this on
     having declined a longer window. After a day without signal it opens
     the form empty.
   - **ETags:** since #1890 the three reads that lacked one (`/items`,
-    `/units`, `/parcels/by-crop`) answer with one. The phone's revalidation
-    (`If-None-Match`) gets a 304 instead of the full body, which for
-    `/parcels/by-crop` is up to 5000 parcel geometries.
+    `/units`, `/parcels/by-crop`) answer with one, so the web's
+    revalidation is a 304. The phone sends no `If-None-Match` (`APIClient`;
+    there has been no HTTP cache since #134). Every online read is the full
+    body, which for `/parcels/by-crop` is up to 5000 parcel geometries.
+    Filed as #329.
   - **What a farmer is told:** neither client says how old the lists are.
     The phone has said nothing since #70.
   - **A parcel deleted meanwhile** comes back `REFERENCE_NOT_IN_TENANT` on
