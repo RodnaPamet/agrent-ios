@@ -34,6 +34,8 @@ struct PublicProfileEditView: View {
 
     private var problems: [String] { FarmBrandLimits.problems(in: edited) }
 
+    static let noOblast = "Не е посочена"
+
     var body: some View {
         NavigationStack {
             PageForm {
@@ -73,15 +75,15 @@ struct PublicProfileEditView: View {
                 }
 
                 Section {
-                    Picker("Област", selection: $edited.oblast) {
-                        Text("Не е посочена").tag(String?.none)
-                        ForEach(FarmBrandLimits.oblasts(keeping: saved?.oblast), id: \.self) { name in
-                            Text(name).tag(Optional(name))
-                        }
-                    }
-                    // Its own page, not a menu: 28 names, and a menu
-                    // picker's UIKit-drawn value cuts a long one (#160).
-                    .pickerStyle(.navigationLink)
+                    // A page of its own, not a menu: 28 names. `PagePicker`,
+                    // not `.navigationLink`, whose page the system draws on
+                    // its grouped grey (#164).
+                    PagePicker("Област", english: "Region", selection: $edited.oblast,
+                               value: edited.oblast ?? Self.noOblast,
+                               choices: [PickerChoice(value: String?.none, label: Self.noOblast)]
+                                   + FarmBrandLimits.oblasts(keeping: saved?.oblast).map {
+                                       PickerChoice(value: Optional($0), label: $0)
+                                   })
                 } header: {
                     SectionHeader("Област")
                 }
