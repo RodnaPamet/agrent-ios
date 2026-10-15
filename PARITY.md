@@ -1031,6 +1031,12 @@ of 2026-10-15 no web screen calls the brand routes (#1884).
   suggestions are buttons. A published page can be shared (the web share
   kit's URL, agri-saas #1885), opened and withdrawn. Renaming a published
   address asks first.
+- **The A6 card (P6.7, agri-saas #1910):** a published page offers
+  «Карта за печат (A6)». It's the server's PDF (name, address, QR code),
+  opened in Quick Look to print or share, and deleted when Quick Look
+  closes. The phone draws no QR of its own: the server keeps one encoder,
+  so a printed code and an on-screen one can't differ. The server refuses
+  the card for a page that isn't published, and the phone says why.
 - **Not publishing (owner):** consent needs the web's text and its
   version, and there is none yet. The section says publishing waits for
   it.
@@ -1043,8 +1049,9 @@ of 2026-10-15 no web screen calls the brand routes (#1884).
 - **Admin data, so not cached:** the draft is read on every open, and with
   no signal the page says it couldn't load.
 
-**Unverified:** nothing has been saved, claimed or withdrawn from this app.
-The flag is off, and the first real write is the owner's.
+**Unverified:** nothing has been saved, claimed or withdrawn from this app,
+and no card has been printed (it needs a published page). The flag is off,
+and the first real write is the owner's.
 
 ### Ahead of the web — «Ферми», the farm directory (#323, owner 2026-10-15)
 

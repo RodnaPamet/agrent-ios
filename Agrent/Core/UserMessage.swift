@@ -747,6 +747,15 @@ enum UserMessage {
         "FARM_HANDLE_TOO_SHORT": "Адресът трябва да е поне 3 знака, след като се изпише с латински букви.",
         "FARM_HANDLE_TOO_LONG": "Адресът може да е най-много 40 знака, след като се изпише с латински букви.",
         "FARM_HANDLE_UNUSABLE": "Адресът трябва да съдържа букви или цифри.",
+        // What publishing and the A6 card (agri-saas #1910) both need first,
+        // so the sentences name neither. The phone offers the card only on a
+        // published page with an address, which leaves a change made on the
+        // web in between: the page taken down, the name cleared.
+        "FARM_BRAND_HANDLE_REQUIRED": "Първо изберете адрес на страницата.",
+        "FARM_BRAND_DISPLAY_NAME_REQUIRED": "Първо попълнете името, което страницата показва.",
+        "FARM_BRAND_NOT_PUBLISHED":
+            "Страницата не е публикувана. Карта за печат се прави само за публикувана страница, "
+            + "иначе отпечатаният адрес няма да се отваря.",
 
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "

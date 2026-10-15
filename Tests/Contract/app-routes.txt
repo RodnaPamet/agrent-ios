@@ -57,6 +57,7 @@
 /api/t/{tenantSlug}/farm-brand/consent
 /api/t/{tenantSlug}/farm-brand/handle
 /api/t/{tenantSlug}/farm-brand/publication
+/api/t/{tenantSlug}/farm-brand/share-card
 /api/t/{tenantSlug}/field-operations/{taskId}
 /api/t/{tenantSlug}/field-operations/{taskId}/parcels/{lineId}
 /api/t/{tenantSlug}/grain/calculator

@@ -119,6 +119,7 @@ final class A11yShotsTests: XCTestCase {
             case "01e-journal-treatment": captureJournalTreatment(app)
             case "17-new-entry": captureNewEntryForm(app)
             case "19-admin-prices": captureAdminPrices(app)
+            case "19c-public-profile": capturePublicProfile(app)
             case "18-operation-typed-product":
                 openTheLocation(app)
                 captureOperationSheet(app)
@@ -415,6 +416,35 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let close = app.navigationBars.buttons["Затвори"]
         XCTAssertTrue(close.waitForExistence(timeout: 10), "«Цени» did not go back to Админ")
+        close.tap()
+    }
+
+    // MARK: - «Публичен профил» (agrent-ios#323)
+
+    /// Админ → «Публичен профил» on `farm-brand.json`, a published page: the
+    /// facts first, then «Публикуване» with «Сподели», «Карта за печат (A6)»
+    /// and «Спри публикуването». Taps none of the three: the card is a GET
+    /// with no fixture, and withdrawing is a write.
+    private func capturePublicProfile(_ app: XCUIApplication) {
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Админ")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Публичен профил")).firstMatch
+        // Below the account card, which fills the first screen at AX5.
+        for _ in 0..<8 where !(row.waitForExistence(timeout: 3) && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.exists, "Админ offered no «Публичен профил» — auth-me.json's flag did not reach the gate")
+        row.tap()
+        XCTAssertTrue(app.navigationBars["Публичен профил"].waitForExistence(timeout: 10),
+                      "«Публичен профил» did not push its page")
+        Thread.sleep(forTimeInterval: 2)
+        capture("19c-public-profile", app: app)
+        let card = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Карта за печат")).firstMatch
+        for _ in 0..<30 where !(card.exists && card.isHittable) { app.swipeUp() }
+        XCTAssertTrue(card.exists, "no «Карта за печат» — farm-brand.json is not a published page")
+        Thread.sleep(forTimeInterval: 1)
+        capture("19d-public-profile-publication", app: app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let close = app.navigationBars.buttons["Затвори"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "«Публичен профил» did not go back to Админ")
         close.tap()
     }
 

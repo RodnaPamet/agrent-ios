@@ -295,7 +295,7 @@ farm. Under the seam it would get a 501, but the suite doesn't rely on that.
 
 It also turns `social.public-profile` on (agrent-ios#323), so Борса's bar
 has «Ферми» and Админ has «Публичен профил». A11yShots photographs «Ферми»
-(`ONLY=09d-farm-directory`) and nothing in Админ's profile screens.
+(`ONLY=09d-farm-directory`) and «Публичен профил» (`ONLY=19c-public-profile`).
 
 ## `farm-directory.json`: «Ферми», the published farms (agrent-ios#323)
 
@@ -308,6 +308,17 @@ first load only; a search or a filter is `NO_FIXTURE`.
 
 A11yShots never taps a farm: a farm opens its web page in Safari's view,
 which loads from the real host, outside the seam.
+
+## `farm-brand.json`: «Публичен профил», a published page (agrent-ios#323)
+
+**Synthetic.** The fixture world's farm as its public page's draft
+(`GET /farm-brand`, agri-saas #1815): every field filled, an address, and
+`published: true`, so the page shows «Публикуване» with «Сподели»,
+«Карта за печат (A6)» and «Спри публикуването». The address is the one
+`farm-directory.json` lists the farm under.
+
+A11yShots taps none of the three. The card is a GET below this path with
+no fixture (`NO_FIXTURE`), and withdrawing is a write.
 
 ## `me-farms.json`: the fixture person's farms (agrent-ios#179, stage 3)
 

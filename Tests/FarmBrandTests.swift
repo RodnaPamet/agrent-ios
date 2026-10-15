@@ -130,6 +130,33 @@ final class FarmBrandTests: XCTestCase {
         }
     }
 
+    /// What publishing and the A6 card need first, said in Bulgarian, and
+    /// naming neither: the same two codes refuse both (agri-saas #1910).
+    func testTheCardsRefusalsAreSaidInBulgarian() {
+        for code in ["FARM_BRAND_HANDLE_REQUIRED", "FARM_BRAND_DISPLAY_NAME_REQUIRED", "FARM_BRAND_NOT_PUBLISHED"] {
+            let text = UserMessage.httpText(status: 400, code: code, message: "Publish the farm profile first.")
+            XCTAssertNotEqual(text, UserMessage.statusText(400), code)
+            XCTAssertTrue(UserMessage.isBulgarianSentence(text), "\(code): \(text)")
+        }
+        XCTAssertFalse(UserMessage.httpText(status: 400, code: "FARM_BRAND_HANDLE_REQUIRED", message: nil).contains("карт"))
+    }
+
+    /// The card is a GET of the server's PDF, named after the farm as the
+    /// server names it: in Cyrillic, which only `filename*` can carry, and
+    /// the address when it names none.
+    func testTheCardIsTheServersPDFNamedAfterTheFarm() throws {
+        XCTAssertTrue(FarmBrandAPI.shareCardPath.hasSuffix("/farm-brand/share-card"), FarmBrandAPI.shareCardPath)
+        XCTAssertTrue(FarmBrandAPI.shareCardPath.hasPrefix(FarmBrandAPI.draftPath))
+
+        let name = "Синтетично стопанство.pdf"
+        let encoded = try XCTUnwrap(name.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "."))))
+        let header = "attachment; filename=\"sintetichno-stopanstvo.pdf\"; filename*=UTF-8''\(encoded)"
+        let served = APIClient.fileName(contentDisposition: header)
+        XCTAssertEqual(FarmRecordAPI.fileName(served, fallback: FarmBrandAPI.shareCardFallbackName("pobeda")), name)
+        XCTAssertEqual(FarmRecordAPI.fileName(nil, fallback: FarmBrandAPI.shareCardFallbackName("pobeda")), "pobeda-karta.pdf")
+        XCTAssertThrowsError(try FarmRecordAPI.keep(Data("{\"error\":{}}".utf8), named: "x.pdf"))
+    }
+
     /// The page's address is the web share kit's (agri-saas #1885):
     /// the app's host, `/f/`, the handle.
     func testThePublicAddress() throws {

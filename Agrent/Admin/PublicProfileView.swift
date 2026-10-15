@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 
 /// «Публичен профил»: the farm's public page as its administrators see and
@@ -12,8 +13,9 @@ import SwiftUI
 ///
 /// ── What it does and doesn't do ──
 ///
-/// It edits the five fields, claims the web address and takes a published
-/// page down. It does NOT publish. Publishing needs a recorded consent to a
+/// It edits the five fields, claims the web address, and for a published
+/// page shares the link, opens the server's A6 card to print (P6.7) and
+/// takes the page down. It does NOT publish. Publishing needs a recorded consent to a
 /// versioned text, the owner chose the web's text for the phone, and the
 /// web doesn't have one yet. The section says so instead of offering a
 /// button that can only be refused (`FARM_BRAND_CONSENT_REQUIRED`).
@@ -36,6 +38,9 @@ struct PublicProfileView: View {
     @State private var choosingAddress = false
     @State private var confirmingWithdraw = false
     @State private var withdrawing = false
+    @State private var printingCard = false
+    /// The A6 card while Quick Look shows it.
+    @State private var card: URL?
     @State private var failure: String?
     /// What the last change did, said until the next one.
     @State private var note: String?
@@ -83,6 +88,17 @@ struct PublicProfileView: View {
                 note = Self.claimedNote(claim)
                 await load()
             }
+        }
+        .quickLookPreview($card)
+        // Removed when Quick Look closes (`FarmRecordAPI.removeGenerated`).
+        .onChange(of: card) { _, now in
+            if now == nil { FarmRecordAPI.removeGenerated() }
+        }
+        // Said, not only drawn: a refusal shows at the top of the page,
+        // away from the button that was tapped.
+        .onChange(of: failure) { _, now in
+            guard let now else { return }
+            AccessibilityNotification.Announcement(now).post()
         }
     }
 
@@ -163,11 +179,23 @@ struct PublicProfileView: View {
     private func publicationSection(_ draft: FarmBrandDraft?) -> some View {
         if let draft, draft.published, let handle = draft.handle, let url = PublicProfileLink.url(handle: handle) {
             Section {
-                Label("Страницата е публикувана", systemImage: "globe")
+                Label(SoftHyphens.display(Self.publishedState), systemImage: "globe")
+                    .accessibilityLabel(Self.publishedState)
                 ShareLink(item: url, message: Text(draft.displayName ?? "")) {
                     Label("Сподели", systemImage: "square.and.arrow.up")
                 }
                 .accessibilityInputLabels(A11y.spokenNames("Сподели", "Share"))
+                Button {
+                    Task { await printCard(handle) }
+                } label: {
+                    if printingCard {
+                        ProgressView().accessibilityLabel("Изготвяне на картата")
+                    } else {
+                        Label("Карта за печат (A6)", systemImage: "qrcode")
+                    }
+                }
+                .disabled(printingCard)
+                .accessibilityInputLabels(A11y.spokenNames("Карта за печат", "Карта", "Print card"))
                 Link(destination: url) {
                     Label("Отвори страницата", systemImage: "safari")
                 }
@@ -195,6 +223,8 @@ struct PublicProfileView: View {
                 }
             } header: {
                 SectionHeader("Публикуване")
+            } footer: {
+                SectionFooter(Self.cardAbout)
             }
         } else {
             Section {
@@ -230,6 +260,20 @@ struct PublicProfileView: View {
         }
     }
 
+    /// The card is the server's (agri-saas #1910), so the QR on it is the
+    /// one encoder's: drawing a second QR here would make a different code
+    /// for the same address, and only the screen's could ever be redrawn.
+    private func printCard(_ handle: String) async {
+        printingCard = true
+        failure = nil
+        defer { printingCard = false }
+        do {
+            card = try await FarmBrandAPI.shareCard(handle: handle)
+        } catch {
+            failure = UserMessage.text(for: error)
+        }
+    }
+
     // MARK: - Words
 
     static let about = "Страница на стопанството, която всеки може да отвори, без да има профил в Agrent. "
@@ -239,6 +283,9 @@ struct PublicProfileView: View {
     static let addressAfterSave = "Адрес може да се избере, след като профилът бъде запазен."
     static let publishLater = "Публикуването ще стане възможно, когато е готов текстът на съгласието, "
         + "което се дава преди публикуване."
+    static let publishedState = "Страницата е публикувана"
+    static let cardAbout = "Картата за печат е PDF с името на стопанството, адреса на страницата "
+        + "и QR код към нея, за раздаване на пазара или в стопанството."
     static let savedNote = "Профилът е запазен."
     static let withdrawnNote = "Страницата вече не е публикувана."
 

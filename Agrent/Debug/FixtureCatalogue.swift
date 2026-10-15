@@ -183,6 +183,10 @@ enum FixtureCatalogue {
         // day's prices (POST) and a clear (DELETE) are writes to every
         // farm's prices, answered 501 as every write is.
         (AdminPricesAPI.path, "admin-price-overrides"),
+        // agrent-ios#323: «Публичен профил», a published page. The draft's
+        // GET only — every write on it is answered 501, and the A6 card
+        // (a GET below it) has no fixture: A11yShots never taps it.
+        (FarmBrandAPI.draftPath, "farm-brand"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 
