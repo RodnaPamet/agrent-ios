@@ -225,7 +225,9 @@ final class FarmBrandTests: XCTestCase {
         XCTAssertFalse(PublishingConsent.isCurrent(nil))
 
         let recorded = PublishingConsent.recorded(at)
-        XCTAssertTrue(recorded.hasPrefix("Съгласието е записано на 15 октомври 2026 г"), recorded)
+        // The year's «г.» follows a narrow no-break space, as `BgDate` writes it.
+        XCTAssertTrue(recorded.hasPrefix("Съгласието е записано на 15 октомври 2026"), recorded)
+        XCTAssertTrue(recorded.hasSuffix("г."), recorded)
         XCTAssertFalse(recorded.hasSuffix(".."), recorded)
         XCTAssertTrue(UserMessage.isBulgarianSentence(recorded), recorded)
     }
