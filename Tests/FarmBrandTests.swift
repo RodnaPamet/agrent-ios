@@ -133,10 +133,10 @@ final class FarmBrandTests: XCTestCase {
     /// The page's address is the web share kit's (agri-saas #1885):
     /// the app's host, `/f/`, the handle.
     func testThePublicAddress() throws {
-        let url = try XCTUnwrap(FarmBrandAPI.publicURL(handle: "pobeda"))
+        let url = try XCTUnwrap(PublicProfileLink.url(handle: "pobeda"))
         XCTAssertEqual(url.path(), "/f/pobeda")
         XCTAssertEqual(url.host(), Config.baseURL.host())
-        XCTAssertEqual(FarmBrandAPI.displayAddress(handle: "pobeda"), "\(Config.baseURL.host() ?? "")/f/pobeda")
+        XCTAssertEqual(PublicProfileLink.displayAddress(handle: "pobeda"), "\(Config.baseURL.host() ?? "")/f/pobeda")
         XCTAssertTrue(PublicProfileView.claimedNote(HandleClaim(handle: "pobeda", normalised: true)).contains("/f/pobeda"))
     }
 

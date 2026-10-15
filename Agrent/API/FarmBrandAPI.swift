@@ -76,20 +76,6 @@ enum FarmBrandAPI {
         guard let joined = params?[APIClient.ErrorEnvelope.Err.suggestionsKey], !joined.isEmpty else { return [] }
         return joined.components(separatedBy: "\n")
     }
-
-    /// Where the published page is. The same URL the web's share kit builds
-    /// (`publicProfileUrl`, agri-saas #1885): one address for a link, a
-    /// forward and a printed QR.
-    static func publicURL(handle: String) -> URL? {
-        URL(string: "/f/\(URLEscape.segment(handle))", relativeTo: Config.baseURL)?.absoluteURL
-    }
-
-    /// The address as a person reads it: host and path, no scheme.
-    /// «app.agrent.bg/f/pobeda» is what goes on a card or into a message.
-    static func displayAddress(handle: String) -> String {
-        guard let url = publicURL(handle: handle), let host = url.host() else { return "/f/\(handle)" }
-        return "\(host)/f/\(handle)"
-    }
 }
 
 /// `GET /farm-brand`: wider than the public page. It carries `published`,

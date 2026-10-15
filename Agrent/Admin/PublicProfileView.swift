@@ -138,7 +138,7 @@ struct PublicProfileView: View {
     private func addressSection(_ draft: FarmBrandDraft?) -> some View {
         Section {
             if let handle = draft?.handle {
-                Text(FarmBrandAPI.displayAddress(handle: handle))
+                Text(PublicProfileLink.displayAddress(handle: handle))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -161,7 +161,7 @@ struct PublicProfileView: View {
 
     @ViewBuilder
     private func publicationSection(_ draft: FarmBrandDraft?) -> some View {
-        if let draft, draft.published, let handle = draft.handle, let url = FarmBrandAPI.publicURL(handle: handle) {
+        if let draft, draft.published, let handle = draft.handle, let url = PublicProfileLink.url(handle: handle) {
             Section {
                 Label("Страницата е публикувана", systemImage: "globe")
                 ShareLink(item: url, message: Text(draft.displayName ?? "")) {
@@ -191,7 +191,7 @@ struct PublicProfileView: View {
                     Button("Отказ", role: .cancel) {}
                         .accessibilityInputLabels(A11y.Spoken.cancel)
                 } message: {
-                    Text(Self.withdrawMessage(FarmBrandAPI.displayAddress(handle: handle)))
+                    Text(Self.withdrawMessage(PublicProfileLink.displayAddress(handle: handle)))
                 }
             } header: {
                 SectionHeader("Публикуване")
@@ -242,12 +242,12 @@ struct PublicProfileView: View {
     static let savedNote = "Профилът е запазен."
     static let withdrawnNote = "Страницата вече не е публикувана."
 
-    static func claimedNote(_ claim: HandleClaim) -> String {
-        let address = FarmBrandAPI.displayAddress(handle: claim.handle)
+    nonisolated static func claimedNote(_ claim: HandleClaim) -> String {
+        let address = PublicProfileLink.displayAddress(handle: claim.handle)
         return claim.normalised ? "Адресът е записан като \(address)." : "Адресът е \(address)."
     }
 
-    static func withdrawMessage(_ address: String) -> String {
+    nonisolated static func withdrawMessage(_ address: String) -> String {
         "Страницата на \(address) спира да се отваря веднага. Профилът остава запазен."
     }
 }

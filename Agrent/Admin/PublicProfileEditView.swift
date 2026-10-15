@@ -79,6 +79,9 @@ struct PublicProfileEditView: View {
                             Text(name).tag(Optional(name))
                         }
                     }
+                    // Its own page, not a menu: 28 names, and a menu
+                    // picker's UIKit-drawn value cuts a long one (#160).
+                    .pickerStyle(.navigationLink)
                 } header: {
                     SectionHeader("Област")
                 }

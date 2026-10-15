@@ -244,10 +244,12 @@ final class FarmErrorShapeTests: XCTestCase {
         let notAnObject = envelope(#"{"error":{"code":"EIK_INVALID","params":[1,2]}}"#)
         XCTAssertEqual(notAnObject?.code, "EIK_INVALID")
         XCTAssertNil(notAnObject?.params)
-        // Nor odd `details`.
-        let oddDetails = envelope(#"{"error":{"code":"STALE_DATA","details":{"currentVersion":"seven"}}}"#)
+        // Nor an odd value in `details`, which costs that value: each of its
+        // fields is read on its own since `suggestions` joined them (#323).
+        let oddDetails = envelope(#"{"error":{"code":"STALE_DATA","details":{"currentVersion":"seven","expectedVersion":6}}}"#)
         XCTAssertEqual(oddDetails?.code, "STALE_DATA")
-        XCTAssertNil(oddDetails?.details)
+        XCTAssertNil(oddDetails?.details?.currentVersion)
+        XCTAssertEqual(oddDetails?.details?.expectedVersion, 6)
         // Positive control: readable details are read.
         XCTAssertEqual(envelope(#"{"error":{"code":"STALE_DATA","details":{"currentVersion":7}}}"#)?
             .details?.currentVersion, 7)

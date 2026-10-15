@@ -154,6 +154,8 @@ final class RouteContractTests: XCTestCase {
         "AppSurface.swift": "web page routes, not API paths",
         // The web's privacy notice, opened in Safari from «Изтрий профила».
         "DeleteAccountView.swift": "the web's /privacy page, not an API path",
+        // A farm's public page (#323), opened in Safari and shared.
+        "PublicProfileLink.swift": "the public page /f/{handle}, not an API path",
     ]
 
     // MARK: - Every path the app builds

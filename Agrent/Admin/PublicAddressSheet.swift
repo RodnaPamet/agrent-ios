@@ -106,7 +106,7 @@ struct PublicAddressSheet: View {
                     .accessibilityInputLabels(A11y.Spoken.cancel)
             } message: {
                 if let current {
-                    Text(Self.renameWarning(FarmBrandAPI.displayAddress(handle: current)))
+                    Text(Self.renameWarning(PublicProfileLink.displayAddress(handle: current)))
                 }
             }
         }
@@ -139,7 +139,7 @@ struct PublicAddressSheet: View {
     static let rules = "Между 3 и 40 знака. Написаното на кирилица се записва с латински букви: "
         + "„Победа“ става „pobeda“."
 
-    static func renameWarning(_ old: String) -> String {
+    nonisolated static func renameWarning(_ old: String) -> String {
         "Страницата е публикувана на \(old). Със смяната старият адрес спира да се отваря веднага, "
             + "включително в изпратени връзки и отпечатани кодове."
     }
