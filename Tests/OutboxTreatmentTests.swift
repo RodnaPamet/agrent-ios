@@ -145,6 +145,31 @@ final class OutboxTreatmentTests: XCTestCase {
         XCTAssertEqual(refused?.lastError, UserMessage.text(for: refusal))
     }
 
+    /// agrent-ios#326. A row that kept coming back short is abandoned by an
+    /// administrator. The server no longer resumes the handle, and without
+    /// its 410 the next send would write the whole treatment again
+    /// (agri-saas #1869). So the 410 refuses the row, says so in Bulgarian,
+    /// and no later pass sends that handle again.
+    func testAnAbandonedTreatmentIsRefusedAndNeverSentAgain() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire)
+        let gone = APIClient.APIError.http(status: 410, code: "TREATMENT_ABANDONED",
+                                           message: "This treatment was abandoned by an administrator.")
+        var answers: [Error] = [TreatmentAttempt.Shortfall(recorded: 1, sent: 3), gone]
+        wire.answer = { _ in throw answers.isEmpty ? gone : answers.removeFirst() }
+        let item = row()
+        await outbox.enqueue(item)
+
+        await outbox.flush()
+        await outbox.flush()
+        let refused = await queue.all().first
+        XCTAssertEqual(refused?.isRefused, true)
+        XCTAssertEqual(refused?.lastError, UserMessage.text(for: gone))
+        XCTAssertTrue(UserMessage.isBulgarianSentence(refused?.lastError ?? ""), refused?.lastError ?? "nil")
+
+        await outbox.flush()
+        XCTAssertEqual(wire.sent.map(\.id), [item.id, item.id], "an abandoned handle went out again")
+    }
+
     // MARK: - The journal
 
     private func entry(handle: String?) -> LogEntry {

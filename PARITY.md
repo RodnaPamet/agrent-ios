@@ -606,6 +606,16 @@ waits for the updated app, as a queued spray does. The owner chose this on
   since #70. A parcel deleted in the meantime comes back
   `REFERENCE_NOT_IN_TENANT` on replay. The row is then kept as refused,
   with the server's sentence.
+- **A treatment an administrator abandoned (#326, agri-saas #1860/#1869):**
+  a row that keeps coming back short is resent under its handle, which is
+  how a passing cause gets finished. When the cause doesn't pass, an ADMIN
+  can abandon the treatment on the web. The server then answers that handle
+  410 `TREATMENT_ABANDONED`, instead of writing the whole treatment again
+  under it. The phone refuses the row with a Bulgarian sentence saying an
+  administrator stopped it and that a new entry is the way to record the
+  work. The web's outbox takes any 2xx as delivered and never resends a
+  short one, so it neither finishes a partial treatment nor meets this
+  refusal (agri-saas is filing that difference).
 
 **Unverified:** no treatment has been queued on a device. The check is
 airplane mode → «Нов запис» → save → close the app → signal back → open
