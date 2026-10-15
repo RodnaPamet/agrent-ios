@@ -26,10 +26,18 @@ struct QueuedTreatmentRow: View {
     /// Waiting for signal, or refused: the two need opposite things from the
     /// farmer — one needs nothing, the other a person to read it — so they
     /// are never said the same way (`PendingOperation.isRefused`).
+    ///
+    /// A treatment the server holds in part says how much (#326). That's
+    /// mostly on the server's row, which takes this one's place, but not when
+    /// nothing has reached the register yet.
     private var status: String {
-        guard item.isRefused else { return Self.waiting }
+        guard item.isRefused else { return treatment.partialText ?? Self.waiting }
         return item.lastError ?? Self.refused
     }
+
+    /// Amber for a refusal, and for a treatment resending no longer
+    /// finishes: both need a person.
+    private var needsAPerson: Bool { item.isRefused || treatment.stalled == true }
 
     static let waiting = "Чака изпращане"
     static let refused = "Сървърът не прие записа."
@@ -55,9 +63,9 @@ struct QueuedTreatmentRow: View {
             .font(.footnote)
             .foregroundStyle(Palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
-            Label(status, systemImage: item.isRefused ? "exclamationmark.triangle" : "tray.and.arrow.up")
+            Label(status, systemImage: needsAPerson ? "exclamationmark.triangle" : "tray.and.arrow.up")
                 .font(.footnote)
-                .foregroundStyle(item.isRefused ? Palette.warning : Palette.secondaryText)
+                .foregroundStyle(needsAPerson ? Palette.warning : Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 6)

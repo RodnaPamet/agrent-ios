@@ -616,6 +616,21 @@ waits for the updated app, as a queued spray does. The owner chose this on
   work. The web's outbox takes any 2xx as delivered and never resends a
   short one, so it neither finishes a partial treatment nor meets this
   refusal (agri-saas is filing that difference).
+- **A treatment the server can't finish (#326, owner 2026-10-15, asked
+  directly):** the phone says so, and an ADMIN ends it from the phone.
+  - A queued row notes each short answer.
+  - The journal row says «Записани 2 от 3 парцела.», then «Останалите се
+    изпращат отново.» or, once a resend holds no more parcels than the last,
+    «Останалите не могат да бъдат записани.».
+  - The entry's screen asks the server (`GET /journal/treatments/{handle}`)
+    and, for an incomplete treatment, offers «Прекрати мероприятието» to
+    whoever the farm's `canAdmin` allows. The confirmation names the
+    ДНЕВНИК entries that go with it.
+  - Everyone else is told only an administrator can.
+  - The abandon also drops the phone's own copy, so nothing resends it.
+  - **The web:** has no button for the abandon as of 2026-10-15; the route
+    is API-only. Its outbox never resends a short treatment either, so a
+    web farmer sees the server's row with fewer parcels and no note.
 
 **Unverified:** no treatment has been queued on a device. The check is
 airplane mode → «Нов запис» → save → close the app → signal back → open

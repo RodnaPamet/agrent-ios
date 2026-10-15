@@ -256,4 +256,10 @@ protocol TreatmentRecorder: Sendable {
     /// its own key once it can be (#324). Says whether it is now on the
     /// phone; when it is not, the save's error is what the person sees.
     func keep(_ entry: TreatmentAttempt.Sent, after error: Error) async -> Bool
+    /// How far the server got with a treatment: nil when it holds nothing
+    /// under the handle (#326).
+    func progress(of handle: String) async throws -> TreatmentProgress?
+    /// Abandons an unfinished treatment: ADMIN only, the whole treatment,
+    /// its ДНЕВНИК entries included (agri-saas #1860, owner 2026-10-15).
+    func abandon(_ handle: String) async throws
 }

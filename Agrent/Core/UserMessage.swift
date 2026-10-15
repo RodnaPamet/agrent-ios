@@ -713,6 +713,11 @@ enum UserMessage {
         "TREATMENT_ABANDONED":
             "Администратор прекрати това мероприятие, защото не можеше да бъде записано докрай. "
             + "Ако работата трябва да е в дневника, направете нов запис.",
+        // The abandon met a treatment that finished meanwhile (agri-saas
+        // #1860): it's a full register record now, which the abandon never
+        // touches. The server's message sends the person to the journal's
+        // own delete, which the phone doesn't offer, so it isn't repeated.
+        "TREATMENT_COMPLETE": "Мероприятието вече е записано изцяло, затова не може да бъде прекратено.",
 
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "

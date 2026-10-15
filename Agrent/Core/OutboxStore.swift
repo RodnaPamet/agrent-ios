@@ -243,6 +243,15 @@ final class OutboxStore {
         await refresh()
     }
 
+    /// Drops the row kept under a treatment's handle once an administrator
+    /// has abandoned that treatment from this phone (#326). Sent again, it
+    /// would be refused (agri-saas #1869) and come back as a refusal of work
+    /// the person themselves just removed. Nothing when no row is kept.
+    func forget(_ handle: String) async {
+        await queue.remove(handle)
+        await refresh()
+    }
+
     /// A row that already carries a farm keeps it; otherwise the farm open
     /// NOW is the one it was made on — a spray is queued by a tap in its
     /// sheet, inside that farm. A parcel-line mark is queued AFTER its live
@@ -486,6 +495,12 @@ final class OutboxStore {
                     item.lastError = CreateFieldOperation.failureText(error)
                 } else {
                     item.lastError = UserMessage.text(for: error)
+                }
+                // A treatment the server holds in part keeps a note of how
+                // much, so its row can say so, and say when resending stops
+                // getting any further (#326).
+                if let short = error as? TreatmentAttempt.Shortfall {
+                    item.treatment?.cameBackShort(recorded: short.recorded)
                 }
                 if let conflict = PendingOperation.Conflict(replayOf: item, failedWith: error) {
                     // ── A STALE MARK IS A CONFLICT, NOT A REFUSAL (#138) ──

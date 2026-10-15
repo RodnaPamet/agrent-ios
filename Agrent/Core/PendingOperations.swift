@@ -248,10 +248,44 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
         /// The known parcels' area. nil when none had one.
         let areaHa: Double?
         let blockNames: [String]
+        /// How many parcels the server held when an answer came back short
+        /// (#326). nil until one did. Optional, so rows written before it
+        /// still decode.
+        var recorded: Int? = nil
+        /// A short answer held no more parcels than the one before it, so
+        /// resending is not getting any further. Only an administrator's
+        /// abandon ends such a treatment (agri-saas #1860).
+        var stalled: Bool? = nil
 
         var treatmentKind: TreatmentDraft.Kind? { TreatmentDraft.Kind(rawValue: kind) }
         var day: Date? { BgDate.parseISODay(occurredOn) }
         var area: Area? { areaHa.map(Area.init(hectares:)) }
+
+        /// After a short answer: how much is on the register, and whether
+        /// the rest is still being sent. Without this the row said «Чака
+        /// изпращане» over a treatment the server held in part and would
+        /// never finish (#326).
+        var partialText: String? {
+            guard let recorded else { return nil }
+            let rest = stalled == true ? Self.restStuck : Self.restResent
+            return "\(Self.recordedText(recorded, of: parcelCount)) \(rest)"
+        }
+
+        /// «Записани 2 от 3 парцела.»: also what the entry's screen says,
+        /// from the server's own count (`UnfinishedTreatmentSection`).
+        static func recordedText(_ recorded: Int, of total: Int) -> String {
+            "\(recorded == 1 ? "Записан" : "Записани") \(recorded) от \(Plural.bg(total, "парцел", "парцела"))."
+        }
+
+        static let restResent = "Останалите се изпращат отново."
+        static let restStuck = "Останалите не могат да бъдат записани."
+
+        /// The answer came back short: note what the server held, and
+        /// whether that is more than last time.
+        mutating func cameBackShort(recorded now: Int) {
+            stalled = recorded.map { now <= $0 } ?? false
+            recorded = now
+        }
     }
 
     /// Where a replay goes, for the three kinds.

@@ -215,6 +215,10 @@ final class TreatmentSaveTests: XCTestCase {
             kept.append(entry.key)
             return keeps
         }
+
+        // The entry's screen, not the save: never reached from these tests.
+        func progress(of handle: String) async throws -> TreatmentProgress? { throw URLError(.unsupportedURL) }
+        func abandon(_ handle: String) async throws { throw URLError(.unsupportedURL) }
     }
 
     private func press(_ attempt: inout TreatmentAttempt, _ draft: TreatmentDraft,

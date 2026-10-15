@@ -13,6 +13,8 @@ struct JournalListView: View {
     @State private var people = CurrentUserStore.shared
     /// Treatments kept on the phone, shown above the entries (#324).
     @State private var outbox = OutboxStore.shared
+    /// A treatment abandoned from its entry's screen (#326): read again.
+    @State private var changes = JournalChanges.shared
 
     private var waiting: [PendingOperation] {
         JournalStore.waiting(in: outbox.pending, farm: FarmPath.openSlug, listed: store.entries)
@@ -103,6 +105,9 @@ struct JournalListView: View {
                 guard !before.subtracting(after).isEmpty else { return }
                 Task { await store.load() }
             }
+            .onChange(of: changes.revision) {
+                Task { await store.load() }
+            }
         }
     }
 
@@ -183,9 +188,10 @@ struct JournalListView: View {
                     }
                     .pageRow()
                 }
+                let partial = JournalStore.partial(in: outbox.pending, farm: FarmPath.openSlug)
                 ForEach(entries) { entry in
                     NavigationLink(value: AppRoute.journalEntry(entry)) {
-                        JournalRow(entry: entry)
+                        JournalRow(entry: entry, partial: entry.treatment?.treatmentGroupId.flatMap { partial[$0] })
                     }
                     .pageRow()
                 }
@@ -271,6 +277,9 @@ struct JournalListView: View {
 /// without reading either.
 struct JournalRow: View {
     let entry: LogEntry
+    /// The phone's copy of this treatment, when the server's answer to it
+    /// came back short (#326): the row says the rest is missing.
+    var partial: PendingOperation.QueuedTreatment? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -284,6 +293,15 @@ struct JournalRow: View {
             // title, which names one parcel of many.
             if let treatment = entry.treatment, treatment.isTreatment {
                 treatmentLines(treatment)
+            }
+
+            if let text = partial?.partialText {
+                // Amber only once resending stops getting further: until
+                // then the phone is still finishing it, which needs nobody.
+                Label(text, systemImage: partial?.stalled == true ? "exclamationmark.triangle" : "tray.and.arrow.up")
+                    .font(.footnote)
+                    .foregroundStyle(partial?.stalled == true ? Palette.warning : Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             AdaptiveRow { chip; dateAndStatus }
@@ -304,7 +322,7 @@ struct JournalRow: View {
             entry.type.label,
             entry.occurredAt.map(BgDate.full) ?? LogEntry.noDate,
             entry.status == .planned ? entry.status.label : nil,
-        ] + Self.spokenTreatment(entry.treatment)))
+        ] + Self.spokenTreatment(entry.treatment) + [partial?.partialText]))
     }
 
     /// The treatment's facts in words — «декара», never the «дка» a screen

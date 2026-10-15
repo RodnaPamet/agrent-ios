@@ -139,6 +139,29 @@ enum TreatmentAPI {
         return summary.complete ? .landed(parcelCount: summary.parcelCount) : .half
     }
 
+    /// How far the server got, for the entry's screen (#326). nil on the
+    /// route's own 404: nothing under the handle, which after an abandon is
+    /// what the server says too.
+    static func progress(of handle: String) async throws -> TreatmentProgress? {
+        do {
+            return try progress(from: try await APIClient.shared.data(for: treatmentPath(handle)))
+        } catch let error where isNothingRecorded(error) {
+            return nil
+        }
+    }
+
+    /// STRICT, as `landing` is: the counts decide whether an administrator
+    /// is offered the abandon, which removes ДНЕВНИК entries.
+    static func progress(from data: Data) throws -> TreatmentProgress {
+        try JSONDecoder().decode(TreatmentProgress.self, from: data)
+    }
+
+    /// Abandons an unfinished treatment (agri-saas #1860). The 200's counts
+    /// aren't read: the entry's screen closes and the list is read again.
+    static func abandon(_ handle: String) async throws {
+        _ = try await APIClient.shared.deleteReturningData(treatmentPath(handle))
+    }
+
     /// The treatment's ДНЕВНИК pages, kept as the per-block register is
     /// (`FarmRecordAPI.keep`): bytes inline, checked for `%PDF`, removed when
     /// the sheet closes. A GET, and a pure read — the server files nothing.
@@ -180,6 +203,18 @@ enum TreatmentLanding: Equatable, Sendable {
     case half
 }
 
+/// How far the server got with a treatment (`GET /journal/treatments/{handle}`,
+/// agri-saas #1758): the counts behind `TreatmentLanding`, for a screen that
+/// says them.
+struct TreatmentProgress: Decodable, Equatable, Sendable {
+    /// The treatment's lines, one per parcel, across every block.
+    let parcelCount: Int
+    /// Those marked done: each has its ДНЕВНИК entry.
+    let completedCount: Int
+    /// Every line done. Only an incomplete treatment can be abandoned.
+    let complete: Bool
+}
+
 /// The recorder «Нов запис» opens with: the server, through `TreatmentAPI`.
 struct LiveTreatmentRecorder: TreatmentRecorder {
     func record(_ record: TreatmentRecord, idempotencyKey: String) async throws -> TreatmentReceipt {
@@ -192,6 +227,14 @@ struct LiveTreatmentRecorder: TreatmentRecorder {
 
     func document(forTreatment handle: String) async throws -> URL {
         try await TreatmentAPI.document(forTreatment: handle)
+    }
+
+    func progress(of handle: String) async throws -> TreatmentProgress? {
+        try await TreatmentAPI.progress(of: handle)
+    }
+
+    func abandon(_ handle: String) async throws {
+        try await TreatmentAPI.abandon(handle)
     }
 
     /// Into the outbox, under the entry's own key (#324).

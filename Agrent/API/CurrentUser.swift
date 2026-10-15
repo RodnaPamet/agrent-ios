@@ -150,6 +150,11 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// Codable, because a remembered `Farm` carries its own (`ActiveFarm`).
     struct Permissions: Codable, Equatable, Hashable, Sendable {
         let canWrite: Bool
+        /// The administrator's tier: abandoning an unfinished treatment
+        /// (#326) is `assertCanAdmin`. Optional, unlike `canWrite`, because
+        /// a farm remembered before this field (`ActiveFarm`) was written
+        /// without it, and a missing key must not cost it its decode.
+        var canAdmin: Bool? = nil
     }
 
     private enum Outer: String, CodingKey { case user, featureFlags, tenant }
@@ -228,6 +233,13 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// unblock and retract are `assertCanWrite`; reading and marking read are
     /// `assertCanRead`).
     var mayWrite: Bool { permissions?.canWrite ?? true }
+
+    /// Whether to OFFER an administrator's action — abandoning an unfinished
+    /// treatment (#326) — on the server's `canAdmin` for the open farm.
+    /// Fails open when not told, as `mayWrite` does and for the same reason:
+    /// the server's refusal is a sentence that can be read, and the action is
+    /// behind a confirmation either way.
+    var mayAdmin: Bool { permissions?.canAdmin ?? true }
 
     /// This person as they stand in ONE farm: `role` replaced by their role
     /// there, when it is known, and the tier with it — the farm's own when
