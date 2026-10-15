@@ -116,6 +116,12 @@ enum MembershipStatus: String, LenientDecodable, Sendable {
 /// FIRST, and had I written it here the server would have written a second
 /// an hour later. It is canonical now at `authEnums.role.*` with a guard
 /// deriving the required members from the schema, and these are verbatim.
+///
+/// They are also inside sentences now. The server's role refusals
+/// (`errors.ADMIN_FORBIDDEN_FOR_ROLE.<ROLE>` and the audit one, agri-saas
+/// #1924) quote them, and so does this app's own sentence for each
+/// (`UserMessage.interpolated`). A word changed here goes to both places in
+/// `messages/bg.json`, or a farmer meets one role under two names.
 enum MembershipRole: String, LenientDecodable, Sendable {
     case owner = "OWNER"
     case admin = "ADMIN"
