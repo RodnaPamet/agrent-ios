@@ -63,14 +63,16 @@ struct ListingDetailView: View {
                             Button {
                                 farmPage = page
                             } label: {
-                                // Without its icon at the accessibility sizes,
-                                // where beside one «Страницата» breaks mid-word.
+                                // Without its icon and with soft hyphens at the
+                                // accessibility sizes: AX5 broke «Страница / та»
+                                // beside the icon and «стопанство / то» without it.
                                 if typeSize.isAccessibilitySize {
-                                    Text("Страницата на стопанството")
+                                    Text(SoftHyphens.display("Страницата на стопанството"))
                                 } else {
                                     Label("Страницата на стопанството", systemImage: "arrow.up.right.square")
                                 }
                             }
+                            .accessibilityLabel("Страницата на стопанството")
                             .accessibilityHint("Отваря публичната страница на стопанството.")
                             .accessibilityInputLabels(A11y.spokenNames("Страницата на стопанството", "Farm page"))
                         }
