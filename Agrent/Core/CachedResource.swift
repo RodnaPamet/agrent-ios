@@ -80,8 +80,11 @@ enum CachedResource {
         }
     }
 
+    /// - Parameter conditional: revalidate with the entry's ETag. Off only
+    ///   for the second ask after a 304 the entry couldn't answer.
     static func load<T: Equatable & Sendable>(
         _ pathAndQuery: String,
+        conditional: Bool = true,
         decode: @Sendable (Data) async throws -> T
     ) async -> LoadState<T> {
         // Captured ONCE, before the request. Whoever this request is for is
@@ -90,8 +93,18 @@ enum CachedResource {
         let scope = CacheScope.current(for: pathAndQuery)
         let key = scope.map { ResponseCache.key(scope: $0, pathAndQuery: pathAndQuery) }
 
+        // ── An unchanged list costs a 304, not the list (agrent-ios#329) ──
+        //
+        // The server answers every list it lets the web keep with an ETag,
+        // and a 304 to `If-None-Match` when nothing changed. Before this the
+        // phone never asked, so every online open was the whole body again:
+        // up to 5000 parcel geometries for one crop in «Нов запис», on the
+        // weak connection this cache exists for.
+        var tag: String?
+        if conditional, let key { tag = await ResponseCache.shared.etag(key) }
+
         do {
-            let data = try await APIClient.shared.data(for: pathAndQuery)
+            let (data, etag) = try await APIClient.shared.conditionalData(for: pathAndQuery, ifNoneMatch: tag)
             // Decode BEFORE writing. A payload we cannot read must never
             // become the thing we later fall back to.
             let value = try await decode(data)
@@ -103,20 +116,30 @@ enum CachedResource {
             // read them, but they would be A's data at rest on a phone A has
             // signed out of, which is what the purge is for.
             if let key, CacheScope.current(for: pathAndQuery) == scope {
-                await ResponseCache.shared.write(key, data)
+                await ResponseCache.shared.write(key, data, etag: etag)
             }
             return .loaded(value, .fresh)
         } catch APIClient.APIError.notModified {
             // Not a failure — the server just told us the cached copy is
             // current. So the cache is served as .fresh, NOT .stale: the age
             // shown to an operator should reflect how current the DATA is,
-            // and the server has this second confirmed it is.
+            // and the server has this second confirmed it is. Its age on disk
+            // restarts too, under the same rule as a write.
             if let key, let hit = await ResponseCache.shared.read(key),
                let value = try? await decode(hit.data) {
+                if CacheScope.current(for: pathAndQuery) == scope { await ResponseCache.shared.confirm(key) }
                 return .loaded(value, .fresh)
             }
-            // A 304 with nothing cached to pair it with — the app asked to
-            // revalidate something it does not hold. Nothing to show.
+            // The tag outlived what it vouched for: the entry is gone, or was
+            // written by an older build in a shape this one can't decode.
+            // Asked again with the same tag, the server would 304 every time
+            // until the list changed, and the screen would show nothing. So
+            // the entry goes, and the list is asked for once more, outright.
+            if tag != nil {
+                if let key { await ResponseCache.shared.remove(key) }
+                return await load(pathAndQuery, conditional: false, decode: decode)
+            }
+            // A 304 nobody asked for: a proxy's. Nothing to show.
             return .failed(UserMessage.text(for: APIClient.APIError.notModified))
         } catch {
             guard let key else { return .failed(UserMessage.text(for: error)) }

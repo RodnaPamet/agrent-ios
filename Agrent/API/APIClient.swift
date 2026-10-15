@@ -172,10 +172,10 @@ actor APIClient {
         case clientTooOld
         /// 304 Not Modified — the server confirms the cached copy is current.
         ///
-        /// Unreachable today: the app sends no `If-None-Match` of its own, and
-        /// since #134 URLSession has no HTTP cache to revalidate from, so
-        /// nothing asks the server for a 304. Kept because a proxy or a
-        /// future conditional request could still produce one.
+        /// Asked for since agrent-ios#329: `CachedResource` revalidates its
+        /// entry with `If-None-Match` (`conditionalData`). URLSession has had
+        /// no HTTP cache since #134, so this is only ever the app's own
+        /// question being answered.
         /// But `default:` used to catch it and render "Грешка от сървъра
         /// (304)" on a screen whose data is perfectly fine, so the one path
         /// where it CAN surface produced an error for a success.
@@ -544,6 +544,18 @@ actor APIClient {
         try await send(path: path, method: "GET", body: nil, idempotencyKey: nil)
     }
 
+    /// A GET the response cache can revalidate (agrent-ios#329). It sends
+    /// `If-None-Match` with the ETag the cached entry came with, and returns
+    /// the response's own ETag to keep with the new body. An unchanged list
+    /// is then a 304 (`APIError.notModified`) instead of the whole body again,
+    /// which for a crop's parcels is up to 5000 geometries.
+    func conditionalData(for path: String, ifNoneMatch: String?) async throws -> (data: Data, etag: String?) {
+        let (data, http) = try await sendWithResponse(
+            path: path, method: "GET", body: nil, idempotencyKey: nil,
+            ifNoneMatch: ifNoneMatch, session: session)
+        return (data, http.value(forHTTPHeaderField: "ETag"))
+    }
+
     /// Decode with THIS client's decoder — the one that accepts ISO 8601 both
     /// with and without fractional seconds. A caller reaching for a fresh
     /// `JSONDecoder()` reintroduces the bug documented above it.
@@ -866,7 +878,8 @@ actor APIClient {
     /// `send`, keeping the response — a document's name is in its headers.
     private func sendWithResponse(
         path: String, method: String, body: Data?, idempotencyKey: String?,
-        ifMatch: String? = nil, contentType: String? = nil, session: URLSession
+        ifMatch: String? = nil, ifNoneMatch: String? = nil, contentType: String? = nil,
+        session: URLSession
     ) async throws -> (data: Data, http: HTTPURLResponse) {
         // Before the tokens: a refresh is a request too, and nothing goes
         // out for a farm path with no farm in it (`FarmPath`, #192).
@@ -876,11 +889,13 @@ actor APIClient {
         let cancelsBefore = deletionCancels
 
         var (data, http) = try await perform(
-            path, method, body, idempotencyKey, ifMatch, tokens, contentType, session: session)
+            path, method, body, idempotencyKey, ifMatch, tokens, contentType,
+            ifNoneMatch: ifNoneMatch, session: session)
         if http.statusCode == 401 {
             tokens = try await refresh(tokens)
             (data, http) = try await perform(
-                path, method, body, idempotencyKey, ifMatch, tokens, contentType, session: session)
+                path, method, body, idempotencyKey, ifMatch, tokens, contentType,
+                ifNoneMatch: ifNoneMatch, session: session)
         }
 
         switch http.statusCode {
@@ -1007,7 +1022,7 @@ actor APIClient {
     private func perform(
         _ path: String, _ method: String, _ body: Data?, _ key: String?,
         _ ifMatch: String?, _ tokens: Tokens, _ contentType: String? = nil,
-        session: URLSession? = nil
+        ifNoneMatch: String? = nil, session: URLSession? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         let session = session ?? self.session
         var req = try Self.request(for: path, method: method, accessToken: tokens.accessToken)
@@ -1018,6 +1033,7 @@ actor APIClient {
         }
         if let key { req.setValue(key, forHTTPHeaderField: "Idempotency-Key") }
         if let ifMatch { req.setValue(ifMatch, forHTTPHeaderField: "If-Match") }
+        if let ifNoneMatch { req.setValue(ifNoneMatch, forHTTPHeaderField: "If-None-Match") }
 
         let loggable = LoggablePath(path)
         Log.request(method, loggable)
