@@ -13,7 +13,7 @@ import SwiftUI
 /// The web has no directory screen yet. The phone is first here (PARITY.md).
 struct FarmDirectoryView: View {
     @State private var store = FarmDirectoryStore()
-    @State private var page: WebPage?
+    @State private var page: InAppPage?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -103,8 +103,7 @@ struct FarmDirectoryView: View {
     }
 
     private func open(_ hit: FarmDirectoryHit) {
-        guard let url = PublicProfileLink.url(handle: hit.handle), InAppBrowser.opens(url) else { return }
-        page = WebPage(url: url)
+        page = InAppPage.farm(handle: hit.handle)
     }
 
     // MARK: - Filters
@@ -149,11 +148,4 @@ struct FarmDirectoryView: View {
     /// The 28 names the editor offers, in Bulgarian order. Sorted once, not
     /// on every redraw of the bar.
     private static let oblasts = FarmBrandLimits.oblasts(keeping: nil)
-}
-
-/// The page a tap opened. A type of its own because `sheet(item:)` needs an
-/// identity and `URL` has none.
-private struct WebPage: Identifiable {
-    let url: URL
-    var id: String { url.absoluteString }
 }

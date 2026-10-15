@@ -1084,6 +1084,28 @@ live since 12.31.0). It's anonymous and behind the same flag.
 **Unverified:** no published farm has been listed. The flag is off and no
 farm can publish yet (consent, above).
 
+### «Публикувай от името на стопанството» on a listing (#336, agri-saas #1922)
+
+**A listing can be published as the farm, as on the web.** The server
+stores only the choice. The farm's verified name and address are read live
+on every read (`farmHandle`), so a farm that renames its address or takes
+its page down changes every attributed listing at once.
+
+- **«Нова обява»:** the switch, with the web's footer word for word, sent as
+  `publishAsFarm: true` only when on. It's always enabled, as on the web:
+  whether the farm's page is public takes an admin-only read, and the
+  server accepts the choice either way.
+- **A listing's page:** an attributed listing shows «Страницата на
+  стопанството» under the seller, opening `/f/{handle}` in the in-app
+  browser, as «Ферми» does.
+- **Behind `social.public-profile` on the phone, unlike the web:** `/f/`
+  answers only while the flag is on (it's checked server-wide), so outside
+  it the switch can't attribute anything and the link wouldn't open. The
+  web offers the switch to everyone: agri-saas #1929.
+
+**Unverified:** no listing has been posted from the phone (the owner makes
+the first send), and no attributed listing has been seen on the real server.
+
 ### Haptics — since 2026-10-06 (agri-saas#1193 P2.8)
 
 Web `src/lib/haptics.ts` (Vibration API; Android browsers only — iOS Safari

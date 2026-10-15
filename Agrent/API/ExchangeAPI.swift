@@ -366,6 +366,12 @@ struct CreateExchangeListing: Encodable, Sendable {
     /// Must be in the FUTURE when present, or the schema refuses it.
     let expiresAt: String?
 
+    /// Publish as the farm (P6.7, agri-saas #1922): shown under the farm's
+    /// verified name with a link to its page, while that page is public.
+    /// Sent only as `true`. Left out, the server's default is false, and a
+    /// person the flag is off for sends no P6 field at all.
+    var publishAsFarm: Bool? = nil
+
     enum Invalid: Equatable {
         case quantityOutOfRange
         case priceOutOfRange
