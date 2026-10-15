@@ -431,7 +431,7 @@ final class SignOutHygieneTests: XCTestCase {
         XCTAssertTrue(source.contains("guard let scope = CacheScope.current(for: pathAndQuery) else {"),
                       "the cache-first path reads with no identity")
         guard let check = source.range(of: "if let key, CacheScope.current(for: pathAndQuery) == scope {"),
-              let write = source.range(of: "await ResponseCache.shared.write(key, data)") else {
+              let write = source.range(of: "await ResponseCache.shared.write(key, data, etag: etag)") else {
             return XCTFail("positive control: the write is guarded by the scope it was read under")
         }
         XCTAssertLessThan(check.lowerBound, write.lowerBound)
