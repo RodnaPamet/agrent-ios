@@ -19,6 +19,8 @@ final class FarmDirectoryStore {
     /// names would offer choices that find nothing. A value taken from an
     /// answer finds at least the farm it came from. It only grows, so a
     /// filter that narrows the list doesn't narrow the choices with it.
+    /// agri-saas #1909 asks the server to compare crops case-insensitively;
+    /// once it does, a choice per spelling is still right, only redundant.
     private(set) var knownCrops: [String] = []
 
     /// Which load is the latest. Counted, not compared by query: the search

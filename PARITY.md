@@ -1061,7 +1061,7 @@ live since 12.31.0). It's anonymous and behind the same flag.
   Cyrillic, and Latin through the name's transliteration); oblast from the
   28 names; crop from the crops the answers carried. A fixed crop list
   can't be offered: the server matches a crop exactly, case included,
-  against what each farm typed.
+  against what each farm typed (agri-saas #1909).
 - **At most 50, no paging:** the server's bound. A full answer says to
   narrow by oblast or crop.
 - **Not cached:** a farm that withdraws leaves the directory at once.
