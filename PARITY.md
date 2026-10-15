@@ -1031,6 +1031,13 @@ of 2026-10-15 no web screen calls the brand routes (#1884).
   suggestions are buttons. A published page can be shared (the web share
   kit's URL, agri-saas #1885), opened and withdrawn. Renaming a published
   address asks first.
+- **What the page withholds (agri-saas #1933):** «Показва се публично», a
+  switch for each of tagline, «За стопанството», oblast and crops, ON
+  meaning visible, as on the web. Each switch saves at once and sends only
+  its own flag. The text stays stored, so switching a field back on needs
+  no retyping. A hidden fact is marked «Не се показва публично» in «Какво
+  показва страницата», and said so to VoiceOver. The name and the address
+  have no switch: a published page needs both.
 - **The A6 card (P6.7, agri-saas #1910):** a published page offers
   «Карта за печат (A6)». It's the server's PDF (name, address, QR code),
   opened in Quick Look to print or share, and deleted when Quick Look

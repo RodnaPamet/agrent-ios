@@ -192,6 +192,42 @@ final class FarmBrandTests: XCTestCase {
         XCTAssertEqual(FarmBrandLimits.oblasts(keeping: "област Добрич").first, "област Добрич")
     }
 
+    // MARK: - What the page withholds
+
+    /// The four flags read as a set; absent (a server before #1933) or odd
+    /// reads as shown, which is what such a server does.
+    func testTheHiddenFieldsAreReadFromTheirFlags() throws {
+        let json = #"{"tagline":"Т","hideTagline":false,"hideAbout":true,"hideOblast":true,"hideCrops":"yes"}"#
+        let draft = try XCTUnwrap(FarmBrandAPI.decodeDraft(from: Data(json.utf8)))
+        XCTAssertEqual(draft.hidden, [.about, .oblast])
+        XCTAssertEqual(draft.tagline, "Т", "positive control: the rest of the draft reads")
+        let old = try XCTUnwrap(FarmBrandAPI.decodeDraft(from: Data(#"{"tagline":"Т"}"#.utf8)))
+        XCTAssertTrue(old.hidden.isEmpty)
+    }
+
+    /// The wire names, and no flag for the two fields a published page needs.
+    func testTheFlagsAreTheServersNames() {
+        XCTAssertEqual(HideableField.allCases.map(\.flag), ["hideTagline", "hideAbout", "hideOblast", "hideCrops"])
+        XCTAssertEqual(HideableField.allCases.map(\.label), ["Кратко описание", "За стопанството", "Област", "Култури"])
+    }
+
+    /// One flag per save: `{"hideOblast": true}` hides, `false` shows, and
+    /// nothing else is in the body to disturb another field.
+    func testOneSwitchSendsOnlyItsFlag() throws {
+        let body = try JSONEncoder().encode([HideableField.oblast.flag: !false])
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Bool])
+        XCTAssertEqual(object, ["hideOblast": true])
+    }
+
+    /// A hidden fact says so to VoiceOver too, not only on screen.
+    func testAHiddenFactIsSaid() {
+        let hidden = PublicProfileView.factSentence("Област", "Добрич", hidden: true)
+        XCTAssertTrue(hidden.contains("не се показва публично"), hidden)
+        XCTAssertTrue(hidden.contains("Добрич"), hidden)
+        XCTAssertFalse(PublicProfileView.factSentence("Област", "Добрич", hidden: false).contains("публично"))
+        XCTAssertTrue(PublicProfileView.factSentence("Област", nil, hidden: false).contains("не е попълнено"))
+    }
+
     // MARK: - Publishing
 
     /// The web's text and version, word for word (owner, 2026-10-15). The
