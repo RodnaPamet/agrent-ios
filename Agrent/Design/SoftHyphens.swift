@@ -29,6 +29,9 @@ enum SoftHyphens {
         // The composers' prompts (#225): in a field beside its send arrow,
         // AX5 broke «Напишет / е» and «съобщени / е».
         ("Напишете", ["На", "пи", "ше", "те"]),
+        // «Публичен профил»'s state beside its globe (#323): AX5 broke
+        // «Страница / та е публикувана».
+        ("Страницата", ["Стра", "ни", "ца", "та"]),
         ("съобщение", ["съоб", "ще", "ние"]),
     ]
 

@@ -148,6 +148,8 @@ final class FixtureSeamTests: XCTestCase {
             (FarmsAPI.farmsPath, "me-farms"),
             // agrent-ios#258 — the superuser's prices form.
             (AdminPricesAPI.path, "admin-price-overrides"),
+            // agrent-ios#323 — «Публичен профил».
+            (FarmBrandAPI.draftPath, "farm-brand"),
         ]
         for (pathAndQuery, fixture) in expected {
             let (path, query) = FixtureCatalogue.split(pathAndQuery)
@@ -454,6 +456,9 @@ final class FixtureSeamTests: XCTestCase {
         ("admin-price-overrides", { _ = try await APIClient.shared.decode($0, as: AdminPricesAPI.Overrides.self) }),
         // agrent-ios#323.
         ("farm-directory", { _ = try FarmDirectoryAPI.decodeHits(from: $0) }),
+        // A draft, not `null`: `null` decodes too, and would photograph the
+        // empty editor instead of a published page.
+        ("farm-brand", { _ = try XCTUnwrap(FarmBrandAPI.decodeDraft(from: $0)) }),
     ]
 
     /// A MISSING FIXTURE IS A FAILURE, NOT A SKIP.

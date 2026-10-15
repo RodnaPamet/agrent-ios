@@ -179,7 +179,8 @@ struct PublicProfileView: View {
     private func publicationSection(_ draft: FarmBrandDraft?) -> some View {
         if let draft, draft.published, let handle = draft.handle, let url = PublicProfileLink.url(handle: handle) {
             Section {
-                Label("Страницата е публикувана", systemImage: "globe")
+                Label(SoftHyphens.display(Self.publishedState), systemImage: "globe")
+                    .accessibilityLabel(Self.publishedState)
                 ShareLink(item: url, message: Text(draft.displayName ?? "")) {
                     Label("Сподели", systemImage: "square.and.arrow.up")
                 }
@@ -282,6 +283,7 @@ struct PublicProfileView: View {
     static let addressAfterSave = "Адрес може да се избере, след като профилът бъде запазен."
     static let publishLater = "Публикуването ще стане възможно, когато е готов текстът на съгласието, "
         + "което се дава преди публикуване."
+    static let publishedState = "Страницата е публикувана"
     static let cardAbout = "Картата за печат е PDF с името на стопанството, адреса на страницата "
         + "и QR код към нея, за раздаване на пазара или в стопанството."
     static let savedNote = "Профилът е запазен."
