@@ -719,6 +719,16 @@ enum UserMessage {
         // own delete, which the phone doesn't offer, so it isn't repeated.
         "TREATMENT_COMPLETE": "Мероприятието вече е записано изцяло, затова не може да бъде прекратено.",
 
+        // «Публичен профил» (agrent-ios #323, agri-saas #1865/#1871). The
+        // address is the one field another farm can refuse: the taken case
+        // shows its alternatives beside this (`PublicAddressSheet`).
+        "FARM_BRAND_NOT_FOUND": "Профилът още не е създаден. Запазете го веднъж и опитайте отново.",
+        "FARM_HANDLE_TAKEN": "Този адрес вече е на друго стопанство. Изберете друг.",
+        "FARM_HANDLE_RESERVED": "Този адрес е запазен и не може да бъде използван. Изберете друг.",
+        "FARM_HANDLE_TOO_SHORT": "Адресът трябва да е поне 3 знака, след като се изпише с латински букви.",
+        "FARM_HANDLE_TOO_LONG": "Адресът може да е най-много 40 знака, след като се изпише с латински букви.",
+        "FARM_HANDLE_UNUSABLE": "Адресът трябва да съдържа букви или цифри.",
+
         "TERMS_ACCEPTANCE_REQUIRED":
             "Трябва да приемете условията за ползване. Отворете уеб приложението, "
             + "приемете ги и опитайте отново.",

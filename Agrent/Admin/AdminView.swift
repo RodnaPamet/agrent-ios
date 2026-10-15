@@ -42,6 +42,9 @@ struct AdminView: View {
     @State private var me = CurrentUserStore.shared
     /// Which farm is open, for the platform farm's «Цени» row (#258).
     @State private var farms = FarmStore.shared
+    /// Whether «Публичен профил» is offered (#323): the flag every public
+    /// profile surface is behind on the server too.
+    @State private var flags = FeatureFlags.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -78,6 +81,12 @@ struct AdminView: View {
 
             case .allowed:
                 Section { farmRow }.pageRow()
+                // The farm's public page (#323), right after the farm it
+                // presents. Only where the server would answer: behind
+                // `social.public-profile`, off by default (agri-saas #1888).
+                if flags.isOn(FarmBrandAPI.flag) {
+                    Section { publicProfileRow }.pageRow()
+                }
                 // The superuser's daily prices: the platform farm only, to its
                 // owner or admins. Every other farm's Админ looks as it did.
                 if farms.activeFarm?.offersPlatformPrices == true {
@@ -164,6 +173,19 @@ struct AdminView: View {
                 Label("Стопанство", systemImage: "building.2")
             }
         }
+    }
+
+    /// No value on the row: whether the page is published is the page's
+    /// first fact, one tap away, and reading it here would cost every open
+    /// of Админ a request this row doesn't need.
+    private var publicProfileRow: some View {
+        NavigationLink {
+            PublicProfileView()
+        } label: {
+            Label(PublicProfileView.title, systemImage: "globe")
+        }
+        .accessibilityHint("Страницата на стопанството, която всеки може да отвори")
+        .accessibilityInputLabels(A11y.spokenNames(PublicProfileView.title, "Public profile"))
     }
 
     /// The count is of the rows the page lists — invited and deactivated

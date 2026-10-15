@@ -1012,6 +1012,38 @@ and they win over the API, for every farm, until cleared. Server: agri-saas
 the owner creates the platform farm and `PLATFORM_TENANT_SLUG` names it; the
 owner makes the first entry. The web console is agri-saas's.
 
+### Ahead of the web — «Публичен профил» (#323, owner 2026-10-15)
+
+**The phone has an editor the web doesn't have yet.** The owner chose to
+build it now, behind the flag. The web's editor is agri-saas #1815, and as
+of 2026-10-15 no web screen calls the brand routes (#1884).
+
+- **Where:** Админ → «Публичен профил», right after «Стопанство». Shown
+  only when `social.public-profile` is on for the person. The server
+  answers 404 on every P6 route while the flag is off (agri-saas #1888),
+  and it's off by default.
+- **What:** the page's facts read-only, «Редактирай» for name, tagline,
+  «За стопанството», oblast and crops, and the web address. A save sends
+  only the changed fields (left out is untouched, `null` clears). The
+  address is the server's normalised one; when it's taken, the server's
+  suggestions are buttons. A published page can be shared (the web share
+  kit's URL, agri-saas #1885), opened and withdrawn. Renaming a published
+  address asks first.
+- **Not publishing (owner):** consent needs the web's text and its
+  version, and there is none yet. The section says publishing waits for
+  it.
+- **Oblast:** one of the 28 Bulgarian names the server uses for regions
+  (`BulgarianRegion.names`), the form its tests and farm search use
+  («Добрич»). The web's editor should store the same names, or a search by
+  oblast will miss farms saved from the other client.
+- **Not on the phone:** `indexable` (the search-engine toggle, agri-saas
+  #1873) and the live preview. Neither was in the owner's choice.
+- **Admin data, so not cached:** the draft is read on every open, and with
+  no signal the page says it couldn't load.
+
+**Unverified:** nothing has been saved, claimed or withdrawn from this app.
+The flag is off, and the first real write is the owner's.
+
 ### Haptics — since 2026-10-06 (agri-saas#1193 P2.8)
 
 Web `src/lib/haptics.ts` (Vibration API; Android browsers only — iOS Safari

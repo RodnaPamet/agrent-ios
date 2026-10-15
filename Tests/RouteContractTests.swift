@@ -236,6 +236,11 @@ final class RouteContractTests: XCTestCase {
                 FieldOperationAPI.detailPath("{taskId}"),
                 FieldOperationAPI.linePath(taskID: "{taskId}", lineID: "{lineId}"),
             ]),
+            // agrent-ios #323: the farm's public profile, as its admins edit it.
+            ("FarmBrandAPI.swift", [
+                FarmBrandAPI.draftPath, FarmBrandAPI.handlePath,
+                FarmBrandAPI.publicationPath, FarmBrandAPI.consentPath,
+            ]),
             ("AdminAPI.swift", [
                 AdminAPI.membersPath, AdminAPI.invitesPath, AdminAPI.farmProfilePath,
                 AdminAPI.invitePath,
