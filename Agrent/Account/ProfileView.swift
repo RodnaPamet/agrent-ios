@@ -74,8 +74,8 @@ struct ProfileView: View {
                     AccountPictureRows(user: user)
                 }
             } footer: {
-                if me.user != nil {
-                    SectionFooter(AccountPicture.note)
+                SectionFooter {
+                    if me.user != nil { Text(AccountPicture.note) }
                 }
             }
             .pageRow()

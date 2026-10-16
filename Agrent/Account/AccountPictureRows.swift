@@ -26,12 +26,14 @@ struct AccountPictureRows: View {
     @State private var failure: String?
 
     var body: some View {
+        // Read here, outside the label closure: `PhotosPicker` takes that
+        // closure as `@Sendable`, so it may not touch this view's state.
+        let title = hasPicture ? AccountPicture.changeTitle : AccountPicture.uploadTitle
         // `.current`: the library's own bytes, HEIC included, because the
         // conversion below reads them anyway. `.compatible` would have the
         // system transcode to JPEG first, and then this app would do it again.
         PhotosPicker(selection: $picked, matching: .images, preferredItemEncoding: .current) {
-            Label(hasPicture ? AccountPicture.changeTitle : AccountPicture.uploadTitle,
-                  systemImage: "photo")
+            Label(title, systemImage: "photo")
         }
         .disabled(working)
         .accessibilityInputLabels(hasPicture
