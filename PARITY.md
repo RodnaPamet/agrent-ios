@@ -983,11 +983,26 @@ card (one `AccountCard`), for every role.
   both. Админ draws the account row for every role and in every state: above
   «Нямате достъп» for a reader, and as a plain «Профил» row before `/me`
   answers. `UserMessage`'s session-expired text says where Изход is now.
-- Not ported, and why: name editing (`PATCH /api/account/profile`) and the
-  picture upload/removal (`POST`/`DELETE /api/account/avatar`) are route code
-  absent from openapi.json — follow-ups once documented. «Сигурност»
+- **The picture (#333, agri-saas #1903/#1951):** «Качване на снимка» /
+  «Смяна на снимката» and «Премахване» under the card, the web's words. As
+  on the web, a pick uploads at once and removal asks nothing. The web makes
+  a 256×256 WebP in its canvas; iOS can't encode WebP, so the phone makes a
+  256×256 JPEG the same way: orientation applied, centre cover-crop, pixels
+  only. The server takes JPEG or WebP and re-encodes either (owner,
+  2026-10-16: no HEIC, so a camera HEIC is converted on the phone). No EXIF
+  or GPS leaves the phone. The upload is tens of kilobytes. The card shows
+  the JPEG it sent: the serve URL is the same for every upload, so a refetch
+  could only show the same picture. The server's refusals are said in its
+  own Bulgarian; the phone words only its own two failures (a photo the
+  library couldn't hand over, a file that isn't a picture).
+- Not ported, and why: name editing (`PATCH /api/account/profile`) is route
+  code absent from openapi.json, a follow-up once documented. «Сигурност»
   (password change) is for credential accounts; this app signs in through the
   browser. The web's sound/haptics preferences are device-local web settings.
+
+**Unverified (the picture):** no picture has been uploaded or removed from
+this app. The first real upload is the owner's, from the phone, once
+agri-saas #1951 is live.
 
 ### «Цени» — the superuser's daily prices (#258, owner 2026-10-10)
 
