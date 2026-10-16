@@ -451,7 +451,7 @@ final class FarmPathTests: XCTestCase {
     func testWithNoFarmOpenAPathGoesNowhere() {
         ActiveFarm.shared.set(nil)
         let path = LocationsAPI.listPath
-        XCTAssertEqual(path, "/api/t//locations", "a farm the person did not choose was put in the path")
+        XCTAssertEqual(path, "/api/t//locations?kind=FIELD", "a farm the person did not choose was put in the path")
         XCTAssertTrue(FarmPath.isUnscoped(path))
         XCTAssertThrowsError(try APIClient.url(for: path)) { error in
             guard case APIClient.APIError.noFarmOpen = error else { return XCTFail("refused as \(error)") }
