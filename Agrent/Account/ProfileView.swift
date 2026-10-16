@@ -20,11 +20,13 @@ import SwiftUI
 /// either — `/api/auth/me` has no slug in its path.
 ///
 /// What this page shows is what `/me` already sends: the picture (or the
-/// initials), the name, the email. The web's edits are NOT here: `PATCH
-/// /api/account/profile` and `POST`/`DELETE /api/account/avatar` exist as
-/// route code but are not in openapi.json, and this app builds against the
-/// spec (owner: no editing until the API is documented). The password form is
-/// for credential accounts; this app signs in through the browser.
+/// initials), the name, the email. The picture can be changed or removed
+/// here (`AccountPictureRows`, #333): `POST`/`DELETE /api/account/avatar` are
+/// documented since agri-saas #1900, and the server takes the JPEG a phone
+/// can make since #1951. The name can't: `PATCH /api/account/profile` is
+/// still not in openapi.json, and this app builds against the spec (owner:
+/// no editing until the API is documented). The password form is for
+/// credential accounts; this app signs in through the browser.
 ///
 /// ── The same card as Админ, not a second copy ──
 ///
@@ -66,7 +68,17 @@ struct ProfileView: View {
 
     var body: some View {
         List {
-            Section { identity }.pageRow()
+            Section {
+                identity
+                if let user = me.user {
+                    AccountPictureRows(user: user)
+                }
+            } footer: {
+                SectionFooter {
+                    if me.user != nil { Text(AccountPicture.note) }
+                }
+            }
+            .pageRow()
 
             // A person's farms are the person's, not one farm's — so Профил,
             // not Админ (owner, 2026-10-08, agrent-ios#179).

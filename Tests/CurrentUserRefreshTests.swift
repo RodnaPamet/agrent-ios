@@ -77,6 +77,31 @@ final class CurrentUserRefreshTests: XCTestCase {
 
     // MARK: - adoption
 
+    /// Профил's picture change (#333): the server's answer becomes `/me`'s
+    /// `avatarUrl`, with every other field kept and no request sent.
+    func testAPictureChangeIsAdoptedFromTheServersAnswer() {
+        let held = CurrentUser(id: "u1", name: "Синтетичен Потребител", email: nil, role: "OWNER",
+                               bottomTabOrder: ["map"], featureFlags: ["social.dm": true])
+        store.adoptForTesting(held)
+
+        store.adoptAvatarURL("/api/account/avatar/u1")
+        XCTAssertEqual(store.user?.avatarUrl, "/api/account/avatar/u1")
+        XCTAssertEqual(store.user?.name, held.name)
+        XCTAssertEqual(store.user?.bottomTabOrder, held.bottomTabOrder)
+        XCTAssertEqual(store.user?.featureFlags, held.featureFlags)
+
+        store.adoptAvatarURL(nil)
+        XCTAssertNil(store.user?.avatarUrl)
+        XCTAssertEqual(me.calls, 0, "a picture change asked /me again")
+    }
+
+    /// Nobody held, nobody invented: an answer that lands after Изход
+    /// leaves the store empty.
+    func testAPictureChangeWithNoUserHeldIsIgnored() {
+        store.adoptAvatarURL("/api/account/avatar/u1")
+        XCTAssertNil(store.user)
+    }
+
     /// Past the memo: a store that already holds a user still asks, and the
     /// fresh answer replaces user, flags, identity and bar.
     func testARefreshAdoptsTheFreshAnswer() async {

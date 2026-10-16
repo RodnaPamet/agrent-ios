@@ -186,6 +186,8 @@ final class RouteContractTests: XCTestCase {
             // spec documents for that value (`getUserAvatar`). A server that
             // retired it would leave every uploaded avatar on initials.
             ("AccountAvatar.swift", ["/api/account/avatar/{userId}"]),
+            // Changing or removing that picture from Профил (#333).
+            ("AccountPicture.swift", [AccountPicture.path]),
             ("SessionReset.swift", [SessionRevocation.path]),
             // This phone's APNs token, per farm (#272).
             ("PushAPI.swift", [PushAPI.subscriptionsPath(in: "{tenantSlug}")]),
