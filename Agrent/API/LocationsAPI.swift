@@ -4,7 +4,16 @@ enum LocationsAPI {
     private static var base: String { "\(FarmPath.root)/locations" }
 
     /// A BARE ARRAY, not an envelope. Measured.
-    static var listPath: String { base }
+    ///
+    /// Fields only (`kind=FIELD`): a Location is a block of parcels OR a
+    /// silo or warehouse, by `kind`. The owner's words, 2026-10-16 (agri-saas
+    /// #1966): «блок» for a group of parcels, «силоз» for a bin, «склад» for
+    /// a warehouse. The owner chose «Блокове», fields only, for the tab, as on
+    /// the web, whose silos have a page of their own. Every caller here is a
+    /// field context: the tab, the journal's block filter, the farm record
+    /// and the risk picker. The server's `kind` is never null (it defaults to
+    /// FIELD), so the filter hides no field.
+    static var listPath: String { "\(base)?kind=FIELD" }
 
     /// The parcels live HERE, not on the location detail: that route returns a
     /// flat row with no `parcels` key at all. The optional-parcels DTO on the

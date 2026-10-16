@@ -441,6 +441,23 @@ Web `locations` (225) + `locations/[locationId]` (1342, with
 `apiPost`/`apiPatch`/`apiDelete`) · iOS `Locations/LocationsView.swift` (59)
 + `ParcelMapView.swift` + `SatelliteParcelMap.swift` (two modes, one map view)
 
+### «Блокове», fields only (owner, 2026-10-16)
+
+The owner's words for a Location, one per `LocationKind` (agri-saas #1966):
+«блок» for a group of parcels (FIELD), «силоз» for a grain bin, «склад» for
+a warehouse. The web retired «Локация» and «Обект» for the entity in
+agri-saas #1985.
+
+- **The tab:** asked directly, the owner chose «Блокове», fields only, as on
+  the web, where silos and warehouses have a page of their own. The list
+  asks for `kind=FIELD`. So do the journal's block filter, the farm record
+  and the risk picker, which share the path and were field contexts already.
+- **Fixed on the way:** each row printed the server's `kind` as sent, so
+  every row read «FIELD». The line now shows only the parcel count.
+- **Wording:** pickers, empty states and the two refusals of the phone's own
+  that said «локация» (`INVALID_LOCATION`, `PARCEL_LOCATION_MISMATCH`) now
+  say «блок». Silos and warehouses don't appear on the phone.
+
 ### Gap 4 — read-only — CLOSED 2026-09-22 as a DECISION
 
 Recorded in `ROADMAP.md` rather than built. The geometry feeds subsidy

@@ -143,7 +143,7 @@ struct FarmRiskView: View {
     @ViewBuilder
     private var locationPicker: some View {
         if let locations = store.locations.value, locations.count > 1 {
-            Picker("Локация", selection: Binding(
+            Picker("Блок", selection: Binding(
                 get: { store.selected?.id ?? "" },
                 set: { id in
                     if let match = locations.first(where: { $0.id == id }) {
@@ -193,7 +193,7 @@ struct FarmRiskView: View {
             EmptyState(
                 "Няма парцели",
                 icon: "map",
-                message: "Тази локация още няма въведени парцели."
+                message: "Този блок още няма въведени парцели."
             )
 
         case .loaded(let rows, _):

@@ -23,7 +23,7 @@ struct LocationsView: View {
             // `safeAreaInset(edge: .top)`.
             content
                 .background(Palette.Surface.page)
-            .navigationTitle("Локации")
+            .navigationTitle(AppSurface.locations.label)
             .appMenu()
             .task {
                 if store.state.value == nil { await store.load() }
@@ -42,9 +42,9 @@ struct LocationsView: View {
 
         case .loaded(let locations, _) where locations.isEmpty:
             EmptyState(
-                "Няма локации",
+                "Няма блокове",
                 icon: "map",
-                message: "Това стопанство още няма въведени локации."
+                message: "Това стопанство още няма въведени блокове."
             )
 
         case .loaded(let locations, _):
@@ -52,21 +52,14 @@ struct LocationsView: View {
                 NavigationLink(value: AppRoute.location(location)) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(location.name).font(.headline)
-                        // `kind` is nil when the server omitted it or sent
-                        // it blank — see `Location.kind`. The separator is
-                        // conditional on BOTH sides, so an absent kind does
-                        // not leave a leading «·» in front of the count, the
-                        // way an absent dose unit left a trailing space on
-                        // the operation lines.
-                        MetaRow(spacing: 8) {
-                            if let kind = location.kind { Text(kind) }
-                            if let count = location.parcelCount {
-                                if location.kind != nil { MetaSeparator() }
-                                Text(Plural.bg(count, "парцел", "парцела"))
-                            }
+                        // No kind: every row is a block now (`LocationsAPI.
+                        // listPath` asks for FIELD only), and the line used
+                        // to print the server's enum, «FIELD», in English.
+                        if let count = location.parcelCount {
+                            Text(Plural.bg(count, "парцел", "парцела"))
+                                .font(.footnote)
+                                .foregroundStyle(Palette.secondaryText)
                         }
-                        .font(.footnote)
-                        .foregroundStyle(Palette.secondaryText)
                     }
                     .padding(.vertical, 2)
                     // `.combine` was here and it read the `·` aloud as
@@ -76,7 +69,6 @@ struct LocationsView: View {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(A11y.sentence([
                         location.name,
-                        location.kind,
                         location.parcelCount.map { Plural.bg($0, "парцел", "парцела") },
                     ]))
                 }

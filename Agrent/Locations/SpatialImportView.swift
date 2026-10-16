@@ -333,7 +333,7 @@ struct SpatialImportView: View {
                 return
             }
         }
-        phase = .failed("Обработката още продължава. Проверете локацията по-късно.")
+        phase = .failed("Обработката още продължава. Проверете блока по-късно.")
     }
 
     /// Two minutes at two seconds a poll. Long enough for a parse of a file

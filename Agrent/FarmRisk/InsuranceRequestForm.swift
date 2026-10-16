@@ -228,7 +228,7 @@ struct InsuranceRequestForm: View {
             PageForm {
                 if available.isEmpty {
                     RefusalNote(
-                        text: "Тази локация няма парцели.",
+                        text: "Този блок няма парцели.",
                         icon: "map")
                 } else {
                     Section {

@@ -189,9 +189,9 @@ final class A11yShotsTests: XCTestCase {
         // Локации → a location's map: the one #97 calls "the one that matters
         // most", because Increase Contrast is what switches the near-solid
         // fill on and the label outline is the answer to it.
-        XCTAssertTrue(app.tabBars.buttons["Локации"].waitForExistence(timeout: 10),
-                      "no «Локации» button in the tab bar")
-        app.tabBars.buttons["Локации"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Блокове"].waitForExistence(timeout: 10),
+                      "no «Блокове» button in the tab bar")
+        app.tabBars.buttons["Блокове"].tap()
 
         // A fixture answers in milliseconds, so this wait is for the push and
         // the first layout rather than a network. Kept at 20s anyway: it
@@ -229,9 +229,9 @@ final class A11yShotsTests: XCTestCase {
     /// Локации → the fixture world's one location, for a capture run alone
     /// (`ONLY=18-operation-typed-product`); the full walk is already there.
     private func openTheLocation(_ app: XCUIApplication) {
-        XCTAssertTrue(app.tabBars.buttons["Локации"].waitForExistence(timeout: 10),
-                      "no «Локации» button in the tab bar")
-        app.tabBars.buttons["Локации"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Блокове"].waitForExistence(timeout: 10),
+                      "no «Блокове» button in the tab bar")
+        app.tabBars.buttons["Блокове"].tap()
         XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20),
                       "Локации showed no rows within 20s — locations-list.json did not load")
         app.cells.firstMatch.tap()
