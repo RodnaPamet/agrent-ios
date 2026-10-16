@@ -393,6 +393,134 @@ final class AccountCardTests: XCTestCase {
                       "the old picture's late answer replaced the uploaded one")
     }
 
+    // MARK: - Revalidation (#345, agri-saas #1958)
+
+    /// A held picture is asked again with its ETag, but not within the
+    /// minute; a 304 keeps the picture as it is.
+    func testAHeldPictureIsRevalidatedWithItsETagAfterAMinute() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        var sent: [String?] = []
+        let store = AccountAvatarStore(conditional: { _, tag in
+            sent.append(tag)
+            if tag == Self.v1 { throw APIClient.APIError.notModified }
+            return .init(data: png, etag: Self.v1)
+        }, now: { clock })
+
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        let first = try XCTUnwrap(store.image(for: "usr_a", avatarURL: Self.relative))
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(sent, [nil], "asked again within the minute")
+
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(sent, [nil, Self.v1], "the held ETag was not sent")
+        XCTAssertTrue(store.image(for: "usr_a", avatarURL: Self.relative) === first,
+                      "a 304 replaced the picture")
+    }
+
+    /// A picture changed on the web: same URL, new bytes, new ETag. The new
+    /// one is shown, and the next check sends ITS tag.
+    func testAPictureChangedElsewhereReplacesTheHeldOne() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        var sent: [String?] = []
+        let store = AccountAvatarStore(conditional: { _, tag in
+            sent.append(tag)
+            return .init(data: png, etag: tag == nil ? Self.v1 : Self.v2)
+        }, now: { clock })
+
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        let first = try XCTUnwrap(store.image(for: "usr_a", avatarURL: Self.relative))
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        let second = try XCTUnwrap(store.image(for: "usr_a", avatarURL: Self.relative))
+        XCTAssertFalse(second === first, "a 200 on revalidation kept the old picture")
+
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(sent, [nil, Self.v1, Self.v2])
+    }
+
+    /// Offline is not an answer: the picture stays, and the next appearance
+    /// asks again rather than waiting out another minute.
+    func testAFailedRevalidationKeepsThePictureAndAsksAgain() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        var calls = 0
+        let store = AccountAvatarStore(conditional: { _, tag in
+            calls += 1
+            if tag != nil { throw URLError(.notConnectedToInternet) }
+            return .init(data: png, etag: Self.v1)
+        }, now: { clock })
+
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        let first = try XCTUnwrap(store.image(for: "usr_a", avatarURL: Self.relative))
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertTrue(store.image(for: "usr_a", avatarURL: Self.relative) === first)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(calls, 3, "a failed check counted as a check")
+    }
+
+    /// Removed on the web while the `/me` value still names it: initials.
+    func testAPictureRemovedElsewhereBecomesInitials() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        let store = AccountAvatarStore(conditional: { _, tag in
+            if tag != nil { throw APIClient.APIError.http(status: 404, code: nil, message: nil) }
+            return .init(data: png, etag: Self.v1)
+        }, now: { clock })
+
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertNotNil(store.image(for: "usr_a", avatarURL: Self.relative), "positive control")
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.relative))
+        XCTAssertEqual(store.avatar, AccountAvatarStore.Avatar.none)
+    }
+
+    /// A provider's photo isn't this server's: never asked again.
+    func testAProvidersPhotoIsNotRevalidated() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        var calls = 0
+        let store = AccountAvatarStore(conditional: { _, _ in
+            calls += 1
+            return .init(data: png, etag: nil)
+        }, now: { clock })
+
+        let google = "https://lh3.example.invalid/a/photo"
+        await store.load(for: "usr_a", avatarURL: google)
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: google)
+        XCTAssertEqual(calls, 1)
+    }
+
+    /// The picture this phone uploaded has no ETag (the upload's answer has
+    /// none), so after the minute it's fetched outright once, to learn one.
+    func testAnUploadedPictureLearnsItsETagAfterAMinute() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var clock = Date(timeIntervalSince1970: 1_000_000)
+        var sent: [String?] = []
+        let store = AccountAvatarStore(conditional: { _, tag in
+            sent.append(tag)
+            return .init(data: png, etag: Self.v1)
+        }, now: { clock })
+
+        store.adopt(userID: "usr_a", avatarURL: Self.relative, image: Self.onePixel())
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(sent, [], "the just-uploaded picture was fetched back at once")
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        clock = clock.addingTimeInterval(AccountAvatarStore.revalidateAfter + 1)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertEqual(sent, [nil, Self.v1])
+    }
+
+    private static let v1 = "\"1834-1760600000000\""
+    private static let v2 = "\"2051-1760600100000\""
+
     // The circle's contrast is measured in `PaletteTokenTests`, from the
     // token colours as the app resolves them in each arm.
 
