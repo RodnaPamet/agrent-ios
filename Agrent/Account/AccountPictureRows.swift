@@ -53,10 +53,8 @@ struct AccountPictureRows: View {
         }
 
         if hasPicture {
-            Button {
+            Button(AccountPicture.removeTitle, systemImage: "xmark.circle") {
                 Task { await remove() }
-            } label: {
-                Label(AccountPicture.removeTitle, systemImage: "xmark.circle")
             }
             .disabled(working)
             .accessibilityInputLabels(A11y.spokenNames(AccountPicture.removeTitle, "Remove photo"))
