@@ -21,6 +21,7 @@ struct AccountPictureRows: View {
     var me: CurrentUserStore = .shared
     var avatars: AccountAvatarStore = .shared
 
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var picked: PhotosPickerItem?
     @State private var working = false
     @State private var failure: String?
@@ -29,11 +30,14 @@ struct AccountPictureRows: View {
         // Read here, outside the label closure: `PhotosPicker` takes that
         // closure as `@Sendable`, so it may not touch this view's state.
         let title = hasPicture ? AccountPicture.changeTitle : AccountPicture.uploadTitle
+        // No icons at the accessibility sizes: beside the glyph at AX5,
+        // «Премахване» broke «Премахва / не».
+        let iconless = typeSize.isAccessibilitySize
         // `.current`: the library's own bytes, HEIC included, because the
         // conversion below reads them anyway. `.compatible` would have the
         // system transcode to JPEG first, and then this app would do it again.
         PhotosPicker(selection: $picked, matching: .images, preferredItemEncoding: .current) {
-            Label(title, systemImage: "photo")
+            if iconless { Text(title) } else { Label(title, systemImage: "photo") }
         }
         .disabled(working)
         .accessibilityInputLabels(hasPicture
@@ -53,8 +57,14 @@ struct AccountPictureRows: View {
         }
 
         if hasPicture {
-            Button(AccountPicture.removeTitle, systemImage: "xmark.circle") {
+            Button {
                 Task { await remove() }
+            } label: {
+                if iconless {
+                    Text(AccountPicture.removeTitle)
+                } else {
+                    Label(AccountPicture.removeTitle, systemImage: "xmark.circle")
+                }
             }
             .disabled(working)
             .accessibilityInputLabels(A11y.spokenNames(AccountPicture.removeTitle, "Remove photo"))
