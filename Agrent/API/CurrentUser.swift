@@ -561,6 +561,22 @@ final class CurrentUserStore {
         Task { await ResponseCache.shared.remove(key) }
     }
 
+    /// The picture this person just set or removed on Профил (#333).
+    ///
+    /// The server answers an upload with the new `avatarUrl` and a removal
+    /// clears it to null, which is exactly what the next `/me` would say. So
+    /// it's adopted from that answer rather than by asking `/me` again. The
+    /// disk copy keeps the old value until the next `/me`, which only an
+    /// offline cold launch reads, and a picture can't be fetched offline
+    /// anyway.
+    func adoptAvatarURL(_ avatarURL: String?) {
+        guard let held = answered, held.avatarUrl != avatarURL else { return }
+        answered = CurrentUser(id: held.id, name: held.name, email: held.email, role: held.role,
+                               bottomTabOrder: held.bottomTabOrder, featureFlags: held.featureFlags,
+                               avatarUrl: avatarURL, tenant: held.tenant, deletion: held.deletion,
+                               permissions: held.permissions)
+    }
+
     /// The one place a resolved `/me` is adopted, by both paths, and only
     /// AFTER each has checked the epoch.
     ///

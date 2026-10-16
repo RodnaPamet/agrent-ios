@@ -234,6 +234,11 @@ final class AccountAvatarStore {
     }
 
     @ObservationIgnored private var inFlight: Key?
+    /// Moved by `adopt` and `reset`. A fetch that started before either one
+    /// answers for bytes that are no longer the account's picture: the
+    /// upload's URL is the same as the old picture's, so the key alone
+    /// can't tell them apart.
+    @ObservationIgnored private var generation = 0
     /// The seam for `AccountCardTests`. The app's routes each `Source` to the
     /// one place that may fetch it — see `fetchLive`.
     @ObservationIgnored private let fetch: @MainActor (AccountAvatarAPI.Source) async throws -> Data
@@ -273,6 +278,7 @@ final class AccountAvatarStore {
         // Captured BEFORE the await: an answer for A that lands after Изход
         // must not become the picture B's Админ opens on.
         let epoch = SessionEpoch.current
+        let generation = generation
         let result: Avatar?
         do {
             let data = try await fetch(source)
@@ -289,27 +295,35 @@ final class AccountAvatarStore {
         }
         // The same epoch AND still the value on screen: an answer for an
         // `avatarUrl` the refresh has since replaced is not this picture.
-        guard SessionEpoch.isCurrent(epoch), self.key == key else { return }
+        guard SessionEpoch.isCurrent(epoch), self.key == key,
+              self.generation == generation else { return }
         inFlight = nil
         if let result { avatar = result }
     }
 
+    /// The picture this phone has just uploaded (#333), shown without asking
+    /// for it back. It's the JPEG that was sent, and the server stores the
+    /// same 256×256 square re-encoded as WebP, so the two differ only by
+    /// the encoder.
+    ///
+    /// Not a refetch: the serve URL didn't change, so a fetch would have to
+    /// be forced past this store's rule of one ask per value, and it would
+    /// cost a round trip to show what the phone already holds.
+    func adopt(userID: String, avatarURL: String, image: UIImage) {
+        guard let source = AccountAvatarAPI.source(avatarURL) else { return }
+        generation += 1
+        inFlight = nil
+        key = Key(userID: userID, source: source)
+        avatar = .image(image)
+    }
+
     /// Back to a fresh launch's state — part of `SessionReset`.
     func reset() {
+        generation += 1
         key = nil
         avatar = .unknown
         inFlight = nil
     }
-
-    #if DEBUG
-    /// For `AccountCardTests`, which must seed the SHARED store (the one
-    /// `SessionReset` empties) without a fetch.
-    func adoptForTesting(userID: String, avatarURL: String, image: UIImage) {
-        guard let source = AccountAvatarAPI.source(avatarURL) else { return }
-        key = Key(userID: userID, source: source)
-        avatar = .image(image)
-    }
-    #endif
 }
 
 /// One or two letters for the circle when there is no picture.

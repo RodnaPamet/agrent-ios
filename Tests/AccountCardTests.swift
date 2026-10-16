@@ -314,8 +314,8 @@ final class AccountCardTests: XCTestCase {
     /// And the shared one is actually on the sign-out path, not just
     /// resettable: `resetUserState()` must empty it.
     func testResetUserStateEmptiesTheSharedStore() {
-        AccountAvatarStore.shared.adoptForTesting(userID: "usr_a", avatarURL: Self.relative,
-                                                  image: Self.onePixel())
+        AccountAvatarStore.shared.adopt(userID: "usr_a", avatarURL: Self.relative,
+                                        image: Self.onePixel())
         XCTAssertNotNil(AccountAvatarStore.shared.image(for: "usr_a", avatarURL: Self.relative),
                         "positive control")
         SessionReset.resetUserState()
@@ -358,6 +358,39 @@ final class AccountCardTests: XCTestCase {
         await old.value
         XCTAssertNil(store.key, "the removed avatar came back from a late answer")
         XCTAssertNil(store.image(for: "usr_a", avatarURL: Self.relative))
+    }
+
+    /// A picture this phone uploaded (#333) shows at once and asks for
+    /// nothing: the serve URL is the same as before, and the store already
+    /// holds the bytes that were sent.
+    func testAnUploadedPictureIsShownWithoutAFetch() async throws {
+        var asked = 0
+        let store = AccountAvatarStore { _ in asked += 1; return Data() }
+        let uploaded = Self.onePixel()
+        store.adopt(userID: "usr_a", avatarURL: Self.relative, image: uploaded)
+        await store.load(for: "usr_a", avatarURL: Self.relative)
+        XCTAssertTrue(store.image(for: "usr_a", avatarURL: Self.relative) === uploaded)
+        XCTAssertEqual(asked, 0, "the card fetched a picture the phone had just sent")
+    }
+
+    /// The OLD picture, still downloading when the upload lands, must not
+    /// replace it: both answer for the same URL, so only the order tells
+    /// them apart.
+    func testAnOlderFetchDoesNotReplaceAnUploadedPicture() async throws {
+        let png = try XCTUnwrap(Self.onePixel().pngData())
+        var release: CheckedContinuation<Void, Never>?
+        let store = AccountAvatarStore { _ in
+            await withCheckedContinuation { release = $0 }
+            return png
+        }
+        let old = Task { await store.load(for: "usr_a", avatarURL: Self.relative) }
+        while release == nil { await Task.yield() }
+        let uploaded = Self.onePixel()
+        store.adopt(userID: "usr_a", avatarURL: Self.relative, image: uploaded)
+        release?.resume()
+        await old.value
+        XCTAssertTrue(store.image(for: "usr_a", avatarURL: Self.relative) === uploaded,
+                      "the old picture's late answer replaced the uploaded one")
     }
 
     // The circle's contrast is measured in `PaletteTokenTests`, from the
