@@ -33,7 +33,7 @@ struct FarmRecordSheet: View {
     var body: some View {
         NavigationStack {
             PageForm {
-                Section(titled: "Локация") {
+                Section(titled: "Блок") {
                     switch locations.state {
                     case .loading:
                         ProgressView()
@@ -43,14 +43,14 @@ struct FarmRecordSheet: View {
                             .foregroundStyle(Palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     case .loaded where choices.isEmpty:
-                        Text("Стопанството няма локации, за които да има дневник.")
+                        Text("Стопанството няма блокове, за които да има дневник.")
                             .font(.footnote)
                             .foregroundStyle(Palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     case .loaded where choices.count == 1:
                         Text(choices[0].name)
                     case .loaded:
-                        MenuPicker("Локация", selection: $locationID, value: chosen?.name ?? "— изберете —") {
+                        MenuPicker("Блок", selection: $locationID, value: chosen?.name ?? "— изберете —") {
                             Text("— изберете —").tag(String?.none)
                             ForEach(choices) { Text($0.name).tag(String?.some($0.id)) }
                         }

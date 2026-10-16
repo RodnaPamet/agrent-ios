@@ -441,9 +441,9 @@ final class FarmPathTests: XCTestCase {
     func testPathsFollowTheOpenFarm() {
         ActiveFarm.shared.set(Farm(slug: "ferma-1", name: nil))
         XCTAssertEqual(FarmPath.openSlug, "ferma-1")
-        XCTAssertEqual(LocationsAPI.listPath, "/api/t/ferma-1/locations")
+        XCTAssertEqual(LocationsAPI.listPath, "/api/t/ferma-1/locations?kind=FIELD")
         ActiveFarm.shared.set(Farm(slug: "ferma-2", name: nil))
-        XCTAssertEqual(LocationsAPI.listPath, "/api/t/ferma-2/locations", "a path kept the farm before")
+        XCTAssertEqual(LocationsAPI.listPath, "/api/t/ferma-2/locations?kind=FIELD", "a path kept the farm before")
     }
 
     /// With no farm open a farm path names NO farm — never the pinned one —
@@ -451,7 +451,7 @@ final class FarmPathTests: XCTestCase {
     func testWithNoFarmOpenAPathGoesNowhere() {
         ActiveFarm.shared.set(nil)
         let path = LocationsAPI.listPath
-        XCTAssertEqual(path, "/api/t//locations", "a farm the person did not choose was put in the path")
+        XCTAssertEqual(path, "/api/t//locations?kind=FIELD", "a farm the person did not choose was put in the path")
         XCTAssertTrue(FarmPath.isUnscoped(path))
         XCTAssertThrowsError(try APIClient.url(for: path)) { error in
             guard case APIClient.APIError.noFarmOpen = error else { return XCTFail("refused as \(error)") }
