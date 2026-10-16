@@ -48,16 +48,25 @@ final class PushRegistrar {
     private var sending: Set<Sending> = []
 
     private let register: @MainActor (_ token: String, _ farm: String) async throws -> Void
+    private let unregister: @MainActor (_ token: String, _ farm: String) async throws -> Void
     private let farms: @MainActor () -> [String]
+    /// False once the person has switched notifications off in Профил.
+    private let wanted: @MainActor () -> Bool
 
     init(
         register: @escaping @MainActor (_ token: String, _ farm: String) async throws -> Void = {
             try await PushAPI.register($0, in: $1)
         },
-        farms: @escaping @MainActor () -> [String] = { FarmStore.shared.memberSlugs }
+        unregister: @escaping @MainActor (_ token: String, _ farm: String) async throws -> Void = {
+            try await PushAPI.unregister($0, from: $1)
+        },
+        farms: @escaping @MainActor () -> [String] = { FarmStore.shared.memberSlugs },
+        wanted: @escaping @MainActor () -> Bool = { !PushPermission.shared.storedSwitchedOff }
     ) {
         self.register = register
+        self.unregister = unregister
         self.farms = farms
+        self.wanted = wanted
     }
 
     /// False on a simulator, and under the screenshot harness — the
@@ -104,9 +113,9 @@ final class PushRegistrar {
         let epoch = SessionEpoch.current
         for farm in farms() {
             // Again on every pass, because each pass awaits: a person who
-            // signed out while the last farm was sent is not registered with
-            // the rest of their farms under whoever is signed in now.
-            guard SessionEpoch.isCurrent(epoch), token == deviceToken else { return }
+            // signed out — or switched notifications off — while the last farm
+            // was sent is not registered with the rest of their farms.
+            guard SessionEpoch.isCurrent(epoch), token == deviceToken, wanted() else { return }
             let marker = Sending(farm: farm, token: token, epoch: epoch)
             guard !registered.contains(farm), !sending.contains(marker) else { continue }
             sending.insert(marker)
@@ -121,6 +130,25 @@ final class PushRegistrar {
                 Log.auth.info("push register not sent: \(Log.summary(for: error), privacy: .public)")
             }
             sending.remove(marker)
+        }
+    }
+
+    /// Профил's switch turned off: remove this phone from every farm the
+    /// person belongs to. A removal that fails is tried again by the next
+    /// `withdraw` — the switch turned off again — and `sync` registers
+    /// nothing meanwhile, so the farm hears from this phone no more than it
+    /// did.
+    func withdraw() async {
+        guard let token = deviceToken else { return }
+        let epoch = SessionEpoch.current
+        for farm in registered.union(farms()).sorted() {
+            guard SessionEpoch.isCurrent(epoch) else { return }
+            do {
+                try await unregister(token, farm)
+                registered.remove(farm)
+            } catch {
+                Log.auth.info("push withdraw not sent: \(Log.summary(for: error), privacy: .public)")
+            }
         }
     }
 

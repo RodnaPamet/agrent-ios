@@ -818,6 +818,14 @@ actor APIClient {
         try await send(path: path, method: "DELETE", body: nil, idempotencyKey: nil)
     }
 
+    /// A DELETE that names what it removes in a BODY — the push route's,
+    /// whose row is addressed by the device token rather than by a path id
+    /// (agri-saas #1789). The token in a path would also reach every log line.
+    func deleteReturningData<B: Encodable>(_ path: String, body: B) async throws -> Data {
+        let payload = try encoder.encode(body)
+        return try await send(path: path, method: "DELETE", body: payload, idempotencyKey: nil)
+    }
+
     /// A `multipart/form-data` POST — the only one in this app.
     ///
     /// ── Why bytes and not a file URL ──

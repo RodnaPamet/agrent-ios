@@ -65,6 +65,8 @@ struct ProfileView: View {
     @State private var flags = FeatureFlags.shared
     @State private var farms = FarmStore.shared
     @State private var addingFarm = false
+    @State private var permission = PushPermission.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         List {
@@ -112,6 +114,28 @@ struct ProfileView: View {
                 }
                 .pageRow()
             }
+
+            // Notifications on this phone, for this person (owner,
+            // 2026-10-14, #272) — the same choice as the card in «Задачи»,
+            // for whoever closed it or changes their mind.
+            Section {
+                Toggle(isOn: notificationsOn) {
+                    Label(PushText.switchTitle, systemImage: "bell")
+                }
+                // iOS will not ask again after a no, so the switch cannot
+                // turn this on; the button below says where it can be.
+                .disabled(permission.standing == .refused)
+                .accessibilityInputLabels(A11y.spokenNames(PushText.switchTitle, "Notifications"))
+                if permission.standing == .refused {
+                    Button(PushText.openSettings) { permission.openSystemSettings() }
+                        .accessibilityInputLabels(A11y.spokenNames(PushText.openSettings, "Open Settings"))
+                }
+            } footer: {
+                SectionFooter {
+                    Text(permission.standing == .refused ? PushText.refusedNote : PushText.switchOnNote)
+                }
+            }
+            .pageRow()
 
             // Its own section, so the destructive row never reads as one more
             // fact about the account. ALWAYS drawn — a page that cannot say
@@ -167,6 +191,24 @@ struct ProfileView: View {
         // Read again whenever the page opens — alongside `/me`, not after it:
         // a farm someone was added to on the web an hour ago belongs here now.
         .task { await farms.refreshFarms() }
+        // Where iOS stands — again on a return, as the person may have just
+        // been to Settings.
+        .task { await permission.refresh() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await permission.refresh() } }
+        }
+    }
+
+    /// The switch, onto `PushPermission`: what it shows is where iOS and the
+    /// person stand, and a change is work — the iOS prompt, or removing this
+    /// phone from the person's farms — rather than a value to store.
+    private var notificationsOn: Binding<Bool> {
+        Binding(
+            get: { permission.isOn },
+            set: { on in
+                if on { Task { await permission.turnOn() } } else { permission.turnOff() }
+            }
+        )
     }
 
     /// The list once it has been read; until then the open farm alone, so

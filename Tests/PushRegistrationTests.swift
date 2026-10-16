@@ -25,7 +25,8 @@ final class PushRegistrationTests: XCTestCase {
                 sent.calls.append("\(farm) \(token.prefix(6))")
                 if sent.refuse.contains(farm) { throw URLError(.notConnectedToInternet) }
             },
-            farms: farms
+            farms: farms,
+            wanted: { true }
         )
     }
 
@@ -138,7 +139,8 @@ final class PushRegistrationTests: XCTestCase {
                 // The person signs out while the request is on its way.
                 SessionEpoch.advance()
             },
-            farms: { ["ferma-1"] }
+            farms: { ["ferma-1"] },
+            wanted: { true }
         )
         await push.adopt(token).value
         XCTAssertEqual(push.registered, [], "a registration from the old session was kept")
@@ -153,7 +155,8 @@ final class PushRegistrationTests: XCTestCase {
                 sent.calls.append(farm)
                 SessionEpoch.advance()
             },
-            farms: { ["ferma-1", "ferma-2", "ferma-3"] }
+            farms: { ["ferma-1", "ferma-2", "ferma-3"] },
+            wanted: { true }
         )
         await push.adopt(token).value
         XCTAssertEqual(sent.calls, ["ferma-1"], "the old session's farms went on being registered")
@@ -171,7 +174,8 @@ final class PushRegistrationTests: XCTestCase {
                 // iOS hands over a new token while the first is on its way.
                 if sent.calls.count == 1 { await late.push?.adopt(fresh).value }
             },
-            farms: { ["ferma-1"] }
+            farms: { ["ferma-1"] },
+            wanted: { true }
         )
         late.push = push
         await push.adopt(token).value
