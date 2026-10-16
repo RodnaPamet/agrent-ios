@@ -184,10 +184,19 @@ enum AccountAvatarAPI {
 /// ── Keyed on the user AND the value of `avatarUrl` ──
 ///
 /// The foreground `/me` refresh (#147) can change `avatarUrl` — an upload,
-/// a removal, a first Google sign-in — and that change, and only that one,
-/// fetches again. The same value is asked once per session; a picture held
-/// for a different value is never shown, so a removed avatar turns back
-/// into initials on the refresh that reports it, with no request.
+/// a removal, a first Google sign-in — and that change fetches again. A
+/// picture held for a different value is never shown, so a removed avatar
+/// turns back into initials on the refresh that reports it, with no request.
+///
+/// ── The same value, revalidated (#345, agri-saas #1958) ──
+///
+/// An uploaded picture's URL never changes, so a picture changed on the WEB
+/// left the value alone and the phone showed the old one until the next
+/// launch. The serve route now sends an `ETag` with `no-cache`, so each time
+/// the card appears, a held picture from the API asks again with
+/// `If-None-Match`, at most once a minute. A 304 costs no body; a 200 is a
+/// real change and replaces the picture. A provider's photo (Google) is not
+/// revalidated: it isn't this server's, and a sign-in changes its URL.
 ///
 /// ── A singleton, so it is on the sign-out list ──
 ///
@@ -239,23 +248,58 @@ final class AccountAvatarStore {
     /// upload's URL is the same as the old picture's, so the key alone
     /// can't tell them apart.
     @ObservationIgnored private var generation = 0
-    /// The seam for `AccountCardTests`. The app's routes each `Source` to the
-    /// one place that may fetch it — see `fetchLive`.
-    @ObservationIgnored private let fetch: @MainActor (AccountAvatarAPI.Source) async throws -> Data
+    /// The held picture's validator, from the response it came in. Nil for a
+    /// provider's photo, and for a picture this phone uploaded (the upload's
+    /// answer carries none), which the next revalidation then asks for
+    /// outright.
+    @ObservationIgnored private var etag: String?
+    /// When the held picture was last fetched, adopted or confirmed.
+    @ObservationIgnored private var validatedAt: Date?
 
-    init(fetch: @escaping @MainActor (AccountAvatarAPI.Source) async throws -> Data = {
-        try await AccountAvatarStore.fetchLive($0)
-    }) {
-        self.fetch = fetch
+    /// The card appears on Админ and on Профил, and moving between them
+    /// shows it twice in a second. A minute keeps that to one request, and a
+    /// picture changed on the web still shows the next time anyone looks.
+    static let revalidateAfter: TimeInterval = 60
+
+    /// What a fetch brought back: the bytes, and the validator they came with.
+    struct Fetched: Sendable {
+        let data: Data
+        let etag: String?
     }
 
-    /// Relative → `APIClient` (bearer, refresh, fixture seam). Absolute →
-    /// the credential-free session. There is no third branch: `source(_:)`
-    /// has already refused everything else.
-    nonisolated static func fetchLive(_ source: AccountAvatarAPI.Source) async throws -> Data {
+    /// The seams for `AccountCardTests`. The app's routes each `Source` to
+    /// the one place that may fetch it (`fetchLive`), passing the held ETag
+    /// as `If-None-Match`; a 304 arrives as `APIClient.APIError.notModified`.
+    @ObservationIgnored private let fetch: @MainActor (AccountAvatarAPI.Source, String?) async throws -> Fetched
+    @ObservationIgnored private let now: @MainActor () -> Date
+
+    init(
+        conditional fetch: @escaping @MainActor (AccountAvatarAPI.Source, String?) async throws -> Fetched = {
+            try await AccountAvatarStore.fetchLive($0, ifNoneMatch: $1)
+        },
+        now: @escaping @MainActor () -> Date = { Date() }
+    ) {
+        self.fetch = fetch
+        self.now = now
+    }
+
+    /// A fetch that knows no validators: the tests about WHICH picture is
+    /// held, where revalidation is beside the point.
+    convenience init(fetch: @escaping @MainActor (AccountAvatarAPI.Source) async throws -> Data) {
+        self.init(conditional: { source, _ in Fetched(data: try await fetch(source), etag: nil) })
+    }
+
+    /// Relative → `APIClient` (bearer, refresh, fixture seam), conditional on
+    /// the held ETag. Absolute → the credential-free session, never
+    /// conditional. There is no third branch: `source(_:)` has already
+    /// refused everything else.
+    nonisolated static func fetchLive(_ source: AccountAvatarAPI.Source, ifNoneMatch: String?) async throws -> Fetched {
         switch source {
-        case .api(let path): try await APIClient.shared.data(for: path)
-        case .external(let url): try await AccountAvatarAPI.fetchExternal(url)
+        case .api(let path):
+            let (data, etag) = try await APIClient.shared.conditionalData(for: path, ifNoneMatch: ifNoneMatch)
+            return Fetched(data: data, etag: etag)
+        case .external(let url):
+            return Fetched(data: try await AccountAvatarAPI.fetchExternal(url), etag: nil)
         }
     }
 
@@ -267,7 +311,10 @@ final class AccountAvatarStore {
             return
         }
         let key = Key(userID: userID, source: source)
-        if self.key == key, avatar != .unknown { return }
+        if self.key == key, avatar != .unknown {
+            await revalidate(key)
+            return
+        }
         if inFlight == key { return }
         if self.key != key {
             self.key = key
@@ -280,9 +327,11 @@ final class AccountAvatarStore {
         let epoch = SessionEpoch.current
         let generation = generation
         let result: Avatar?
+        var tag: String?
         do {
-            let data = try await fetch(source)
-            result = AccountAvatarAPI.image(from: data).map(Avatar.image) ?? Avatar.none
+            let fetched = try await fetch(source, nil)
+            result = AccountAvatarAPI.image(from: fetched.data).map(Avatar.image) ?? Avatar.none
+            tag = fetched.etag
         } catch APIClient.APIError.http(404, _, _, _, _) {
             result = Avatar.none
         } catch is AccountAvatarAPI.Unavailable {
@@ -298,7 +347,47 @@ final class AccountAvatarStore {
         guard SessionEpoch.isCurrent(epoch), self.key == key,
               self.generation == generation else { return }
         inFlight = nil
-        if let result { avatar = result }
+        if let result {
+            avatar = result
+            etag = tag
+            validatedAt = now()
+        }
+    }
+
+    /// The held picture, asked again with its ETag. See the type's comment.
+    ///
+    /// A failure that may pass (offline, a 5xx, the card leaving the screen
+    /// mid-request) keeps the picture and doesn't count as a check, so the
+    /// next appearance asks again. A 404 means it was removed elsewhere:
+    /// initials.
+    private func revalidate(_ key: Key) async {
+        guard case .api = key.source, case .image = avatar, inFlight == nil else { return }
+        if let validatedAt, now().timeIntervalSince(validatedAt) < Self.revalidateAfter { return }
+        inFlight = key
+        let epoch = SessionEpoch.current
+        let generation = generation
+        let held = etag
+        var replacement: Avatar?
+        var tag = held
+        do {
+            let fetched = try await fetch(key.source, held)
+            replacement = AccountAvatarAPI.image(from: fetched.data).map(Avatar.image) ?? Avatar.none
+            tag = fetched.etag
+        } catch APIClient.APIError.notModified {
+            replacement = nil
+        } catch APIClient.APIError.http(404, _, _, _, _) {
+            replacement = Avatar.none
+            tag = nil
+        } catch {
+            if SessionEpoch.isCurrent(epoch), self.generation == generation, inFlight == key { inFlight = nil }
+            return
+        }
+        guard SessionEpoch.isCurrent(epoch), self.key == key,
+              self.generation == generation else { return }
+        inFlight = nil
+        etag = tag
+        validatedAt = now()
+        if let replacement { avatar = replacement }
     }
 
     /// The picture this phone has just uploaded (#333), shown without asking
@@ -315,6 +404,8 @@ final class AccountAvatarStore {
         inFlight = nil
         key = Key(userID: userID, source: source)
         avatar = .image(image)
+        etag = nil
+        validatedAt = now()
     }
 
     /// Back to a fresh launch's state — part of `SessionReset`.
@@ -323,6 +414,8 @@ final class AccountAvatarStore {
         key = nil
         avatar = .unknown
         inFlight = nil
+        etag = nil
+        validatedAt = nil
     }
 }
 

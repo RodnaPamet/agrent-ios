@@ -992,7 +992,10 @@ card (one `AccountCard`), for every role.
   2026-10-16: no HEIC, so a camera HEIC is converted on the phone). No EXIF
   or GPS leaves the phone. The upload is tens of kilobytes. The card shows
   the JPEG it sent: the serve URL is the same for every upload, so a refetch
-  could only show the same picture. The server's refusals are said in its
+  could only show the same picture. A picture changed on the web shows the
+  next time the card appears, at most a minute later: the card asks again
+  with the server's ETag, and an unchanged picture costs a bodyless 304
+  (#345, agri-saas #1958). The server's refusals are said in its
   own Bulgarian; the phone words only its own two failures (a photo the
   library couldn't hand over, a file that isn't a picture).
 - Not ported, and why: name editing (`PATCH /api/account/profile`) is route
