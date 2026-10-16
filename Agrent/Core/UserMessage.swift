@@ -324,6 +324,23 @@ enum UserMessage {
             // quoted: anything else is not a length.
             guard let max = params?["max"], Int(max) != nil else { return nil }
             return "Името на стопанството е твърде дълго — до \(max) знака."
+        case "NOTES_TOO_LONG", "WEED_NAME_TOO_LONG", "WEED_ENTRIES_TOO_MANY":
+            // A parcel's history, with the bound in the sentence (agri-saas
+            // #1973, #1976), read from `params.max` as `FARM_NAME_TOO_LONG`
+            // is. With no whole number the table's plain sentence stands, so
+            // a server that sends none still reads correctly.
+            guard let max = params?["max"], Int(max) != nil else { return nil }
+            return switch code {
+            case "NOTES_TOO_LONG": "Бележките са твърде дълги — до \(max) знака."
+            case "WEED_NAME_TOO_LONG": "Името на плевела е твърде дълго — до \(max) знака."
+            default: "Твърде много плевели в едно наблюдение — до \(max)."
+            }
+        case "CROP_SEASON_YEAR_INVALID":
+            // The range is computed on the server (its upper end is next
+            // year but one), so `params` is the only place it can come from.
+            guard let min = params?["min"], let max = params?["max"],
+                  Int(min) != nil, Int(max) != nil else { return nil }
+            return "Годината на реколтата трябва да е между \(min) и \(max)."
         case "WRITE_FORBIDDEN_FOR_ROLE", "ADMIN_FORBIDDEN_FOR_ROLE", "AUDIT_FORBIDDEN_FOR_ROLE":
             // The person's role in THIS farm may not do this — change records
             // (agri-saas #1767), or an operation that needs an administrator

@@ -245,6 +245,30 @@ final class UserMessageHTTPTests: XCTestCase {
         }
     }
 
+    /// A parcel-history limit says what the limit is, from the server's
+    /// params (agri-saas #1973, #1976). With no whole number, the plain
+    /// sentence stands, so an older server still reads correctly.
+    func testAParcelHistoryLimitSaysTheLimit() {
+        func said(_ code: String, _ params: [String: String]?) -> String {
+            UserMessage.httpText(status: 400, code: code, message: nil, params: params)
+        }
+        XCTAssertEqual(said("NOTES_TOO_LONG", ["max": "2000"]), "Бележките са твърде дълги — до 2000 знака.")
+        XCTAssertEqual(said("WEED_NAME_TOO_LONG", ["max": "120"]), "Името на плевела е твърде дълго — до 120 знака.")
+        XCTAssertEqual(said("WEED_ENTRIES_TOO_MANY", ["max": "50", "count": "51"]),
+                       "Твърде много плевели в едно наблюдение — до 50.")
+        XCTAssertEqual(said("CROP_SEASON_YEAR_INVALID", ["min": "1990", "max": "2028", "year": "2031"]),
+                       "Годината на реколтата трябва да е между 1990 и 2028.")
+
+        for code in ["NOTES_TOO_LONG", "WEED_NAME_TOO_LONG", "WEED_ENTRIES_TOO_MANY", "CROP_SEASON_YEAR_INVALID"] {
+            let plain = UserMessage.bulgarian[code]
+            XCTAssertNotNil(plain, "positive control: \(code) has a plain sentence")
+            XCTAssertEqual(said(code, nil), plain, "\(code) with no params")
+            XCTAssertEqual(said(code, ["max": "много", "min": "x"]), plain, "\(code) quoted a non-number")
+        }
+        XCTAssertEqual(said("CROP_SEASON_YEAR_INVALID", ["max": "2028"]),
+                       UserMessage.bulgarian["CROP_SEASON_YEAR_INVALID"], "half a range was quoted")
+    }
+
     /// The error path itself must never be the thing that fails. This is the
     /// route a blank screen took once already.
     func testEveryStatusProducesSomethingReadable() {
