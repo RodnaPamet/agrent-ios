@@ -22,11 +22,27 @@
   is refused. The list of categories and reasons is Apple's:
   https://developer.apple.com/documentation/bundleresources/privacy-manifest-files/describing-use-of-required-reason-api
 
-  COLLECTED DATA describes what leaves the device: the signed-in account's
-  identifier and the farm records the user enters (journal, tasks, costs,
-  parcels), sent to app.agrent.bg for the app to function. Linked to the
-  user, never used for tracking, no third-party SDKs, no tracking domains.
-  This must agree with the "App Privacy" answers in App Store Connect.
+  COLLECTED DATA describes what leaves the device, all of it sent to
+  app.agrent.bg for the app to function, linked to the user, never used for
+  tracking. No third-party SDKs, no tracking domains.
+
+    User ID          the signed-in account's identifier.
+    Email Address    Sign in with Apple asks for the `.email` scope, and the
+                     address reaches the server inside Apple's identity
+                     token (AuthClient, AppleSignIn).
+    Photos or Videos the account picture, chosen in Профил and uploaded as
+                     a 256×256 JPEG (AccountPicture, #333/#344, 2026-10-16).
+                     Nothing else from the photo library leaves the phone.
+    Other User Content
+                     the farm records the user enters (journal, tasks,
+                     costs, parcels) and Борса listings and messages.
+
+  No device location is read: parcels are drawn from the farm's own
+  geometry, and nothing calls CoreLocation.
+
+  This must agree with the "App Privacy" answers in App Store Connect,
+  which the owner keeps. A new kind of data leaving the phone needs an
+  entry here AND an answer there before the next upload.
 -->
 <plist version="1.0">
 <dict>
@@ -39,6 +55,30 @@
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeUserID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>
