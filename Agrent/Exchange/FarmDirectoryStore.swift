@@ -14,13 +14,15 @@ final class FarmDirectoryStore {
     ///
     /// ── Why from the answers, not a list of crops ──
     ///
-    /// The server matches a crop EXACTLY, case included, against what each
-    /// farm typed («Пшеница» doesn't find «пшеница»). A fixed list of crop
-    /// names would offer choices that find nothing. A value taken from an
-    /// answer finds at least the farm it came from. It only grows, so a
-    /// filter that narrows the list doesn't narrow the choices with it.
-    /// agri-saas #1909 asks the server to compare crops case-insensitively;
-    /// once it does, a choice per spelling is still right, only redundant.
+    /// The server matches a crop against what each farm typed, ignoring
+    /// case but nothing else («пшеница» finds «Пшеница», not «Пшеница
+    /// (мека)»; agri-saas #2069). A fixed list of crop names would offer
+    /// choices that find nothing. A value taken from an answer finds at
+    /// least the farm it came from. It only grows, so a filter that narrows
+    /// the list doesn't narrow the choices with it.
+    ///
+    /// One choice per crop, not per spelling: two that differ only in case
+    /// find the same farms, so the menu keeps the first one seen.
     private(set) var knownCrops: [String] = []
 
     /// Which load is the latest. Counted, not compared by query: the search
@@ -52,9 +54,20 @@ final class FarmDirectoryStore {
     }
 
     private func remember(_ hits: [FarmDirectoryHit]) {
-        let new = Set(hits.flatMap(\.crops)).subtracting(knownCrops)
-        guard !new.isEmpty else { return }
-        knownCrops = Self.sorted(knownCrops + new)
+        let merged = Self.merged(knownCrops, with: hits.flatMap(\.crops))
+        guard merged.count != knownCrops.count else { return }
+        knownCrops = merged
+    }
+
+    /// `known` plus each crop in `found` whose case-folded spelling it
+    /// doesn't have yet, in Bulgarian order. Folded as the server's
+    /// `lower()` folds, so the menu merges exactly the spellings the
+    /// filter does.
+    nonisolated static func merged(_ known: [String], with found: [String]) -> [String] {
+        let bulgarian = Locale(identifier: "bg_BG")
+        var seen = Set(known.map { $0.lowercased(with: bulgarian) })
+        let new = found.filter { seen.insert($0.lowercased(with: bulgarian)).inserted }
+        return new.isEmpty ? known : sorted(known + new)
     }
 
     /// Alphabetical as a Bulgarian reads it, whatever the phone's language.
