@@ -1,0 +1,42 @@
+name: agri-saas mirrored copy
+
+# DO AGRI-SAAS'S PINS OF THE COPY THIS APP MIRRORS STILL HOLD HERE? (agrent-ios#366)
+#
+# agri-saas pins every Bulgarian string the phone copies from the web in
+# `tests/guards/ios-mirrored-copy.json`, labelled with the phone file that
+# holds it. Their guard fails when the web rewords a pinned key. It cannot
+# see this repository, so a label that names a file the phone no longer has,
+# or one that no longer holds the text, stays green there. This job is the
+# half only this tree can run.
+#
+# NOT ON PULL REQUESTS, for the reason «agri-saas routes» gives: it reads
+# another repository's branch, and that must not decide a PR here. Schedule
+# and manual dispatch only.
+#
+# A red run is one of two things, and the ::error:: line says which file:
+# the pin's label is wrong (tell backend 1, who owns the file), or the phone
+# moved or reworded a mirrored string (fix it here, or ask for a re-pin).
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"   # Mondays 06:23 UTC, beside «agri-saas routes»
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agri-saas-mirrored-copy
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Pins hold in this tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same script a developer runs. Which agri-saas branch it reads is
+      # set in the script (`REF`), not here.
+      - name: Check the pins against Agrent/
+        run: scripts/check-mirrored-copy.sh
