@@ -6,7 +6,10 @@ import SwiftUI
 ///   1. What was done — every field the ДНЕВНИК prints (`TreatmentFieldsView`).
 ///   2. «Напред»: the crop at the top right, its parcels on a map and in a
 ///      list, the treated ones ticked (`TreatmentPlaceView`).
-///   3. «Запази»: saved, with «Изтегли PDF» — the ДНЕВНИК pages for this
+///   3. «Продължи»: the whole treatment read back, with the amount of
+///      product and the end of the quarantine period (`TreatmentCheckView`,
+///      #362, owner 2026-10-20 — PRZ's check screen).
+///   4. «Добави»: saved, with «Изтегли PDF» — the ДНЕВНИК pages for this
 ///      entry alone (`TreatmentSavedView`). With no signal, kept on the
 ///      phone and sent later, under the same key (#324).
 ///
@@ -25,6 +28,8 @@ struct TreatmentEntryFlow: View {
     @State private var path: [Step] = []
     @State private var cropKey: String?
     @State private var chosen: Set<String> = []
+    /// What step three reads back, as it was when «Продължи» was pressed.
+    @State private var checking: Checking?
     @State private var saving = false
     @State private var failure: String?
     @State private var saved: TreatmentSavedView.Saved?
@@ -34,7 +39,12 @@ struct TreatmentEntryFlow: View {
     /// see `TreatmentAttempt`.
     @State private var attempt = TreatmentAttempt()
 
-    enum Step: Hashable { case place }
+    enum Step: Hashable { case place, check }
+
+    struct Checking: Equatable {
+        let record: TreatmentRecord
+        let fields: [TreatmentPlace.Field]
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -54,10 +64,27 @@ struct TreatmentEntryFlow: View {
                     }
                 }
             }
-            .navigationDestination(for: Step.self) { _ in
-                TreatmentPlaceView(store: place, kind: draft.kind, cropKey: $cropKey, chosen: $chosen,
-                                   saving: saving, failure: failure, retryCrops: { await loadPlace() }) { fields in
-                    Task { await save(fields) }
+            .navigationDestination(for: Step.self) { step in
+                switch step {
+                case .place:
+                    TreatmentPlaceView(store: place, kind: draft.kind, cropKey: $cropKey, chosen: $chosen,
+                                       failure: failure, retryCrops: { await loadPlace() }) { fields in
+                        proceed(fields)
+                    }
+                case .check:
+                    if let checking {
+                        TreatmentCheckView(
+                            record: checking.record, fields: checking.fields, cropLabel: cropLabel,
+                            doseUnitSymbol: draft.doseUnit?.symbol, saving: saving, failure: failure,
+                            onEdit: {
+                                // Back to the fields, everything kept: the
+                                // parcels stay ticked for the way forward.
+                                failure = nil
+                                path = []
+                            },
+                            onAdd: { Task { await save(checking.fields) } },
+                            onCancel: { dismiss() })
+                    }
                 }
             }
         }
@@ -84,11 +111,28 @@ struct TreatmentEntryFlow: View {
         }
     }
 
+    private var cropLabel: String? { place.state.value?.first { $0.key == cropKey }?.label }
+
+    /// «Продължи»: on to the check with the treatment as it stands, or the
+    /// first thing in its way, said on step two. «Напред» was allowed with
+    /// the catalogue not yet in hand, a name then counting as new; once it
+    /// loads, the name may turn out to be a sample or the wrong kind.
+    private func proceed(_ fields: [TreatmentPlace.Field]) {
+        guard let record = TreatmentRecord.make(draft, catalogue: reference.items.value, fields: fields) else {
+            failure = draft.problems(catalogue: reference.items.value).first?.text
+                ?? "Изберете поне един парцел."
+            return
+        }
+        failure = nil
+        checking = Checking(record: record, fields: fields)
+        path.append(.check)
+    }
+
     private func save(_ fields: [TreatmentPlace.Field]) async {
         guard !saving else { return }
-        // «Напред» was allowed with the catalogue not yet in hand, a name then
-        // counting as new; once it loads, the name may turn out to be a sample
-        // or the wrong kind. Said here, never a «Запази» that does nothing.
+        // Asked again, not taken from the check: the catalogue may have
+        // loaded since «Продължи». Said here, never an «Добави» that does
+        // nothing.
         guard let record = TreatmentRecord.make(draft, catalogue: reference.items.value, fields: fields) else {
             failure = draft.problems(catalogue: reference.items.value).first?.text
                 ?? "Изберете поне един парцел."
@@ -101,7 +145,7 @@ struct TreatmentEntryFlow: View {
         // state across an `await`.
         var attempt = attempt
         let outcome = await attempt.save(
-            record, fields: fields, cropLabel: place.state.value?.first { $0.key == cropKey }?.label,
+            record, fields: fields, cropLabel: cropLabel,
             entered: draft, with: recorder)
         self.attempt = attempt
         switch outcome {

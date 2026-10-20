@@ -101,7 +101,7 @@ struct TreatmentDraft: Equatable, Sendable {
     /// as the ДНЕВНИК computes it (`buildChemicalRows`). Shown, never typed.
     var earliestHarvest: Date? {
         guard kind == .spray, let days = quarantineDays else { return nil }
-        return Calendar(identifier: .gregorian).date(byAdding: .day, value: days, to: date)
+        return TreatmentCheck.earliestHarvest(after: date, days: days)
     }
 
     /// Everything still in the way of «Напред», first problem first.

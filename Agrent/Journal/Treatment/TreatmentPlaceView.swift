@@ -12,20 +12,19 @@ import SwiftUI
 /// is the second way, for the person who knows their fields by shape, and
 /// gives way to the list at the accessibility text sizes.
 ///
-/// «Запази» carries the total, so the area being recorded is in view at the
-/// moment it is recorded — and so does a refusal, above the button it
-/// refused.
+/// «Продължи» carries the total, so the area being recorded is in view at
+/// the moment it is chosen — and so does a problem, above the button it
+/// stopped. The save itself is step three's (`TreatmentCheckView`, #362).
 struct TreatmentPlaceView: View {
     let store: TreatmentPlaceStore
     let kind: TreatmentDraft.Kind
     @Binding var cropKey: String?
     @Binding var chosen: Set<String>
-    let saving: Bool
     let failure: String?
     /// Reads the crop list again after it failed. The flow's, not the
     /// store's, because the flow also chooses a farm's only crop.
     let retryCrops: @MainActor () async -> Void
-    let onSave: ([TreatmentPlace.Field]) -> Void
+    let onContinue: ([TreatmentPlace.Field]) -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .body) private var scaledMapHeight: CGFloat = 230
@@ -57,9 +56,6 @@ struct TreatmentPlaceView: View {
         .pageBackground()
         .safeAreaInset(edge: .bottom) { saveBar }
         .inlineTitle("Къде")
-        // A save under way is not abandoned by a swipe back, and its refusal
-        // does not land on a screen that has gone.
-        .navigationBarBackButtonHidden(saving)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { cropMenu }
         }
@@ -238,7 +234,7 @@ struct TreatmentPlaceView: View {
         return lines.joined(separator: " ")
     }
 
-    // MARK: - «Запази»
+    // MARK: - «Продължи»
 
     private var saveBar: some View {
         VStack(spacing: 6) {
@@ -259,20 +255,15 @@ struct TreatmentPlaceView: View {
                                         + Plural.bg(total.parcels, "парцел", "парцела") + ".")
             }
             Button {
-                onSave(chosenFields)
+                onContinue(chosenFields)
             } label: {
-                if saving {
-                    ProgressView().frame(maxWidth: .infinity)
-                        .accessibilityLabel("Записване")
-                } else {
-                    Text("Запази").frame(maxWidth: .infinity)
-                }
+                Text("Продължи").frame(maxWidth: .infinity)
             }
             .prominentButton()
             .controlSize(.large)
-            .disabled(saving || chosenFields.isEmpty)
+            .disabled(chosenFields.isEmpty)
             .accessibilityHint(chosenFields.isEmpty ? "Изберете поне един парцел." : "")
-            .accessibilityInputLabels(A11y.Spoken.save)
+            .accessibilityInputLabels(A11y.Spoken.proceed)
         }
         .padding(.horizontal)
         .padding(.vertical, 10)

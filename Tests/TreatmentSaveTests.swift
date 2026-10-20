@@ -3,7 +3,7 @@ import XCTest
 
 /// «Ново мероприятие»'s save (agrent-ios#293) against agri-saas #1740's
 /// contract: the body, the two answers read off the wire, and what one press
-/// of «Запази» does when an earlier save was never answered. Synthetic
+/// of «Добави» does when an earlier save was never answered. Synthetic
 /// fixtures throughout; nothing here reaches a network.
 final class TreatmentSaveTests: XCTestCase {
 
@@ -171,7 +171,7 @@ final class TreatmentSaveTests: XCTestCase {
         XCTAssertFalse(TreatmentAPI.isNothingRecorded(URLError(.timedOut)))
     }
 
-    // MARK: - One press of «Запази»
+    // MARK: - One press of «Добави»
 
     /// The server, scripted: answers in order, and every call written down.
     private actor Server: TreatmentRecorder {
@@ -345,7 +345,7 @@ final class TreatmentSaveTests: XCTestCase {
         let key = attempt.key
 
         let short = try await press(&attempt, spray(), on: server)
-        XCTAssertEqual(short, .failed("Сървърът е записал 1 от 2 парцела. Натиснете «Запази» отново."))
+        XCTAssertEqual(short, .failed("Сървърът е записал 1 от 2 парцела. Натиснете «Добави» отново."))
         XCTAssertEqual(attempt.unsettled?.key, key)
 
         let again = try await press(&attempt, spray(), on: server)
@@ -478,7 +478,7 @@ final class TreatmentSaveTests: XCTestCase {
 
     /// An entry the outbox could not take — nobody known to be signed in, or
     /// a disk that would not write — is not said to be kept: the error stays
-    /// on screen, and the entry is still the unanswered one «Запази» retries.
+    /// on screen, and the entry is still the unanswered one «Добави» retries.
     func testAnEntryThatCannotBeKeptStaysOnScreen() async throws {
         let server = Server(records: [.failure(URLError(.timedOut))], keeps: false)
         var attempt = TreatmentAttempt()
