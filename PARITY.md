@@ -663,6 +663,36 @@ waits for the updated app, as a queued spray does. The owner chose this on
 airplane mode → «Нов запис» → save → close the app → signal back → open
 it: one entry in the journal, with its PDF.
 
+### Divergence — «Продължи» reads the treatment back before «Добави» (#362, owner 2026-10-20)
+
+The owner compared the journal with PRZ (app.prz.center, manual v2.1.0)
+and chose to bring the **form** closer to PRZ's. In PRZ, «Продължи» opens a
+check screen with the amount of product and the end of the quarantine
+period, then «Добави», or «Редактирай данните» to go back.
+
+**iOS** puts that check between the parcels and the save:
+- **Step two** says «Продължи» instead of «Запази».
+- **Step three, «Проверка»**, lists:
+  - kind, day, product, pest, dose and technique;
+  - crop, blocks, parcels and treated area;
+  - the **amount needed**: the dose × the area, in the dose's own unit, with a thousand мл or г shown as л or кг;
+  - on a spraying, the **quarantine period** and the **earliest harvest day**.
+- **No amount:** with no area, or a dose that isn't per area, there is no amount. The screen says why, rather than guessing.
+- **«Добави»** is the same save as before: same key, same outbox. «Редактирай данните» goes back to step one with everything kept.
+- **Not shown: remaining stock.** A ДНЕВНИК treatment deducts none (agri-saas #1740), and the owner didn't choose it.
+
+**The web** has no check step yet. The web is backend 1's lane, to settle with the owner there (agri-saas #2072).
+
+The owner's other choices that day wait on the server (agri-saas #2072 →
+agrent-ios #363):
+- Фенофаза/BBCH, optional on every spraying;
+- treated area per parcel;
+- pest, dose and quarantine-period suggestions from the БАБХ register;
+- seed treatment not now.
+
+Offered and **not** chosen: PRZ's per-field layout by farming year, a crop
+record per block, and other activities with yield and cloning.
+
 ### Gap 6 — the list is capped at 50 with no paging — CLOSED 2026-09-22
 
 Cursor paging with an explicit "Покажи още", and the header count now

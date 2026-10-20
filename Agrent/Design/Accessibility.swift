@@ -124,6 +124,12 @@ enum A11y {
         static let importing = spokenNames("Импортирай", "Import")
         /// The farm profile's way into its editor.
         static let edit = spokenNames("Редактирай", "Edit")
+        /// «Ново мероприятие»'s check step (#362): «Добави» records it, and
+        /// «Редактирай данните» goes back to the fields.
+        static let add = spokenNames("Добави", "Add")
+        /// Step two's way on to that check.
+        static let proceed = spokenNames("Продължи", "Continue")
+        static let editEntry = spokenNames("Редактирай данните", "Редактирай", "Edit")
         /// The unsaved-changes guard's way out. NOT `cancel`: «Отказ» is what
         /// opened this question, and the answer that throws the edits away
         /// must not answer to the same word that asked it.

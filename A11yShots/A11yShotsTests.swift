@@ -1038,7 +1038,7 @@ final class A11yShotsTests: XCTestCase {
 
     /// «Нов запис», the most-used of the app's `Form`s (#156) — since #293
     /// step one of the treatment record — opened and CANCELLED. «Напред»
-    /// stays untouched, and nothing is saved before step two's «Запази»
+    /// stays untouched, and nothing is saved before step three's «Добави»
     /// anyway.
     private func captureNewEntryForm(_ app: XCUIApplication) {
         let open = app.buttons["Нов запис"]

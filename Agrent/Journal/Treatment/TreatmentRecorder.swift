@@ -114,7 +114,7 @@ struct TreatmentAttempt: Equatable, Sendable {
         let sent: Int
 
         var text: String {
-            "Сървърът е записал \(recorded) от \(sent) парцела. Натиснете «Запази» отново."
+            "Сървърът е записал \(recorded) от \(sent) парцела. Натиснете «Добави» отново."
         }
     }
 
@@ -125,7 +125,7 @@ struct TreatmentAttempt: Equatable, Sendable {
         return key
     }
 
-    /// One press of «Запази» — apart from the screen, so a test can read it.
+    /// One press of «Добави» — apart from the screen, so a test can read it.
     ///
     /// ── An earlier save is settled before a changed entry goes out ──
     ///
@@ -151,7 +151,7 @@ struct TreatmentAttempt: Equatable, Sendable {
     /// an earlier save under ANOTHER key is still unsettled: settling it
     /// needs the server, and sending the changed entry without that answer
     /// could record the treatment twice. Then, as before, the error stays on
-    /// screen and «Запази» asks again.
+    /// screen and «Добави» asks again.
     mutating func save(_ record: TreatmentRecord, fields: [TreatmentPlace.Field], cropLabel: String?,
                        entered draft: TreatmentDraft, with recorder: TreatmentRecorder) async -> Outcome {
         let entry = Sent(key: key(for: draft, parcels: fields.map(\.id)),
