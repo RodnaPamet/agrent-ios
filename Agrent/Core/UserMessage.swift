@@ -429,15 +429,19 @@ enum UserMessage {
         // spelling sent, so it is named through `CommodityName`, never quoted
         // raw. The form sends one field per row the server listed, so the
         // first three mean the two lists drifted; the fourth is real.
+        //
+        // A row the sentence can't name is «една от стоките», not «една от
+        // културите»: the day's prices include diesel and fertiliser, so the
+        // owner's word for the whole set is «стока» (agri-saas #2051).
         case "DUPLICATE_COMMODITY":
             return commodityNamed(params, "Цената на „%@“ е въведена два пъти за един ден.",
                                   otherwise: "Една от цените е въведена два пъти за един ден.")
         case "UNKNOWN_COMMODITY":
             return commodityNamed(params, "Сървърът не разпознава „%@“.",
-                                  otherwise: "Сървърът не разпознава една от културите.")
+                                  otherwise: "Сървърът не разпознава една от стоките.")
         case "COMMODITY_NOT_OVERRIDABLE":
             return commodityNamed(params, "За „%@“ не се въвежда цена от тук.",
-                                  otherwise: "За една от културите не се въвежда цена от тук.")
+                                  otherwise: "За една от стоките не се въвежда цена от тук.")
         case "OVERRIDE_DENOMINATION_CHANGED":
             // `stored` and `expected` are «EUR EUR/t»: currency, then unit.
             // The unit says it all, and is what differs.

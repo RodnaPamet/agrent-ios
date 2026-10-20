@@ -179,6 +179,10 @@ final class AdminPricesTests: XCTestCase {
                             ["commodity": "diesel", "stored": "EUR EUR/t", "expected": "EUR EUR/l"]),
                        "Цената на „\(CommodityName.canonical("diesel")!)“ е въведена в EUR/t, "
                        + "а вече се въвежда в EUR/l. Изчистете я, преди да въведете нова.")
+        // Unnamed, a row is «една от стоките»: diesel is priced here too, and
+        // the owner's word for the set is «стока» (agri-saas #2051).
+        XCTAssertEqual(said("UNKNOWN_COMMODITY"), "Сървърът не разпознава една от стоките.")
+        XCTAssertEqual(said("COMMODITY_NOT_OVERRIDABLE"), "За една от стоките не се въвежда цена от тук.")
         for code in ["DUPLICATE_COMMODITY", "UNKNOWN_COMMODITY", "COMMODITY_NOT_OVERRIDABLE",
                      "OVERRIDE_DENOMINATION_CHANGED"] {
             let bare = said(code)
