@@ -1094,9 +1094,10 @@ draft, so a field saved on one shows on the other.
 - **Oblast:** one of the 28 Bulgarian names the server uses for regions
   (`BulgarianRegion.names`), the form its tests and farm search use
   («Добрич»). The web's editor takes free text instead (up to 80
-  characters), and the directory matches oblast exactly. So a farm that
-  types «Добричка» on the web is missing from the phone's «Добрич» filter.
-  Raised on agri-saas #1909 (2026-10-16); the fix is the web's.
+  characters), and the directory ignores only case (agri-saas #2069). So
+  a farm that types «добрич» on the web is found by the phone's «Добрич»
+  filter, but one that types «Добричка» is not. Raised on agri-saas
+  #1909 (2026-10-16); the fix is the web's, tracked in agri-saas #2068.
 - **Not on the phone:** `indexable` (the search-engine toggle, agri-saas
   #1873) and the web's live preview (agri-saas #1939, which renders the
   real page's markup from unsaved edits). Neither was in the owner's choice.
@@ -1123,8 +1124,10 @@ live since 12.31.0). It's anonymous and behind the same flag.
 - **Search and filters:** a name search on submit (the server matches
   Cyrillic, and Latin through the name's transliteration); oblast from the
   28 names; crop from the crops the answers carried. A fixed crop list
-  can't be offered: the server matches a crop exactly, case included,
-  against what each farm typed (agri-saas #1909).
+  can't be offered: the server matches a crop against what each farm
+  typed, ignoring case but nothing else (agri-saas #2069). So the menu
+  has one choice per crop whatever its case («Пшеница», «пшеница»), and
+  a variety such as «Пшеница (мека)» is its own (#356).
 - **At most 50, no paging:** the server's bound. A full answer says to
   narrow by oblast or crop.
 - **Not cached:** a farm that withdraws leaves the directory at once.

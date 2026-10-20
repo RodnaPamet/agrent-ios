@@ -80,15 +80,32 @@ final class FarmDirectoryTests: XCTestCase {
 
     // MARK: - The crop filter's choices
 
-    /// Bulgarian order whatever the phone's language, and case kept: the
-    /// server matches a crop exactly, so «Пшеница» and «пшеница» are two
-    /// choices that find different farms.
+    /// Bulgarian order whatever the phone's language, and the spelling kept
+    /// as the farm typed it.
     func testCropsAreInBulgarianOrderWithTheirCaseKept() {
         XCTAssertEqual(FarmDirectoryStore.sorted(["ябълки", "ечемик", "царевица", "люцерна"]),
                        ["ечемик", "люцерна", "царевица", "ябълки"])
         XCTAssertEqual(FarmDirectoryStore.sorted(["ябълки", "Ечемик"]), ["Ечемик", "ябълки"],
                        "case doesn't move a crop")
-        XCTAssertEqual(Set(FarmDirectoryStore.sorted(["Пшеница", "пшеница"])), ["Пшеница", "пшеница"])
+    }
+
+    /// The server ignores case (agri-saas #2069), so «Пшеница» and
+    /// «пшеница» are one choice: the first spelling seen, later answers
+    /// included.
+    func testSpellingsThatDifferOnlyInCaseAreOneChoice() {
+        XCTAssertEqual(FarmDirectoryStore.merged([], with: ["Пшеница", "ечемик", "пшеница", "ПШЕНИЦА"]),
+                       ["ечемик", "Пшеница"])
+        XCTAssertEqual(FarmDirectoryStore.merged(["Пшеница"], with: ["пшеница", "Ечемик"]),
+                       ["Ечемик", "Пшеница"], "a later answer's spelling doesn't replace the first")
+        let known = ["Пшеница"]
+        XCTAssertEqual(FarmDirectoryStore.merged(known, with: ["пшеница"]), known, "nothing new, nothing changes")
+    }
+
+    /// Case only: a named variety is a different crop on the server too,
+    /// so it stays its own choice.
+    func testAVarietyIsStillItsOwnChoice() {
+        XCTAssertEqual(FarmDirectoryStore.merged(["пшеница"], with: ["Пшеница (мека)", "слънчоглед"]),
+                       ["пшеница", "Пшеница (мека)", "слънчоглед"])
     }
 
     // MARK: - The row and the screen
