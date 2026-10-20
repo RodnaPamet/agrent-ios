@@ -1,0 +1,26 @@
+[
+  {
+    "id": "inv-fixture-1",
+    "tenantId": "t-fixture",
+    "email": "operator.one@example.invalid",
+    "role": "MECHANISATOR",
+    "expiresAt": "2026-10-27T09:00:00.000Z",
+    "createdAt": "2026-10-20T09:00:00.000Z",
+    "updatedAt": "2026-10-20T09:00:00.000Z",
+    "invitedBy": { "id": "u-fixture-owner", "name": "Тестов Стопанин" },
+    "inviteDelivery": null,
+    "inviteDeliveryAt": null
+  },
+  {
+    "id": "inv-fixture-2",
+    "tenantId": "t-fixture",
+    "email": "returned@example.invalid",
+    "role": "READER",
+    "expiresAt": "2026-10-27T09:30:00.000Z",
+    "createdAt": "2026-10-20T09:30:00.000Z",
+    "updatedAt": "2026-10-20T09:31:00.000Z",
+    "invitedBy": { "id": "u-fixture-owner", "name": "Тестов Стопанин" },
+    "inviteDelivery": "BOUNCED",
+    "inviteDeliveryAt": "2026-10-20T09:31:00.000Z"
+  }
+]

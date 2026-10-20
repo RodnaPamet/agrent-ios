@@ -30,6 +30,17 @@ enum AdminAPI {
         try await APIClient.shared.decode(data, as: [Membership].self)
     }
 
+    /// The pending invitations (#365). A row that can't be read is left out
+    /// rather than failing the list, as members aren't: an invitation is
+    /// shown for information, and one bad row mustn't hide the rest.
+    static func decodeInvites(from data: Data) async throws -> [PendingInvite] {
+        struct Lossy: Decodable, Sendable {
+            let invite: PendingInvite?
+            init(from decoder: any Decoder) throws { invite = try? PendingInvite(from: decoder) }
+        }
+        return try await APIClient.shared.decode(data, as: [Lossy].self).compactMap(\.invite)
+    }
+
     static func decodeFarmProfile(from data: Data) async throws -> FarmProfile {
         try await APIClient.shared.decode(data, as: FarmProfile.self)
     }

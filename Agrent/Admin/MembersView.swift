@@ -55,12 +55,55 @@ struct MembersView: View {
 
         case .allowed:
             List {
+                invitesSection.pageRow()
                 membersSection.pageRow()
             }
             .refreshable { await PullToRefresh.bounded { await store.load() } }
             .pageBackground()
         }
     }
+
+    // MARK: - Invitations (#365)
+
+    /// Who was invited and hasn't joined: first, because "has my invite
+    /// gone out?" is why most people open this screen. Absent when there
+    /// are none; a failure is one line, never in the members' way.
+    @ViewBuilder
+    private var invitesSection: some View {
+        switch store.invites {
+        case .loading:
+            EmptyView()
+        case .failed(let message):
+            Section(titled: "Покани") {
+                Text("Поканите не се заредиха. \(message)")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .loaded(let all, _) where all.isEmpty:
+            EmptyView()
+        case .loaded(let all, _):
+            Section {
+                ForEach(all) { invite in InviteRow(invite: invite) }
+            } header: {
+                SectionHeader("Покани")
+            } footer: {
+                SectionFooter {
+                    if all.contains(where: { $0.delivery != .pending }) {
+                        Text(Self.notDeliveredNote)
+                    } else {
+                        Text(Self.pendingNote)
+                    }
+                }
+            }
+        }
+    }
+
+    /// What to do about it, with the honest limit on what "pending" means.
+    nonisolated static let notDeliveredNote = "Недоставената покана е върната от пощата на получателя. "
+        + "Проверете адреса и я изпратете отново с «Покани»."
+    nonisolated static let pendingNote = "Изпратените покани чакат приемане. Ако някоя не стигне до получателя, "
+        + "това се вижда тук само за покани, изпратени след 20 октомври 2026 г."
 
     // MARK: - Members
 
@@ -367,5 +410,35 @@ private struct InviteMemberView: View {
             // a write that worked — #921, in a different form.
             failure = UserMessage.text(for: error)
         }
+    }
+}
+
+/// One pending invitation (#365): the address, the role, until when, and
+/// whether the email came back.
+private struct InviteRow: View {
+    let invite: PendingInvite
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(invite.email)
+                .fixedSize(horizontal: false, vertical: true)
+            MetaRow {
+                Text(invite.role.label)
+                if let until = invite.expiresAt { MetaSeparator(); Text("до \(BgDate.full(until))") }
+            }
+            .font(.footnote)
+            .foregroundStyle(Palette.secondaryText)
+            if case .notDelivered(let at) = invite.delivery {
+                Label(Self.notDelivered(at), systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    static func notDelivered(_ at: Date?) -> String {
+        at.map { "Поканата не е доставена (\(BgDate.full($0)))." } ?? "Поканата не е доставена."
     }
 }

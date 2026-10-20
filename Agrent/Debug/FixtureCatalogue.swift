@@ -129,6 +129,10 @@ enum FixtureCatalogue {
         // agrent-ios#323: «Ферми» as it opens, unfiltered. A search or a
         // filter is another question, and `NO_FIXTURE` is its true answer.
         (FarmDirectoryAPI.searchPath(FarmDirectoryQuery()), "farm-directory"),
+        // agrent-ios#365: Членове's pending invitations, the members PATH
+        // with `?view=invites`. Here, by its query, or the members payload
+        // would answer it.
+        (AdminAPI.invitesPath, "admin-invites"),
     ]) { $0 }
 
     /// Routes matched on the path alone.
@@ -156,9 +160,8 @@ enum FixtureCatalogue {
         // make got a SYNTHETIC payload. Provenance in Tests/Fixtures/README.md.
         //
         // Админ's invites view (`AdminAPI.invitesPath`) is the same PATH as
-        // the members list and nothing calls it today; if something starts
-        // to, it belongs in `byPathAndQuery` with its own fixture, or it will
-        // be answered with the members.
+        // the members list, so it sits in `byPathAndQuery` with its own
+        // fixture (#365); answered from here it would get the members.
         (AdminAPI.membersPath, "admin-members"),
         (AdminAPI.farmProfilePath, "admin-farm-profile"),
         (FarmRiskAPI.leadsPath, "insurance-leads"),

@@ -14,6 +14,9 @@ final class AdminStore {
 
     private(set) var access: Access = .allowed
     private(set) var members: LoadState<[Membership]> = .loading
+    /// Invitations not yet accepted (#365): `TenantInvite` rows, which the
+    /// members list doesn't carry. Read beside it, never instead of it.
+    private(set) var invites: LoadState<[PendingInvite]> = .loading
     private(set) var profile: LoadState<FarmProfile> = .loading
 
     /// Whether THIS reader may edit the farm profile.
@@ -59,8 +62,9 @@ final class AdminStore {
 
     func load() async {
         async let m: Void = loadMembers()
+        async let i: Void = loadInvites()
         async let p: Void = loadProfile()
-        _ = await (m, p)
+        _ = await (m, i, p)
     }
 
     private func loadMembers() async {
@@ -88,6 +92,20 @@ final class AdminStore {
             } else {
                 members = .failed(UserMessage.text(for: error))
             }
+        }
+    }
+
+    /// Network only, for the members list's reason: addresses of people
+    /// who may not even have an account, on a screen used at a desk.
+    private func loadInvites() async {
+        if invites.value == nil { invites = .loading }
+        do {
+            let data = try await APIClient.shared.data(for: AdminAPI.invitesPath)
+            invites = .loaded(try await AdminAPI.decodeInvites(from: data), .fresh)
+        } catch {
+            // A reader's 403 is the members list's to say; this section
+            // has nothing to add to it.
+            invites = AdminAPI.isForbidden(error) ? .loaded([], .fresh) : .failed(UserMessage.text(for: error))
         }
     }
 

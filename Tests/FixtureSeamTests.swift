@@ -120,6 +120,7 @@ final class FixtureSeamTests: XCTestCase {
             (ExchangeAPI.threadPath(FixtureCatalogue.fixtureThreadID), "exchange-thread"),
             // agrent-ios#115 — the four menu screens A11yShots photographs.
             (AdminAPI.membersPath, "admin-members"),
+            (AdminAPI.invitesPath, "admin-invites"),
             (AdminAPI.farmProfilePath, "admin-farm-profile"),
             (FarmRiskAPI.leadsPath, "insurance-leads"),
             (FarmRiskAPI.analysisPath("par_holes"), "risk-analysis-holes"),
@@ -429,6 +430,7 @@ final class FixtureSeamTests: XCTestCase {
         ("exchange-threads", { _ = try await ExchangeAPI.decodeThreads(from: $0) }),
         ("exchange-thread", { _ = try await ExchangeAPI.decodeThread(from: $0) }),
         ("admin-members", { _ = try await AdminAPI.decodeMembers(from: $0) }),
+        ("admin-invites", { _ = try await AdminAPI.decodeInvites(from: $0) }),
         ("admin-farm-profile", { _ = try await AdminAPI.decodeFarmProfile(from: $0) }),
         ("insurance-leads", { _ = try await FarmRiskAPI.decodeLeads(from: $0) }),
         ("risk-analysis-holes", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
