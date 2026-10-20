@@ -307,3 +307,64 @@ struct FarmProfile: Decodable, Equatable, Sendable {
         return noText && sizeHa == nil && grainProduced.isEmpty
     }
 }
+
+/// An invitation not yet accepted (`PendingInvite`, `GET /admin/members?
+/// view=invites`, agrent-ios#365). A `TenantInvite` row, not a membership:
+/// the person may have no account yet, so it carries the address the
+/// invitation went to. PERSONAL DATA, as `Membership` is, and never cached.
+struct PendingInvite: Decodable, Identifiable, Equatable, Sendable {
+    let id: String
+    let email: String
+    let role: MembershipRole
+    /// When the invitation stops appearing in the list. The server has no
+    /// "expired" state to show.
+    let expiresAt: Date?
+    let invitedBy: Membership.Brief?
+    /// agri-saas #2084: whether the email came back. `null` means NOTHING
+    /// CAME BACK, which is not "delivered": only invitations sent after the
+    /// recorder shipped can be joined to a bounce, so an older one stays
+    /// null for good. A token otherwise (`BOUNCED`, `COMPLAINED`, `FAILED`),
+    /// and an unknown token still means not delivered, never null.
+    let inviteDelivery: String?
+    let inviteDeliveryAt: Date?
+
+    /// The row's state as the screen says it.
+    enum Delivery: Equatable, Sendable {
+        /// Sent, and nothing has come back. Not "delivered".
+        case pending
+        /// The email came back, learned at that moment if the server said.
+        case notDelivered(Date?)
+    }
+
+    var delivery: Delivery {
+        inviteDelivery?.recorded == nil ? .pending : .notDelivered(inviteDeliveryAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, email, role, expiresAt, invitedBy, inviteDelivery, inviteDeliveryAt
+    }
+
+    /// Lenient past the id and the address: an invitation the screen can't
+    /// name isn't shown, but a missing date or role doesn't drop one.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        email = try c.decode(String.self, forKey: .email)
+        role = (try? c.decodeIfPresent(MembershipRole.self, forKey: .role)) ?? .unknown
+        expiresAt = (try? c.decodeIfPresent(Date.self, forKey: .expiresAt)) ?? nil
+        invitedBy = (try? c.decodeIfPresent(Membership.Brief.self, forKey: .invitedBy)) ?? nil
+        inviteDelivery = (try? c.decodeIfPresent(String.self, forKey: .inviteDelivery)) ?? nil
+        inviteDeliveryAt = (try? c.decodeIfPresent(Date.self, forKey: .inviteDeliveryAt)) ?? nil
+    }
+
+    init(id: String, email: String, role: MembershipRole, expiresAt: Date?, invitedBy: Membership.Brief?,
+         inviteDelivery: String?, inviteDeliveryAt: Date?) {
+        self.id = id
+        self.email = email
+        self.role = role
+        self.expiresAt = expiresAt
+        self.invitedBy = invitedBy
+        self.inviteDelivery = inviteDelivery
+        self.inviteDeliveryAt = inviteDeliveryAt
+    }
+}

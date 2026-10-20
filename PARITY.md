@@ -1071,6 +1071,16 @@ Owner's request: Админ is now an index of three rows — «Стопанст
 profile), «Долна лента», «Потребители» (with a count). The member list moved
 unchanged to its own pushed page.
 
+### Matched — pending invitations, and the ones that never arrived (#365, 2026-10-20)
+
+Членове listed only memberships, so an invitation sent by email to someone
+without an account didn't appear until they accepted it. It now opens with
+**«Покани»**, from `?view=invites` (agri-saas `PendingInvite`):
+- **Each row:** the address, the role and the last day.
+- **Not delivered:** **«Поканата не е доставена»**, with the date it was learned, when the server's `inviteDelivery` is set (agri-saas #2084). Every token, known or not, counts.
+- **Pending isn't delivered:** `null` means nothing came back. Only invitations sent from 2026-10-20 can be joined to a bounce, and the section's note says so.
+- **Network only:** the rows carry addresses, as the members do.
+
 ### Профил — every role, since 2026-10-06 (agri-saas#1193 P2.8)
 
 Web `/account` (P2.7: «Вашият акаунт», sections «Профил» and «Сигурност»,
