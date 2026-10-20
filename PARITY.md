@@ -743,6 +743,18 @@ filling it, as before.
 - **A failed read** leaves the person filling it, says so, and never blocks the record.
 - **Someone else** gets the assignment email, notice and push. A self-assignment notifies nobody.
 
+### Divergence — «Нова задача» from a + on «Задачи» (#372, owner 2026-10-20)
+
+**The web's** `NewTaskModal` asks for a title, description, type, severity,
+priority, due date, assignee and links. **iOS** asks what a phone needs:
+- **The fields:** title (required), description, a due day and the assignee.
+  - **Assignee:** from `/users/assignable`, «Без изпълнител» by default as on the web, kept in memory only.
+  - **Due day:** sent as UTC midnight of the day, as the web's `ymdToInstant` sends it.
+  - **Type and severity:** the web's defaults, `TASK` and `MEDIUM`, sent as the web sends them. No priority (owner, 2026-10-09).
+- **Opened from:** a **+ at the bottom right** of «Задачи», the owner's choice, offered only to someone who may write in the farm.
+- **After a save:** the list reloads and the new task opens.
+- **Not idempotent:** the route honours no key, so a lost answer is said as possibly created, never retried.
+
 ### Matched — a tapped notification opens its task (#368)
 
 **The web** opens a push's `url` when it is clicked (`tag: task-{id}`

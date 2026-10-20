@@ -22,6 +22,10 @@ struct TasksListView: View {
             // Борса's shape — see `JournalListView` for what it costs.
             content
                 .background(Palette.Surface.page)
+                // «Нова задача», at the bottom right (owner, 2026-10-20, #372).
+                .overlay(alignment: .bottomTrailing) {
+                    NewTaskButton { await store.load() }
+                }
             .navigationTitle("Задачи")
             .appMenu()
             .task { if store.state.value == nil { await store.load() } }
@@ -86,6 +90,8 @@ struct TasksListView: View {
             }
             .listStyle(.plain)
             .pageBackground()
+            // The last row scrolls clear of the + rather than under it.
+            .contentMargins(.bottom, 96, for: .scrollContent)
             .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
     }
