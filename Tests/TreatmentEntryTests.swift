@@ -376,6 +376,62 @@ final class TreatmentEntryTests: XCTestCase {
         XCTAssertNil(fertilising.pest)
         XCTAssertNil(fertilising.technique)
     }
+
+    // MARK: - Фенофаза/BBCH (#363, agri-saas #2083)
+
+    private func spraying(phenophase: String) -> TreatmentDraft {
+        var draft = TreatmentDraft(date: today)
+        draft.productText = "Нов препарат"
+        draft.registrationText = "0123"
+        draft.pestText = "Листни въшки"
+        draft.doseText = "1"; draft.doseUnit = mlPerDca; draft.quarantineText = "14"
+        draft.phenophaseText = phenophase
+        return draft
+    }
+
+    /// Optional (owner, 2026-10-20), trimmed, and capped where the server
+    /// caps it: free text, because the register takes a code or a name.
+    func testThePhenophaseIsOptionalTrimmedAndCapped() {
+        XCTAssertNil(spraying(phenophase: "  ").phenophase, "blank is not captured")
+        XCTAssertEqual(spraying(phenophase: "  BBCH 31 ").phenophase, "BBCH 31")
+        XCTAssertEqual(spraying(phenophase: "").problems(catalogue: [], now: today), [], "never required")
+        XCTAssertEqual(spraying(phenophase: String(repeating: "я", count: 64)).problems(catalogue: [], now: today), [])
+        XCTAssertEqual(spraying(phenophase: String(repeating: "я", count: 65)).problems(catalogue: [], now: today),
+                       [.phenophaseTooLong])
+        XCTAssertTrue(TreatmentDraft.Problem.phenophaseTooLong.text.hasSuffix("."))
+    }
+
+    /// On a spraying it goes out with every line; left out when not given,
+    /// which the server stores as "not captured"; never on fertilising,
+    /// which the owner did not ask for.
+    func testThePhenophaseGoesOutWithASprayingOnly() throws {
+        let fields = [field(parcel("p1", "1", crop: "Wheat", ha: 1))]
+        func body(_ draft: TreatmentDraft) throws -> [String: Any] {
+            let record = try XCTUnwrap(TreatmentRecord.make(draft, catalogue: [], fields: fields, now: today))
+            let data = try JSONEncoder().encode(TreatmentAPI.Body(record))
+            return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        }
+        XCTAssertEqual(try body(spraying(phenophase: " BBCH 31 "))["phenophase"] as? String, "BBCH 31")
+        XCTAssertNil(try body(spraying(phenophase: ""))["phenophase"], "not sent as null or blank")
+
+        var fertilising = spraying(phenophase: "BBCH 31")
+        fertilising.kind = .fertilize
+        XCTAssertNil(try body(fertilising)["phenophase"])
+        XCTAssertEqual(fertilising.problems(catalogue: [], now: today).contains(.phenophaseTooLong), false)
+    }
+
+    /// The folded row carries it with no product fallback: absent or null
+    /// is "not captured", and a value of the wrong type is not a value.
+    func testTheFoldedRowReadsThePhenophaseLeniently() throws {
+        func row(_ json: String) throws -> JournalTreatment {
+            try JSONDecoder().decode(JournalTreatment.self, from: Data(json.utf8))
+        }
+        XCTAssertEqual(try row(#"{"parcelCount":2,"phenophase":"BBCH 31"}"#).phenophase, "BBCH 31")
+        XCTAssertNil(try row(#"{"parcelCount":2,"phenophase":null}"#).phenophase)
+        XCTAssertNil(try row(#"{"parcelCount":2}"#).phenophase)
+        XCTAssertNil(try row(#"{"parcelCount":2,"phenophase":31}"#).phenophase)
+        XCTAssertEqual(try row(#"{"parcelCount":2,"phenophase":31}"#).parcelCount, 2, "the rest still reads")
+    }
 }
 
 /// The store asks for the crop list, then a crop's parcels — every spelling

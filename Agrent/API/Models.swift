@@ -195,12 +195,16 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     var applicationTechnique: String?
     /// The period as it applied ON THE DAY (#1775), the one the ДНЕВНИК prints.
     var quarantinePeriodDays: Int?
+    /// «Фенофаза/BBCH» as captured on the line (agri-saas #2083). No
+    /// product fallback, unlike the period: nil means not captured, and
+    /// nothing else can supply it.
+    var phenophase: String?
 
     init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
          totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil,
          kind: String? = nil, doseValue: Decimal? = nil, doseUnit: String? = nil,
          targetNote: String? = nil, applicationTechnique: String? = nil,
-         quarantinePeriodDays: Int? = nil) {
+         quarantinePeriodDays: Int? = nil, phenophase: String? = nil) {
         self.treatmentGroupId = treatmentGroupId
         self.productName = productName
         self.parcelCount = parcelCount
@@ -213,6 +217,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         self.targetNote = targetNote
         self.applicationTechnique = applicationTechnique
         self.quarantinePeriodDays = quarantinePeriodDays
+        self.phenophase = phenophase
     }
 
     init(from decoder: any Decoder) throws {
@@ -229,6 +234,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         targetNote = (try? c?.decodeIfPresent(String.self, forKey: .targetNote)) ?? nil
         applicationTechnique = (try? c?.decodeIfPresent(String.self, forKey: .applicationTechnique)) ?? nil
         quarantinePeriodDays = (try? c?.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)) ?? nil
+        phenophase = (try? c?.decodeIfPresent(String.self, forKey: .phenophase)) ?? nil
     }
 
     /// A row that stands for parcels, rather than an entry folded to itself.

@@ -683,11 +683,20 @@ period, then «Добави», or «Редактирай данните» to go 
 
 **The web** has no check step yet. The web is backend 1's lane, to settle with the owner there (agri-saas #2072).
 
+**Фенофаза/BBCH** (#363, agri-saas #2083, live 2026-10-20) is optional on
+every spraying, after the dose, as in PRZ. It's free text up to 64
+characters, because the register takes a BBCH code or a stage name. It's
+stored on every line, read back on the entry and on «Проверка», and never
+sent blank. It **doesn't print yet**: the chemical table of Приложение 1
+has no phenophase column. Its place is column 2 of the scouting table, in
+the rows the owner ruled are derived from the treatments (agri-saas #1740
+Q2). That derivation is backend 1's next change, so the form's note says it
+isn't printed.
+
 The owner's other choices that day wait on the server (agri-saas #2072 →
 agrent-ios #363):
-- Фенофаза/BBCH, optional on every spraying;
-- treated area per parcel;
-- pest, dose and quarantine-period suggestions from the БАБХ register;
+- treated area per parcel (agri-saas #2086);
+- pest, dose and quarantine-period suggestions from the БАБХ register (agri-saas #2077);
 - seed treatment not now.
 
 Offered and **not** chosen: PRZ's per-field layout by farming year, a crop

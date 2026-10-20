@@ -78,6 +78,12 @@ enum TreatmentAPI {
         let doseUnitId: String
         /// The SLUG — see `ApplicationTechnique`.
         let applicationTechnique: String?
+        /// «Фенофаза/BBCH», stored on every line (agri-saas #2083). Left
+        /// out when not given, which the server stores as "not captured".
+        /// It does not print yet: the ДНЕВНИК's chemical table has no such
+        /// column, and the scouting table it belongs to isn't derived from
+        /// treatments yet (agri-saas #2072).
+        let phenophase: String?
 
         init(_ record: TreatmentRecord) {
             let spraying = record.kind == .spray
@@ -94,6 +100,7 @@ enum TreatmentAPI {
             doseValue = record.dose
             doseUnitId = record.doseUnitID
             applicationTechnique = record.technique?.rawValue
+            phenophase = record.phenophase
         }
     }
 

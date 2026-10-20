@@ -142,6 +142,9 @@ struct JournalDetailView: View {
         if let pest = treatment.targetNote?.recorded {
             LabelledFact(label: "Вредител") { factText(pest) }
         }
+        if let stage = treatment.phenophase?.recorded {
+            LabelledFact(label: "Фенофаза/BBCH") { factText(stage) }
+        }
         if let technique = ApplicationTechnique.display(treatment.applicationTechnique) {
             LabelledFact(label: "Техника") { factText(technique) }
         }

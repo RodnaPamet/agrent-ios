@@ -58,6 +58,19 @@ struct TreatmentFieldsView: View {
                 }
             }
 
+            // PRZ's place for it: after the dose, before the period (#363).
+            if draft.kind == .spray {
+                Section {
+                    TextField("Фенофаза/BBCH", text: $draft.phenophaseText,
+                              prompt: .fieldPrompt(Self.phenophaseExample))
+                        .accessibilityInputLabels(A11y.spokenNames("Фенофаза", "BBCH", "Growth stage"))
+                } header: {
+                    SectionHeader("Фенофаза/BBCH")
+                } footer: {
+                    SectionFooter(Self.phenophaseNote)
+                }
+            }
+
             if draft.kind == .spray {
                 Section {
                     // The unit in the prompt, not the title, as on the parcel
@@ -167,6 +180,10 @@ struct TreatmentFieldsView: View {
     }
 
     private static let pestExample = "напр. Листни въшки"
+    static let phenophaseExample = "напр. BBCH 31 или братене"
+    /// Honest about where it goes: the ДНЕВНИК doesn't print it yet
+    /// (agri-saas #2072), so the form doesn't promise a printed cell.
+    static let phenophaseNote = "По избор. Пази се с мероприятието, но в ДНЕВНИКА в PDF още не се отпечатва."
     private static let harvestNote =
         "Най-ранната дата за прибиране е датата на третирането плюс карантинния срок."
     private static let areaNote =
