@@ -15,6 +15,20 @@ import UIKit
 /// server actually delivers (agri-saas #1764 step 3) — nobody should grant
 /// permission and then hear nothing.
 ///
+/// ── Except on a development-signed build ──
+///
+/// "No permission" is what Apple documents, and what PRODUCTION tokens
+/// (TestFlight, App Store) should do; no TestFlight build has measured it
+/// yet. A development-signed build gets a SANDBOX
+/// token, and iOS doesn't hand one over until notifications are allowed:
+/// the request reaches the push service and waits there, with neither
+/// callback, because the phone connects to Apple's sandbox server only for
+/// an app with permission. Measured on the owner's iPhone, iOS 27.0.1,
+/// 2026-10-20 (#359): no token in five traced launches, through a restart and
+/// with the VPN off, then a token 110 ms after Allow and a 201 from each farm.
+/// So a build installed from this Mac registers only after the ask, which
+/// calls `start()` again once the person says yes.
+///
 /// ── Never from a development machine ──
 ///
 /// A simulator signed in to the owner's account would register real rows on
