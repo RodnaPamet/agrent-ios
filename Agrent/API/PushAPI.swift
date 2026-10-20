@@ -79,7 +79,7 @@ enum PushAPI {
     /// notifications off in Профил. Изход's removal is `removalRequest`.
     static func unregister(_ deviceToken: String, from farm: String) async throws {
         _ = try await APIClient.shared.deleteReturningData(
-            subscriptionsPath(in: farm), body: Registration(deviceToken: deviceToken)
+            subscriptionsPath(in: farm), body: Registration(deviceToken: deviceToken, environment: nil)
         )
     }
 
