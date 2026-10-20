@@ -79,8 +79,15 @@ final class PushRegistrar {
 
     /// Ask iOS for the token. Every signed-in launch, as Apple asks: the
     /// token can change, and iOS answers at once when it has not.
+    ///
+    /// Each step from here to the server's answer logs at a level iOS keeps
+    /// (`.notice`, `.error`), not `.info`, which it drops. Until #359 no
+    /// registration had ever reached the server, and nothing on the phone
+    /// said which step stopped. The token itself is never logged.
     func start() {
         guard Self.mayRegister else { return }
+        let before = UIApplication.shared.isRegisteredForRemoteNotifications
+        Log.auth.notice("push: asking iOS for a token (registered before: \(before, privacy: .public))")
         UIApplication.shared.registerForRemoteNotifications()
     }
 
@@ -89,6 +96,8 @@ final class PushRegistrar {
     @discardableResult
     func adopt(_ token: Data) -> Task<Void, Never> {
         let hex = PushAPI.hex(token)
+        let kind = hex == deviceToken ? "same" : "new"
+        Log.auth.notice("push: iOS handed over a token (\(kind, privacy: .public))")
         if hex != deviceToken {
             deviceToken = hex
             registered = []
@@ -102,7 +111,10 @@ final class PushRegistrar {
     func sync() async {
         guard let token = deviceToken else { return }
         let epoch = SessionEpoch.current
-        for farm in farms() {
+        let all = farms()
+        let due = all.filter { !registered.contains($0) }.count
+        Log.auth.notice("push: \(due, privacy: .public) of \(all.count, privacy: .public) farms to register")
+        for farm in all {
             // Again on every pass, because each pass awaits: a person who
             // signed out while the last farm was sent is not registered with
             // the rest of their farms under whoever is signed in now.
@@ -112,13 +124,14 @@ final class PushRegistrar {
             sending.insert(marker)
             do {
                 try await register(token, farm)
+                Log.auth.notice("push: registered with a farm")
                 // Not if the session ended, or the token changed, while it
                 // was on its way: `registered` now belongs to that change.
                 if SessionEpoch.isCurrent(epoch), token == deviceToken {
                     registered.insert(farm)
                 }
             } catch {
-                Log.auth.info("push register not sent: \(Log.summary(for: error), privacy: .public)")
+                Log.auth.error("push register not sent: \(Log.summary(for: error), privacy: .public)")
             }
             sending.remove(marker)
         }

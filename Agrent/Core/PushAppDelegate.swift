@@ -11,11 +11,13 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate {
     }
 
     /// Logged and nothing else: the next launch asks again, and nothing the
-    /// person sees depends on a token yet.
+    /// person sees depends on a token yet. At `.error`, which iOS keeps:
+    /// `.info` is dropped, and this line is what says why a phone never
+    /// registered (#359).
     func application(
         _ application: UIApplication,
         didFailToRegisterForRemoteNotificationsWithError error: any Error
     ) {
-        Log.auth.info("no APNs token: \(Log.summary(for: error), privacy: .public)")
+        Log.auth.error("no APNs token: \(Log.summary(for: error), privacy: .public)")
     }
 }
