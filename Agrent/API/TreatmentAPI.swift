@@ -80,9 +80,9 @@ enum TreatmentAPI {
         let applicationTechnique: String?
         /// «Фенофаза/BBCH», stored on every line (agri-saas #2083). Left
         /// out when not given, which the server stores as "not captured".
-        /// It does not print yet: the ДНЕВНИК's chemical table has no such
-        /// column, and the scouting table it belongs to isn't derived from
-        /// treatments yet (agri-saas #2072).
+        /// It prints in the scouting table's «Фенофаза/BBCH», on a row
+        /// derived from the treatment (agri-saas #2089), not in the
+        /// chemical table, which has no such column.
         let phenophase: String?
         /// The parcels only partly treated, with their area in HECTARES
         /// (agri-saas #2086): a refinement of `parcelIds`, which still names
