@@ -724,6 +724,20 @@ Web `FieldOperationPanel` (on a FIELD_OPERATION task's overview) and the PWA's
 `OfflineFieldPanel` · iOS `Tasks/FieldOperationSection.swift` +
 `FieldOperationStore.swift`, on the task detail.
 
+### Matched — a tapped notification opens its task (#368)
+
+**The web** opens a push's `url` when it is clicked (`tag: task-{id}`
+coalesces repeats). **iOS** reads the same path, which agri-saas #2076 sends
+as `link` beside `aps`:
+- **A tap** on `/t/{slug}/farm-tasks/{id}` opens that task on «Задачи».
+  - If the task is in another of the person's farms, that farm opens first.
+  - If the farm is no longer theirs, the app says so instead of opening another farm.
+- **Ignored:** any other path, a missing link, or a tap from a session that has since ended. The app then opens as it is.
+- **In the foreground**, a notification is shown as a banner, with sound, and kept in the list, as it would be with the app closed.
+
+**Unverified:** nothing has been delivered yet. That needs #317's ask, the
+transport (#2076) and the owner's APNs key on the server.
+
 ### Gap 8 — parcel lines could not be marked — CLOSED 2026-10-07 (#138)
 
 The web lets an operator mark each prescription line of a spray job

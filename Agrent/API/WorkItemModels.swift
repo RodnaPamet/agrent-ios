@@ -181,6 +181,26 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
 /// columns. The extra keys are ignored by Codable, so the model would have
 /// worked — but it would have quietly left the useful half on the wire, and
 /// "it decoded" is not the same as "we read what was there".
+extension WorkItemSummary {
+    /// The row a task's own read stands for, for a screen reached by id
+    /// (#368): `TaskDetailView` draws its title, kind and status from the
+    /// row while it reads the task again.
+    init(item: WorkItem) {
+        id = item.id
+        key = item.key
+        title = item.title
+        type = item.type
+        status = item.status
+        severityRaw = item.severity
+        dueAt = item.dueAt
+        assignee = item.assignee
+        assigneeUserId = item.assigneeUserId
+        createdAt = item.createdAt
+        updatedAt = item.updatedAt
+        completedAt = item.completedAt
+    }
+}
+
 struct WorkItem: Decodable, Identifiable, Equatable, Sendable {
     let id: String
     let tenantId: String

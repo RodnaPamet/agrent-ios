@@ -71,6 +71,9 @@ import Foundation
 ///                                      The server's rows for A are removed by
 ///                                      the `DELETE`s `AuthClient.signOut`
 ///                                      sends ahead of the revoke.
+///     · `PushInbox.shared`          — a tapped notification not yet opened
+///                                      (#368): A's farm and task, never
+///                                      opened for B.
 ///
 ///   PURGED, then made unreachable by key:
 ///     · `ResponseCache.shared`      — `removeAll()` here, and every entry is
@@ -162,6 +165,7 @@ enum SessionReset {
         AccountAvatarStore.shared.reset()
         FarmStore.shared.reset()
         PushRegistrar.shared.reset()
+        PushInbox.shared.reset()
         // A half-made farm's name does not stay on a shared phone after its
         // person has gone (#197).
         FarmWizardDrafts(defaults: .standard).clear()
