@@ -182,6 +182,14 @@ enum BgDate {
         isoDayWriter.string(from: date)
     }
 
+    /// A task's due DAY as the web sends it (#372): UTC midnight of the day
+    /// chosen, `2026-10-21T00:00:00.000Z` (`ymdToInstant`, agri-saas
+    /// `date-utils.ts`). The day is the one the person picked, in their own
+    /// zone, so phone and web agree on what a due date means.
+    static func dueInstant(_ date: Date) -> String {
+        isoDay(date) + "T00:00:00.000Z"
+    }
+
     /// An instant as the server reads one: `2026-10-09T20:59:59.999Z`, in UTC,
     /// with milliseconds. It writes the journal filter's `occurredFrom` and
     /// `occurredTo`, which the server hands straight to `new Date(…)`.
