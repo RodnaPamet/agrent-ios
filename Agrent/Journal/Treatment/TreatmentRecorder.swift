@@ -27,6 +27,8 @@ struct TreatmentRecord: Equatable, Sendable {
     let doseUnitID: String
     /// The slug, never the label: it prints raw onto the ДНЕВНИК.
     let technique: ApplicationTechnique?
+    /// «Фенофаза/BBCH» (#363), on a spraying only. nil when not given.
+    let phenophase: String?
     let parcelIDs: [String]
 
     /// nil while the draft has a problem or no parcel is chosen.
@@ -55,6 +57,7 @@ struct TreatmentRecord: Equatable, Sendable {
             dose: dose,
             doseUnitID: unit.id,
             technique: spraying ? draft.technique : nil,
+            phenophase: spraying ? draft.phenophase : nil,
             parcelIDs: fields.map(\.id)
         )
     }

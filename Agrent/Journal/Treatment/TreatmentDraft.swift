@@ -43,6 +43,10 @@ struct TreatmentDraft: Equatable, Sendable {
     var pestText = ""
     var doseText = ""
     var doseUnit: Unit?
+    /// «Фенофаза/BBCH» (#363): the crop's growth stage on the day, optional
+    /// on a spraying (owner, 2026-10-20). Free text, because the register's
+    /// column takes a BBCH code or a stage name, as PRZ's field does.
+    var phenophaseText = ""
     var technique: ApplicationTechnique = .boom
 
     /// What the prefill put in, so a later product can replace it while the
@@ -63,6 +67,7 @@ struct TreatmentDraft: Equatable, Sendable {
         case doseNotPositive
         case unitMissing
         case quarantineMissing
+        case phenophaseTooLong
 
         var text: String {
             switch self {
@@ -75,6 +80,7 @@ struct TreatmentDraft: Equatable, Sendable {
             case .doseNotPositive: "Дозата трябва да е по-голяма от нула."
             case .unitMissing: "Изберете мерна единица за дозата."
             case .quarantineMissing: "Въведете карантинния срок в дни."
+            case .phenophaseTooLong: "Фенофазата е твърде дълга — до \(TreatmentDraft.phenophaseMaxLength) знака."
             }
         }
     }
@@ -90,6 +96,16 @@ struct TreatmentDraft: Equatable, Sendable {
     }
 
     var dose: Decimal? { Self.decimal(doseText) }
+
+    /// The server's cap (`RecordDiaryTreatment.phenophase`, agri-saas #2083).
+    static let phenophaseMaxLength = 64
+
+    /// Trimmed, and nil when empty: the server stores an omitted stage as
+    /// "not captured", never as a blank one.
+    var phenophase: String? {
+        let text = phenophaseText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
 
     var quarantineDays: Int? {
         guard let days = Int(quarantineText.trimmingCharacters(in: .whitespacesAndNewlines)),
@@ -137,6 +153,9 @@ struct TreatmentDraft: Equatable, Sendable {
         }
         if doseUnit == nil { found.append(.unitMissing) }
         if kind == .spray, quarantineDays == nil { found.append(.quarantineMissing) }
+        if kind == .spray, let stage = phenophase, stage.count > Self.phenophaseMaxLength {
+            found.append(.phenophaseTooLong)
+        }
         return found
     }
 

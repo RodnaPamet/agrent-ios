@@ -59,6 +59,7 @@ struct TreatmentCheckView: View {
                 ValueRow(record.kind.inputLabel) { Text(record.productName) }
                 if let pest = record.pest { ValueRow("Вредител") { Text(pest) } }
                 ValueRow("Доза") { Text(dose).accessibilityLabel(doseSpoken) }
+                if let stage = record.phenophase { ValueRow("Фенофаза/BBCH") { Text(stage) } }
                 if let technique = record.technique { ValueRow("Техника") { Text(technique.label) } }
             }
             Section {
