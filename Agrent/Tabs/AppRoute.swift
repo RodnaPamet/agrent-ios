@@ -29,6 +29,9 @@ enum AppRoute: Hashable, Sendable {
     case listing(ExchangeListing)
     case conversation(threadID: String, commodity: String?)
     case task(WorkItemSummary)
+    /// A task named by id alone: a tapped notification's link (#368). Its
+    /// screen reads the task first, then shows it as a row's tap would.
+    case taskID(String)
     case location(Location)
     /// The name rides along so the header isn't blank while the archive
     /// loads — see `ParcelHistoryView.parcelName`.
@@ -42,6 +45,7 @@ enum AppRoute: Hashable, Sendable {
         case .listing(let listing): hasher.combine("listing"); hasher.combine(listing.id)
         case .conversation(let threadID, _): hasher.combine("conversation"); hasher.combine(threadID)
         case .task(let summary): hasher.combine("task"); hasher.combine(summary.id)
+        case .taskID(let id): hasher.combine("taskID"); hasher.combine(id)
         case .location(let location): hasher.combine("location"); hasher.combine(location.id)
         case .parcelHistory(let parcelID, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
         case .farmDirectory: hasher.combine("farmDirectory")
@@ -54,7 +58,7 @@ enum AppRoute: Hashable, Sendable {
         switch self {
         case .journalEntry: .journal
         case .listing, .conversation, .farmDirectory: .exchange
-        case .task: .tasks
+        case .task, .taskID: .tasks
         case .location: .locations
         case .parcelHistory: .farmRisk
         }
@@ -70,10 +74,20 @@ enum AppRoute: Hashable, Sendable {
         case .conversation(let threadID, let commodity):
             ConversationView(threadID: threadID, commodity: commodity)
         case .task(let summary): TaskDetailView(summary: summary)
+        case .taskID(let id): TaskLinkView(id: id)
         case .location(let location): ParcelMapView(location: location)
         case .parcelHistory(let parcelID, let parcelName):
             ParcelHistoryView(parcelID: parcelID, parcelName: parcelName)
         case .farmDirectory: FarmDirectoryView()
+        }
+    }
+}
+
+extension AppRoute {
+    /// The screen a tapped notification's link opens (#368).
+    init(_ link: PushLink) {
+        switch link {
+        case .task(_, let id): self = .taskID(id)
         }
     }
 }

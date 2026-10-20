@@ -140,6 +140,8 @@ struct MainTabView: View {
     /// Here, not shared: `FarmGate` rebuilds this view per farm, so every
     /// farm's tabs start at their roots (see `AppRouter`).
     @State private var router = AppRouter(bar: BottomTabsStore.shared.bottomTabs)
+    /// A tapped notification, opened once these are its farm's tabs (#368).
+    @State private var inbox = PushInbox.shared
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AuthClient.self) private var auth
 
@@ -182,6 +184,14 @@ struct MainTabView: View {
             }
         }
         .environment(router)
+        // `FarmGate` has opened the link's farm, or it was open already.
+        // Initial too: after a farm switch, these tabs are built for the
+        // link and find it waiting.
+        .onChange(of: inbox.current, initial: true) { _, _ in
+            guard let farm = FarmStore.shared.activeFarm?.slug,
+                  let link = inbox.take(in: farm) else { return }
+            router.open(AppRoute(link))
+        }
         // Drained on launch and on every return to the foreground — which
         // is when a farmer who recorded something in a field has most
         // likely just found signal. Waiting for them to press a button

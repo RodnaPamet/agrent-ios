@@ -22,6 +22,11 @@ struct FarmGate: View {
     @State private var tellingLostAccess = false
     @State private var lostAccessNote = ""
 
+    /// A tapped notification, and whether its farm turned out not to be
+    /// the person's (#368).
+    @State private var inbox = PushInbox.shared
+    @State private var linkNotYours = false
+
     @Environment(\.scenePhase) private var scenePhase
     @State private var foreground = ForegroundReturn()
 
@@ -144,6 +149,48 @@ struct FarmGate: View {
         } message: {
             Text(lostAccessNote)
         }
+        // A tapped notification for another of the person's farms (#368):
+        // that farm opens here, and its tabs open the screen. Asked again
+        // when the farm list arrives, which a tap that launched the app
+        // comes before.
+        .onChange(of: inbox.current, initial: true) { _, _ in followLink() }
+        .onChange(of: farms.memberSlugs) { _, _ in followLink() }
+        .alert(Self.linkNotYoursTitle, isPresented: $linkNotYours) {
+            Button("Добре", role: .cancel) {}
+        } message: {
+            Text(Self.linkNotYoursMessage)
+        }
+    }
+
+    /// What a tapped notification's farm asks of this gate.
+    enum LinkStep: Equatable {
+        /// The farm is open: its tabs take the link.
+        case here
+        /// The list isn't in yet, and it decides.
+        case wait
+        case open(Farm)
+        /// Not one of the person's farms, or no longer.
+        case notYours
+    }
+
+    /// Never another farm's data under the wrong name: a farm opens only
+    /// when the person's own list has it.
+    static func linkStep(_ link: PushLink, active: Farm?, list: [Farm]?) -> LinkStep {
+        if active?.slug == link.farm { return .here }
+        guard let list else { return .wait }
+        if let farm = list.first(where: { $0.slug == link.farm }) { return .open(farm) }
+        return .notYours
+    }
+
+    private func followLink() {
+        guard let link = inbox.current else { return }
+        switch Self.linkStep(link, active: farms.activeFarm, list: farms.farms) {
+        case .here, .wait: break
+        case .open(let farm): farms.open(farm)
+        case .notYours:
+            inbox.drop()
+            linkNotYours = true
+        }
     }
 
     /// Once the old tabs — and any sheet open over them — have gone. High
@@ -170,6 +217,10 @@ struct FarmGate: View {
     static let unavailable = "Стопанството не може да бъде заредено. Проверете връзката и опитайте пак."
 
     static let lostAccessTitle = "Стопанството вече не е достъпно"
+
+    /// A tapped notification from a farm the person no longer belongs to.
+    static let linkNotYoursTitle = "Известието не може да се отвори"
+    static let linkNotYoursMessage = "То е от стопанство, което вече не е сред стопанствата Ви."
 
     /// Which farm went, and which is open now. The farm seeded by slug alone
     /// may never have been named; a farm from the list always has been.
