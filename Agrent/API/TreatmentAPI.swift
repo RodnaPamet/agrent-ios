@@ -84,6 +84,15 @@ enum TreatmentAPI {
         /// column, and the scouting table it belongs to isn't derived from
         /// treatments yet (agri-saas #2072).
         let phenophase: String?
+        /// The parcels only partly treated, with their area in HECTARES
+        /// (agri-saas #2086): a refinement of `parcelIds`, which still names
+        /// every parcel. Left out when every parcel was treated whole.
+        let parcels: [ParcelArea]?
+
+        struct ParcelArea: Encodable, Equatable, Sendable {
+            let parcelId: String
+            let treatedAreaHa: Double
+        }
 
         init(_ record: TreatmentRecord) {
             let spraying = record.kind == .spray
@@ -101,6 +110,12 @@ enum TreatmentAPI {
             doseUnitId = record.doseUnitID
             applicationTechnique = record.technique?.rawValue
             phenophase = record.phenophase
+            // In `parcelIds`' order, each once: the server refuses an id it
+            // doesn't list there, or one listed twice.
+            let partly = record.parcelIDs.compactMap { id in
+                record.treatedAreas[id].map { ParcelArea(parcelId: id, treatedAreaHa: $0) }
+            }
+            parcels = partly.isEmpty ? nil : partly
         }
     }
 
@@ -278,7 +293,7 @@ struct LiveTreatmentRecorder: TreatmentRecorder {
         let outbox = OutboxStore.shared
         outbox.pause.absorb(error)
         outbox.absorbClientTooOld(error)
-        let total = TreatmentPlace.total(entry.fields)
+        let total = TreatmentPlace.total(entry.fields, treated: entry.record.treatedAreas)
         let blocks = entry.fields.reduce(into: [String]()) { names, field in
             if !names.contains(field.blockName) { names.append(field.blockName) }
         }

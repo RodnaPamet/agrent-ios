@@ -47,6 +47,12 @@ struct TreatmentDraft: Equatable, Sendable {
     /// on a spraying (owner, 2026-10-20). Free text, because the register's
     /// column takes a BBCH code or a stage name, as PRZ's field does.
     var phenophaseText = ""
+    /// The treated area typed for a chosen parcel, in decares, by parcel id
+    /// (#363, agri-saas #2086). Empty means the whole parcel. Here, in the
+    /// draft, so a changed area is a changed entry and mints a new save key
+    /// (`TreatmentAttempt`): a reused key with a changed body is replayed,
+    /// not refused, so an area kept outside the draft would be lost.
+    var treatedText: [String: String] = [:]
     var technique: ApplicationTechnique = .boom
 
     /// What the prefill put in, so a later product can replace it while the
@@ -96,6 +102,38 @@ struct TreatmentDraft: Equatable, Sendable {
     }
 
     var dose: Decimal? { Self.decimal(doseText) }
+
+    /// The treated area of each chosen parcel that ISN'T the whole parcel.
+    ///
+    /// An entry within the register's tolerance of the parcel's own area is
+    /// the whole parcel and left out: the field shows that area rounded, and
+    /// typing the shown figure back must not read as larger than the parcel,
+    /// which the server refuses (`TREATMENT_AREA_EXCEEDS_PARCEL`, inclusive).
+    /// A parcel with no recorded area takes any positive value.
+    static func treatedAreas(_ texts: [String: String], for fields: [TreatmentPlace.Field]) -> [String: Area] {
+        var areas: [String: Area] = [:]
+        for field in fields {
+            guard let text = texts[field.id]?.recorded, let area = Area.parse(decares: text) else { continue }
+            if let whole = field.parcel.areaHa.map({ Area(hectares: $0) }), !area.differs(from: whole) { continue }
+            areas[field.id] = area
+        }
+        return areas
+    }
+
+    /// The first chosen parcel whose typed area can't go out, in list order.
+    static func treatedProblem(_ texts: [String: String], for fields: [TreatmentPlace.Field]) -> String? {
+        for field in fields {
+            guard let text = texts[field.id]?.recorded else { continue }
+            guard let area = Area.parse(decares: text) else {
+                return "Въведете площ над нула за «\(field.parcel.name)» или оставете полето празно."
+            }
+            if let whole = field.parcel.areaHa.map({ Area(hectares: $0) }),
+               area.wireHectares > whole.wireHectares, area.differs(from: whole) {
+                return "Площта на «\(field.parcel.name)» е по-голяма от парцела (\(whole.text))."
+            }
+        }
+        return nil
+    }
 
     /// The server's cap (`RecordDiaryTreatment.phenophase`, agri-saas #2083).
     static let phenophaseMaxLength = 64
@@ -191,5 +229,15 @@ struct TreatmentDraft: Equatable, Sendable {
             .replacingOccurrences(of: ",", with: ".")
         guard !cleaned.isEmpty else { return nil }
         return Decimal(string: cleaned, locale: WireDecimal.wireLocale)
+    }
+}
+
+extension Dictionary where Key == String, Value == String {
+    /// A field's typed text by id, for a binding: a key path can't carry
+    /// `[key, default: ""]`, whose default is a closure (see `AppRouter`).
+    /// Clearing the field removes the entry, so "whole parcel" is no entry.
+    subscript(typed key: String) -> String {
+        get { self[key] ?? "" }
+        set { self[key] = newValue.isEmpty ? nil : newValue }
     }
 }

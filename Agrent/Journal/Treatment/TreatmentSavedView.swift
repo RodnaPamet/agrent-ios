@@ -60,7 +60,9 @@ struct TreatmentSavedView: View {
     /// — it opens with what was recorded and is the thing to hear.
     private enum Landing { case title, note }
 
-    private var total: TreatmentPlace.Total { TreatmentPlace.total(saved.fields) }
+    private var total: TreatmentPlace.Total {
+        TreatmentPlace.total(saved.fields, treated: saved.record.treatedAreas)
+    }
 
     /// The area is never presented as complete when it is not.
     private var withoutAreaNote: String {

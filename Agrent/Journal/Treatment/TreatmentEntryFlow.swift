@@ -68,6 +68,7 @@ struct TreatmentEntryFlow: View {
                 switch step {
                 case .place:
                     TreatmentPlaceView(store: place, kind: draft.kind, cropKey: $cropKey, chosen: $chosen,
+                                       treatedText: $draft.treatedText,
                                        failure: failure, retryCrops: { await loadPlace() }) { fields in
                         proceed(fields)
                     }
@@ -120,6 +121,7 @@ struct TreatmentEntryFlow: View {
     private func proceed(_ fields: [TreatmentPlace.Field]) {
         guard let record = TreatmentRecord.make(draft, catalogue: reference.items.value, fields: fields) else {
             failure = draft.problems(catalogue: reference.items.value).first?.text
+                ?? TreatmentDraft.treatedProblem(draft.treatedText, for: fields)
                 ?? "Изберете поне един парцел."
             return
         }

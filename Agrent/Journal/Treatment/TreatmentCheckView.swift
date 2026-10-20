@@ -26,7 +26,7 @@ struct TreatmentCheckView: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
-    private var total: TreatmentPlace.Total { TreatmentPlace.total(fields) }
+    private var total: TreatmentPlace.Total { TreatmentPlace.total(fields, treated: record.treatedAreas) }
 
     private var amount: TreatmentCheck.Amount? {
         doseUnitSymbol.flatMap { TreatmentCheck.amount(dose: record.dose, unitSymbol: $0, area: total.area) }

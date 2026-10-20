@@ -731,6 +731,11 @@ enum UserMessage {
         "TREATMENT_DATE_INVALID": "Датата на мероприятието не е валидна. Изберете я отново.",
         "TREATMENT_DATE_IN_FUTURE": TreatmentDraft.Problem.futureDate.text,
         "TREATMENT_NO_PARCELS": "Изберете поне един парцел.",
+        // agri-saas #2086: a parcel's treated area above its own (inclusive
+        // bound). The phone checks first, so this is the server disagreeing
+        // about a parcel's area, and the advice is the same.
+        "TREATMENT_AREA_EXCEEDS_PARCEL": "Третираната площ не може да надвишава площта на парцела. "
+            + "Въведете по-малка площ или оставете полето празно за целия парцел.",
         "REFERENCE_NOT_IN_TENANT": "Нещо от избраното вече не е в това стопанство. Проверете избора и опитайте отново.",
         // The operation write underneath, on this route and the spray
         // sheet's. Both send a name and a dose always, so these are the
