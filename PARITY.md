@@ -693,11 +693,17 @@ the rows the owner ruled are derived from the treatments (agri-saas #1740
 Q2). That derivation is backend 1's next change, so the form's note says it
 isn't printed.
 
-The owner's other choices that day wait on the server (agri-saas #2072 →
-agrent-ios #363):
-- treated area per parcel (agri-saas #2086);
-- pest, dose and quarantine-period suggestions from the БАБХ register (agri-saas #2077);
-- seed treatment not now.
+**Treated area per parcel** (#363, agri-saas #2086, live 2026-10-20): step
+two lists each chosen parcel's area under «Третирана площ, дка». An empty
+field means the whole parcel; a smaller figure is sent as
+`parcels: [{parcelId, treatedAreaHa}]` beside `parcelIds`.
+- **The bound:** a figure within the register's tolerance of the parcel's own area counts as the whole parcel, since the field shows that area rounded. A larger one is refused on the phone before the server's inclusive bound would refuse it.
+- **The total:** the check, the saved screen and the outbox row show what was treated.
+- **The save key:** the areas are part of the draft, so a changed area mints a new key, as the replay rule needs (agri-saas #1765).
+
+Still waiting on the server: pest, dose and quarantine-period suggestions
+from the БАБХ register (agri-saas #2077, four open owner questions). Seed
+treatment: not now.
 
 Offered and **not** chosen: PRZ's per-field layout by farming year, a crop
 record per block, and other activities with yield and cloning.

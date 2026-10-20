@@ -420,6 +420,80 @@ final class TreatmentEntryTests: XCTestCase {
         XCTAssertEqual(fertilising.problems(catalogue: [], now: today).contains(.phenophaseTooLong), false)
     }
 
+    // MARK: - Treated area per parcel (#363, agri-saas #2086)
+
+    /// Empty is the whole parcel; less is sent; the shown figure typed back
+    /// is still the whole parcel; a parcel with no area takes any positive.
+    func testOnlyAPartlyTreatedParcelCarriesAnArea() {
+        let fields = [field(parcel("p1", "Север", crop: "Wheat", ha: 2.4567)),
+                      field(parcel("p2", "Юг", crop: "Wheat", ha: 1)),
+                      field(parcel("p3", "Без площ", crop: "Wheat", ha: nil))]
+        let areas = TreatmentDraft.treatedAreas(["p1": "24,57", "p2": "4", "p3": " 3,5 "], for: fields)
+        XCTAssertNil(areas["p1"], "24,57 is p1's own 24,567 shown rounded: the whole parcel")
+        XCTAssertEqual(areas["p2"]?.decares ?? 0, 4, accuracy: 0.0001)
+        XCTAssertEqual(areas["p3"]?.decares ?? 0, 3.5, accuracy: 0.0001)
+        XCTAssertTrue(TreatmentDraft.treatedAreas(["p2": "  "], for: fields).isEmpty, "blank is the whole parcel")
+    }
+
+    func testAnAreaThatCantGoOutIsSaid() {
+        let fields = [field(parcel("p1", "Север", crop: "Wheat", ha: 1))]
+        XCTAssertNil(TreatmentDraft.treatedProblem([:], for: fields))
+        XCTAssertNil(TreatmentDraft.treatedProblem(["p1": "10"], for: fields), "exactly the parcel is fine")
+        XCTAssertEqual(TreatmentDraft.treatedProblem(["p1": "12"], for: fields),
+                       "Площта на «Север» е по-голяма от парцела (10 дка).")
+        XCTAssertEqual(TreatmentDraft.treatedProblem(["p1": "0"], for: fields),
+                       "Въведете площ над нула за «Север» или оставете полето празно.")
+        XCTAssertEqual(TreatmentDraft.treatedProblem(["p1": "две"], for: fields),
+                       "Въведете площ над нула за «Север» или оставете полето празно.")
+        XCTAssertNil(TreatmentDraft.treatedProblem(["p9": "12"], for: fields), "only chosen parcels count")
+    }
+
+    /// `parcels` refines `parcelIds`: hectares, in their order, each once,
+    /// and left out when every parcel was treated whole.
+    func testThePartlyTreatedParcelsGoOutInHectares() throws {
+        let fields = [field(parcel("p1", "1", crop: "Wheat", ha: 1)),
+                      field(parcel("p2", "2", crop: "Wheat", ha: 2))]
+        func body(_ treated: [String: String]) throws -> [String: Any] {
+            var draft = spraying(phenophase: "")
+            draft.treatedText = treated
+            let record = try XCTUnwrap(TreatmentRecord.make(draft, catalogue: [], fields: fields, now: today))
+            let data = try JSONEncoder().encode(TreatmentAPI.Body(record))
+            return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        }
+        XCTAssertNil(try body([:])["parcels"], "all whole: no refinement")
+        let partly = try XCTUnwrap(try body(["p2": "5"])["parcels"] as? [[String: Any]])
+        XCTAssertEqual(partly.count, 1)
+        XCTAssertEqual(partly[0]["parcelId"] as? String, "p2")
+        XCTAssertEqual(partly[0]["treatedAreaHa"] as? Double ?? 0, 0.5, accuracy: 0.0000001)
+        XCTAssertEqual(try body(["p2": "5"])["parcelIds"] as? [String], ["p1", "p2"], "every parcel still named")
+
+        var tooBig = spraying(phenophase: "")
+        tooBig.treatedText = ["p1": "50"]
+        XCTAssertNil(TreatmentRecord.make(tooBig, catalogue: [], fields: fields, now: today), "never sent over the bound")
+    }
+
+    /// The total is what was treated: the ДНЕВНИК prints per-row areas, and
+    /// the list's `totalAreaHa` sums them too.
+    func testTheTotalIsTheTreatedArea() {
+        let fields = [field(parcel("p1", "1", crop: "Wheat", ha: 1)),
+                      field(parcel("p2", "2", crop: "Wheat", ha: 0.4)),
+                      field(parcel("p3", "3", crop: "Wheat", ha: nil))]
+        let total = TreatmentPlace.total(fields, treated: ["p1": 0.2, "p3": 0.1])
+        XCTAssertEqual(total.area.decares, 7, accuracy: 0.0001, "2 + 4 + 1 дка")
+        XCTAssertEqual(total.withoutArea, 0, "a typed area is an area")
+        XCTAssertEqual(TreatmentPlace.total(fields).withoutArea, 1)
+    }
+
+    /// A changed area is a changed entry: a reused key would be replayed
+    /// as the old body (agri-saas #1765), so it must mint a new one.
+    func testAChangedAreaMintsANewSaveKey() {
+        var attempt = TreatmentAttempt()
+        var draft = spraying(phenophase: "")
+        let first = attempt.key(for: draft, parcels: ["p1"])
+        draft.treatedText = ["p1": "5"]
+        XCTAssertNotEqual(attempt.key(for: draft, parcels: ["p1"]), first)
+    }
+
     /// The folded row carries it with no product fallback: absent or null
     /// is "not captured", and a value of the wrong type is not a value.
     func testTheFoldedRowReadsThePhenophaseLeniently() throws {

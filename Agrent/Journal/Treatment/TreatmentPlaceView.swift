@@ -20,6 +20,8 @@ struct TreatmentPlaceView: View {
     let kind: TreatmentDraft.Kind
     @Binding var cropKey: String?
     @Binding var chosen: Set<String>
+    /// The treated area typed per chosen parcel, in decares (#363).
+    @Binding var treatedText: [String: String]
     let failure: String?
     /// Reads the crop list again after it failed. The flow's, not the
     /// store's, because the flow also chooses a farm's only crop.
@@ -36,7 +38,10 @@ struct TreatmentPlaceView: View {
     private var fieldsState: LoadState<[TreatmentPlace.Field]>? { cropKey.flatMap { store.fields[$0] } }
     private var fields: [TreatmentPlace.Field] { fieldsState?.value ?? [] }
     private var chosenFields: [TreatmentPlace.Field] { fields.filter { chosen.contains($0.id) } }
-    private var total: TreatmentPlace.Total { TreatmentPlace.total(chosenFields) }
+    private var total: TreatmentPlace.Total {
+        TreatmentPlace.total(chosenFields,
+                             treated: TreatmentDraft.treatedAreas(treatedText, for: chosenFields).mapValues(\.wireHectares))
+    }
     private var areaWord: String { kind == .spray ? "Третирана площ" : "Наторена площ" }
 
     /// Above the list, never at the cost of it: the map grows with the text
@@ -131,6 +136,7 @@ struct TreatmentPlaceView: View {
             case .loaded:
                 if let crop {
                     cropSection(crop)
+                    treatedSection
                 } else {
                     Section { note(Self.chooseCrop).pageRow() }
                 }
@@ -200,6 +206,35 @@ struct TreatmentPlaceView: View {
         // blocks with a field of the same name fall back to numbering.
         .accessibilityInputLabels([field.parcel.name, "\(field.parcel.name) \(field.blockName)"])
     }
+
+    /// Each chosen parcel's treated area (#363, owner 2026-10-20): its whole
+    /// area unless one is typed, which is how the ДНЕВНИК prints a row per
+    /// parcel. Below the list rather than in it, so choosing stays one tap
+    /// a row and a long crop doesn't double in length.
+    @ViewBuilder
+    private var treatedSection: some View {
+        if !chosenFields.isEmpty {
+            Section {
+                ForEach(chosenFields) { field in
+                    let whole = field.parcel.areaHa.map { Area(hectares: $0) }
+                    FieldRow(field.parcel.name,
+                             spoken: "\(areaWord) на \(field.parcel.name) в декари") {
+                        TextField("дка", text: $treatedText[typed: field.id],
+                                  prompt: .fieldPrompt(whole?.number ?? "дка"))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .cardRow()
+                }
+            } header: {
+                SectionHeader("\(areaWord), дка")
+            } footer: {
+                SectionFooter(Self.treatedNote)
+            }
+        }
+    }
+
+    static let treatedNote = "Празно поле означава целия парцел. Въведете по-малка площ, ако е третирана само част от него."
 
     private func selectAllButton() -> some View {
         let all = fields.allSatisfy { chosen.contains($0.id) }

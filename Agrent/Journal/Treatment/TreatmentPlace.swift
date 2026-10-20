@@ -85,8 +85,11 @@ enum TreatmentPlace {
         let withoutArea: Int
     }
 
-    static func total(_ fields: [Field]) -> Total {
-        let known = fields.compactMap(\.parcel.areaHa)
+    /// The chosen parcels' area: each one's treated area where only part
+    /// of it was treated (`treated`, hectares, #363), its whole area
+    /// otherwise.
+    static func total(_ fields: [Field], treated: [String: Double] = [:]) -> Total {
+        let known = fields.compactMap { treated[$0.id] ?? $0.parcel.areaHa }
         return Total(area: Area(hectares: known.reduce(0, +)),
                      parcels: fields.count,
                      withoutArea: fields.count - known.count)

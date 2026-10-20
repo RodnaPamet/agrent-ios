@@ -30,11 +30,15 @@ struct TreatmentRecord: Equatable, Sendable {
     /// «Фенофаза/BBCH» (#363), on a spraying only. nil when not given.
     let phenophase: String?
     let parcelIDs: [String]
+    /// HECTARES, for the parcels only partly treated (#363, agri-saas
+    /// #2086). A parcel absent here is the whole parcel.
+    let treatedAreas: [String: Double]
 
     /// nil while the draft has a problem or no parcel is chosen.
     static func make(_ draft: TreatmentDraft, catalogue: [InputItem]?,
                      fields: [TreatmentPlace.Field], now: Date = Date()) -> TreatmentRecord? {
         guard draft.problems(catalogue: catalogue, now: now).isEmpty, !fields.isEmpty,
+              TreatmentDraft.treatedProblem(draft.treatedText, for: fields) == nil,
               let dose = draft.dose, let unit = draft.doseUnit else { return nil }
         let typed = draft.typed(in: catalogue)
         let name: String
@@ -58,7 +62,8 @@ struct TreatmentRecord: Equatable, Sendable {
             doseUnitID: unit.id,
             technique: spraying ? draft.technique : nil,
             phenophase: spraying ? draft.phenophase : nil,
-            parcelIDs: fields.map(\.id)
+            parcelIDs: fields.map(\.id),
+            treatedAreas: TreatmentDraft.treatedAreas(draft.treatedText, for: fields).mapValues(\.wireHectares)
         )
     }
 }
