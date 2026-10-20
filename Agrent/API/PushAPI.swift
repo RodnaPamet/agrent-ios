@@ -26,26 +26,34 @@ import Foundation
 /// transport is #1764's step 3 and waits on the owner's APNs key. Asking the
 /// person for permission waits for that too (owner, 2026-10-14) — a token
 /// needs no permission, an alert does.
+///
+/// ── Which host ──
+///
+/// Each registration says whether its token is a sandbox or a production
+/// one (`environment`, #355), as the server sends to both from one
+/// deployment. Sent on every registration, repeats included, so the value
+/// a row holds is whichever this install last said.
 enum PushAPI {
     static func subscriptionsPath(in farm: String) -> String {
         FarmPath.root(for: farm) + "/push-subscriptions"
     }
 
     /// The body of both the registration and its removal.
-    ///
-    /// No APNs environment yet: a development-signed install's token is a
-    /// SANDBOX token and a TestFlight or App Store one is a production token,
-    /// and the server cannot tell them apart. Asked of backend 1 on
-    /// 2026-10-14; the field joins this body once it is in the server's schema.
     struct Registration: Encodable, Equatable, Sendable {
         let platform: String
         /// 64 lowercase hex characters — the server's pin is
         /// `^[0-9a-f]{64}$`, case-insensitive.
         let deviceToken: String
+        /// Which APNs host the token works against (#355). Left out when
+        /// `nil`: of a removal, which finds its row by the token, and of a
+        /// registration whose profile couldn't be read — see
+        /// `APNsEnvironment`.
+        let environment: APNsEnvironment?
 
-        init(deviceToken: String) {
+        init(deviceToken: String, environment: APNsEnvironment?) {
             self.platform = "IOS"
             self.deviceToken = deviceToken
+            self.environment = environment
         }
     }
 
@@ -60,7 +68,7 @@ enum PushAPI {
     static func register(_ deviceToken: String, in farm: String) async throws {
         _ = try await APIClient.shared.postReturningData(
             subscriptionsPath(in: farm),
-            body: Registration(deviceToken: deviceToken),
+            body: Registration(deviceToken: deviceToken, environment: .current),
             // Idempotent on the token server-side, so a key would read as
             // protection that is not there.
             idempotencyKey: nil
@@ -81,7 +89,7 @@ enum PushAPI {
             for: subscriptionsPath(in: farm), method: "DELETE", accessToken: accessToken
         )
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONEncoder().encode(Registration(deviceToken: deviceToken))
+        req.httpBody = try JSONEncoder().encode(Registration(deviceToken: deviceToken, environment: nil))
         // Short, as the revoke's: nobody waits on it, and the revoke waits
         // on IT — see `SessionRevocation.revokeThisDevice`.
         req.timeoutInterval = 10

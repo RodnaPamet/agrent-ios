@@ -41,13 +41,24 @@ final class PushRegistrationTests: XCTestCase {
 
     /// `ApnsRegistrationSchema`: `platform` is the literal `IOS`, which is
     /// what tells the route's union this is not a browser's subscription.
+    /// `environment` in the wire's lower-case words (backend 2, 2026-10-20).
     func testTheBodyIsTheServersApnsShape() throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        let body = try encoder.encode(PushAPI.Registration(deviceToken: hex))
+        let body = try encoder.encode(PushAPI.Registration(deviceToken: hex, environment: .development))
         XCTAssertEqual(String(decoding: body, as: UTF8.self),
-                       #"{"deviceToken":"\#(hex)","platform":"IOS"}"#)
+                       #"{"deviceToken":"\#(hex)","environment":"development","platform":"IOS"}"#)
+        let production = try encoder.encode(PushAPI.Registration(deviceToken: hex, environment: .production))
+        XCTAssertTrue(String(decoding: production, as: UTF8.self).contains(#""environment":"production""#))
         XCTAssertEqual(PushAPI.subscriptionsPath(in: "ferma-1"), "/api/t/ferma-1/push-subscriptions")
+    }
+
+    /// An unreadable profile leaves the key out, never sends `null` or a
+    /// guess: the server reads a missing value as "the client did not say".
+    func testAnUnknownEnvironmentIsLeftOut() throws {
+        let body = try JSONEncoder().encode(PushAPI.Registration(deviceToken: hex, environment: nil))
+        let sent = try JSONDecoder().decode([String: String].self, from: body)
+        XCTAssertEqual(sent, ["platform": "IOS", "deviceToken": hex])
     }
 
     /// The removal is sent after the Keychain is cleared, so it carries the
