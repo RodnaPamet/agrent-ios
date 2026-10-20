@@ -733,6 +733,16 @@ Web `FieldOperationPanel` (on a FIELD_OPERATION task's overview) and the PWA's
 `OfflineFieldPanel` · iOS `Tasks/FieldOperationSection.swift` +
 `FieldOperationStore.swift`, on the task detail.
 
+### Matched — «Ново мероприятие» names its operator (#371, owner 2026-10-20)
+
+**Before:** the parcel's operation sheet assigned the work to whoever
+filled it. Now an **«Изпълнител»** row offers the farm's active members,
+from `/users/assignable`, the server's own list. It defaults to the person
+filling it, as before.
+- **Kept in memory:** the list carries colleagues' emails, so it's read when the sheet opens and never cached.
+- **A failed read** leaves the person filling it, says so, and never blocks the record.
+- **Someone else** gets the assignment email, notice and push. A self-assignment notifies nobody.
+
 ### Matched — a tapped notification opens its task (#368)
 
 **The web** opens a push's `url` when it is clicked (`tag: task-{id}`

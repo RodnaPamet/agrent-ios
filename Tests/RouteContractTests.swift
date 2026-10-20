@@ -191,6 +191,8 @@ final class RouteContractTests: XCTestCase {
             ("SessionReset.swift", [SessionRevocation.path]),
             // This phone's APNs token, per farm (#272).
             ("PushAPI.swift", [PushAPI.subscriptionsPath(in: "{tenantSlug}")]),
+            // Who a farm's work can be given to (#371, #372).
+            ("AssignableUsersAPI.swift", [AssignableUsersAPI.path]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
             // «Ново мероприятие»'s save and its read by handle (#293).

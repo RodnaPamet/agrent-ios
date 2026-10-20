@@ -50,6 +50,10 @@ struct ParcelOperationSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var store = OperationReferenceStore()
     @State private var me: CurrentUser?
+    /// Who the farm can give the work to, and who was chosen (#371). nil is
+    /// the person filling the sheet, as before the row existed.
+    @State private var people = AssignableUsersStore()
+    @State private var assigneeID: String?
 
     @State private var kind: Kind = .spray
     /// The product's trade name, typed (#237) — see `TypedProduct`.
@@ -211,6 +215,15 @@ struct ParcelOperationSheet: View {
 
     private var units: [Unit] { store.units.value ?? [] }
 
+    private var assigneeChoices: [AssignableUsersStore.Choice] {
+        AssignableUsersStore.choices(people.state.value, me: me)
+    }
+
+    private var assigneeLabel: String {
+        let chosen = assigneeID ?? me?.id
+        return assigneeChoices.first { $0.id == chosen }?.label ?? "—"
+    }
+
     private func decimal(_ text: String) -> Decimal? {
         let cleaned = text
             .replacingOccurrences(of: " ", with: "")
@@ -225,18 +238,13 @@ struct ParcelOperationSheet: View {
         return CreateFieldOperation(
             operationType: kind.rawValue,
             parcelIds: [parcel.id],
-            // SELF-ASSIGNED, from `/api/auth/me`. The field is
-            // `z.string().min(1)` — required, not nullable, unlike the
-            // same-named field on task creation one route away.
-            //
-            // Self rather than a roster because the person tapping a
-            // parcel in a field is logging their own work. `/users/
-            // assignable` exists and is reachable by the roles that can
-            // create operations at all, so assigning somebody else is a
-            // later feature rather than a blocked one — and it carries
-            // colleague emails, which is a reason not to fetch it until
-            // something renders it.
-            assigneeUserId: me?.id,
+            // The chosen operator, or the person filling the sheet (#371).
+            // The field is `z.string().min(1)`: required, not nullable,
+            // unlike the same-named field on task creation one route away.
+            // Someone else gets the assignment email, notice and push
+            // (`createFieldOperation` goes through `createTask`); the person
+            // assigning themselves gets none.
+            assigneeUserId: assigneeID ?? me?.id,
             productName: spraying ? sentName : nil,
             doseValue: spraying ? dose : nil,
             doseUnitId: spraying ? doseUnit?.id : nil,
@@ -365,6 +373,21 @@ struct ParcelOperationSheet: View {
                     }
                 }
 
+                Section {
+                    MenuPicker("Изпълнител", english: "Assignee", selection: $assigneeID,
+                               value: assigneeLabel) {
+                        ForEach(assigneeChoices) { Text($0.label).tag(String?.some($0.id)) }
+                    }
+                } footer: {
+                    SectionFooter {
+                        if case .failed = people.state {
+                            Text("Списъкът с хора не се зареди, затова мероприятието се възлага на Вас.")
+                        } else {
+                            Text("Изпълнителят го вижда в «Задачи» и получава известие.")
+                        }
+                    }
+                }
+
                 Section(titled: "Бележка") {
                     TextEditor(text: $note).frame(minHeight: 80)
                 }
@@ -427,6 +450,9 @@ struct ParcelOperationSheet: View {
                 await store.load()
                 me = await CurrentUserStore.shared.load()
             }
+            // Beside the rest, and never in the way: until it answers, or
+            // if it fails, the person filling the sheet is the operator.
+            .task { await people.load() }
         }
     }
 
