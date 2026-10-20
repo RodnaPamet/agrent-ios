@@ -687,11 +687,15 @@ period, then «Добави», or «Редактирай данните» to go 
 every spraying, after the dose, as in PRZ. It's free text up to 64
 characters, because the register takes a BBCH code or a stage name. It's
 stored on every line, read back on the entry and on «Проверка», and never
-sent blank. It **doesn't print yet**: the chemical table of Приложение 1
-has no phenophase column. Its place is column 2 of the scouting table, in
-the rows the owner ruled are derived from the treatments (agri-saas #1740
-Q2). That derivation is backend 1's next change, so the form's note says it
-isn't printed.
+sent blank. It **prints** (agri-saas #2089, live 2026-10-20) in column 2,
+«Фенофаза/BBCH», of the scouting table, not in Приложение 1's chemical
+table, which has no such column. It goes on a row derived from the
+treatment, as the owner ruled (agri-saas #1740 Q2):
+- one row per spraying that recorded a stage;
+- the date marked with an asterisk, and a caption saying such rows are derived from the treatments and aren't a separate inspection;
+- «Болест», «Неприятел» and the four measurement columns left blank.
+
+The form's note says that.
 
 **Treated area per parcel** (#363, agri-saas #2086, live 2026-10-20): step
 two lists each chosen parcel's area under «Третирана площ, дка». An empty

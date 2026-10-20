@@ -181,9 +181,12 @@ struct TreatmentFieldsView: View {
 
     private static let pestExample = "напр. Листни въшки"
     static let phenophaseExample = "напр. BBCH 31 или братене"
-    /// Honest about where it goes: the ДНЕВНИК doesn't print it yet
-    /// (agri-saas #2072), so the form doesn't promise a printed cell.
-    static let phenophaseNote = "По избор. Пази се с мероприятието, но в ДНЕВНИКА в PDF още не се отпечатва."
+    /// Where it goes, as the farmer will see it on the printed sheet
+    /// (agri-saas #2089): not in the chemical table, which has no such
+    /// column, but in the scouting table's «Фенофаза/BBCH», on a row marked
+    /// as derived from the treatment rather than a separate inspection.
+    static let phenophaseNote = "По избор. В ДНЕВНИКА се отпечатва в таблицата за обследване, "
+        + "на ред, отбелязан като изведен от мероприятието."
     private static let harvestNote =
         "Най-ранната дата за прибиране е датата на третирането плюс карантинния срок."
     private static let areaNote =
