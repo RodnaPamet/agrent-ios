@@ -65,7 +65,7 @@ enum OfflinePrefetch {
         // writes below are keyed on the identity (`CacheScope`), which only
         // the store adopts. Waiting for its answer means a fresh install's
         // catalogue lands under the user it belongs to rather than nowhere.
-        _ = await CurrentUserStore.shared.settled()
+        let me = await CurrentUserStore.shared.settled()
         let locations = await CachedResource.load(LocationsAPI.listPath) {
             try await LocationsAPI.decodeList(from: $0)
         }
@@ -80,6 +80,39 @@ enum OfflinePrefetch {
         }
         _ = await CachedResource.load(LocationsAPI.rateUnitsPath) {
             try await LocationsAPI.decodeUnits(from: $0)
+        }
+        await warmTreatmentParcels(for: me)
+    }
+
+    /// «Ново мероприятие»'s step two: the farm's crops and every crop's
+    /// parcels (#384).
+    ///
+    /// Found by the owner offline on 2026-10-21: only a crop opened earlier
+    /// with signal had parcels, and every other crop said there was no
+    /// connection. `TreatmentPlaceStore` reads each crop's parcels when that
+    /// crop is chosen, and the cache is written only by a read that
+    /// succeeded. Each is asked for here, one at a time, for the reasons
+    /// above. Since #329 an unchanged crop answers 304, so a warm on every
+    /// return to the foreground costs a request per crop, not the geometry.
+    ///
+    /// The same values the store asks for: each `cropType` as the totals
+    /// spell it. The store groups spellings that differ only in case under
+    /// one crop and reads every spelling, so warming one spelling per total
+    /// covers them all.
+    ///
+    /// Not for an operator: `/parcels/by-crop` is outside the MECHANISATOR's
+    /// path lockdown (`CurrentUser.isOperator`), so every read would be a
+    /// 403. Nor for someone who may not write (`mayWrite`, failing open),
+    /// since the form records a treatment.
+    private static func warmTreatmentParcels(for me: CurrentUser?) async {
+        guard !(me?.isOperator ?? false), me?.mayWrite ?? true else { return }
+        let totals = await CachedResource.load(ParcelsByCropAPI.path) {
+            try await ParcelsByCropAPI.decodeTotals(from: $0)
+        }
+        for crop in totals.value?.crops ?? [] {
+            _ = await CachedResource.load(ParcelsByCropAPI.path(crop: crop.cropType)) {
+                try await ParcelsByCropAPI.decodeParcels(from: $0)
+            }
         }
     }
 }

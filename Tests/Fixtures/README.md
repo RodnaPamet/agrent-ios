@@ -366,3 +366,17 @@ because the server half did not exist yet when they were written:
 Choosing a topic is a PUT, which the seam answers with a 501 like every write.
 A11yShots opens «Предпочитания» and closes it, and never touches a switch.
 
+## «Ново мероприятие»'s crops (agrent-ios#384)
+
+`parcels-by-crop.json` and `parcels-by-crop-wheat.json`: `GET /parcels/by-crop`
+and `GET /parcels/by-crop?crop=Wheat`, shaped as `ParcelsByCropAPI` decodes
+them. ONE crop, so the flow chooses it for the person, as it does on a
+one-crop farm. Its two parcels are `par_holes` and `par_simple` from
+`locations-parcels.json`, with their names, areas and synthetic geometry
+copied rather than invented again, and the crop given as `Wheat`. The name
+is ASCII so the query is the same string however it's escaped.
+
+| case | where |
+|---|---|
+| a parcel with four holes and one without, both drawable | `parcels` 0–1 |
+| the total equals the parcels' sum | `crops[0].areaHaTotal` |
