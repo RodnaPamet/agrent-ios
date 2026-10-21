@@ -116,6 +116,7 @@ enum A11y {
         /// The operation sheet's own verb. "Save" as well — see above.
         static let record = spokenNames("Запиши", "Save")
         static let create = spokenNames("Създай", "Create")
+        static let retry = spokenNames("Опитай пак", "Retry")
         /// «Задачи»'s + (#372).
         static let newTask = spokenNames("Нова задача", "Нова", "New task")
         static let publish = spokenNames("Публикувай", "Post")
