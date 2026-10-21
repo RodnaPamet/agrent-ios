@@ -61,7 +61,7 @@ final class TaskParcelsStepTests: XCTestCase {
 
     // MARK: - A block's parcels
 
-    private func parcel(_ id: String, _ name: String) -> Parcel {
+    private nonisolated static func parcel(_ id: String, _ name: String) -> Parcel {
         Parcel(id: id, name: name, cropType: nil, areaHa: 1.5, geometry: nil, soilType: nil,
                cadastralId: nil, ekatte: nil, hasActiveLease: nil, absentFromImportAt: nil)
     }
@@ -77,7 +77,7 @@ final class TaskParcelsStepTests: XCTestCase {
     /// every field carries its block.
     func testABlocksParcelsAreListedByName() async throws {
         let fields = TaskBlocksStore.fields(
-            [parcel("p3", "Нива 10"), parcel("p1", "Нива 2"), parcel("p2", "Ливада")],
+            [Self.parcel("p3", "Нива 10"), Self.parcel("p1", "Нива 2"), Self.parcel("p2", "Ливада")],
             in: try await block())
         XCTAssertEqual(fields.map(\.parcel.name), ["Ливада", "Нива 2", "Нива 10"])
         XCTAssertEqual(Set(fields.map(\.blockID)), ["loc_synthetic_1"])
@@ -93,7 +93,7 @@ final class TaskParcelsStepTests: XCTestCase {
             loadParcels: { id, publish in
                 XCTAssertEqual(id, "loc_synthetic_1")
                 publish(.loaded(ParcelsResponse(locationId: id, bounds: nil,
-                                                parcels: [self.parcel("p1", "Нива 2")]), .fresh))
+                                                parcels: [Self.parcel("p1", "Нива 2")]), .fresh))
             })
         await store.load()
         XCTAssertEqual(store.blocks.value?.map(\.id), ["loc_synthetic_1"])
@@ -105,16 +105,19 @@ final class TaskParcelsStepTests: XCTestCase {
     @MainActor
     func testAFailedReadKeepsAShownBlock() async throws {
         let one = try await block()
-        var fail = false
+        /// On the main actor, as the store's reads are, so the switch is
+        /// flipped and read on one actor.
+        @MainActor final class Switch { var fail = false }
+        let offline = Switch()
         let store = TaskBlocksStore(
             loadBlocks: { publish in publish(.loaded([one], .fresh)) },
             loadParcels: { id, publish in
-                publish(fail ? .failed("Няма интернет връзка.")
+                publish(offline.fail ? .failed("Няма интернет връзка.")
                              : .loaded(ParcelsResponse(locationId: id, bounds: nil,
-                                                       parcels: [self.parcel("p1", "Нива 2")]), .fresh))
+                                                       parcels: [Self.parcel("p1", "Нива 2")]), .fresh))
             })
         await store.loadFields(for: one)
-        fail = true
+        offline.fail = true
         await store.loadFields(for: one)
         XCTAssertEqual(store.fields["loc_synthetic_1"]?.value?.map(\.id), ["p1"])
     }
