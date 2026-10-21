@@ -222,16 +222,14 @@ enum SessionEpoch {
 ///
 /// The server ends the session the refresh token hangs from, plus every token
 /// on it — not the account; the person's other phones stay signed in, per the
-/// owner's "only this phone" decision. The caveat #1206 states, kept here so
-/// nobody has to discover it: a native credential is a CHILD of the session
-/// the browser sign-in created. `AuthClient.present` sets
-/// `prefersEphemeralWebBrowserSession = false`, so that browser is Safari's
-/// shared cookie jar; if the person was already signed in to app.agrent.bg in
-/// Safari on this phone, the native session descends from THAT login and this
-/// ends it too. The blast radius is the session the credential descends from,
-/// which usually coincides with the device and is not guaranteed to. A web
-/// login on the SAME phone is within "only this phone", so it is accepted
-/// rather than engineered around.
+/// owner's "only this phone" decision. A native credential is a CHILD of the
+/// session the browser sign-in created (#1206). Since #379,
+/// `AuthClient.present` sets `prefersEphemeralWebBrowserSession = true`, so
+/// that browser session lives in the sign-in sheet's own cookie jar and is
+/// discarded with it. The session revoked here is therefore the app's alone.
+/// A login to app.agrent.bg in Safari on the same phone is a separate session
+/// and stays signed in. (While the sheet shared Safari's jar, a native
+/// session could descend from that web login and end it too.)
 ///
 /// ── Unauthenticated, by the route's construction ──
 ///
