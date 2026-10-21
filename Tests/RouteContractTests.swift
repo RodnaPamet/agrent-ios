@@ -195,6 +195,8 @@ final class RouteContractTests: XCTestCase {
             ("AssignableUsersAPI.swift", [AssignableUsersAPI.path]),
             // «Нова задача» posts to the task list (#372).
             ("NewTaskAPI.swift", [NewTaskAPI.path]),
+            // «Редактирай» on a task: the fields, then the assignee (#382).
+            ("TaskEditAPI.swift", [WorkItemAPI.detailPath(id), TaskEditAPI.assignPath(id)]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
             // «Ново мероприятие»'s save and its read by handle (#293).
