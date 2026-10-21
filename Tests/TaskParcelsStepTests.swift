@@ -67,7 +67,7 @@ final class TaskParcelsStepTests: XCTestCase {
     }
 
     /// The synthetic block from `locations-list.json` («Synthetic Land»).
-    private func block() async throws -> Location {
+    private nonisolated static func block() async throws -> Location {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "locations-list", withExtension: "json"))
         let blocks = try await LocationsAPI.decodeList(from: Data(contentsOf: url))
         return try XCTUnwrap(blocks.first)
@@ -78,7 +78,7 @@ final class TaskParcelsStepTests: XCTestCase {
     func testABlocksParcelsAreListedByName() async throws {
         let fields = TaskBlocksStore.fields(
             [Self.parcel("p3", "Нива 10"), Self.parcel("p1", "Нива 2"), Self.parcel("p2", "Ливада")],
-            in: try await block())
+            in: try await Self.block())
         XCTAssertEqual(fields.map(\.parcel.name), ["Ливада", "Нива 2", "Нива 10"])
         XCTAssertEqual(Set(fields.map(\.blockID)), ["loc_synthetic_1"])
         XCTAssertEqual(Set(fields.map(\.blockName)), ["Synthetic Land"])
@@ -87,7 +87,7 @@ final class TaskParcelsStepTests: XCTestCase {
     /// A block's parcels as the store publishes them, through injected reads.
     @MainActor
     func testTheStoreLoadsABlocksParcels() async throws {
-        let one = try await block()
+        let one = try await Self.block()
         let store = TaskBlocksStore(
             loadBlocks: { publish in publish(.loaded([one], .fresh)) },
             loadParcels: { id, publish in
@@ -104,7 +104,7 @@ final class TaskParcelsStepTests: XCTestCase {
     /// A read that fails after the block was shown keeps what it showed.
     @MainActor
     func testAFailedReadKeepsAShownBlock() async throws {
-        let one = try await block()
+        let one = try await Self.block()
         /// On the main actor, as the store's reads are, so the switch is
         /// flipped and read on one actor.
         @MainActor final class Switch { var fail = false }

@@ -1741,6 +1741,36 @@ final class A11yShotsTests: XCTestCase {
         if cancel.exists { cancel.tap() }
     }
 
+    // MARK: - «Нова задача» → «Парцели» (agrent-ios#388)
+
+    /// Задачи → + → a title → «Напред» → «Парцели»: the fixture farm's one
+    /// block is chosen for the person, its parcels are listed, and choosing
+    /// all of them is counted at the bottom. Stops before «Създай»: nothing
+    /// is written, and the seam refuses writes anyway.
+    func testNewTaskParcelsStep() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        app.tabBars.buttons["Задачи"].tap()
+        let plus = app.buttons["Нова задача"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 15), "no + on Задачи")
+        plus.tap()
+        let title = app.textFields["Заглавие"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "no «Заглавие»")
+        title.tap()
+        title.typeText("Синтетична задача")
+        app.buttons["Напред"].tap()
+        XCTAssertTrue(app.navigationBars["Парцели"].waitForExistence(timeout: 10), "«Напред» opened no «Парцели»")
+        let all = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Избери всички'")).firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 15), "the one block's parcels weren't listed\n\(app.debugDescription)")
+        all.tap()
+        let counted = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'към задачата.'")).firstMatch
+        XCTAssertTrue(counted.waitForExistence(timeout: 5), "the chosen parcels aren't counted")
+        XCTAssertTrue(app.buttons["Създай"].exists, "no «Създай» on «Парцели»")
+        capture("08e-new-task-parcels", app: app)
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")
