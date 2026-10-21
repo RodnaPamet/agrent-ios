@@ -42,8 +42,20 @@ struct ParcelHistoryView: View {
     /// comes back.
     @State private var store: ParcelHistoryStore
 
-    init(parcelID: String, parcelName: String) {
+    /// The parcel in its block, when this was opened from Блокове's map
+    /// (#387). Then «Ново мероприятие» is here, where a tap on the map used
+    /// to open it (owner, 2026-10-21). Nil from Риск.
+    private let recordIn: ParcelInBlock?
+    @State private var recording = false
+    /// Who is signed in: whether to offer «Ново мероприятие».
+    @State private var people = CurrentUserStore.shared
+    /// An operation saved from the sheet. Played here, because the sheet
+    /// closes on success (`WriteFeedback`).
+    @State private var feedback = WriteFeedback()
+
+    init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil) {
         self.parcelName = parcelName
+        self.recordIn = recordIn
         _store = State(initialValue: ParcelHistoryStore(parcelID: parcelID))
     }
 
@@ -62,6 +74,41 @@ struct ParcelHistoryView: View {
             .task {
                 if store.state.value == nil { await store.load() }
             }
+            .task { _ = await people.load() }
+            .safeAreaInset(edge: .bottom, spacing: 0) { recordButton }
+            .sheet(isPresented: $recording) {
+                if let recordIn {
+                    ParcelOperationSheet(locationID: recordIn.locationID, parcel: recordIn.parcel) {
+                        feedback.saved()
+                        Task { await store.refresh() }
+                    }
+                }
+            }
+            .writeFeedback(feedback)
+    }
+
+    /// «Ново мероприятие» for this parcel, the primary action at the bottom,
+    /// as the journal's «Нов запис» is: a gloved thumb reaches the bottom of
+    /// a phone. Only when opened from Блокове, and only for someone who may
+    /// create an operation (`mayCreateOperations`, failing open, as the map's
+    /// tap did). Not while the archive loads or fails: the sheet needs only
+    /// the parcel, which the route carries.
+    @ViewBuilder
+    private var recordButton: some View {
+        if recordIn != nil, people.user?.mayCreateOperations ?? true {
+            Button {
+                recording = true
+            } label: {
+                Text("Ново мероприятие").frame(maxWidth: .infinity, minHeight: 30)
+            }
+            .prominentButton()
+            .controlSize(.large)
+            .accessibilityInputLabels(A11y.Spoken.newOperation)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            .solidBar(hairline: .top)
+        }
     }
 
     @ViewBuilder

@@ -118,6 +118,8 @@ enum A11y {
         static let create = spokenNames("Създай", "Create")
         /// «Задачи»'s + (#372).
         static let newTask = spokenNames("Нова задача", "Нова", "New task")
+        /// A parcel's history → «Ново мероприятие» (#387).
+        static let newOperation = spokenNames("Ново мероприятие", "Мероприятие", "New operation")
         static let publish = spokenNames("Публикувай", "Post")
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")

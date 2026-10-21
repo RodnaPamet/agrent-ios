@@ -264,8 +264,17 @@ final class A11yShotsTests: XCTestCase {
                       "no parcel row for SYNTH-1 — may the fixture person not record operations?")
         row.tap()
 
+        // A row opens the parcel's history since #387 (owner, 2026-10-21),
+        // and «Ново мероприятие» is there.
+        XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10),
+                      "the parcel row opened no history")
+        capture("18a-parcel-history-from-map", app: app)
+        let record = app.buttons["Ново мероприятие"]
+        XCTAssertTrue(record.waitForExistence(timeout: 10), "the history has no «Ново мероприятие»")
+        record.tap()
+
         let name = app.textFields["Търговско наименование"]
-        XCTAssertTrue(name.waitForExistence(timeout: 10), "the parcel row opened no operation sheet")
+        XCTAssertTrue(name.waitForExistence(timeout: 10), "«Ново мероприятие» opened no operation sheet")
         name.tap()
         // The newline submits, which puts the keyboard away so the section
         // under the field is in the picture.
@@ -290,6 +299,9 @@ final class A11yShotsTests: XCTestCase {
         let cancel = app.navigationBars.buttons["Отказ"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
         cancel.tap()
+        // Back from the history to the map, where the next capture starts.
+        let history = app.navigationBars["История"]
+        if history.waitForExistence(timeout: 5) { history.buttons.element(boundBy: 0).tap() }
     }
 
     /// The schematic map, which is up to two taps away and is the one #97
