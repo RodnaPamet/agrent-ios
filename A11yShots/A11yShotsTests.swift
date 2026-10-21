@@ -1756,11 +1756,13 @@ final class A11yShotsTests: XCTestCase {
         let plus = app.buttons["Нова задача"]
         XCTAssertTrue(plus.waitForExistence(timeout: 15), "no + on Задачи")
         plus.tap()
-        Thread.sleep(forTimeInterval: 3)
-        print("A11Y-TREE-BEGIN\n\(app.debugDescription)\nA11Y-TREE-END")
-        // A text VIEW: the title grows downwards (`axis: .vertical`). The
-        // first one on the form; the description is the second.
-        let title = app.textViews.firstMatch
+        // The sheet has to be IN the accessibility tree, which it wasn't
+        // while the + sat in an `.overlay` (#388): this is the assertion
+        // that caught it.
+        XCTAssertTrue(app.navigationBars["Нова задача"].waitForExistence(timeout: 10),
+                      "«Нова задача» is not in the accessibility tree")
+        // The first field on the form; the description is the second.
+        let title = app.textFields.firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 10), "no «Заглавие»\n\(app.debugDescription)")
         title.tap()
         title.typeText("Синтетична задача")
