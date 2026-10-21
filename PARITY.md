@@ -1323,6 +1323,14 @@ caller of `.sensoryFeedback`.
 
 ---
 
+## Risk by parcel
+
+### Divergence — one «Застраховай», bottom right; «История» works (#386, owner 2026-10-21)
+
+- **One way to ask:** the screen's floating «Застраховай» at the bottom right. It opens the enquiry form with no parcel chosen, and the person picks it there. The per-row «Запитай за оферта» / «Запитай отново» is removed. A row still shows «Изпраща се…» while an ask is out, and «Заявено запитване» once one was made.
+- **The floating button moved** from bottom-left to bottom-right, where Задачи's + is. The risk page is its only user.
+- **«История» on a row opens the parcel's history.** It did nothing before, because the button read `pushRoute` from outside the stack it pushes onto.
+
 ## Design status — the AX3 failures are FIXED
 
 Owned by the peer, on hardware. Recorded here so the two halves of the

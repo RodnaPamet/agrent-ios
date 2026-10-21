@@ -1,16 +1,15 @@
 import SwiftUI
 
-/// The app's floating action button — one per screen, bottom LEADING.
+/// The app's floating action button — one per screen, bottom TRAILING.
 ///
-/// ── Why leading, against the platform's habit ──
+/// ── Trailing, where the right thumb falls (owner, 2026-10-21, #386) ──
 ///
-/// iOS puts a floating action where the right thumb falls. This one is on
-/// the left, by the owner's instruction, and there is a reason to keep it
-/// there beyond the instruction: the parcel map already owns the
-/// bottom-trailing corner with «Следващ парцел», and Apple's map
-/// attribution owns bottom-leading only on the map itself, where this
-/// button does not appear. Putting both controls in the same corner on any
-/// screen that grows a second one is how a farmer taps the wrong thing.
+/// It was bottom-leading, by an earlier instruction. The owner moved it to
+/// the bottom right, where Задачи's + already is, so the app's floating
+/// actions share one corner. The parcel map's «Следващ парцел» also owns
+/// bottom-trailing, but only on the map, where this button doesn't appear.
+/// A screen that ever needs both would put two controls in one corner, so it
+/// should use its toolbar instead (see below).
 ///
 /// ── One per screen ──
 ///
@@ -53,7 +52,7 @@ struct ActionButton: View {
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .padding(.leading, 16)
+            .padding(.trailing, 16)
             .padding(.bottom, 16)
             .accessibilityLabel(label)
         }
@@ -61,7 +60,7 @@ struct ActionButton: View {
 }
 
 extension View {
-    /// Floats an `ActionButton` over this view, bottom-leading.
+    /// Floats an `ActionButton` over this view, bottom-trailing.
     ///
     /// An overlay rather than a `safeAreaInset`, because the button covers
     /// content by design — a list scrolls under it and the last row stays
@@ -73,7 +72,7 @@ extension View {
         isEnabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
-        overlay(alignment: .bottomLeading) {
+        overlay(alignment: .bottomTrailing) {
             ActionButton(label: label, systemImage: systemImage,
                          action: action, isEnabled: isEnabled)
         }
