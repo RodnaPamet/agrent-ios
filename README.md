@@ -99,8 +99,9 @@ build — there is no macOS on the machine this was written on:
 ## What it does
 
 - **Sign in** through the system browser with PKCE — not a webview, because
-  Google refuses OAuth in embedded webviews (`disallowed_useragent`). If you
-  are already signed in to `app.agrent.bg` in Safari, it is one tap.
+  Google refuses OAuth in embedded webviews (`disallowed_useragent`). Each
+  sign-in gets its own empty cookie jar, so a website login in Safari plays
+  no part (#379).
 - **List** the 50 most recent journal entries, pull to refresh.
 - **Create** an entry: type, date, title, notes.
 - Tokens in the **Keychain**, refreshed automatically on 401, single-flight so

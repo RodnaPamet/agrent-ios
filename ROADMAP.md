@@ -81,6 +81,15 @@ Shipped and proven end to end on a device simulator (2026-09-21):
   changed once, at inception — and the asymmetry beat it. See
   `LogEntryType`'s header.
 
+- ~~Google sign-in on TestFlight 0.1.0 (2.1) came back to the sign-in
+  screen with nothing said (#379).~~ **FIXED 2026-10-21.** The cause: the
+  sheet shared Safari's cookie jar. Safari held a website session for
+  another account, so the server refused the Google account into it and
+  sent the sheet back to `/login?error=…`, which the website doesn't show.
+  The owner chose (2026-10-21) to give each sign-in its own empty jar
+  (`prefersEphemeralWebBrowserSession = true`), even though Google now asks
+  for the account each time. The website's half (showing its sign-in
+  errors) is for agri-saas.
 - ~~Sign-in rendered raw JSON and English.~~ **CLOSED 2026-09-23,** and it
   was found while checking the entry above rather than by looking for it.
   `AuthError.server` carried the whole response body and `friendly` returned

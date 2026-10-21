@@ -6,8 +6,8 @@ import Observation
 ///
 /// That is not a style choice: Google refuses OAuth inside an embedded webview
 /// (`disallowed_useragent`). `ASWebAuthenticationSession` is the supported
-/// surface and gives us the shared Safari cookie jar, so a user already signed
-/// in on the web is one tap away.
+/// surface. Each sign-in gets its own empty cookie jar, not Safari's (#379;
+/// see `present`).
 @Observable
 @MainActor
 final class AuthClient: NSObject {
@@ -782,8 +782,8 @@ final class AuthClient: NSObject {
         // session only, one attempt in a detached task. NOT
         // `/api/auth/logout`: that clears a web cookie and would revoke
         // nothing. After the local clear and never awaited, so the network
-        // can neither delay nor undo the sign-out — see `SessionRevocation`,
-        // including what "this device's session" can reach in Safari.
+        // can neither delay nor undo the sign-out — see `SessionRevocation`
+        // for what "this device's session" is.
         //
         // The push removals go first, inside the same detached task: a
         // revoked session's access token is refused at once.
@@ -811,9 +811,19 @@ final class AuthClient: NSObject {
                 else { cont.resume(throwing: URLError(.badServerResponse)) }
             }
             s.presentationContextProvider = self
-            // Use the shared cookie jar: if they are signed in to app.agrent.bg
-            // in Safari, this becomes a single tap rather than a full login.
-            s.prefersEphemeralWebBrowserSession = false
+            // Its own empty cookie jar, not Safari's (#379, owner 2026-10-21).
+            // Safari's was shared for a one-tap sign-in, and that let a
+            // website session in Safari decide how the app's sign-in ended.
+            // Safari was signed in to the website as another account, so the
+            // server refused the Google account into that session and sent
+            // the sheet back to the login page, with nothing said, until the
+            // owner changed Safari's session. A sign-in here starts from
+            // nothing, so the account is the one picked in this sheet.
+            //
+            // The cost: Google doesn't remember the account between sign-ins,
+            // so it asks for it each time. Password AutoFill still works, and
+            // a phone signs in rarely.
+            s.prefersEphemeralWebBrowserSession = true
             self.session = s
             s.start()
         }
