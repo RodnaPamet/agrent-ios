@@ -775,6 +775,22 @@ priority, due date, assignee and links. **iOS** asks what a phone needs:
 - **After a save:** the list reloads and the new task opens.
 - **Not idempotent:** the route honours no key, so a lost answer is said as possibly created, never retried.
 
+### Divergence — «Редактирай» on a task, for its creator and administrators (#382, owner 2026-10-21)
+
+**The web's** task page has an edit form (`FarmTaskDetailClient`) with title,
+description, priority, type and due date, offered to anyone who can write
+tasks. **iOS** opens the «Нова задача» form on the task:
+- **The fields:** title, description, due day and assignee (owner, 2026-10-21). No priority and no type, as in «Нова задача».
+- **Who sees it:** the task's creator and the farm's administrators, and only someone who may write there. This is the owner's rule.
+  - **The server allows more:** `updateTask` checks `assertCanWriteTasks` only, so any writer may edit any task. Enforcing the owner's rule is agri-saas's to do.
+  - **When the tier is unknown,** the button shows, as every write does, and the server's answer is read out.
+- **What is sent:** only what changed.
+  - The fields go by `PATCH /tasks/{id}`. A cleared description or due day is an explicit `null`.
+  - The assignee goes by `POST /tasks/{id}/assign`, which records it and tells the assignee. It is sent only if the assignee changed.
+  - The due DAY is compared, not the instant, so an untouched day set elsewhere at another hour is not rewritten to midnight.
+- **No lock and no key:** the task row has no version and neither route reads a key. Both set a state, so last write wins, as on the web.
+- **A description the server couldn't decrypt** opens empty. It isn't sent unless somebody types over it.
+
 ### Matched — a tapped notification opens its task (#368)
 
 **The web** opens a push's `url` when it is clicked (`tag: task-{id}`

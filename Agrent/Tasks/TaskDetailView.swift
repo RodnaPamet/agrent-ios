@@ -35,6 +35,9 @@ struct TaskDetailView: View {
     /// `FieldOperationPanel` on exactly this condition.
     @State private var lines: FieldOperationStore?
 
+    /// The task «Редактирай» opened on (#382), as it stood at the tap.
+    @State private var editing: WorkItem?
+
     /// A comment being written (#225). Here rather than in the section, so
     /// it survives the task being re-read under it.
     @State private var commentDraft = ""
@@ -67,9 +70,15 @@ struct TaskDetailView: View {
         // while costing the width that made `inlineTitle` necessary.
         .inlineTitle(summary.key ?? "Задача")
         .toolbar {
+            if let item = store.state.value, TaskEdit.mayEdit(item, me: people.user) {
+                ToolbarItem(placement: .primaryAction) { editButton(item) }
+            }
             if let item = store.state.value, TaskCloseRules.mayClose(item, me: people.user) {
                 ToolbarItem(placement: .primaryAction) { closeButton }
             }
+        }
+        .sheet(item: $editing) { item in
+            EditTaskView(item: item) { await store.load() }
         }
         .sheet(isPresented: $closing) {
             CloseTaskSheet(asksWeeds: closeAsksWeeds) { answers in
@@ -114,6 +123,20 @@ struct TaskDetailView: View {
         .disabled(store.saving)
         .accessibilityLabel("Завърши задачата")
         .accessibilityInputLabels(A11y.Spoken.completeTask)
+    }
+
+    /// «Редактирай» (#382, owner 2026-10-21): to the task's creator and the
+    /// farm's administrators (`TaskEdit.mayEdit`). A pencil beside the tick
+    /// rather than a word, so the bar keeps room for both at large sizes.
+    /// The name is spoken, and shown in the large content viewer.
+    private func editButton(_ item: WorkItem) -> some View {
+        Button {
+            editing = item
+        } label: {
+            Label("Редактирай задачата", systemImage: "pencil")
+        }
+        .disabled(store.saving)
+        .accessibilityInputLabels(A11y.Spoken.edit)
     }
 
     /// The parcels a close's weeds are recorded on: the task's own, as
