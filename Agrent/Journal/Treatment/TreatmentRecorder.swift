@@ -4,8 +4,8 @@ import Foundation
 ///
 /// Built only from a draft with no problems and at least one parcel, so a
 /// record that exists is one the server can be asked to keep.
-struct TreatmentRecord: Equatable, Sendable {
-    struct NewProduct: Equatable, Sendable {
+struct TreatmentRecord: Hashable, Sendable {
+    struct NewProduct: Hashable, Sendable {
         let pppRegistrationNo: String
         let quarantineDays: Int
     }

@@ -69,6 +69,8 @@ final class A11yShotsTests: XCTestCase {
     /// it cannot read the constant. If the two ever disagree the app opens on
     /// `SignInView`, and `assertSeamActive` fails naming this property.
     private static let seamArgument = "AGRENT_UITEST_FIXTURES"
+    /// `UITestSeam.offlineArgument`, copied for the same reason.
+    private static let offlineArgument = "AGRENT_UITEST_OFFLINE"
 
     /// A failed step leaves the app on an unknown screen, and the screenshots
     /// taken after it would be of that screen under the previous one's name.
@@ -1648,6 +1650,97 @@ final class A11yShotsTests: XCTestCase {
     /// device, so it reads the same settings the app under test reads, and a
     /// mismatch between the directory and the file name inside it IS the
     /// report.
+    // MARK: - «Проверка» with no signal (agrent-ios#384)
+
+    /// «Ново мероприятие» walked to «Проверка» twice: once with the fixtures
+    /// answering, which also caches every read the flow makes, then on a
+    /// second launch where every request fails as it does in Airplane mode.
+    /// On the owner's phone the second walk ended on an empty page with only
+    /// a back arrow (2026-10-21). Nothing is saved: «Отказ» on «Проверка»,
+    /// and the seam refuses writes anyway.
+    func testTreatmentCheckWithNoSignal() {
+        let online = XCUIApplication()
+        online.launchArguments.append(Self.seamArgument)
+        online.launch()
+        assertSeamActive(online)
+        walkToCheck(online, named: "20-treatment-check-online")
+        online.terminate()
+
+        let offline = XCUIApplication()
+        offline.launchArguments += [Self.seamArgument, Self.offlineArgument]
+        offline.launch()
+        XCTAssertTrue(offline.tabBars.firstMatch.waitForExistence(timeout: 20),
+                      "no tab bar with no signal")
+        // The seam's limit, not the phone's. Under the seam the identity is
+        // memory-only and learned from the fixture `/me` after launch, so
+        // Дневник's first read has no cache scope yet and fails. A phone has
+        // its identity in the Keychain before the first read (the owner's
+        // #113 check 1: cached data on a cold launch). One retry, once the
+        // identity is known, reads the cache as the phone would at once.
+        let retry = offline.buttons["Опитай пак"]
+        if retry.waitForExistence(timeout: 5) { retry.tap() }
+        walkToCheck(offline, named: "20b-treatment-check-offline")
+    }
+
+    /// Дневник → «Нов запис» → «Торене», a new fertiliser, a dose and a unit
+    /// → «Напред» → the one crop's parcels, all chosen → «Продължи», then
+    /// asserts that «Проверка» shows its read-back.
+    private func walkToCheck(_ app: XCUIApplication, named name: String) {
+        let open = app.buttons["Нов запис"]
+        let launched = Date()
+        let found = open.waitForExistence(timeout: 30)
+        capture("\(name)-start", app: app)
+        XCTAssertTrue(found, "no «Нов запис» on Дневник\n\(app.debugDescription)")
+        // How long Дневник took to offer it, in the log: #113 measured a
+        // 16-second stall on a cold launch with no signal once.
+        print("A11Y-TIMING \(name): «Нов запис» after \(Int(Date().timeIntervalSince(launched)))s")
+        open.tap()
+
+        let fertilise = app.buttons["Торене"]
+        XCTAssertTrue(fertilise.waitForExistence(timeout: 10), "no «Торене» on step one")
+        fertilise.tap()
+
+        let product = app.textFields["Търговско наименование"]
+        XCTAssertTrue(product.waitForExistence(timeout: 5), "no product field")
+        product.tap()
+        product.typeText("Синтетичен тор")
+
+        let dose = app.textFields["Количество"].exists ? app.textFields["Количество"] : app.textFields["0"]
+        XCTAssertTrue(dose.waitForExistence(timeout: 5), "no dose field\n\(app.debugDescription)")
+        dose.tap()
+        dose.typeText("10")
+
+        let unit = app.buttons["Мерна единица"]
+        if !unit.isHittable { app.swipeUp() }
+        XCTAssertTrue(unit.waitForExistence(timeout: 5), "no unit picker\n\(app.debugDescription)")
+        unit.tap()
+        let kg = app.buttons["кг/дка"]
+        XCTAssertTrue(kg.waitForExistence(timeout: 5), "no «кг/дка» in the unit menu\n\(app.debugDescription)")
+        kg.tap()
+
+        let next = app.buttons["Напред"]
+        if !next.isHittable { app.swipeUp() }
+        XCTAssertTrue(next.waitForExistence(timeout: 5), "no «Напред»")
+        next.tap()
+
+        let all = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Избери всички'")).firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 15), "no parcels on «Къде»\n\(app.debugDescription)")
+        all.tap()
+
+        let proceed = app.buttons["Продължи"]
+        XCTAssertTrue(proceed.waitForExistence(timeout: 5), "no «Продължи»")
+        proceed.tap()
+
+        let add = app.buttons["Добави"]
+        let shown = add.waitForExistence(timeout: 10)
+        capture(name, app: app)
+        XCTAssertTrue(shown, "«Проверка» is empty: no «Добави»\n\(app.debugDescription)")
+        XCTAssertTrue(app.staticTexts["Изчислено"].exists || app.staticTexts["ИЗЧИСЛЕНО"].exists,
+                      "«Проверка» has no read-back")
+        let cancel = app.navigationBars.buttons["Отказ"]
+        if cancel.exists { cancel.tap() }
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")

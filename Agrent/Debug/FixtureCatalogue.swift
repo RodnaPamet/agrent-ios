@@ -133,6 +133,9 @@ enum FixtureCatalogue {
         // with `?view=invites`. Here, by its query, or the members payload
         // would answer it.
         (AdminAPI.invitesPath, "admin-invites"),
+        // agrent-ios#384: «Ново мероприятие»'s step two, the one crop's
+        // parcels, by the query that names the crop.
+        (ParcelsByCropAPI.path(crop: "Wheat"), "parcels-by-crop-wheat"),
     ]) { $0 }
 
     /// Routes matched on the path alone.
@@ -142,6 +145,9 @@ enum FixtureCatalogue {
         (LocationsAPI.listPath, "locations-list"),
         (LocationsAPI.parcelsPath(fixtureLocationID), "locations-parcels"),
         (LocationsAPI.itemsPath, "items"),
+        // agrent-ios#384: the farm's crops for «Ново мероприятие». ONE crop,
+        // so the flow chooses it as it would on a one-crop farm.
+        (ParcelsByCropAPI.path, "parcels-by-crop"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),

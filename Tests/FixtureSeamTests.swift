@@ -420,6 +420,9 @@ final class FixtureSeamTests: XCTestCase {
         ("locations-parcels", { _ = try await LocationsAPI.decodeParcels(from: $0) }),
         ("items", { _ = try await LocationsAPI.decodeItems(from: $0) }),
         ("units-rate", { _ = try await LocationsAPI.decodeUnits(from: $0) }),
+        // #384: «Ново мероприятие»'s crops, and the one crop's parcels.
+        ("parcels-by-crop", { _ = try await ParcelsByCropAPI.decodeTotals(from: $0) }),
+        ("parcels-by-crop-wheat", { _ = try await ParcelsByCropAPI.decodeParcels(from: $0) }),
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),
         ("costs-defaults", { _ = try await APIClient.shared.decode($0, as: OverheadDefaults.self) }),

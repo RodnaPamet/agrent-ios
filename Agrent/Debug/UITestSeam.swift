@@ -88,6 +88,17 @@ enum UITestSeam {
     static let isActive: Bool =
         ProcessInfo.processInfo.arguments.contains(launchArgument)
 
+    /// Beside `launchArgument`: every request fails as it does in Airplane
+    /// mode (`URLError.notConnectedToInternet`), so a UI test can walk a
+    /// flow on what an earlier launch cached (#384). The cache survives
+    /// between launches of the same install, which is what makes the second
+    /// launch the offline one. Spelled once here, like `launchArgument`;
+    /// `A11yShotsTests.offlineArgument` points back.
+    static let offlineArgument = "AGRENT_UITEST_OFFLINE"
+
+    static let isOffline: Bool =
+        isActive && ProcessInfo.processInfo.arguments.contains(offlineArgument)
+
     /// Tokens that never leave the device.
     ///
     /// `FixtureURLProtocol` answers every request before URLSession opens a

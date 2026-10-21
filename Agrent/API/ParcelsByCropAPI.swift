@@ -105,4 +105,16 @@ enum ParcelsByCropAPI {
     static func decodeParcels(from data: Data) async throws -> CropParcels {
         try await APIClient.shared.decode(data, as: CropParcels.self)
     }
+
+    /// The crop list and every crop's parcels into the cache, one at a time,
+    /// for `OfflinePrefetch` (#384). The same values `TreatmentPlaceStore`
+    /// asks for: each `cropType` as the totals spell it. The store groups
+    /// spellings that differ only in case under one crop and reads every
+    /// spelling, so one read per total covers them all.
+    static func warm() async {
+        let totals = await CachedResource.load(path) { try await decodeTotals(from: $0) }
+        for crop in totals.value?.crops ?? [] {
+            _ = await CachedResource.load(path(crop: crop.cropType)) { try await decodeParcels(from: $0) }
+        }
+    }
 }

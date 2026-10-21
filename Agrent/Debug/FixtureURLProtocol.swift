@@ -91,6 +91,23 @@ final class FixtureURLProtocol: URLProtocol {
         let path = url.path
         let loggable = LoggablePath(path)
 
+        // No signal (#384): failed as URLSession fails in Airplane mode, before
+        // any payload, so the app falls back to what it cached.
+        //
+        // Except `/me` and the farm list: together they say whose cache, and
+        // which farm's, a read uses (`CacheScope`). On a phone both are on
+        // the device: the identity in the Keychain beside the tokens, the
+        // open farm remembered per person. So a launch with no signal still
+        // reads its cache. Under the seam both are learned from these
+        // fixtures. Refused here, they would leave the offline launch with
+        // no cache at all, which is the seam's limitation, not the phone's
+        // behaviour.
+        if UITestSeam.isOffline, path != MeAPI.path, path != FarmsAPI.farmsPath {
+            Log.api.info("fixture seam offline: \(loggable.value, privacy: .public) not sent")
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
+
         guard method == "GET" else {
             Log.api.error(
                 "fixture seam refused \(method, privacy: .public) \(loggable.value, privacy: .public)"

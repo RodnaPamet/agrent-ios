@@ -352,8 +352,11 @@ final class CurrentUserRefreshTests: XCTestCase {
         let home = "CurrentUser.swift"
         // `APIClient` compares a request's path with `/me`'s — it reads
         // the suspension off `/me`'s answer (#283) — and fetches nothing.
+        // So does the seam's no-signal switch, which still answers `/me`
+        // (#384), the identity a phone holds in its Keychain.
         let allowed = ["FixtureCatalogue.swift": "(MeAPI.path, \"auth-me\"),",
-                       "APIClient.swift": "path == MeAPI.path"]
+                       "APIClient.swift": "path == MeAPI.path",
+                       "FixtureURLProtocol.swift": "path != MeAPI.path"]
         var homeHits = 0
         for file in files {
             var code = SignOutHygieneTests.code(try String(contentsOf: file, encoding: .utf8))

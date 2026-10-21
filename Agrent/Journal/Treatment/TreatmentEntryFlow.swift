@@ -28,8 +28,6 @@ struct TreatmentEntryFlow: View {
     @State private var path: [Step] = []
     @State private var cropKey: String?
     @State private var chosen: Set<String> = []
-    /// What step three reads back, as it was when «Продължи» was pressed.
-    @State private var checking: Checking?
     @State private var saving = false
     @State private var failure: String?
     @State private var saved: TreatmentSavedView.Saved?
@@ -39,9 +37,17 @@ struct TreatmentEntryFlow: View {
     /// see `TreatmentAttempt`.
     @State private var attempt = TreatmentAttempt()
 
-    enum Step: Hashable { case place, check }
+    /// Step three carries what it reads back, as it was when «Продължи» was
+    /// pressed (#384). It used to be a separate `@State`, set just before the
+    /// push, and the destination could be built in the same update with it
+    /// still nil: an empty page with only a back arrow. Online, a network
+    /// answer arriving a moment later redrew the destination and hid it.
+    /// Offline, and under the UI-test seam, nothing redraws, so the page
+    /// stayed empty (the owner's phone, 2026-10-21; A11yShots 20b). In the
+    /// path itself it can't be missing.
+    enum Step: Hashable { case place, check(Checking) }
 
-    struct Checking: Equatable {
+    struct Checking: Hashable {
         let record: TreatmentRecord
         let fields: [TreatmentPlace.Field]
     }
@@ -72,20 +78,18 @@ struct TreatmentEntryFlow: View {
                                        failure: failure, retryCrops: { await loadPlace() }) { fields in
                         proceed(fields)
                     }
-                case .check:
-                    if let checking {
-                        TreatmentCheckView(
-                            record: checking.record, fields: checking.fields, cropLabel: cropLabel,
-                            doseUnitSymbol: draft.doseUnit?.symbol, saving: saving, failure: failure,
-                            onEdit: {
-                                // Back to the fields, everything kept: the
-                                // parcels stay ticked for the way forward.
-                                failure = nil
-                                path = []
-                            },
-                            onAdd: { Task { await save(checking.fields) } },
-                            onCancel: { dismiss() })
-                    }
+                case .check(let checking):
+                    TreatmentCheckView(
+                        record: checking.record, fields: checking.fields, cropLabel: cropLabel,
+                        doseUnitSymbol: draft.doseUnit?.symbol, saving: saving, failure: failure,
+                        onEdit: {
+                            // Back to the fields, everything kept: the
+                            // parcels stay ticked for the way forward.
+                            failure = nil
+                            path = []
+                        },
+                        onAdd: { Task { await save(checking.fields) } },
+                        onCancel: { dismiss() })
                 }
             }
         }
@@ -126,8 +130,7 @@ struct TreatmentEntryFlow: View {
             return
         }
         failure = nil
-        checking = Checking(record: record, fields: fields)
-        path.append(.check)
+        path.append(.check(Checking(record: record, fields: fields)))
     }
 
     private func save(_ fields: [TreatmentPlace.Field]) async {
