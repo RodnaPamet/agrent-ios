@@ -711,6 +711,13 @@ asks for the product before step two picks the crop, the owner chose to drop
 them. Nothing was built for them on the phone. The free-text pest, dose and
 quarantine fields stay the only source, with the quarantine still prefilled
 from the product. Seed treatment: not now.
+- **The server keeps the register's loader, which nothing reads** (owner to
+  backend 1, 2026-10-21: "keep the loader, drop the suggestions"). agri-saas
+  #2110 stays: an operator upload of the national register, with no read
+  route and no consumer. That is deliberate, not unfinished, so don't build
+  a read against it. agri-saas #2077 is closed as not planned.
+- **Also declined:** filling a product's quarantine period and registration
+  number from the register (backend 1 asked the owner, who dropped the idea).
 
 Offered and **not** chosen: PRZ's per-field layout by farming year, a crop
 record per block, and other activities with yield and cloning.
