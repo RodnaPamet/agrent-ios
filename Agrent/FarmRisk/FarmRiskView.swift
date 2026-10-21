@@ -31,20 +31,6 @@ struct FarmRiskView: View {
     /// the lead cannot be revised once it is sent.
     @State private var requesting: RequestTarget?
 
-    /// Pushes a parcel's archive onto this screen's stack.
-    ///
-    /// A PROGRAMMATIC PUSH RATHER THAN A `NavigationLink`, and the reason is
-    /// the row it lives in: `parcelRow` already contains a Button — the
-    /// insurance ask — and a `NavigationLink` inside a List row makes the
-    /// WHOLE row tappable. The two controls would then overlap, and which one
-    /// a tap reached would depend on where in the row it landed. The insurance
-    /// ask writes something that cannot be withdrawn, so an ambiguous tap
-    /// there is not a cosmetic problem.
-    ///
-    /// A Button that pushes the route keeps each control's hit area its own.
-    /// It pushes a VALUE (#194), as everything in a routed stack does; it was
-    /// a `navigationDestination(item:)` until the stack started taking values.
-    @Environment(\.pushRoute) private var pushRoute
 
 
     var body: some View {
@@ -56,19 +42,19 @@ struct FarmRiskView: View {
                     }
                     .solidBar(hairline: .bottom)
                 }
-                // THE ACTION BUTTON, bottom-leading, as asked for — and
-                // the same control other screens will grow for their own
-                // primary action. Here it opens the enquiry form with
-                // nothing chosen, so a farmer who wants a quote does not
-                // have to find the field first.
+                // THE ACTION BUTTON, and the screen's only way to ask
+                // (owner, 2026-10-21, #386): «Застраховай» at the bottom
+                // right. The per-row asks are gone. It opens the enquiry form
+                // with nothing chosen; the form lists the parcels and says
+                // which were asked about already.
                 //
                 // Hidden rather than disabled when there is nothing to ask
                 // about: no parcels, no permission, or every parcel already
                 // asked about. A floating button that refuses is a promise
                 // the screen cannot keep.
                 .actionButton(
-                    "Запитване за оферта",
-                    systemImage: "envelope",
+                    "Застраховай",
+                    systemImage: "checkmark.shield",
                     isEnabled: store.mayAsk && !allParcels.isEmpty
                 ) {
                     requesting = RequestTarget(parcel: nil)
@@ -223,7 +209,7 @@ struct FarmRiskView: View {
     /// `children: .ignore` on the WHOLE row would have been the obvious
     /// thing and the wrong one — it swallows controls, which is exactly the
     /// defect the ЕГН row on Админ was fixed for. So the grouping stops
-    /// short of the two buttons, and they stay their own stops.
+    /// short of «История» and the ask's status, which stay their own stops.
     ///
     /// Spoken from the VALUES rather than `.combine`, for the reason
     /// `JournalRow` records: the acquisition line contains a `·`, and
@@ -234,9 +220,9 @@ struct FarmRiskView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(spoken(row))
 
-            historyControl(row)
+            RiskHistoryButton(parcel: row.parcel)
 
-            askControl(row)
+            askStatus(row)
         }
     }
 
@@ -325,124 +311,23 @@ struct FarmRiskView: View {
         return text
     }
 
-    /// THE ARCHIVE, as its own control — never the whole row.
-    ///
-    /// This row is where the archive belongs: it is the one list of parcels
-    /// every role can open, and the map tap that looks like the obvious home
-    /// for it opens `ParcelOperationSheet` — a form to RECORD an operation,
-    /// gated on `mayCreateOperations`, which is false for MECHANISATOR, READER
-    /// and AUDITOR. The archive would have been invisible to the operator who
-    /// sprayed the field.
-    ///
-    /// Shown for EVERY role, and not gated on anything. `GET /history` is a
-    /// READ under `/api/t/{slug}/agro/…`, and `agro` is one of the five
-    /// prefixes the server's operator lockdown lets through — see
-    /// `CurrentUser.isOperator`. So this is not the `/insurance` division that
-    /// hides `askControl` from a MECHANISATOR, and it is not a write, so
-    /// `mayCreateOperations` has nothing to say about it either.
-    ///
-    /// The label is spoken with the parcel's name in it. "История" alone is
-    /// unambiguous on screen, where it sits inside a named row, and useless to
-    /// someone swiping between elements one at a time.
-    private func historyControl(_ row: RiskRow) -> some View {
-        Button {
-            pushRoute(.parcelHistory(parcelID: row.parcel.id, parcelName: row.parcel.name))
-        } label: {
-            HStack(spacing: 4) {
-                Text("История")
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-            }
-            .font(.footnote.weight(.medium))
-            // 44pt, WHICH IS THE POINT — `contentShape` alone was not.
-            //
-            // `contentShape(Rectangle())` on an unframed HStack makes the gap
-            // between the text and the chevron hit-testable instead of just
-            // the glyphs. It does not ENLARGE anything. That left a footnote
-            // plus a caption chevron, roughly 18pt tall, sitting 8pt above
-            // `askControl` — which sends an insurance enquiry that has no
-            // DELETE, no PATCH and no withdraw.
-            //
-            // Two sub-44pt targets 8pt apart, one of them irreversible, is
-            // the same mis-tap this control was carefully shaped to avoid by
-            // not being a NavigationLink wrapping a Button — the ambiguity
-            // arriving by a different route. In a field, on a phone, in
-            // gloves. `ParcelMapView` already uses this frame for the same
-            // reason.
-            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Palette.accent)
-        .accessibilityLabel("История на парцел \(row.parcel.name)")
-        .accessibilityHint("Отваря записаните реколти, дейности и плевели за този парцел")
-    }
-
-    /// Ask, already asked, or nothing at all.
-    ///
-    /// Hidden entirely for a MECHANISATOR: `/insurance` is outside the
-    /// operator API allowlist, so both leads calls 403 for them while the
-    /// readings work. Hidden rather than shown-and-refused, consistent
-    /// with how the tab filter treats the same division.
+    /// Where an ask about this parcel stands: being sent, or asked already.
+    /// Status only (#386). The owner removed the per-row ask, leaving the
+    /// screen's «Застраховай», so this is what still shows that an ask sent
+    /// from the form was sent. Hidden from a MECHANISATOR, for whom
+    /// `/insurance` is outside the operator allowlist (`store.mayAsk`).
     @ViewBuilder
-    private func askControl(_ row: RiskRow) -> some View {
+    private func askStatus(_ row: RiskRow) -> some View {
         if store.mayAsk {
             if store.asking.contains(row.parcel.id) {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
                     Text("Изпраща се…").font(.footnote).foregroundStyle(Palette.secondaryText)
                 }
-            } else {
-                let asked = store.askedParcelIDs.contains(row.parcel.id)
-                VStack(alignment: .leading, spacing: 4) {
-                    // A NOTE BESIDE THE BUTTON, NOT INSTEAD OF IT.
-                    //
-                    // This used to replace the control entirely, which was
-                    // right against a server that answered a second ask
-                    // with 409. The constraint is gone (agri-saas
-                    // f98e39d2): several asks per parcel, no 409, and the
-                    // operator mail deduped on the lead id so a repeat
-                    // actually sends rather than vanishing.
-                    //
-                    // The change exists so a farmer can CORRECT an area
-                    // they got wrong. Refusing to reopen the form would
-                    // make the correction unreachable from the phone,
-                    // which is the one thing dropping the constraint was
-                    // for. State still read from the server, never
-                    // remembered locally.
-                    if asked {
-                        Label("Заявено запитване", systemImage: "checkmark.seal")
-                            .font(.footnote)
-                            .foregroundStyle(Palette.secondaryText)
-                    }
-                    Button {
-                        requesting = RequestTarget(parcel: row.parcel)
-                    } label: {
-                        Label(asked ? "Запитай отново" : "Запитай за оферта",
-                              systemImage: "envelope")
-                            .font(.footnote.weight(.medium))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Palette.accent)
-                    // 44pt, on the IRREVERSIBLE one.
-                    //
-                    // A `.plain` button around a `.footnote` Label with no
-                    // frame has the glyphs themselves as its hit area — about
-                    // 18pt tall. This is the control that sends an insurance
-                    // enquiry with no DELETE, no PATCH and no withdraw.
-                    //
-                    // «История ›» eight points above it was given a 44pt frame
-                    // yesterday, for the stated reason that two small targets
-                    // beside an irreversible one is a mis-tap waiting to
-                    // happen. I enlarged the reversible control and left the
-                    // irreversible one at glyph size, which is the wrong way
-                    // round and was invisible until an audit measured both.
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                    .accessibilityHint(asked
-                        ? "Изпраща ново запитване за този парцел, например с поправена площ"
-                        : "Изпраща запитване за застрахователна оферта")
-                }
+            } else if store.askedParcelIDs.contains(row.parcel.id) {
+                Label("Заявено запитване", systemImage: "checkmark.seal")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
     }
@@ -595,5 +480,50 @@ struct FarmRiskView: View {
                 .foregroundStyle(Palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+/// THE ARCHIVE, as its own control on a risk row, never the whole row.
+///
+/// This row is where the archive belongs: it is the one list of parcels every
+/// role can open. Shown for EVERY role: `GET /history` is a READ under
+/// `/api/t/{slug}/agro/…`, one of the prefixes the operator lockdown lets
+/// through (`CurrentUser.isOperator`).
+///
+/// ── Its own view, so it pushes onto THIS stack (#386) ──
+///
+/// It was a method on `FarmRiskView` calling `FarmRiskView`'s
+/// `@Environment(\.pushRoute)`. `RoutedStack` sets `pushRoute` on the
+/// `NavigationStack` it builds, which is INSIDE `FarmRiskView`, so the view
+/// that builds the stack reads the default, which does nothing. That's
+/// exactly what the owner saw (2026-10-21). A view placed inside the stack
+/// reads the stack's own.
+///
+/// 44pt, because a footnote and a caption chevron unframed are an 18pt
+/// target, in a field, in gloves. `ParcelMapView` uses the same frame.
+///
+/// Spoken with the parcel's name in it. "История" alone is clear on screen,
+/// inside a named row, but not to someone swiping element by element.
+private struct RiskHistoryButton: View {
+    let parcel: Parcel
+    @Environment(\.pushRoute) private var pushRoute
+
+    var body: some View {
+        Button {
+            pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name))
+        } label: {
+            HStack(spacing: 4) {
+                Text("История")
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+            }
+            .font(.footnote.weight(.medium))
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Palette.accent)
+        .accessibilityLabel("История на парцел \(parcel.name)")
+        .accessibilityHint("Отваря записаните реколти, дейности и плевели за този парцел")
     }
 }
