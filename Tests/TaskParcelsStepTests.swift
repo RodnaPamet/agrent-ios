@@ -69,7 +69,8 @@ final class TaskParcelsStepTests: XCTestCase {
     /// The synthetic block from `locations-list.json` («Synthetic Land»).
     private func block() async throws -> Location {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "locations-list", withExtension: "json"))
-        return try XCTUnwrap(try await LocationsAPI.decodeList(from: Data(contentsOf: url)).first)
+        let blocks = try await LocationsAPI.decodeList(from: Data(contentsOf: url))
+        return try XCTUnwrap(blocks.first)
     }
 
     /// By name, as a farmer reads a list, with numbers in their order, and
