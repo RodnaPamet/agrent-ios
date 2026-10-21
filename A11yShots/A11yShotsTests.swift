@@ -1756,6 +1756,8 @@ final class A11yShotsTests: XCTestCase {
         let plus = app.buttons["Нова задача"]
         XCTAssertTrue(plus.waitForExistence(timeout: 15), "no + on Задачи")
         plus.tap()
+        Thread.sleep(forTimeInterval: 3)
+        print("A11Y-TREE-BEGIN\n\(app.debugDescription)\nA11Y-TREE-END")
         // A text VIEW: the title grows downwards (`axis: .vertical`). The
         // first one on the form; the description is the second.
         let title = app.textViews.firstMatch
