@@ -95,24 +95,12 @@ enum OfflinePrefetch {
     /// above. Since #329 an unchanged crop answers 304, so a warm on every
     /// return to the foreground costs a request per crop, not the geometry.
     ///
-    /// The same values the store asks for: each `cropType` as the totals
-    /// spell it. The store groups spellings that differ only in case under
-    /// one crop and reads every spelling, so warming one spelling per total
-    /// covers them all.
-    ///
     /// Not for an operator: `/parcels/by-crop` is outside the MECHANISATOR's
     /// path lockdown (`CurrentUser.isOperator`), so every read would be a
     /// 403. Nor for someone who may not write (`mayWrite`, failing open),
     /// since the form records a treatment.
     private static func warmTreatmentParcels(for me: CurrentUser?) async {
         guard !(me?.isOperator ?? false), me?.mayWrite ?? true else { return }
-        let totals = await CachedResource.load(ParcelsByCropAPI.path) {
-            try await ParcelsByCropAPI.decodeTotals(from: $0)
-        }
-        for crop in totals.value?.crops ?? [] {
-            _ = await CachedResource.load(ParcelsByCropAPI.path(crop: crop.cropType)) {
-                try await ParcelsByCropAPI.decodeParcels(from: $0)
-            }
-        }
+        await ParcelsByCropAPI.warm()
     }
 }
