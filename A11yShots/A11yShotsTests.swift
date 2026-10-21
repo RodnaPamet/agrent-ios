@@ -1741,6 +1741,35 @@ final class A11yShotsTests: XCTestCase {
         if cancel.exists { cancel.tap() }
     }
 
+    // MARK: - Риск: «История» opens the history (agrent-ios#386)
+
+    /// The owner tapped «История» on a risk row and nothing happened
+    /// (2026-10-21). The button pushed through a `pushRoute` read from
+    /// outside the stack. This opens Риск from the menu, as the owner does,
+    /// taps the first row's «История», and asserts that the history screen
+    /// came up.
+    func testRiskHistoryOpens() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root")
+        XCTAssertTrue(tapMenuRow("Риск", in: app), "«Риск» is not in the menu")
+        let history = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'История на парцел'")).firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 20), "no «История» on a risk row\n\(app.debugDescription)")
+        history.tap()
+        let opened = app.navigationBars["История"].waitForExistence(timeout: 10)
+        capture("05b-risk-history", app: app)
+        XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
+        // The floating action, renamed and moved (#386): bottom right.
+        app.navigationBars.buttons.firstMatch.tap()
+        let insure = app.buttons["Застраховай"]
+        XCTAssertTrue(insure.waitForExistence(timeout: 5), "no «Застраховай»")
+        XCTAssertGreaterThan(insure.frame.midX, app.windows.firstMatch.frame.midX,
+                             "«Застраховай» is not on the right")
+        capture("05c-risk-insure", app: app)
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")
