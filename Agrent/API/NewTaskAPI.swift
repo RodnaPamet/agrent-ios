@@ -79,3 +79,41 @@ struct NewTaskDraft: Equatable, Sendable {
         )
     }
 }
+
+/// «Създай» with parcels (#388): the task, then one link per parcel.
+///
+/// ── Not one request, so it can half-land ──
+///
+/// The create honours no key and the links come after it. So once the task
+/// exists it is never created again: a link that failed is retried on its
+/// own, and the person can finish without it. Only what isn't linked yet is
+/// sent; a parcel linked by a send whose answer was lost answers 409, which
+/// `TaskLinksAPI` counts as linked.
+enum NewTaskSave {
+    typealias Link = @Sendable (_ parcelID: String, _ taskID: String) async throws -> Void
+
+    /// The parcels that were linked, one request at a time. On a weak
+    /// connection parallel requests compete for the same scrap of bandwidth
+    /// and all fail; one at a time, the early ones land (`OfflinePrefetch`).
+    static func link(_ parcelIDs: [String], to taskID: String, with link: Link) async -> Set<String> {
+        var linked = Set<String>()
+        for id in parcelIDs {
+            if (try? await link(id, taskID)) != nil { linked.insert(id) }
+        }
+        return linked
+    }
+
+    /// What is left to send: the chosen parcels not linked yet, in a stable
+    /// order so a retry asks in the same order.
+    static func pending(chosen: Set<String>, linked: Set<String>) -> [String] {
+        chosen.subtracting(linked).sorted()
+    }
+
+    /// Said when the task exists and some parcels didn't attach.
+    static func partial(_ missing: Int) -> String {
+        "Задачата е създадена, но " + (missing == 1
+            ? "1 парцел не беше добавен."
+            : "\(missing) парцела не бяха добавени.")
+            + " Опитайте пак или завършете без тях."
+    }
+}

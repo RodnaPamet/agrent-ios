@@ -789,6 +789,10 @@ priority, due date, assignee and links. **iOS** asks what a phone needs:
 - **Opened from:** a **+ at the bottom right** of «Задачи», the owner's choice, offered only to someone who may write in the farm.
 - **After a save:** the list reloads and the new task opens.
 - **Not idempotent:** the route honours no key, so a lost answer is said as possibly created, never retried.
+- **A second step, «Парцели» (#388, owner 2026-10-21):** «Напред» opens the task's parcels, chosen by block, on a map and in a list, and «Създай» is there. They are optional. A choice in one block stays when another block is opened.
+  - **Sent as links**, `POST /tasks/{id}/links` `PARCEL`, one per parcel after the create, as the web's `pendingLinks` does. A 409 (already linked) counts as linked.
+  - **Never created twice:** the create and the links are separate requests. A link that fails leaves the task as created; «Опитай пак» sends only the parcels not linked yet, and «Готово, без тях» finishes without them.
+  - **Reads:** Блокове's blocks and their parcels, cache first, both warmed by `OfflinePrefetch`.
 
 ### Divergence — «Редактирай» on a task, for its creator and administrators (#382, owner 2026-10-21)
 

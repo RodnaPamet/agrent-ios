@@ -1770,6 +1770,42 @@ final class A11yShotsTests: XCTestCase {
         capture("05c-risk-insure", app: app)
     }
 
+    // MARK: - «Нова задача» → «Парцели» (agrent-ios#388)
+
+    /// Задачи → + → a title → «Напред» → «Парцели»: the fixture farm's one
+    /// block is chosen for the person, its parcels are listed, and choosing
+    /// all of them is counted at the bottom. Stops before «Създай»: nothing
+    /// is written, and the seam refuses writes anyway.
+    func testNewTaskParcelsStep() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        app.tabBars.buttons["Задачи"].tap()
+        let plus = app.buttons["Нова задача"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 15), "no + on Задачи")
+        plus.tap()
+        // The sheet has to be IN the accessibility tree, which it wasn't
+        // while the + sat in an `.overlay` (#388): this is the assertion
+        // that caught it.
+        XCTAssertTrue(app.navigationBars["Нова задача"].waitForExistence(timeout: 10),
+                      "«Нова задача» is not in the accessibility tree")
+        // The first field on the form; the description is the second.
+        let title = app.textFields.firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "no «Заглавие»\n\(app.debugDescription)")
+        title.tap()
+        title.typeText("Синтетична задача")
+        app.buttons["Напред"].tap()
+        XCTAssertTrue(app.navigationBars["Парцели"].waitForExistence(timeout: 10), "«Напред» opened no «Парцели»")
+        let all = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Избери всички'")).firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 15), "the one block's parcels weren't listed\n\(app.debugDescription)")
+        all.tap()
+        let counted = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'към задачата.'")).firstMatch
+        XCTAssertTrue(counted.waitForExistence(timeout: 5), "the chosen parcels aren't counted")
+        XCTAssertTrue(app.buttons["Създай"].exists, "no «Създай» on «Парцели»")
+        capture("08e-new-task-parcels", app: app)
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")
