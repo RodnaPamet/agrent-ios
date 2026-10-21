@@ -1756,8 +1756,9 @@ final class A11yShotsTests: XCTestCase {
         let plus = app.buttons["Нова задача"]
         XCTAssertTrue(plus.waitForExistence(timeout: 15), "no + on Задачи")
         plus.tap()
-        // A text VIEW: the title grows downwards (`axis: .vertical`).
-        let title = app.textViews["Заглавие"]
+        // A text VIEW: the title grows downwards (`axis: .vertical`). The
+        // first one on the form; the description is the second.
+        let title = app.textViews.firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 10), "no «Заглавие»\n\(app.debugDescription)")
         title.tap()
         title.typeText("Синтетична задача")
