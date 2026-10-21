@@ -121,7 +121,12 @@ struct JournalListView: View {
         // Not to a role that cannot write — a reader or an auditor would be
         // refused after typing the entry (agrent-ios #312). Fails open while
         // nobody has said, as every write control does (`CurrentUser.mayWrite`).
-        if store.state.value != nil, people.user?.mayWrite ?? true {
+        //
+        // Whatever the LIST is doing (#384). It used to wait for the entries,
+        // from when «Нов запис» could only post with signal. Since #324 it
+        // queues offline, so a list that couldn't load (no signal and nothing
+        // cached) is exactly when it must still be there.
+        if people.user?.mayWrite ?? true {
             Button {
                 composing = true
             } label: {

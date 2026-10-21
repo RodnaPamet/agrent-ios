@@ -617,6 +617,21 @@ waits for the updated app, as a queued spray does. The owner chose this on
     limit. An entry stays until the 8 MB budget, an iOS purge or sign-out.
     **Kept that way on the owner's choice**, as every other cached screen
     is. So a phone opens the form after days without signal.
+    - **Warmed, not only kept (#384, 2026-10-21):** the owner found offline
+      that only crops opened earlier with signal had parcels. `OfflinePrefetch`
+      now reads the crop list and every crop's parcels at launch and on each
+      return to the foreground, beside the product and unit lists it already
+      warmed. It reads one crop at a time, and an unchanged crop costs a 304
+      (#329). Not for an operator, whose path lockdown refuses the route.
+    - **«Проверка» with no signal (#384):** it opened as an empty page with
+      only a back arrow, because the read-back sat in separate state that the
+      pushed page could read before it was set. Online, a later network answer
+      redrew the page and hid the bug. The read-back now travels in the
+      navigation path. A11yShots `testTreatmentCheckWithNoSignal` walks to it
+      with signal, then again on a launch where every request fails.
+    - **«Нов запис» whatever the list is doing (#384):** it used to wait for
+      the journal's entries, so with no signal and nothing cached it wasn't
+      offered at all, though the form queues offline.
   - **The web** persists the same four reads since agri-saas #1890 (#1845),
     geometry included. It drops its whole bucket after 24 hours, the owner
     having declined a longer window. After a day without signal it opens

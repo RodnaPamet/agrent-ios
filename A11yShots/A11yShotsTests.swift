@@ -1671,6 +1671,14 @@ final class A11yShotsTests: XCTestCase {
         offline.launch()
         XCTAssertTrue(offline.tabBars.firstMatch.waitForExistence(timeout: 20),
                       "no tab bar with no signal")
+        // The seam's limit, not the phone's. Under the seam the identity is
+        // memory-only and learned from the fixture `/me` after launch, so
+        // Дневник's first read has no cache scope yet and fails. A phone has
+        // its identity in the Keychain before the first read (the owner's
+        // #113 check 1: cached data on a cold launch). One retry, once the
+        // identity is known, reads the cache as the phone would at once.
+        let retry = offline.buttons["Опитай пак"]
+        if retry.waitForExistence(timeout: 5) { retry.tap() }
         walkToCheck(offline, named: "20b-treatment-check-offline")
     }
 
@@ -1679,7 +1687,13 @@ final class A11yShotsTests: XCTestCase {
     /// asserts that «Проверка» shows its read-back.
     private func walkToCheck(_ app: XCUIApplication, named name: String) {
         let open = app.buttons["Нов запис"]
-        XCTAssertTrue(open.waitForExistence(timeout: 15), "no «Нов запис» on Дневник")
+        let launched = Date()
+        let found = open.waitForExistence(timeout: 30)
+        capture("\(name)-start", app: app)
+        XCTAssertTrue(found, "no «Нов запис» on Дневник\n\(app.debugDescription)")
+        // How long Дневник took to offer it, in the log: #113 measured a
+        // 16-second stall on a cold launch with no signal once.
+        print("A11Y-TIMING \(name): «Нов запис» after \(Int(Date().timeIntervalSince(launched)))s")
         open.tap()
 
         let fertilise = app.buttons["Торене"]
