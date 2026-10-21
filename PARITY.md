@@ -705,9 +705,12 @@ field means the whole parcel; a smaller figure is sent as
 - **The total:** the check, the saved screen and the outbox row show what was treated.
 - **The save key:** the areas are part of the draft, so a changed area mints a new key, as the replay rule needs (agri-saas #1765).
 
-Still waiting on the server: pest, dose and quarantine-period suggestions
-from the БАБХ register (agri-saas #2077, four open owner questions). Seed
-treatment: not now.
+**Retired:** pest, dose and quarantine-period suggestions from the БАБХ
+register (owner, 2026-10-21). Asked where they would sit, since step one
+asks for the product before step two picks the crop, the owner chose to drop
+them. Nothing was built for them on the phone. The free-text pest, dose and
+quarantine fields stay the only source, with the quarantine still prefilled
+from the product. Seed treatment: not now.
 
 Offered and **not** chosen: PRZ's per-field layout by farming year, a crop
 record per block, and other activities with yield and cloning.
