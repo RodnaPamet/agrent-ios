@@ -171,6 +171,21 @@ struct ProfileView: View {
                 .accessibilityInputLabels(A11y.Spoken.deleteAccount)
             }
             .pageRow()
+
+            // Which build this is, last, as iOS's own About puts it
+            // (agrent-ios#393): an update installed while the next build was
+            // still processing at Apple looked like a fix that hadn't worked.
+            // Selectable, so it can go into a report as it reads.
+            if let version = AppVersion.current {
+                Section {
+                    ValueRow {
+                        Text(version).textSelection(.enabled)
+                    } label: {
+                        Text("Версия")
+                    }
+                }
+                .pageRow()
+            }
         }
         .pageBackground()
         .inlineTitle("Профил")
