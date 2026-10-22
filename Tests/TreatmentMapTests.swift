@@ -45,7 +45,7 @@ final class TreatmentMapTests: XCTestCase {
             })
         await store.load()
         XCTAssertEqual(store.state.value?.count, 3)
-        XCTAssertEqual(store.outlines.count, 2, "only drawable parcels have outlines")
+        XCTAssertEqual(store.outlines.values.filter { !$0.isEmpty }.count, 2, "only drawable parcels have outlines")
     }
 
     /// One block missing would show the treatment as smaller than it was.

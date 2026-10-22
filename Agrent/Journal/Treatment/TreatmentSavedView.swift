@@ -49,6 +49,8 @@ struct TreatmentSavedView: View {
 
     let saved: Saved
     let recorder: TreatmentRecorder
+    /// «Виж на картата»: the flow pushes the map onto its own stack (#399).
+    let onShowMap: () -> Void
     let onDone: () -> Void
 
     @State private var generating = false
@@ -102,9 +104,7 @@ struct TreatmentSavedView: View {
                 ValueRow("Парцели") { Text(String(total.parcels)) }
                 // The parcels are in hand already, so the map needs no read
                 // (#399).
-                NavigationLink {
-                    TreatmentMapView(fields: saved.fields, title: TreatmentMapView.title(for: saved.record.kind))
-                } label: {
+                Button(action: onShowMap) {
                     Label(TreatmentMapView.buttonTitle, systemImage: "map")
                 }
                 .accessibilityInputLabels(A11y.Spoken.seeOnMap)

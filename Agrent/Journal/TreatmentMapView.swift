@@ -60,7 +60,7 @@ struct TreatmentMapView: View {
     private func list(_ fields: [TreatmentPlace.Field]) -> some View {
         List {
             Section {
-                ForEach(fields) { row($0) }
+                ForEach(fields) { row($0).cardRow() }
             } footer: {
                 SectionFooter(footer(fields))
             }
@@ -89,7 +89,6 @@ struct TreatmentMapView: View {
         }
         .buttonStyle(.plain)
         .disabled(!field.parcel.isDrawable)
-        .cardRow()
         .accessibilityLabel(A11y.sentence([field.parcel.name, field.blockName, area?.spoken]))
         .accessibilityHint(field.parcel.isDrawable ? "Показва парцела на картата" : "")
         .accessibilityInputLabels([field.parcel.name])
@@ -110,11 +109,11 @@ struct TreatmentMapView: View {
 extension TreatmentMapView {
     /// «Третирани парцели» or «Наторени парцели», the ДНЕВНИК's own words for
     /// what was done to them.
-    static func title(for kind: TreatmentDraft.Kind?) -> String {
+    nonisolated static func title(for kind: TreatmentDraft.Kind?) -> String {
         kind == .fertilize ? "Наторени парцели" : "Третирани парцели"
     }
 
     /// The button that opens it, the same on the journal's entry and the
     /// saved screen.
-    static let buttonTitle = "Виж на картата"
+    nonisolated static let buttonTitle = "Виж на картата"
 }
