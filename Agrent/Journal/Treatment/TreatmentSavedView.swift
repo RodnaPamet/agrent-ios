@@ -100,6 +100,14 @@ struct TreatmentSavedView: View {
                     Text(total.area.text).accessibilityLabel(total.area.spoken)
                 }
                 ValueRow("Парцели") { Text(String(total.parcels)) }
+                // The parcels are in hand already, so the map needs no read
+                // (#399).
+                NavigationLink {
+                    TreatmentMapView(fields: saved.fields, title: TreatmentMapView.title(for: saved.record.kind))
+                } label: {
+                    Label(TreatmentMapView.buttonTitle, systemImage: "map")
+                }
+                .accessibilityInputLabels(A11y.Spoken.seeOnMap)
             } footer: {
                 SectionFooter(withoutAreaNote)
             }

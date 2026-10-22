@@ -66,6 +66,18 @@ struct JournalDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 facts
+                if let treatment, let handle = treatment.treatmentGroupId?.recorded {
+                    // Which parcels, and where (#399, owner 2026-10-22): the
+                    // row above says only how many.
+                    NavigationLink {
+                        TreatmentMapView(handle: handle, title: TreatmentMapView.title(for: treatment.treatmentKind))
+                    } label: {
+                        Label(TreatmentMapView.buttonTitle, systemImage: "map").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityInputLabels(A11y.Spoken.seeOnMap)
+                }
                 if let handle = treatment?.treatmentGroupId?.recorded {
                     UnfinishedTreatmentSection(handle: handle)
                     TreatmentDocumentAction(handle: handle)
