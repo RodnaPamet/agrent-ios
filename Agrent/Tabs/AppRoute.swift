@@ -35,7 +35,12 @@ enum AppRoute: Hashable, Sendable {
     case location(Location)
     /// The name rides along so the header isn't blank while the archive
     /// loads — see `ParcelHistoryView.parcelName`.
-    case parcelHistory(parcelID: String, parcelName: String)
+    ///
+    /// `recordIn` is the parcel in its block when the history was opened from
+    /// Блокове's map (#387): the history then offers «Ново мероприятие» for
+    /// it, which used to be what a tap on the map opened. Nil from Риск,
+    /// which has never offered it.
+    case parcelHistory(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil)
     /// «Ферми», the published farms (#323). Carries nothing: it's one list.
     case farmDirectory
 
@@ -47,7 +52,7 @@ enum AppRoute: Hashable, Sendable {
         case .task(let summary): hasher.combine("task"); hasher.combine(summary.id)
         case .taskID(let id): hasher.combine("taskID"); hasher.combine(id)
         case .location(let location): hasher.combine("location"); hasher.combine(location.id)
-        case .parcelHistory(let parcelID, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
+        case .parcelHistory(let parcelID, _, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
         case .farmDirectory: hasher.combine("farmDirectory")
         }
     }
@@ -76,8 +81,8 @@ enum AppRoute: Hashable, Sendable {
         case .task(let summary): TaskDetailView(summary: summary)
         case .taskID(let id): TaskLinkView(id: id)
         case .location(let location): ParcelMapView(location: location)
-        case .parcelHistory(let parcelID, let parcelName):
-            ParcelHistoryView(parcelID: parcelID, parcelName: parcelName)
+        case .parcelHistory(let parcelID, let parcelName, let recordIn):
+            ParcelHistoryView(parcelID: parcelID, parcelName: parcelName, recordIn: recordIn)
         case .farmDirectory: FarmDirectoryView()
         }
     }
@@ -90,4 +95,11 @@ extension AppRoute {
         case .task(_, let id): self = .taskID(id)
         }
     }
+}
+
+/// A parcel and the block it is in: what «Ново мероприятие»
+/// (`ParcelOperationSheet`) needs, carried on a history route (#387).
+struct ParcelInBlock: Hashable, Sendable {
+    let locationID: String
+    let parcel: Parcel
 }

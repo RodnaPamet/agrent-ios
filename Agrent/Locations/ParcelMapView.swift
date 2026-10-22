@@ -23,22 +23,14 @@ struct ParcelMapView: View {
 
     @Environment(\.colorSchemeContrast) private var contrast
 
-    /// The parcel whose operation sheet is open.
-    @State private var operating: Parcel?
-
-    /// An operation saved (or kept for later) from that sheet. Played HERE
-    /// because the sheet closes on success — see `WriteFeedback`.
-    @State private var operationFeedback = WriteFeedback()
+    /// Opens a parcel's history on this stack: a tap on the map and a row in
+    /// the list both go there (owner, 2026-10-21, #387). «Ново мероприятие»
+    /// moved onto that screen, carried by the route.
+    @Environment(\.pushRoute) private var pushRoute
 
     /// The parcels under an ambiguous tap, offered for the farmer to
     /// choose between.
     @State private var choosing: ParcelChoice?
-
-    /// Nil until resolved. The tap is offered meanwhile — see
-    /// `CurrentUser.mayCreateOperations`, which fails open.
-    @State private var me: CurrentUser?
-
-    private var mayOperate: Bool { me?.mayCreateOperations ?? true }
 
     @State private var indices: SatelliteIndexStore
 
@@ -136,21 +128,11 @@ struct ParcelMapView: View {
                 // Presenting one sheet from another's dismissal needs the
                 // first to be gone before the second is asked for, or the
                 // system drops it silently.
-                DispatchQueue.main.async { operating = picked }
+                DispatchQueue.main.async { openHistory(picked) }
             }
         }
-        .sheet(item: $operating) { parcel in
-            ParcelOperationSheet(
-                locationID: location.id, parcel: parcel
-            ) {
-                operationFeedback.saved()
-                Task { await store.load() }
-            }
-        }
-        .writeFeedback(operationFeedback)
         .task {
             if store.state.value == nil { await store.load() }
-            me = await CurrentUserStore.shared.load()
         }
     }
 
@@ -247,7 +229,7 @@ struct ParcelMapView: View {
             // still frame itself from the parcels.
             SchematicParcelMap(
                 parcels: drawable, bounds: box,
-                onTap: mayOperate ? { tapped($0) } : nil
+                onTap: { tapped($0) }
             )
         } else {
             // ONE map view for both SATELLITE modes, differing by `shape`.
@@ -267,7 +249,7 @@ struct ParcelMapView: View {
                 shape: mode == .simplified ? .boundingBoxes : .outlines,
                 contrast: contrast,
                 camera: camera,
-                onTap: mayOperate ? { tapped($0) } : nil
+                onTap: { tapped($0) }
             )
             .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
             .task { await indices.refreshIfNeeded() }
@@ -320,7 +302,15 @@ struct ParcelMapView: View {
 
     /// The schematic hands over one parcel; it draws true outlines on a
     /// flat ground and an overlap there means the fields really do overlap.
-    private func tapped(_ parcel: Parcel) { operating = parcel }
+    private func tapped(_ parcel: Parcel) { openHistory(parcel) }
+
+    /// The parcel's history, with «Ново мероприятие» on it for this block.
+    /// Every role: the history is a read, and the button there keeps the
+    /// write's own gate.
+    private func openHistory(_ parcel: Parcel) {
+        pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name,
+                                 recordIn: ParcelInBlock(locationID: location.id, parcel: parcel)))
+    }
 
     /// The satellite map hands over everything under the finger.
     ///
@@ -330,7 +320,7 @@ struct ParcelMapView: View {
     /// person who knows which field was meant is holding the phone.
     private func tapped(_ parcels: [Parcel]) {
         if parcels.count == 1 {
-            operating = parcels[0]
+            openHistory(parcels[0])
         } else if parcels.count > 1 {
             choosing = ParcelChoice(parcels: parcels)
         }
@@ -636,24 +626,19 @@ struct ParcelMapView: View {
 
     @ViewBuilder
     private func parcelRow(_ parcel: Parcel) -> some View {
-        // A BUTTON WHEN IT DOES SOMETHING, plain content when it does not.
+        // A BUTTON, FOR EVERY ROLE.
         //
-        // This row is the only route to «Запиши операция» that does not need a
-        // finger on a shape drawn on a map, so for a Switch Control or Full
+        // This row is the only route to a parcel's history that does not need
+        // a finger on a shape drawn on a map, so for a Switch Control or Full
         // Keyboard user it is not a convenience — it IS the route. It was an
         // `.onTapGesture`, which no focus ring stops on and no activation
         // reaches, whatever traits are declared beside it.
         //
         // `ParcelChooser` already renders this same name/crop/area row as a
-        // Button, so this is the app's own pattern. Not a Button for a reader
-        // who cannot operate: a control that focuses and then does nothing is
-        // worse than content.
-        if mayOperate {
-            Button { operating = parcel } label: { parcelRowContent(parcel) }
-                .buttonStyle(.plain)
-        } else {
-            parcelRowContent(parcel)
-        }
+        // Button, so this is the app's own pattern. A Button for every role
+        // now: it opens the history, which everyone may read (#387).
+        Button { openHistory(parcel) } label: { parcelRowContent(parcel) }
+            .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -706,7 +691,7 @@ struct ParcelMapView: View {
         // as three letters, so the audio channel gets «декара».
         // A BUTTON, NOT A TAP GESTURE.
         //
-        // This row is the only route to «Запиши операция» that does not
+        // This row is the only route to the parcel's history that does not
         // require a finger on a shape drawn on a map — so for a Switch Control
         // or Full Keyboard user it is not a convenience, it is the route. An
         // `onTapGesture` is invisible to both: no focus ring stops on it and
@@ -722,7 +707,7 @@ struct ParcelMapView: View {
             // activates; a Full Keyboard user presses space. "Двоен допир" is
             // VoiceOver's gesture and instructing it is wrong for everyone else
             // — the system already announces the right verb per technology.
-            .accessibilityHint(mayOperate ? "Записва операция за този парцел" : "")
+            .accessibilityHint("Отваря историята на парцела")
         .accessibilityLabel(A11y.sentence([
             parcel.name,
             CommodityName.freeText(parcel.cropType),

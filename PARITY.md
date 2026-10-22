@@ -1335,6 +1335,13 @@ caller of `.sensoryFeedback`.
 - **The floating button moved** from bottom-left to bottom-right, where Задачи's + is. The risk page is its only user.
 - **«История» on a row opens the parcel's history.** It did nothing before, because the button read `pushRoute` from outside the stack it pushes onto.
 
+## Blocks (Блокове)
+
+### Divergence — a parcel on the map opens its history (#387, owner 2026-10-21)
+
+- **A tap on a parcel** (either map, or a row of the list under it) opens the parcel's history for every role, where it used to open «Ново мероприятие» for those who may record. Overlapping shapes still ask which parcel first.
+- **«Ново мероприятие» moved to the history**, as a bottom button for that parcel, shown to someone who may create an operation (`mayCreateOperations`). The route carries the parcel and its block (`ParcelInBlock`), so the button works while the history loads or fails. A history opened from Риск has no such button, as before.
+
 ## Design status — the AX3 failures are FIXED
 
 Owned by the peer, on hardware. Recorded here so the two halves of the

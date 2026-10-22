@@ -190,7 +190,7 @@ final class HapticSiteTests: XCTestCase {
     /// listed — with its reason in `WriteFeedback`'s doc comment.
     func testTheModifierSitsOnExactlyTheseScreens() throws {
         let expected: [String: Int] = [
-            "Agrent/Locations/ParcelMapView.swift": 1,        // operation saved / kept
+            "Agrent/Locations/ParcelHistoryView.swift": 1,    // operation saved / kept (#387)
             "Agrent/Locations/ParcelOperationSheet.swift": 1, // operation refused
             "Agrent/Tasks/TaskDetailView.swift": 1,           // status changed / refused
             "Agrent/Exchange/ConversationView.swift": 1,      // message sent / refused
@@ -208,10 +208,10 @@ final class HapticSiteTests: XCTestCase {
 
     /// Where an outcome is RECORDED, by the declaration around it. This is
     /// the list of user actions that can buzz: each is a tap's own code
-    /// path, and `body` in `ParcelMapView` is the sheet's `onSaved`.
+    /// path, and `body` in `ParcelHistoryView` is the sheet's `onSaved` (#387).
     func testOutcomesAreRecordedOnlyInTheseActions() throws {
         let expected: Set<String> = [
-            "Agrent/Locations/ParcelMapView.swift var body saved",
+            "Agrent/Locations/ParcelHistoryView.swift var body saved",
             "Agrent/Locations/ParcelOperationSheet.swift save refused",
             "Agrent/Locations/ParcelOperationSheet.swift queueForLater refused",
             // The green tick's close (#226), which replaced the status menu's
