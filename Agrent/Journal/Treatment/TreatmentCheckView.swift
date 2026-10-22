@@ -127,8 +127,19 @@ struct TreatmentCheckView: View {
         }
     }
 
+    /// Said where «Добави» is decided (owner, 2026-10-22): a recorded
+    /// treatment can't be edited, so this screen is the place to catch a
+    /// mistake. The website's review step (agri-saas #2174) says the same
+    /// words; the two surfaces don't word one rule two ways.
+    nonisolated static let finalNote = "След записване вписването в ДНЕВНИКА не може да се редактира."
+
     private var actions: some View {
         VStack(spacing: 8) {
+            Text(Self.finalNote)
+                .font(.footnote)
+                .foregroundStyle(Palette.secondaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Button(action: onAdd) {
                 if saving {
                     ProgressView().frame(maxWidth: .infinity)
