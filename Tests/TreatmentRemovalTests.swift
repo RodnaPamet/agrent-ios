@@ -75,13 +75,31 @@ final class TreatmentRemovalTests: XCTestCase {
 
     // MARK: - The window
 
+    /// One row can stand for a dozen parcels across blocks, so the bar says
+    /// how many went (agri-saas #2192 names the count on the web too).
+    func testTheBarSaysHowMuchOneSwipeRemoved() {
+        var treatment = JournalTreatment(treatmentGroupId: "tg", productName: "Препарат А", parcelCount: 3,
+                                         blockNames: ["Блок 1", "Блок 2"])
+        XCTAssertEqual(TreatmentRemoval.extent(of: treatment), "3\u{00A0}парцела в 2\u{00A0}блока")
+        treatment.parcelCount = 1
+        treatment.blockNames = ["Блок 1"]
+        XCTAssertEqual(TreatmentRemoval.extent(of: treatment), "1\u{00A0}парцел в 1\u{00A0}блок")
+        treatment.blockNames = []
+        XCTAssertEqual(TreatmentRemoval.extent(of: treatment), "1\u{00A0}парцел")
+        XCTAssertNil(TreatmentRemoval.extent(of: JournalTreatment(parcelCount: 0)))
+
+        let bar = TreatmentRemoval.Undoable(handle: "tg", title: "Препарат А", extent: "3\u{00A0}парцела в 2\u{00A0}блока")
+        XCTAssertEqual(TreatmentRemoval.removedText(bar), "Изтрито: Препарат А, 3\u{00A0}парцела в 2\u{00A0}блока")
+        XCTAssertEqual(TreatmentRemoval.removedText(.init(handle: "tg", title: "Препарат А")), "Изтрито: Препарат А")
+    }
+
     func testASwipeHidesTheRowAndSendsNothingYet() {
         let calls = Calls()
         let store = removal(calls)
         let row = entry()
         store.remove(row)
         XCTAssertTrue(store.isHidden(row))
-        XCTAssertEqual(store.undoable, .init(handle: "tg_1", title: row.displayTitle))
+        XCTAssertEqual(store.undoable, .init(handle: "tg_1", title: row.displayTitle, extent: "3\u{00A0}парцела"))
         XCTAssertEqual(calls.log, [], "nothing goes before the window closes")
     }
 
@@ -104,7 +122,7 @@ final class TreatmentRemovalTests: XCTestCase {
     func testTheWindowIsTheWebsAndLongerUnderAssistiveTechnology() {
         XCTAssertEqual(TreatmentRemoval.window, .seconds(5))
         XCTAssertGreaterThan(TreatmentRemoval.assistedWindow, TreatmentRemoval.window)
-        XCTAssertTrue(TreatmentRemoval.announcement("Препарат А").contains("Кошче"),
+        XCTAssertTrue(TreatmentRemoval.announcement(.init(handle: "tg", title: "Препарат А")).contains("Кошче"),
                       "the spoken sentence names the way back that doesn't run out")
     }
 

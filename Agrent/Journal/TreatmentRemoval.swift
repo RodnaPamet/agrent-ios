@@ -49,6 +49,25 @@ final class TreatmentRemoval {
     struct Undoable: Equatable, Sendable {
         let handle: String
         let title: String
+        /// How much one swipe removed: «3 парцела в 2 блока». A row reads as
+        /// one line and can stand for a dozen parcels across blocks, which
+        /// the web's toast names for the same reason (agri-saas #2192). Nil
+        /// when the row says neither.
+        var extent: String? = nil
+    }
+
+    /// «3 парцела в 2 блока», «1 парцел», or nil when the row counts nothing.
+    /// Each number is held to its noun with a no-break space, so a narrow
+    /// bar never leaves «3» alone at the end of a line.
+    nonisolated static func extent(of treatment: JournalTreatment?) -> String? {
+        guard let treatment, treatment.parcelCount > 0 else { return nil }
+        let parcels = held(Plural.bg(treatment.parcelCount, "парцел", "парцела"))
+        guard !treatment.blockNames.isEmpty else { return parcels }
+        return "\(parcels) в \(held(Plural.bg(treatment.blockNames.count, "блок", "блока")))"
+    }
+
+    private nonisolated static func held(_ counted: String) -> String {
+        counted.replacingOccurrences(of: " ", with: "\u{00A0}")
     }
 
     private enum Stage: Equatable {
@@ -103,7 +122,7 @@ final class TreatmentRemoval {
         if let earlier = undoable { sendNow(earlier.handle) }
         failure = nil
         stages[handle] = .waiting
-        undoable = Undoable(handle: handle, title: entry.displayTitle)
+        undoable = Undoable(handle: handle, title: entry.displayTitle, extent: Self.extent(of: entry.treatment))
         let window = override ?? window
         timers[handle] = Task { [weak self] in
             try? await Task.sleep(for: window)
@@ -171,15 +190,17 @@ final class TreatmentRemoval {
 
     static let actionTitle = "Изтрий"
 
-    /// The bar's sentence: what went, by the name the row carried.
-    nonisolated static func removedText(_ title: String) -> String {
-        "Изтрито: \(title)"
+    /// The bar's sentence: what went, by the name the row carried, and how
+    /// much of the register that was.
+    nonisolated static func removedText(_ undoable: Undoable) -> String {
+        guard let extent = undoable.extent else { return "Изтрито: \(undoable.title)" }
+        return "Изтрито: \(undoable.title), \(extent)"
     }
 
     /// What VoiceOver says at the swipe: the bar's sentence, and the way
     /// back that doesn't run out.
-    nonisolated static func announcement(_ title: String) -> String {
-        "\(removedText(title)). Може да бъде възстановено от «Кошче»."
+    nonisolated static func announcement(_ undoable: Undoable) -> String {
+        "\(removedText(undoable)). Може да бъде възстановено от «Кошче»."
     }
 
     static let undoTitle = "Отмени"
