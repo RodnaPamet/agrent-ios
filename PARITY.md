@@ -694,9 +694,10 @@ period, then «Добави», or «Редактирай данните» to go 
   - on a spraying, the **quarantine period** and the **earliest harvest day**.
 - **No amount:** with no area, or a dose that isn't per area, there is no amount. The screen says why, rather than guessing.
 - **«Добави»** is the same save as before: same key, same outbox. «Редактирай данните» goes back to step one with everything kept.
+- **Above «Добави»:** «След записване вписването в ДНЕВНИКА не може да се редактира.» (owner, 2026-10-22). Recorded treatments stay final, so #392 isn't planned. There's no confirmation tick, the owner's choice for both surfaces.
 - **Not shown: remaining stock.** A ДНЕВНИК treatment deducts none (agri-saas #1740), and the owner didn't choose it.
 
-**The web** has no check step yet. The web is backend 1's lane, to settle with the owner there (agri-saas #2072).
+**The web** gets its review step in agri-saas #2174 (backend 1, open on 2026-10-22). It has the same sentence, and the owner chose no tick on either surface. Once that merges, this entry is matched.
 
 **Фенофаза/BBCH** (#363, agri-saas #2083, live 2026-10-20) is optional on
 every spraying, after the dose, as in PRZ. It's free text up to 64

@@ -71,4 +71,11 @@ final class TreatmentCheckTests: XCTestCase {
         XCTAssertEqual(TreatmentCheckView.withoutAreaNote(0), "")
         XCTAssertTrue(TreatmentCheckView.withoutAreaNote(2).hasPrefix("2 парцела са без площ"))
     }
+
+    /// The website's review step says the same words (agri-saas #2174), and
+    /// the owner chose recorded treatments to stay final (2026-10-22).
+    func testTheFinalNoteMatchesTheWebsite() {
+        XCTAssertEqual(TreatmentCheckView.finalNote,
+                       "След записване вписването в ДНЕВНИКА не може да се редактира.")
+    }
 }
