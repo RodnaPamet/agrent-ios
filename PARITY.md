@@ -756,8 +756,8 @@ before building the routes.
 - **Then** `DELETE /journal/treatments/{handle}` goes out. The phone's own copy in the outbox goes with it, because the server releases an unfinished treatment's key and a resend would record it again. A refusal brings the row back with the server's sentence. A 404 counts as done.
 - **«Кошче»**, from Дневник's toolbar, lists withdrawn treatments, newest first. The server sends at most 200 and doesn't page them. Each row shows the product, the day, the parcels, the area in decares and the blocks. Those come from the listing itself, since a withdrawn handle no longer resolves. «Възстанови» (`POST …/restore`) is offered where the row's `mayRestore` says yes, under the same gate. Restoring brings the treatment back to the list and the register exactly as recorded.
 
-**The web** has the routes (agri-saas #2184). Its swipe row and Trash view
-are still to come.
+**The server** has the routes since agri-saas #2184, live at 683d52a on
+2026-10-22. The web's swipe row and Trash view are still to come.
 
 Asked of backend 1 and added to #2184 (6fac369): `mayDelete` on the row,
 the summary and `mayRestore` on «Кошче», and a DELETE description that no
