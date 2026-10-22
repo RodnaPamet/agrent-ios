@@ -19,6 +19,9 @@ struct FarmRecordSheet: View {
     @State private var to = FarmRecordAPI.defaultPeriod().to
     @State private var generating = false
     @State private var failure: String?
+    /// The server said the block has nothing in the period (#402). Not a
+    /// failure: shown as a plain note, and gone once the question changes.
+    @State private var nothingRecorded = false
     /// The PDF, once generated — what Quick Look shows. Removed when the
     /// sheet closes, by its presenter (`FarmRecordAPI.removeGenerated`).
     @State private var document: URL?
@@ -73,7 +76,13 @@ struct FarmRecordSheet: View {
                     }
                 }
 
-                if let failure {
+                if nothingRecorded {
+                    Section {
+                        Label(FarmRecordAPI.emptyPeriodText, systemImage: "doc.text.magnifyingglass")
+                            .foregroundStyle(Palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else if let failure {
                     Section {
                         Text(failure)
                             .foregroundStyle(Palette.error)
@@ -99,6 +108,10 @@ struct FarmRecordSheet: View {
                 }
             }
             .quickLookPreview($document)
+            // A note about one block and period says nothing about another.
+            .onChange(of: locationID) { nothingRecorded = false }
+            .onChange(of: from) { nothingRecorded = false }
+            .onChange(of: to) { nothingRecorded = false }
             .task {
                 await locations.load()
                 // Chosen for the person when there is nothing to choose.
@@ -114,9 +127,13 @@ struct FarmRecordSheet: View {
         guard let location = chosen, canGenerate else { return }
         generating = true
         failure = nil
+        nothingRecorded = false
         defer { generating = false }
         do {
             document = try await FarmRecordAPI.generate(locationID: location.id, from: from, to: to)
+        } catch let error where FarmRecordAPI.isEmptyPeriod(error) {
+            nothingRecorded = true
+            AccessibilityNotification.Announcement(FarmRecordAPI.emptyPeriodText).post()
         } catch let refused as FarmRecordAPI.Failure {
             failure = refused.errorDescription
         } catch {

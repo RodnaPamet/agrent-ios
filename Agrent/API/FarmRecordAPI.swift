@@ -51,6 +51,20 @@ enum FarmRecordAPI {
         data.starts(with: Array("%PDF".utf8))
     }
 
+    /// A block with nothing recorded in the period (owner, 2026-10-22,
+    /// confirmed to backend 1 on 2026-10-23; agri-saas #2183): the server
+    /// gives no document, and the person is told so. Its OWN code, because a
+    /// bare 404 also means "no such block" and "not this farm", and this is
+    /// the one 404 that says nothing is wrong. An untreated block in a period
+    /// is ordinary, so it is the one met most.
+    static let emptyPeriodCode = "REGISTER_EMPTY_FOR_PERIOD"
+    static let emptyPeriodText = "Няма записи за този период."
+
+    static func isEmptyPeriod(_ error: Error) -> Bool {
+        if case APIClient.APIError.http(404, emptyPeriodCode?, _, _, _) = error { return true }
+        return false
+    }
+
     enum Failure: LocalizedError, Equatable {
         case notAPDF
 

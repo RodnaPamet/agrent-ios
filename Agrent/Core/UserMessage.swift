@@ -749,6 +749,10 @@ enum UserMessage {
         // pages to give. The read by handle answers this code too, and reads
         // it as "nothing landed" itself — it never reaches a person there.
         "TREATMENT_NOT_FOUND": "Мероприятието не е намерено на сървъра. Може да е изтрито.",
+        // «Дневник (PDF)» for a block with nothing in the period (agri-saas
+        // #2183, #402). `FarmRecordSheet` shows it as a note, not an error;
+        // the sentence is here for any other surface that meets the code.
+        "REGISTER_EMPTY_FOR_PERIOD": "Няма записи за този период.",
         // A resend under the handle of a treatment an administrator abandoned
         // because it could not be finished (agri-saas #1869, agrent-ios#326):
         // a 410, and the row is never sent again. Mostly met by an outbox row

@@ -564,6 +564,7 @@ returns the PDF's bytes.
   rather than 15 s. The server builds the PDF before it sends a byte, on a
   60 s budget.
 - **Checked:** a 200 that is not `%PDF` is refused.
+- **A block with nothing in the period** (owner, 2026-10-22, confirmed to backend 1 on 2026-10-23; agri-saas #2183, #402) gets no document. The server answers 404 `REGISTER_EMPTY_FOR_PERIOD`, and the sheet says «Няма записи за този период.» as a plain note, not an error, until the block or period changes. Its own code keeps it apart from a missing block or farm. **Not live yet:** today the route still renders a PDF for an idle block.
 - **Opening:** the PDF opens in Quick Look, which shares it or saves it to
   Files.
 - **Storage:** it is written under complete file protection to a temporary

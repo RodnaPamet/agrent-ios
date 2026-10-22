@@ -9,6 +9,20 @@ final class FarmRecordTests: XCTestCase {
 
     private let request = FarmRecordAPI.Request(from: "2026-01-01", to: "2026-10-09")
 
+    /// A block with nothing in the period is its own 404 (#402, agri-saas
+    /// #2183): told apart from a missing block or farm, which are errors.
+    func testAnEmptyPeriodIsItsOwnAnswer() {
+        XCTAssertTrue(FarmRecordAPI.isEmptyPeriod(APIClient.APIError.http(
+            status: 404, code: "REGISTER_EMPTY_FOR_PERIOD", message: nil)))
+        XCTAssertFalse(FarmRecordAPI.isEmptyPeriod(APIClient.APIError.http(status: 404, code: nil, message: nil)),
+                       "a bare 404 is a missing block, not an empty one")
+        XCTAssertFalse(FarmRecordAPI.isEmptyPeriod(APIClient.APIError.http(
+            status: 404, code: "TENANT_NOT_FOUND", message: nil)))
+        XCTAssertFalse(FarmRecordAPI.isEmptyPeriod(URLError(.notConnectedToInternet)))
+        XCTAssertEqual(UserMessage.text(for: APIClient.APIError.http(
+            status: 404, code: "REGISTER_EMPTY_FOR_PERIOD", message: "Nothing")), FarmRecordAPI.emptyPeriodText)
+    }
+
     func testThePathIsTheLocationsFarmRecord() {
         XCTAssertTrue(FarmRecordAPI.path("loc 1").hasSuffix("/locations/loc%201/farm-record"),
                       FarmRecordAPI.path("loc 1"))
