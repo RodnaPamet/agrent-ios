@@ -116,6 +116,15 @@ final class TaskEditTests: XCTestCase {
     }
 
     /// The assignee goes to its own route, and only when it changed.
+    /// The server's refusal of someone else's task (agri-saas #2182), in Bulgarian.
+    func testTheServersRefusalIsBulgarian() {
+        let text = UserMessage.text(for: APIClient.APIError.http(
+            status: 403, code: "TASK_EDIT_NOT_PERMITTED", message: "Only the creator"))
+        XCTAssertFalse(text.contains("Only"))
+        XCTAssertTrue(text.contains("администратор"))
+        XCTAssertTrue(text.hasSuffix("."))
+    }
+
     func testTheAssigneeIsItsOwnChange() async throws {
         let original = TaskEdit.draft(from: try await task())
         var edited = original
