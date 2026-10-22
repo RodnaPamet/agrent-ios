@@ -826,11 +826,12 @@ priority, due date, assignee and links. **iOS** asks what a phone needs:
 ### Divergence — «Редактирай» on a task, for its creator and administrators (#382, owner 2026-10-21)
 
 **The web's** task page has an edit form (`FarmTaskDetailClient`) with title,
-description, priority, type and due date, offered to anyone who can write
-tasks. **iOS** opens the «Нова задача» form on the task:
+description, priority, type and due date. Since agri-saas #2191 it's offered
+on the same rule as the phone's. **iOS** opens the «Нова задача» form on the task:
 - **The fields:** title, description, due day and assignee (owner, 2026-10-21). No priority and no type, as in «Нова задача».
 - **Who sees it:** the task's creator and the farm's administrators, and only someone who may write there. This is the owner's rule.
-  - **The server allows more:** `updateTask` checks `assertCanWriteTasks` only, so any writer may edit any task. Enforcing the owner's rule is agri-saas's to do.
+  - **The server enforces it** since agri-saas #2182, live at 168ee9a on 2026-10-22 (owner, confirmed directly): `assertCanEditTask` narrows the write gate, and anyone else gets 403 `TASK_EDIT_NOT_PERMITTED`. The phone shows that in the server's words.
+  - **Reassignment is not gated by it.** `POST /tasks/{id}/assign` still takes any writer, which #2182 chose knowingly, since "who may edit" was the question asked. The phone reaches the assignee only through «Редактирай», so it's offered on the stricter rule.
   - **When the tier is unknown,** the button shows, as every write does, and the server's answer is read out.
 - **What is sent:** only what changed.
   - The fields go by `PATCH /tasks/{id}`. A cleared description or due day is an explicit `null`.

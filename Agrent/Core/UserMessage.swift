@@ -1000,6 +1000,12 @@ enum UserMessage {
         // `params.status` is the task's current status, a wire name; not
         // quoted. The task moved on while the screen was open.
         "TASK_NOT_AWAITING_REVIEW": "Задачата вече не чака преглед. Обновете списъка.",
+        // «Редактирай» on a task someone else created (agri-saas #2182, live
+        // 2026-10-22). The phone offers the pencil only to the creator and an
+        // administrator, the same rule, so this is met only when that changed
+        // while the screen was open. The server's own words.
+        "TASK_EDIT_NOT_PERMITTED":
+            "Само човекът, създал тази задача, или администратор на стопанството може да я редактира.",
         // A parcel's history: crops by year and weed observations.
         "CROP_TYPE_INVALID": "Посочете културата.",
         "CROP_SEASON_YEAR_INVALID": "Годината на реколтата е извън допустимия диапазон.",
