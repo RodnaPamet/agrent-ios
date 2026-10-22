@@ -15,12 +15,23 @@ import SwiftUI
 /// and toggle it unannounced. Nothing on it is unique: the list beside it has
 /// every parcel by name with its state, and the bar has the total. That is
 /// the only reason hiding it is right.
+///
+/// ── Except the target button (#398) ──
+///
+/// `ParcelTargetButton`, as on Блокове: each press frames the next drawn
+/// parcel, said aloud, since the camera move itself is silent to VoiceOver. It
+/// sits outside the hidden map, so it is a control like any other.
+///
+/// `onToggle` is nil on a map that only shows (#399): a tap there changes
+/// nothing.
 struct TreatmentParcelMap: View {
     let fields: [TreatmentPlace.Field]
     let outlines: [String: [MKPolygon]]
     let chosen: Set<String>
     @Binding var camera: MapCameraPosition
-    let onToggle: (String) -> Void
+    let onToggle: ((String) -> Void)?
+
+    @State private var focusedID: String?
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -42,6 +53,15 @@ struct TreatmentParcelMap: View {
     }
 
     var body: some View {
+        map
+            .overlay(alignment: .bottomTrailing) {
+                if !drawable.isEmpty {
+                    ParcelTargetButton(parcelCount: drawable.count, action: focusNext)
+                }
+            }
+    }
+
+    private var map: some View {
         MapReader { proxy in
             Map(position: $camera, interactionModes: [.pan, .zoom]) {
                 ForEach(drawn) { outline in
@@ -55,10 +75,31 @@ struct TreatmentParcelMap: View {
                 guard let coordinate = proxy.convert(point, from: .local),
                       let hit = TreatmentPlace.fields(at: coordinate, in: fields, outlines: outlines).first
                 else { return }
-                onToggle(hit.id)
+                onToggle?(hit.id)
             }
         }
         .accessibilityHidden(true)
+    }
+
+    /// The parcels the button cycles: those with an outline, in the list's
+    /// order. A parcel with none is in the list, not on the map, so a press
+    /// that framed it would move the camera to nothing.
+    private var drawable: [Parcel] { fields.map(\.parcel).filter(\.isDrawable) }
+
+    /// Camera only, as on Блокове: no toggle. Said in the words the list's
+    /// row uses, so the two don't describe one field differently.
+    private func focusNext() {
+        let parcels = drawable
+        guard let next = ParcelFocus.next(after: focusedID, in: parcels) else { return }
+        focusedID = next.id
+        if let region = MKCoordinateRegion(fitting: [next]) { camera = .region(region) }
+        let block = fields.first { $0.id == next.id }?.blockName
+        AccessibilityNotification.Announcement(A11y.sentence([
+            ParcelFocus.position(of: next, in: parcels),
+            next.name,
+            block,
+            next.areaHa.map { Area(hectares: $0).spoken },
+        ])).post()
     }
 
     /// Chosen: amber over a light fill, heavier with Increase Contrast. Not

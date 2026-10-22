@@ -117,6 +117,8 @@ enum A11y {
         static let record = spokenNames("Запиши", "Save")
         static let create = spokenNames("Създай", "Create")
         static let retry = spokenNames("Опитай пак", "Retry")
+        /// A recorded treatment's parcels on a map (#399).
+        static let seeOnMap = spokenNames("Виж на картата", "Картата", "See on map")
         /// «Задачи»'s + (#372).
         static let newTask = spokenNames("Нова задача", "Нова", "New task")
         /// A parcel's history → «Ново мероприятие» (#387).

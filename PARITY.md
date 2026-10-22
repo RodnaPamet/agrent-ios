@@ -694,6 +694,8 @@ period, then «Добави», or «Редактирай данните» to go 
   - on a spraying, the **quarantine period** and the **earliest harvest day**.
 - **No amount:** with no area, or a dose that isn't per area, there is no amount. The screen says why, rather than guessing.
 - **«Добави»** is the same save as before: same key, same outbox. «Редактирай данните» goes back to step one with everything kept.
+- **The target button on step two's map** (#398, owner 2026-10-22): each press frames the next parcel with an outline, and VoiceOver says which. It's the same control as on Блокове (`ParcelTargetButton`), and «Нова задача»'s «Парцели» map has it too.
+- **«Виж на картата» on a recorded treatment** (#399, owner 2026-10-22), on its journal entry and on the saved screen: the treated parcels on a map, all highlighted, with the target button, and listed by block below. A row frames its parcel. The parcels come from the treatment's tasks (`taskIds`, then each `/field-operations/{taskId}`), cache first. The saved screen already holds them and makes no read.
 - **Above «Добави»:** «Проверете данните. След записване вписването в ДНЕВНИКА не може да се редактира.», word for word as the website's step 3 (#2174), confirmed by backend 1 with the owner (owner, 2026-10-22). Recorded treatments stay final, so #392 isn't planned. There's no confirmation tick, the owner's choice for both surfaces.
 - **Not shown: remaining stock.** A ДНЕВНИК treatment deducts none (agri-saas #1740), and the owner didn't choose it.
 

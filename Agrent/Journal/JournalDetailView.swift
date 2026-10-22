@@ -57,6 +57,9 @@ struct JournalDetailView: View {
 
     /// The treatment this entry stands for — nil for an entry folded to
     /// itself, whose object says only that it is none.
+    /// The journal's own stack: «Виж на картата» pushes a route onto it (#399).
+    @Environment(\.pushRoute) private var pushRoute
+
     private var treatment: JournalTreatment? {
         entry.treatment.flatMap { $0.isTreatment ? $0 : nil }
     }
@@ -66,6 +69,18 @@ struct JournalDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 facts
+                if let treatment, let handle = treatment.treatmentGroupId?.recorded {
+                    // Which parcels, and where (#399, owner 2026-10-22): the
+                    // row above says only how many.
+                    Button {
+                        pushRoute(.treatmentMap(handle: handle, title: TreatmentMapView.title(for: treatment.treatmentKind)))
+                    } label: {
+                        Label(TreatmentMapView.buttonTitle, systemImage: "map").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityInputLabels(A11y.Spoken.seeOnMap)
+                }
                 if let handle = treatment?.treatmentGroupId?.recorded {
                     UnfinishedTreatmentSection(handle: handle)
                     TreatmentDocumentAction(handle: handle)

@@ -45,7 +45,9 @@ struct TreatmentEntryFlow: View {
     /// Offline, and under the UI-test seam, nothing redraws, so the page
     /// stayed empty (the owner's phone, 2026-10-21; A11yShots 20b). In the
     /// path itself it can't be missing.
-    enum Step: Hashable { case place, check(Checking) }
+    /// `.map` is the saved screen's «Виж на картата» (#399): the parcels it
+    /// already holds, on a map.
+    enum Step: Hashable { case place, check(Checking), map([TreatmentPlace.Field], TreatmentDraft.Kind) }
 
     struct Checking: Hashable {
         let record: TreatmentRecord
@@ -56,7 +58,8 @@ struct TreatmentEntryFlow: View {
         NavigationStack(path: $path) {
             Group {
                 if let saved {
-                    TreatmentSavedView(saved: saved, recorder: recorder) { dismiss() }
+                    TreatmentSavedView(saved: saved, recorder: recorder,
+                                       onShowMap: { path.append(.map(saved.fields, saved.record.kind)) }) { dismiss() }
                 } else {
                     TreatmentFieldsView(draft: $draft, reference: reference) {
                         path.append(.place)
@@ -78,6 +81,8 @@ struct TreatmentEntryFlow: View {
                                        failure: failure, retryCrops: { await loadPlace() }) { fields in
                         proceed(fields)
                     }
+                case .map(let fields, let kind):
+                    TreatmentMapView(fields: fields, title: TreatmentMapView.title(for: kind))
                 case .check(let checking):
                     TreatmentCheckView(
                         record: checking.record, fields: checking.fields, cropLabel: cropLabel,

@@ -95,6 +95,9 @@ enum FixtureCatalogue {
     /// other task id but `fixtureTaskID` stays `NO_FIXTURE`. Spelled by hand for the reason
     /// `fixtureLocationID` is; `FixtureSeamTests` holds it against the files.
     static let fixtureFieldOperationTaskID = "tsk_fixture_fieldop"
+    /// The journal fixture's one treatment (`journal-list.json`), read by its
+    /// handle for «Виж на картата» (#399).
+    static let fixtureTreatmentHandle = "tg_fixture_1"
 
     /// `tasks-list.json`'s row 1, a plain `TASK` with linked parcels — for
     /// the parcels map every other kind of task has (agrent-ios#177).
@@ -148,6 +151,9 @@ enum FixtureCatalogue {
         // agrent-ios#384: the farm's crops for «Ново мероприятие». ONE crop,
         // so the flow chooses it as it would on a one-crop farm.
         (ParcelsByCropAPI.path, "parcels-by-crop"),
+        // agrent-ios#399: the journal treatment's summary, whose one task is
+        // the field-operation fixture's, so «Виж на картата» draws its lines.
+        (TreatmentAPI.treatmentPath(fixtureTreatmentHandle), "treatment-summary"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),

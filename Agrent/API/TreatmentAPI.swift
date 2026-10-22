@@ -152,6 +152,13 @@ enum TreatmentAPI {
     /// STRICT, unlike `receipt`: `complete` decides between never writing
     /// again and sending again, and a guess at it is a treatment recorded
     /// twice or left half done.
+    /// The treatment's field-operation tasks, one per block (#399): what
+    /// «Виж на картата» reads its parcels from.
+    static func taskIDs(from data: Data) throws -> [String] {
+        struct Summary: Decodable { let taskIds: [String] }
+        return try JSONDecoder().decode(Summary.self, from: data).taskIds
+    }
+
     static func landing(from data: Data) throws -> TreatmentLanding {
         struct Summary: Decodable {
             let parcelCount: Int

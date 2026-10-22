@@ -43,6 +43,8 @@ enum AppRoute: Hashable, Sendable {
     case parcelHistory(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil)
     /// «Ферми», the published farms (#323). Carries nothing: it's one list.
     case farmDirectory
+    /// A recorded treatment's parcels on a map (#399), read by its handle.
+    case treatmentMap(handle: String, title: String)
 
     func hash(into hasher: inout Hasher) {
         switch self {
@@ -54,6 +56,7 @@ enum AppRoute: Hashable, Sendable {
         case .location(let location): hasher.combine("location"); hasher.combine(location.id)
         case .parcelHistory(let parcelID, _, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
         case .farmDirectory: hasher.combine("farmDirectory")
+        case .treatmentMap(let handle, _): hasher.combine("treatmentMap"); hasher.combine(handle)
         }
     }
 
@@ -61,7 +64,7 @@ enum AppRoute: Hashable, Sendable {
     /// when that tab is on the bar.
     var home: AppSurface {
         switch self {
-        case .journalEntry: .journal
+        case .journalEntry, .treatmentMap: .journal
         case .listing, .conversation, .farmDirectory: .exchange
         case .task, .taskID: .tasks
         case .location: .locations
@@ -84,6 +87,7 @@ enum AppRoute: Hashable, Sendable {
         case .parcelHistory(let parcelID, let parcelName, let recordIn):
             ParcelHistoryView(parcelID: parcelID, parcelName: parcelName, recordIn: recordIn)
         case .farmDirectory: FarmDirectoryView()
+        case .treatmentMap(let handle, let title): TreatmentMapView(handle: handle, title: title)
         }
     }
 }
