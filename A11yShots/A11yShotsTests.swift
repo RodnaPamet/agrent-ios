@@ -1738,6 +1738,12 @@ final class A11yShotsTests: XCTestCase {
         let all = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Избери всички'")).firstMatch
         XCTAssertTrue(all.waitForExistence(timeout: 15), "no parcels on «Къде»\n\(app.debugDescription)")
         all.tap()
+        // The target button on step two's map (#398): one press frames the
+        // next parcel.
+        let target = app.buttons["Следващ парцел"]
+        XCTAssertTrue(target.waitForExistence(timeout: 5), "no target button on «Къде»")
+        target.tap()
+        capture("\(name)-place-target", app: app)
 
         let proceed = app.buttons["Продължи"]
         XCTAssertTrue(proceed.waitForExistence(timeout: 5), "no «Продължи»")
@@ -1816,6 +1822,35 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(counted.waitForExistence(timeout: 5), "the chosen parcels aren't counted")
         XCTAssertTrue(app.buttons["Създай"].exists, "no «Създай» on «Парцели»")
         capture("08e-new-task-parcels", app: app)
+    }
+
+    // MARK: - «Виж на картата» on a recorded treatment (agrent-ios#399)
+
+    /// Дневник → the fixture treatment («Тестов хербицид») → «Виж на картата»:
+    /// its three parcels on a map and in a list, then one press of the
+    /// target button.
+    func testTreatmentMapFromTheJournal() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Тестов хербицид'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "no fixture treatment on Дневник")
+        row.tap()
+        let open = app.buttons["Виж на картата"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10), "the treatment has no «Виж на картата»\n\(app.debugDescription)")
+        open.tap()
+        XCTAssertTrue(app.navigationBars["Третирани парцели"].waitForExistence(timeout: 10),
+                      "«Виж на картата» opened no map\n\(app.debugDescription)")
+        let parcel = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'SYNTH-1'")).firstMatch
+        XCTAssertTrue(parcel.waitForExistence(timeout: 10), "the treated parcels aren't listed\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 2)
+        capture("01f-treatment-map", app: app)
+        let target = app.buttons["Следващ парцел"]
+        XCTAssertTrue(target.exists, "no target button on the treatment's map")
+        target.tap()
+        Thread.sleep(forTimeInterval: 1)
+        capture("01g-treatment-map-target", app: app)
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

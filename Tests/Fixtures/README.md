@@ -380,3 +380,12 @@ is ASCII so the query is the same string however it's escaped.
 |---|---|
 | a parcel with four holes and one without, both drawable | `parcels` 0–1 |
 | the total equals the parcels' sum | `crops[0].areaHaTotal` |
+
+## A recorded treatment's map (agrent-ios#399)
+
+`treatment-summary.json`: `GET /journal/treatments/tg_fixture_1`, the
+`TreatmentSummary` for the journal fixture's one treatment
+(`journal-list.json` row 2, «Тестов хербицид»). Its one task,
+`tsk_fixture_fieldop`, is the field-operation fixture's, so «Виж на картата»
+draws that task's three lines over «Synthetic Land». The ids follow no real
+format.

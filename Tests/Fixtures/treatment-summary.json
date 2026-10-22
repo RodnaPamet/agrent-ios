@@ -1,0 +1,8 @@
+{
+  "treatmentGroupId": "tg_fixture_1",
+  "occurredOn": "2026-09-16",
+  "complete": true,
+  "completedCount": 3,
+  "parcelCount": 3,
+  "taskIds": ["tsk_fixture_fieldop"]
+}
