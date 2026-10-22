@@ -23,6 +23,7 @@
         "kind": "SPRAY",
         "productName": "Тестов хербицид",
         "parcelCount": 3,
+        "mayDelete": true,
         "totalAreaHa": 4.2,
         "blockNames": [
           "Блок 2",

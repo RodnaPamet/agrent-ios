@@ -192,6 +192,13 @@ enum A11y {
         /// The Дневник page's «Дневник (PDF)» (#246) — the БАБХ register,
         /// not the journal itself, so not «Дневник» alone: that is a tab.
         static let farmRecord = spokenNames("Дневник (PDF)", "Farm record")
+        /// A Дневник row's swipe (#395): the WHOLE treatment, every parcel.
+        static let deleteTreatment = spokenNames("Изтрий", "Delete")
+        /// The bar that follows it, for five seconds before it is sent.
+        static let undo = spokenNames("Отмени", "Undo")
+        /// The Дневник's «Кошче», and its rows' way back.
+        static let trash = spokenNames("Кошче", "Trash", "Deleted")
+        static let restore = spokenNames("Възстанови", "Restore")
         /// A list's filter button, Борса's and the Дневник's (#252). Its
         /// name stays the same when a filter is on; that state is its value.
         static let filters = spokenNames("Филтри", "Filters")

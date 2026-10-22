@@ -15,6 +15,19 @@ struct JournalListView: View {
     @State private var outbox = OutboxStore.shared
     /// A treatment abandoned from its entry's screen (#326): read again.
     @State private var changes = JournalChanges.shared
+    /// Rows swiped away, inside their five seconds or just sent (#395).
+    @State private var removal = TreatmentRemoval()
+    /// «Кошче» is up (#395).
+    @State private var trashing = false
+    /// A swipe the server refused is being said (#395).
+    @State private var refused = false
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
+
+    /// The rows the list shows: the server's, less what was swiped away.
+    private func visible(_ entries: [LogEntry]) -> [LogEntry] {
+        removal.hidden.isEmpty ? entries : entries.filter { !removal.isHidden($0) }
+    }
 
     private var waiting: [PendingOperation] {
         JournalStore.waiting(in: outbox.pending, farm: FarmPath.openSlug, listed: store.entries)
@@ -49,7 +62,12 @@ struct JournalListView: View {
             // text size.
             content
                 .background(Palette.Surface.page)
-                .safeAreaInset(edge: .bottom, spacing: 0) { newEntryButton }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: 0) {
+                        if let undoable = removal.undoable { undoBar(undoable) }
+                        newEntryButton
+                    }
+                }
             .navigationTitle("Земеделски дневник")
             .appMenu()
             .toolbar {
@@ -81,6 +99,17 @@ struct JournalListView: View {
                     .accessibilityLabel("Дневник (PDF)")
                     .accessibilityInputLabels(A11y.Spoken.farmRecord)
                 }
+                // Removed treatments, to restore (#395). For every role: the
+                // listing is a read, and a reader may want to see what went.
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        trashing = true
+                    } label: {
+                        Label("Кошче", systemImage: "trash")
+                    }
+                    .accessibilityLabel("Кошче")
+                    .accessibilityInputLabels(A11y.Spoken.trash)
+                }
             }
             // «Нов запис» is the two-step treatment record (#293). The saved
             // entry comes back from the server folded into one row, which
@@ -95,6 +124,20 @@ struct JournalListView: View {
             .sheet(isPresented: $exportingRecord, onDismiss: FarmRecordAPI.removeGenerated) {
                 FarmRecordSheet()
             }
+            .sheet(isPresented: $trashing) {
+                TreatmentTrashView { handle in
+                    removal.restored(handle)
+                    changes.changed()
+                }
+            }
+            .alert("Мероприятието не е изтрито", isPresented: $refused, presenting: removal.failure) { _ in
+                Button("Затвори", role: .cancel) { removal.dismissFailure() }
+            } message: { failure in
+                Text(failure)
+            }
+            .onChange(of: removal.failure) { _, failure in
+                refused = failure != nil
+            }
             .sheet(isPresented: $filtering) {
                 JournalFilterSheet(filter: store.filter, options: filterOptions) { chosen in
                     Task { await store.apply(chosen) }
@@ -107,6 +150,9 @@ struct JournalListView: View {
             }
             .onChange(of: changes.revision) {
                 Task { await store.load() }
+            }
+            .onChange(of: store.freshReads) {
+                removal.listRead()
             }
         }
     }
@@ -141,6 +187,28 @@ struct JournalListView: View {
         }
     }
 
+    /// What went, with «Отмени», for the five seconds before it is sent.
+    /// Above «Нов запис», where the thumb that swiped already is.
+    private func undoBar(_ undoable: TreatmentRemoval.Undoable) -> some View {
+        // The sentence wraps rather than the button moving: at the largest
+        // text sizes a product name runs to several lines, and «Отмени»
+        // stays where the thumb found it.
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(TreatmentRemoval.removedText(undoable.title))
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(TreatmentRemoval.undoTitle) { removal.undo() }
+                .fontWeight(.semibold)
+                .accessibilityInputLabels(A11y.Spoken.undo)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .solidBar(hairline: .top)
+    }
+
     @ViewBuilder
     private var content: some View {
         // Read once per render: three cases and the section ask it.
@@ -156,7 +224,7 @@ struct JournalListView: View {
         // A filtered no-result is not an empty diary, and saying the wrong
         // one is a claim about the farm's records rather than about the
         // filter. The web's words (`journal.filteredEmpty*`).
-        case .loaded(let entries, _) where entries.isEmpty && waiting.isEmpty && store.filter.isActive:
+        case .loaded(let entries, _) where visible(entries).isEmpty && waiting.isEmpty && store.filter.isActive:
             EmptyState(
                 "Няма записи, отговарящи на филтрите",
                 icon: "line.3.horizontal.decrease.circle",
@@ -165,14 +233,15 @@ struct JournalListView: View {
                 Button("Изчисти филтрите") { Task { await store.clearFilters() } }
             }
 
-        case .loaded(let entries, _) where entries.isEmpty && waiting.isEmpty:
+        case .loaded(let entries, _) where visible(entries).isEmpty && waiting.isEmpty:
             EmptyState(
                 "Няма записи",
                 icon: "book.closed",
                 message: "Добавете първия запис в дневника."
             )
 
-        case .loaded(let entries, _):
+        case .loaded(let listed, _):
+            let entries = visible(listed)
             List {
                 waitingSection(waiting)
                 // THE COUNT MOVED HERE from the in-content header, which
@@ -199,6 +268,25 @@ struct JournalListView: View {
                         JournalRow(entry: entry, partial: entry.treatment?.treatmentGroupId.flatMap { partial[$0] })
                     }
                     .pageRow()
+                    // The WHOLE treatment, every parcel and block (#395).
+                    // Not a full swipe: on a register, removing a record
+                    // takes the tap on «Изтрий», and the bar below still
+                    // offers «Отмени» for five seconds. VoiceOver lists it
+                    // among the row's actions.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if TreatmentRemoval.offered(entry, to: people.user) {
+                            Button(role: .destructive) {
+                                removal.remove(entry, window: voiceOver || switchControl
+                                               ? TreatmentRemoval.assistedWindow : nil)
+                                var said = AttributedString(TreatmentRemoval.announcement(entry.displayTitle))
+                                said.accessibilitySpeechAnnouncementPriority = .high
+                                AccessibilityNotification.Announcement(said).post()
+                            } label: {
+                                Label(TreatmentRemoval.actionTitle, systemImage: "trash")
+                            }
+                            .accessibilityInputLabels(A11y.Spoken.deleteTreatment)
+                        }
+                    }
                 }
                 loadMoreRow
                     .pageRow()

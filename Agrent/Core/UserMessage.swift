@@ -759,10 +759,22 @@ enum UserMessage {
             "Администратор прекрати това мероприятие, защото не можеше да бъде записано докрай. "
             + "Ако работата трябва да е в дневника, направете нов запис.",
         // The abandon met a treatment that finished meanwhile (agri-saas
-        // #1860): it's a full register record now, which the abandon never
-        // touches. The server's message sends the person to the journal's
-        // own delete, which the phone doesn't offer, so it isn't repeated.
+        // #1860). A server since #2184 removes a complete treatment through
+        // the same route and no longer answers this; an older one still can,
+        // to a phone that asked before it was deployed.
         "TREATMENT_COMPLETE": "Мероприятието вече е записано изцяло, затова не може да бъде прекратено.",
+        // A Дневник row's «Изтрий» and «Кошче»'s «Възстанови» (agri-saas
+        // #2184, agrent-ios #395), in the server's own words, which the web
+        // shows. The phone offers both to someone who may write; this is
+        // the server's finer rule, the treatment's creator or an
+        // administrator.
+        "TREATMENT_DELETE_NOT_PERMITTED":
+            "Само човекът, записал това мероприятие, или администратор на стопанството може да го премахне.",
+        // Tasks of one treatment recorded by different people, so "its
+        // creator" names nobody and only an administrator can sort it out.
+        "TREATMENT_MIXED_AUTHORSHIP":
+            "Това мероприятие е записано от повече от един човек и не може да се премахне наведнъж. "
+            + "Обърнете се към администратор.",
 
         // «Публичен профил» (agrent-ios #323, agri-saas #1865/#1871). The
         // address is the one field another farm can refuse: the taken case

@@ -204,6 +204,10 @@ final class RouteContractTests: XCTestCase {
             // «Ново мероприятие»'s save and its read by handle (#293).
             ("TreatmentAPI.swift", [TreatmentAPI.recordPath, TreatmentAPI.treatmentPath("{treatmentGroupId}"),
                                     TreatmentAPI.documentPath("{treatmentGroupId}")]),
+            // A Дневник row's «Изтрий» goes to `treatmentPath` above; «Кошче»
+            // and its «Възстанови» (#395).
+            ("TreatmentTrashAPI.swift", [TreatmentTrashAPI.deletedPath,
+                                         TreatmentTrashAPI.restorePath("{treatmentGroupId}")]),
             ("ExchangeAPI.swift", [
                 ExchangeAPI.listingsPath,
                 ExchangeAPI.listingsPath(ExchangeQuery(text: "q", minTonnes: 1, maxTonnes: 2, cursor: "c")),
