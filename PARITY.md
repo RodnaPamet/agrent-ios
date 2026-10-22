@@ -751,18 +751,20 @@ before building the routes.
 
 **iOS:**
 - **«Изтрий»** sits behind a left swipe on a Дневник row that stands for a treatment. It isn't a full swipe: removing a record takes the tap. VoiceOver lists it among the row's actions.
-- **It's offered** to someone who may write and is the creator or an administrator. That matches the server's `assertCanDeleteTreatment`. A row that doesn't name its creator offers it to anyone who may write, and the server's refusal is shown.
+- **It's offered** where the row's `mayDelete` says the server would allow it. The server computes that from the same predicate its route asserts with: the creator or an administrator, and a single author across the treatment's tasks. That last part refuses administrators too, so no creator field could express it. A cached row from before the field offers it to anyone who may write, and the server's refusal is shown.
 - **The row leaves the list at once.** A bar above «Нов запис» says «Изтрито: …» with «Отмени» for five seconds, as on the web, and twenty under VoiceOver or Switch Control. Nothing is sent until the window closes, so «Отмени» needs no signal and leaves no audit event. A second swipe sends the first at once, so «Отмени» only ever stands for the treatment the bar names.
 - **Then** `DELETE /journal/treatments/{handle}` goes out. The phone's own copy in the outbox goes with it, because the server releases an unfinished treatment's key and a resend would record it again. A refusal brings the row back with the server's sentence. A 404 counts as done.
-- **«Кошче»**, from Дневник's toolbar, lists withdrawn treatments newest first, each with «Възстанови» (`POST …/restore`, the same gate). Restoring brings the treatment back to the list and the register exactly as recorded.
+- **«Кошче»**, from Дневник's toolbar, lists withdrawn treatments, newest first. The server sends at most 200 and doesn't page them. Each row shows the product, the day, the parcels, the area in decares and the blocks. Those come from the listing itself, since a withdrawn handle no longer resolves. «Възстанови» (`POST …/restore`) is offered where the row's `mayRestore` says yes, under the same gate. Restoring brings the treatment back to the list and the register exactly as recorded.
 
 **The web** has the routes (agri-saas #2184). Its swipe row and Trash view
 are still to come.
 
-**Open with backend 1:** a row naming its creator, so the swipe is offered
-only to the people the server allows; «Кошче» rows naming the product and
-blocks, which the phone reads if present; and the DELETE description still
-saying ADMIN-only and INCOMPLETE-only.
+Asked of backend 1 and added to #2184 (6fac369): `mayDelete` on the row,
+the summary and `mayRestore` on «Кошче», and a DELETE description that no
+longer says ADMIN-only and INCOMPLETE-only. backend 1 also found that the
+listing's `occurredOn` had come from a column the treatment write never
+sets, so it was null on every row. It now comes from the entry's day, which
+is the one the journal list prints.
 
 ### Gap 6 — the list is capped at 50 with no paging — CLOSED 2026-09-22
 

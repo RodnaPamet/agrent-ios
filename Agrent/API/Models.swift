@@ -199,18 +199,19 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// product fallback, unlike the period: nil means not captured, and
     /// nothing else can supply it.
     var phenophase: String?
-    /// Who recorded the treatment, when the row says (asked of agri-saas
-    /// #2184). Only an affordance reads it: «Изтрий» is offered to that
-    /// person and to an administrator, which is the server's rule
-    /// (`assertCanDeleteTreatment`). Without it the swipe is offered to
-    /// anyone who may write, and the server's refusal is read out.
-    var createdByUserId: String?
+    /// Whether THIS person may remove the treatment (agri-saas #2184),
+    /// computed by the server from the predicate its route asserts with.
+    /// Not a creator id: the rule is creator-or-administrator AND a single
+    /// author across the treatment's tasks, which refuses administrators
+    /// too, and no field on one row could say that. Advisory: the route
+    /// checks again. Nil from a server, or a cached page, older than it.
+    var mayDelete: Bool?
 
     init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
          totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil,
          kind: String? = nil, doseValue: Decimal? = nil, doseUnit: String? = nil,
          targetNote: String? = nil, applicationTechnique: String? = nil,
-         quarantinePeriodDays: Int? = nil, phenophase: String? = nil, createdByUserId: String? = nil) {
+         quarantinePeriodDays: Int? = nil, phenophase: String? = nil, mayDelete: Bool? = nil) {
         self.treatmentGroupId = treatmentGroupId
         self.productName = productName
         self.parcelCount = parcelCount
@@ -224,7 +225,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         self.applicationTechnique = applicationTechnique
         self.quarantinePeriodDays = quarantinePeriodDays
         self.phenophase = phenophase
-        self.createdByUserId = createdByUserId
+        self.mayDelete = mayDelete
     }
 
     init(from decoder: any Decoder) throws {
@@ -242,7 +243,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         applicationTechnique = (try? c?.decodeIfPresent(String.self, forKey: .applicationTechnique)) ?? nil
         quarantinePeriodDays = (try? c?.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)) ?? nil
         phenophase = (try? c?.decodeIfPresent(String.self, forKey: .phenophase)) ?? nil
-        createdByUserId = (try? c?.decodeIfPresent(String.self, forKey: .createdByUserId)) ?? nil
+        mayDelete = (try? c?.decodeIfPresent(Bool.self, forKey: .mayDelete)) ?? nil
     }
 
     /// A row that stands for parcels, rather than an entry folded to itself.

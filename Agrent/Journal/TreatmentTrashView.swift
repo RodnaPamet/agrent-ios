@@ -5,9 +5,9 @@ import SwiftUI
 ///
 /// A restore brings back everything a reader saw, on the list and in the
 /// printed ДНЕВНИК, because the server only cleared the soft-delete
-/// (agri-saas #2184). It is offered to anyone who may write. The server
-/// lets the treatment's creator and an administrator do it, and its
-/// refusal is shown under the row.
+/// (agri-saas #2184). «Възстанови» is offered where the row's `mayRestore`
+/// says the server would allow it, to someone who may write. The route
+/// checks again, and a refusal is shown under the row.
 struct TreatmentTrashView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var state: LoadState<[TreatmentTrashAPI.Deleted]> = .loading
@@ -60,9 +60,9 @@ struct TreatmentTrashView: View {
             )
         case .loaded(let rows, _):
             List {
-                Section(titled: Plural.bg(rows.count, "изтрито мероприятие", "изтрити мероприятия")) {
+                Section(titled: Self.header(rows.count)) {
                     ForEach(rows) { row in
-                        TrashRow(row: row, mayRestore: people.user?.mayWrite ?? true,
+                        TrashRow(row: row, mayRestore: Self.mayRestore(row, me: people.user),
                                  restoring: restoring == row.id, refusal: refusals[row.id]) {
                             Task { await put(back: row) }
                         }
@@ -74,6 +74,22 @@ struct TreatmentTrashView: View {
             .pageBackground()
             .refreshable { await PullToRefresh.bounded { await read() } }
         }
+    }
+
+    /// At the server's bound the list is the newest of more, and says so
+    /// rather than a count the farm's history doesn't have.
+    nonisolated static func header(_ count: Int) -> String {
+        count >= TreatmentTrashAPI.limit
+            ? "Последните \(count) изтрити мероприятия"
+            : Plural.bg(count, "изтрито мероприятие", "изтрити мероприятия")
+    }
+
+    /// The row's own answer for someone who may write; any writer on a row
+    /// from before the field. Fails open while nobody has said, as every
+    /// write control does (`CurrentUser.mayWrite`).
+    nonisolated static func mayRestore(_ row: TreatmentTrashAPI.Deleted, me: CurrentUser?) -> Bool {
+        guard me?.mayWrite ?? true else { return false }
+        return row.mayRestore ?? true
     }
 
     private func read() async {
@@ -123,6 +139,7 @@ struct TrashRow: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
             Text(Self.lines(row).joined(separator: "\n"))
+                .accessibilityLabel(Self.lines(row, spoken: true).joined(separator: ", "))
                 .font(.footnote)
                 .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -161,11 +178,14 @@ struct TrashRow: View {
     }
 
     /// When the work was done and where, then when it was removed.
-    nonisolated static func lines(_ row: TreatmentTrashAPI.Deleted) -> [String] {
+    /// `spoken` says the area in words: «дка» is spelled out letter by
+    /// letter by VoiceOver (see `Area`).
+    nonisolated static func lines(_ row: TreatmentTrashAPI.Deleted, spoken: Bool = false) -> [String] {
         var lines: [String] = []
         var done: [String] = []
         if let day = row.occurredOn.flatMap(BgDate.parseISODay) { done.append(BgDate.full(day)) }
         if let parcels = row.parcelCount, parcels > 0 { done.append(Plural.bg(parcels, "парцел", "парцела")) }
+        if let area = row.area { done.append(spoken ? area.spoken : area.text) }
         if !done.isEmpty { lines.append(done.joined(separator: ", ")) }
         if !row.blockNames.isEmpty { lines.append(row.blockNames.joined(separator: ", ")) }
         if let at = row.deletedAt { lines.append("Изтрито на \(BgDate.full(at))") }

@@ -8,15 +8,21 @@
       "occurredOn": "2026-10-20",
       "kind": "SPRAY",
       "productName": "Препарат Тест 250 ЕК",
-      "blockNames": ["Блок Север", "Блок Юг"],
-      "parcelCount": 4
+      "blockNames": [
+        "Блок Север",
+        "Блок Юг"
+      ],
+      "parcelCount": 4,
+      "totalAreaHa": 3.25,
+      "mayRestore": true
     },
     {
       "treatmentGroupId": "tg_fixture_deleted_2",
       "deletedAt": "2026-10-19T14:05:00.000Z",
       "deletedByUserId": null,
       "taskCount": 1,
-      "occurredOn": "2026-10-02"
+      "occurredOn": "2026-10-02",
+      "mayRestore": false
     }
   ]
 }

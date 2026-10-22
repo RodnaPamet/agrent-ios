@@ -12,12 +12,12 @@ final class TreatmentRemovalTests: XCTestCase {
                     permissions: CurrentUser.Permissions(canWrite: canWrite, canAdmin: canAdmin))
     }
 
-    private func entry(_ handle: String? = "tg_1", parcels: Int = 3, creator: String? = nil,
+    private func entry(_ handle: String? = "tg_1", parcels: Int = 3, mayDelete: Bool? = true,
                        product: String = "Препарат А") -> LogEntry {
         LogEntry(id: "e_\(handle ?? "none")", type: .inputApplication, status: .done,
                  title: "\(product) — Парцел 1", occurredAt: nil,
                  treatment: JournalTreatment(treatmentGroupId: handle, productName: product,
-                                             parcelCount: parcels, createdByUserId: creator))
+                                             parcelCount: parcels, mayDelete: mayDelete))
     }
 
     /// What the store asked of the server and the outbox, in order.
@@ -40,22 +40,29 @@ final class TreatmentRemovalTests: XCTestCase {
 
     // MARK: - Who is offered «Изтрий»
 
-    func testOfferedToTheCreatorAndAnAdministrator() {
-        let row = entry(creator: "u_creator")
-        XCTAssertTrue(TreatmentRemoval.offered(row, to: me(id: "u_creator")))
-        XCTAssertTrue(TreatmentRemoval.offered(row, to: me(id: "u_other", canAdmin: true)))
-        XCTAssertFalse(TreatmentRemoval.offered(row, to: me(id: "u_other")),
-                       "a writer who did not record it is refused by the server")
+    /// The server's own answer for this person (agri-saas #2184): it alone
+    /// knows a treatment's tasks have one author, which refuses
+    /// administrators too.
+    func testOfferedWhereTheServerSaysYes() {
+        XCTAssertTrue(TreatmentRemoval.offered(entry(mayDelete: true), to: me(id: "u")))
+        XCTAssertFalse(TreatmentRemoval.offered(entry(mayDelete: false), to: me(id: "u", canAdmin: true)),
+                       "an administrator is refused a treatment recorded by several people")
     }
 
     func testNeverOfferedToARoleThatCannotWrite() {
-        XCTAssertFalse(TreatmentRemoval.offered(entry(creator: "u_reader"), to: me(id: "u_reader", canWrite: false)))
+        XCTAssertFalse(TreatmentRemoval.offered(entry(mayDelete: true), to: me(id: "u_reader", canWrite: false)))
         XCTAssertFalse(TreatmentRemoval.offered(entry(), to: nil), "nobody known, nothing offered")
     }
 
-    /// #2184 as first written sends no creator. The server decides then.
-    func testWithoutACreatorOfferedToAnyWriter() {
-        XCTAssertTrue(TreatmentRemoval.offered(entry(creator: nil), to: me(id: "u_any")))
+    /// A cached page from before the field. The server decides then.
+    func testWithoutTheFieldOfferedToAnyWriter() {
+        XCTAssertTrue(TreatmentRemoval.offered(entry(mayDelete: nil), to: me(id: "u_any")))
+    }
+
+    func testTheFieldIsRead() throws {
+        let row = try JSONDecoder().decode(JournalTreatment.self, from: Data(
+            #"{"treatmentGroupId": "tg", "parcelCount": 2, "blockNames": [], "mayDelete": false}"#.utf8))
+        XCTAssertEqual(row.mayDelete, false)
     }
 
     func testAnEntryThatIsNoTreatmentHasNoSwipe() {
@@ -189,10 +196,22 @@ final class TreatmentRemovalTests: XCTestCase {
         XCTAssertNotNil(full.deletedAt)
         XCTAssertEqual(full.blockNames, ["Блок Север", "Блок Юг"])
         XCTAssertEqual(TrashRow.lines(full).count, 3, "done, where, removed")
+        XCTAssertTrue(TrashRow.lines(full)[0].contains("дка"), "hectares on the wire, decares on screen")
+        XCTAssertFalse(TrashRow.lines(full, spoken: true)[0].contains("дка"), "said in words")
+        XCTAssertEqual(full.mayRestore, true)
+        XCTAssertTrue(TreatmentTrashView.mayRestore(full, me: me(id: "u")))
 
         let bare = rows[1]
         XCTAssertEqual(TrashRow.title(bare), "Мероприятие", "only the handle and the dates")
         XCTAssertEqual(TrashRow.lines(bare).count, 2, "done, removed")
+        XCTAssertFalse(TreatmentTrashView.mayRestore(bare, me: me(id: "u")),
+                       "the server said no: «Възстанови» is not offered")
+        XCTAssertFalse(TreatmentTrashView.mayRestore(full, me: me(id: "u", canWrite: false)))
+    }
+
+    func testAFullTrashSaysItIsTheNewest() {
+        XCTAssertEqual(TreatmentTrashView.header(2), "2 изтрити мероприятия")
+        XCTAssertEqual(TreatmentTrashView.header(TreatmentTrashAPI.limit), "Последните 200 изтрити мероприятия")
     }
 
     func testOneOddRowCostsOnlyItself() throws {

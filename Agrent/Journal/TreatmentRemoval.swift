@@ -19,7 +19,9 @@ import Observation
 /// ── What a refusal does ──
 ///
 /// The row comes back, and the server's sentence says why (not its
-/// creator, recorded by several people, no signal). A 404 on the route's own
+/// creator, recorded by several people, no signal). `mayDelete` makes the
+/// first two rare, since the swipe is offered only where the server said
+/// yes, but the route checks again and so does this. A 404 on the route's own
 /// code is counted as done: nothing is left under the handle, which is how
 /// the server answers a treatment already removed from the web.
 ///
@@ -155,18 +157,16 @@ final class TreatmentRemoval {
         changed()
     }
 
-    /// Offered to whoever the server would let remove it: someone who may
-    /// write and is either its creator or an administrator
-    /// (`assertCanDeleteTreatment`, agri-saas #2184). Without a creator on
-    /// the row, to anyone who may write, and the server decides. Only a row
-    /// that stands for a treatment: an entry folded to itself has no handle.
+    /// Offered where the server says pressing it would succeed: the row's
+    /// `mayDelete` (agri-saas #2184), for someone who may write. A row from
+    /// before the field (a cached page) offers it to any writer, and the
+    /// server's refusal is read out. Only a row that stands for a
+    /// treatment: an entry folded to itself has no handle.
     nonisolated static func offered(_ entry: LogEntry, to me: CurrentUser?) -> Bool {
         guard let treatment = entry.treatment, treatment.isTreatment,
               treatment.treatmentGroupId != nil,
               let me, me.mayWrite else { return false }
-        if me.mayAdmin { return true }
-        guard let creator = treatment.createdByUserId else { return true }
-        return creator == me.id
+        return treatment.mayDelete ?? true
     }
 
     static let actionTitle = "Изтрий"
