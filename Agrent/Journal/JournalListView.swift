@@ -194,11 +194,22 @@ struct JournalListView: View {
         // text sizes a product name runs to several lines, and «Отмени»
         // stays where the thumb found it.
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(TreatmentRemoval.removedText(undoable.title))
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
+            // What went, then how much of the register that was, each on
+            // its own line; VoiceOver reads them as one sentence.
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Изтрито: \(undoable.title)")
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                if let extent = undoable.extent {
+                    Text(extent)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(TreatmentRemoval.removedText(undoable))
             Button(TreatmentRemoval.undoTitle) { removal.undo() }
                 .fontWeight(.semibold)
                 .accessibilityInputLabels(A11y.Spoken.undo)
@@ -278,9 +289,11 @@ struct JournalListView: View {
                             Button(role: .destructive) {
                                 removal.remove(entry, window: voiceOver || switchControl
                                                ? TreatmentRemoval.assistedWindow : nil)
-                                var said = AttributedString(TreatmentRemoval.announcement(entry.displayTitle))
-                                said.accessibilitySpeechAnnouncementPriority = .high
-                                AccessibilityNotification.Announcement(said).post()
+                                if let going = removal.undoable {
+                                    var said = AttributedString(TreatmentRemoval.announcement(going))
+                                    said.accessibilitySpeechAnnouncementPriority = .high
+                                    AccessibilityNotification.Announcement(said).post()
+                                }
                             } label: {
                                 Label(TreatmentRemoval.actionTitle, systemImage: "trash")
                             }
