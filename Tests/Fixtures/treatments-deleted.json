@@ -1,0 +1,22 @@
+{
+  "treatments": [
+    {
+      "treatmentGroupId": "tg_fixture_deleted_1",
+      "deletedAt": "2026-10-21T08:30:00.000Z",
+      "deletedByUserId": "usr_fixture_admin",
+      "taskCount": 2,
+      "occurredOn": "2026-10-20",
+      "kind": "SPRAY",
+      "productName": "Препарат Тест 250 ЕК",
+      "blockNames": ["Блок Север", "Блок Юг"],
+      "parcelCount": 4
+    },
+    {
+      "treatmentGroupId": "tg_fixture_deleted_2",
+      "deletedAt": "2026-10-19T14:05:00.000Z",
+      "deletedByUserId": null,
+      "taskCount": 1,
+      "occurredOn": "2026-10-02"
+    }
+  ]
+}

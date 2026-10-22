@@ -199,12 +199,18 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// product fallback, unlike the period: nil means not captured, and
     /// nothing else can supply it.
     var phenophase: String?
+    /// Who recorded the treatment, when the row says (asked of agri-saas
+    /// #2184). Only an affordance reads it: «Изтрий» is offered to that
+    /// person and to an administrator, which is the server's rule
+    /// (`assertCanDeleteTreatment`). Without it the swipe is offered to
+    /// anyone who may write, and the server's refusal is read out.
+    var createdByUserId: String?
 
     init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
          totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil,
          kind: String? = nil, doseValue: Decimal? = nil, doseUnit: String? = nil,
          targetNote: String? = nil, applicationTechnique: String? = nil,
-         quarantinePeriodDays: Int? = nil, phenophase: String? = nil) {
+         quarantinePeriodDays: Int? = nil, phenophase: String? = nil, createdByUserId: String? = nil) {
         self.treatmentGroupId = treatmentGroupId
         self.productName = productName
         self.parcelCount = parcelCount
@@ -218,6 +224,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         self.applicationTechnique = applicationTechnique
         self.quarantinePeriodDays = quarantinePeriodDays
         self.phenophase = phenophase
+        self.createdByUserId = createdByUserId
     }
 
     init(from decoder: any Decoder) throws {
@@ -235,6 +242,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         applicationTechnique = (try? c?.decodeIfPresent(String.self, forKey: .applicationTechnique)) ?? nil
         quarantinePeriodDays = (try? c?.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)) ?? nil
         phenophase = (try? c?.decodeIfPresent(String.self, forKey: .phenophase)) ?? nil
+        createdByUserId = (try? c?.decodeIfPresent(String.self, forKey: .createdByUserId)) ?? nil
     }
 
     /// A row that stands for parcels, rather than an entry folded to itself.

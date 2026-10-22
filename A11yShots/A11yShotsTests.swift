@@ -1853,6 +1853,38 @@ final class A11yShotsTests: XCTestCase {
         capture("01g-treatment-map-target", app: app)
     }
 
+    /// #395: a treatment's «Изтрий», the bar's «Отмени», and «Кошче». The
+    /// undo comes inside the window, so no delete is ever built; one that
+    /// were would meet the seam's refusal of every write, never a server.
+    func testSwipeDeleteUndoAndTrash() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Тестов хербицид'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "no fixture treatment on Дневник")
+        row.swipeLeft()
+        let delete = app.buttons["Изтрий"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the swipe offered no «Изтрий»\n\(app.debugDescription)")
+        capture("01h-journal-swipe", app: app)
+        delete.tap()
+        let undo = app.buttons["Отмени"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»\n\(app.debugDescription)")
+        XCTAssertFalse(row.exists, "the row stayed in the list")
+        capture("01i-journal-undo", app: app)
+        undo.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the row back")
+
+        app.buttons["Кошче"].tap()
+        XCTAssertTrue(app.navigationBars["Кошче"].waitForExistence(timeout: 10),
+                      "«Кошче» opened nothing\n\(app.debugDescription)")
+        XCTAssertTrue(app.staticTexts["Препарат Тест 250 ЕК"].waitForExistence(timeout: 10),
+                      "the withdrawn treatment isn't listed\n\(app.debugDescription)")
+        XCTAssertTrue(app.buttons["Възстанови"].firstMatch.exists, "no «Възстанови» on a row")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01j-trash", app: app)
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")

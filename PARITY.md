@@ -740,6 +740,30 @@ from the product. Seed treatment: not now.
 Offered and **not** chosen: PRZ's per-field layout by farming year, a crop
 record per block, and other activities with yield and cloning.
 
+### Matched — a swipe removes the whole treatment, with «Отмени» and «Кошче» (#395, owner 2026-10-22; agri-saas #2184)
+
+The owner asked for the website's swipe-to-delete, on the phone too, and
+ruled what it removes: the **whole treatment**, every parcel and block,
+never one parcel's row. The ДНЕВНИК it prints leaves it out as well, as if it
+had never been recorded. The treatment's creator and the farm's
+administrators may do it. backend 1 confirmed this with the owner directly
+before building the routes.
+
+**iOS:**
+- **«Изтрий»** sits behind a left swipe on a Дневник row that stands for a treatment. It isn't a full swipe: removing a record takes the tap. VoiceOver lists it among the row's actions.
+- **It's offered** to someone who may write and is the creator or an administrator. That matches the server's `assertCanDeleteTreatment`. A row that doesn't name its creator offers it to anyone who may write, and the server's refusal is shown.
+- **The row leaves the list at once.** A bar above «Нов запис» says «Изтрито: …» with «Отмени» for five seconds, as on the web, and twenty under VoiceOver or Switch Control. Nothing is sent until the window closes, so «Отмени» needs no signal and leaves no audit event. A second swipe sends the first at once, so «Отмени» only ever stands for the treatment the bar names.
+- **Then** `DELETE /journal/treatments/{handle}` goes out. The phone's own copy in the outbox goes with it, because the server releases an unfinished treatment's key and a resend would record it again. A refusal brings the row back with the server's sentence. A 404 counts as done.
+- **«Кошче»**, from Дневник's toolbar, lists withdrawn treatments newest first, each with «Възстанови» (`POST …/restore`, the same gate). Restoring brings the treatment back to the list and the register exactly as recorded.
+
+**The web** has the routes (agri-saas #2184). Its swipe row and Trash view
+are still to come.
+
+**Open with backend 1:** a row naming its creator, so the swipe is offered
+only to the people the server allows; «Кошче» rows naming the product and
+blocks, which the phone reads if present; and the DELETE description still
+saying ADMIN-only and INCOMPLETE-only.
+
 ### Gap 6 — the list is capped at 50 with no paging — CLOSED 2026-09-22
 
 Cursor paging with an explicit "Покажи още", and the header count now

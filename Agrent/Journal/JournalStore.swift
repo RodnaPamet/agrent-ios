@@ -17,6 +17,10 @@ final class JournalStore {
     /// can read.
     private(set) var loadMoreError: String?
 
+    /// Counts the server's answers, not the cache's: a swiped treatment
+    /// stays hidden until one arrives (`TreatmentRemoval.listRead`).
+    private(set) var freshReads = 0
+
     var entries: [LogEntry] { state.value ?? [] }
     var hasMore: Bool { nextCursor != nil }
 
@@ -92,6 +96,7 @@ final class JournalStore {
         case .loaded(let slice, let freshness):
             nextCursor = slice.nextCursor
             state = .loaded(slice.entries, freshness)
+            if freshness == .fresh { freshReads &+= 1 }
         case .failed(let message):
             nextCursor = nil
             state = .failed(message)
