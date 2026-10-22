@@ -1753,6 +1753,71 @@ final class A11yShotsTests: XCTestCase {
         if cancel.exists { cancel.tap() }
     }
 
+    // MARK: - Риск: «История» opens the history (agrent-ios#386)
+
+    /// The owner tapped «История» on a risk row and nothing happened
+    /// (2026-10-21). The button pushed through a `pushRoute` read from
+    /// outside the stack. This opens Риск from the menu, as the owner does,
+    /// taps the first row's «История», and asserts that the history screen
+    /// came up.
+    func testRiskHistoryOpens() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root")
+        XCTAssertTrue(tapMenuRow("Риск", in: app), "«Риск» is not in the menu")
+        let history = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'История на парцел'")).firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 20), "no «История» on a risk row\n\(app.debugDescription)")
+        history.tap()
+        let opened = app.navigationBars["История"].waitForExistence(timeout: 10)
+        capture("05b-risk-history", app: app)
+        XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
+        // The floating action, renamed and moved (#386): bottom right.
+        app.navigationBars.buttons.firstMatch.tap()
+        let insure = app.buttons["Застраховай"]
+        XCTAssertTrue(insure.waitForExistence(timeout: 5), "no «Застраховай»")
+        XCTAssertGreaterThan(insure.frame.midX, app.windows.firstMatch.frame.midX,
+                             "«Застраховай» is not on the right")
+        capture("05c-risk-insure", app: app)
+    }
+
+    // MARK: - «Нова задача» → «Парцели» (agrent-ios#388)
+
+    /// Задачи → + → a title → «Напред» → «Парцели»: the fixture farm's one
+    /// block is chosen for the person, its parcels are listed, and choosing
+    /// all of them is counted at the bottom. Stops before «Създай»: nothing
+    /// is written, and the seam refuses writes anyway.
+    func testNewTaskParcelsStep() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        app.tabBars.buttons["Задачи"].tap()
+        let plus = app.buttons["Нова задача"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 15), "no + on Задачи")
+        plus.tap()
+        // The sheet has to be IN the accessibility tree, which it wasn't
+        // while the + sat in an `.overlay` (#388): this is the assertion
+        // that caught it.
+        XCTAssertTrue(app.navigationBars["Нова задача"].waitForExistence(timeout: 10),
+                      "«Нова задача» is not in the accessibility tree")
+        // The first field on the form; the description is the second.
+        let title = app.textFields.firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "no «Заглавие»\n\(app.debugDescription)")
+        title.tap()
+        title.typeText("Синтетична задача")
+        app.buttons["Напред"].tap()
+        XCTAssertTrue(app.navigationBars["Парцели"].waitForExistence(timeout: 10), "«Напред» opened no «Парцели»")
+        let all = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Избери всички'")).firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 15), "the one block's parcels weren't listed\n\(app.debugDescription)")
+        all.tap()
+        let counted = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'към задачата.'")).firstMatch
+        XCTAssertTrue(counted.waitForExistence(timeout: 5), "the chosen parcels aren't counted")
+        XCTAssertTrue(app.buttons["Създай"].exists, "no «Създай» on «Парцели»")
+        capture("08e-new-task-parcels", app: app)
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")

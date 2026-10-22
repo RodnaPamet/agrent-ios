@@ -20,12 +20,19 @@ struct TasksListView: View {
             // `JournalListView` for why this is no longer a
             // `safeAreaInset(edge: .top)`.
             // Борса's shape — see `JournalListView` for what it costs.
-            content
-                .background(Palette.Surface.page)
-                // «Нова задача», at the bottom right (owner, 2026-10-20, #372).
-                .overlay(alignment: .bottomTrailing) {
-                    NewTaskButton { await store.load() }
-                }
+            // «Нова задача», at the bottom right (owner, 2026-10-20, #372).
+            //
+            // A ZStack layer, NOT an `.overlay` (#388). The button presents
+            // «Нова задача» as a sheet, and a sheet presented from inside an
+            // overlay showed on screen but never reached the accessibility
+            // tree: VoiceOver, Voice Control and XCUITest saw the list under
+            // it, so the form couldn't be used with them. Found by A11yShots
+            // `testNewTaskParcelsStep`.
+            ZStack(alignment: .bottomTrailing) {
+                content
+                    .background(Palette.Surface.page)
+                NewTaskButton { await store.load() }
+            }
             .navigationTitle("Задачи")
             .appMenu()
             .task { if store.state.value == nil { await store.load() } }
