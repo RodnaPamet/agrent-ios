@@ -76,6 +76,6 @@ final class TreatmentCheckTests: XCTestCase {
     /// the owner chose recorded treatments to stay final (2026-10-22).
     func testTheFinalNoteMatchesTheWebsite() {
         XCTAssertEqual(TreatmentCheckView.finalNote,
-                       "След записване вписването в ДНЕВНИКА не може да се редактира.")
+                       "Проверете данните. След записване вписването в ДНЕВНИКА не може да се редактира.")
     }
 }
