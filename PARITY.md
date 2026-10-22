@@ -678,7 +678,7 @@ waits for the updated app, as a queued spray does. The owner chose this on
 airplane mode → «Нов запис» → save → close the app → signal back → open
 it: one entry in the journal, with its PDF.
 
-### Divergence — «Продължи» reads the treatment back before «Добави» (#362, owner 2026-10-20)
+### Matched — «Продължи» reads the treatment back before «Добави» (#362, owner 2026-10-20; the web since agri-saas #2174)
 
 The owner compared the journal with PRZ (app.prz.center, manual v2.1.0)
 and chose to bring the **form** closer to PRZ's. In PRZ, «Продължи» opens a
@@ -699,7 +699,7 @@ period, then «Добави», or «Редактирай данните» to go 
 - **Above «Добави»:** «Проверете данните. След записване вписването в ДНЕВНИКА не може да се редактира.», word for word as the website's step 3 (#2174), confirmed by backend 1 with the owner (owner, 2026-10-22). Recorded treatments stay final, so #392 isn't planned. There's no confirmation tick, the owner's choice for both surfaces.
 - **Not shown: remaining stock.** A ДНЕВНИК treatment deducts none (agri-saas #1740), and the owner didn't choose it.
 
-**The web** gets its review step in agri-saas #2174 (backend 1, open on 2026-10-22). It has the same sentence, and the owner chose no tick on either surface. Once that merges, this entry is matched.
+**The web** has had the same step since agri-saas #2174, live at f8a1e65 on 2026-10-22. It shows the same sentence, and neither surface has a tick, as the owner chose. Two differences remain, both deliberate: the web titles the step «Нов запис — проверка» to match its sibling steps (the phone's navigation bar gives that context), and only the phone shows the amount of product needed.
 
 **Фенофаза/BBCH** (#363, agri-saas #2083, live 2026-10-20) is optional on
 every spraying, after the dose, as in PRZ. It's free text up to 64
