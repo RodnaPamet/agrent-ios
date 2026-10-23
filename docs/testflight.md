@@ -86,6 +86,15 @@ answer the questions in App Store Connect.
 - *"Cloud signing permission error"* at export — the key cannot use Apple's
   cloud-managed distribution certificate. Recreate it with **Admin** access
   and replace the three secrets.
+- *"Your account has reached the maximum number of certificates"* at Archive
+  (#407, build 11): CI development certificates piled up. Each run's archive
+  step makes one, because the runner starts with no signing identity, and its
+  private key dies with the runner. Since #407 the step *Revoke this run's
+  development certificate* removes it at the end of every run, matched by the
+  serial number in that runner's keychain, so the owner's own certificate is
+  never touched. If its summary says one was left behind, revoke it by hand:
+  Certificates, Identifiers & Profiles → Certificates → the «Apple
+  Development» ones created by the API key.
 - *"The bundle version must be higher than the previously uploaded version"* —
   only if builds were uploaded by other means with larger numbers; raise
   `MARKETING_VERSION`.
