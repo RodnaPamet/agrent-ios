@@ -1788,6 +1788,27 @@ final class A11yShotsTests: XCTestCase {
         capture("05c-risk-insure", app: app)
     }
 
+    // MARK: - Тенденции: one price, one line, one row (agrent-ios#409)
+
+    /// The owner's screenshot had a chart with no number above it and a
+    /// quotation list under it. Now: the price large, its change, the line,
+    /// and one row saying whose price it is.
+    func testTrendsShowsOnePrice() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root")
+        XCTAssertTrue(tapMenuRow("Тенденции", in: app), "«Тенденции» is not in the menu")
+        let price = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH '208,62' AND label CONTAINS 'евро на тон'")).firstMatch
+        XCTAssertTrue(price.waitForExistence(timeout: 20), "no headline price\n\(app.debugDescription)")
+        let source = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'България'")).count
+        XCTAssertEqual(source, 1, "one info row under the chart, not a legend\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("07a-trends-one-price", app: app)
+    }
+
     // MARK: - «Нова задача» → «Парцели» (agrent-ios#388)
 
     /// Задачи → + → a title → «Напред» → «Парцели»: the fixture farm's one

@@ -137,49 +137,126 @@ struct PriceSeries: Decodable, Identifiable, Equatable, Sendable {
 }
 
 extension Array where Element == PriceSeries {
-    /// The order the Тенденции chart draws in, EXTRACTED so a second screen
-    /// cannot invent a different answer to "the price of wheat".
+    /// THE ONE SERIES a screen quotes (#409, owner 2026-10-23): the big price
+    /// above Тенденции's chart, its one line, and Табло's price block. One
+    /// rule, so the two screens cannot answer "the price of wheat" differently.
     ///
-    /// This logic was inside `TrendsStore.applyDefaultVisibility`, which was
-    /// the right place while one screen used it. The dashboard's price block
-    /// needs the same top-ranked series, and a second copy of a rule this
-    /// carefully reasoned is how two screens come to disagree about a number a
-    /// farmer sells against.
+    /// The web's rule (agri-saas `trends-helpers.ts`: `selectPrimaryGroup`,
+    /// `chartSeriesFor`, `leadSeriesOf`), in this order:
     ///
-    /// ── The rule, and why each clause is there ──
+    /// 1. **Agrent's typed price**, whatever its unit or region: typed ALWAYS
+    ///    wins until it is cleared (owner, 2026-10-10, #1587). Typed diesel is
+    ///    per litre and the bulletin per 1000 litres, so ranking inside a group
+    ///    would never see it.
+    /// 2. **One group**, by (region, currency, unit), preferring Bulgaria, then
+    ///    the EU average, then whichever group reported last. Grouped before
+    ///    anything is compared, because wheat arrives in USD from Alpha Vantage
+    ///    and EUR from the EC feed, and a "best" series across those would hand
+    ///    back a number in another currency. A group of only our own listings is
+    ///    a last resort: the median of our users' ASKING prices is not the
+    ///    market.
+    /// 3. **The national average** inside it, where EC publishes one (wheat,
+    ///    maize, barley). EC quotes nine Bulgarian delivery points that disagree
+    ///    by tens of euros, and a farm is not tied to one depot. The owner chose
+    ///    it over the freshest quotation, which changes from week to week.
+    /// 4. **Otherwise the freshest**, then the longest record, then the id, so
+    ///    the choice is the same on every open for the same payload.
     ///
-    /// Region first: the EC feed quotes other member states, and "the" price
-    /// means the one this farm is in. `GLOBAL` is kept because some series are
-    /// only quoted that way. Falling back to everything rather than to nothing,
-    /// because an empty chart under a full legend is worse than a foreign
-    /// price honestly labelled.
-    ///
-    /// Then freshest, then longest: a series observed last week says more about
-    /// today than one that stopped in spring, and between two equally current
-    /// ones the longer record is the better line.
-    ///
-    /// Ahead of all of that, the platform's typed price (`isPlatformPrice`):
-    /// typed ALWAYS wins until it is cleared (owner, 2026-10-10), however
-    /// short or old its record next to a feed's.
-    ///
-    /// ── What this does NOT do ──
-    ///
-    /// It does not pick across units or currencies. Wheat arrives as USD per
-    /// metric ton from Alpha Vantage and EUR/t from the EC feed, and ranking
-    /// those together would hand a caller a "best" series whose number cannot
-    /// be compared with the one it replaced. Callers rank WITHIN a
-    /// `SeriesGroup`, which is grouped by (unit, currency) for exactly that
-    /// reason — see its header.
-    func rankedForDefaultDisplay() -> [PriceSeries] {
-        // The platform's price whatever region it names: it is never hidden.
-        let preferred = filter { $0.isPlatformPrice || ["BG", "GLOBAL"].contains($0.region.uppercased()) }
-        let candidates = preferred.isEmpty ? self : preferred
-        return candidates.sorted { left, right in
-            if left.isPlatformPrice != right.isPlatformPrice { return left.isPlatformPrice }
-            let l = left.lastObservedAt ?? ""
-            let r = right.lastObservedAt ?? ""
-            if l != r { return l > r }
-            return left.points.count > right.points.count
+    /// Series with no points cannot lead: a screen quotes a latest price.
+    func lead() -> PriceSeries? {
+        let withPoints = filter { !$0.points.isEmpty }
+        if let typed = withPoints.first(where: \.isPlatformPrice) { return typed }
+
+        var order: [String] = []
+        var groups: [String: [PriceSeries]] = [:]
+        for series in withPoints {
+            let key = "\(series.region.uppercased())|\(series.currency)|\(series.unit)"
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(series)
+        }
+        let all = order.compactMap { groups[$0] }
+        let quotes = all.filter { !$0.allSatisfy { $0.source == SeriesSource.listingsSource } }
+        let candidates = quotes.isEmpty ? all : quotes
+        guard !candidates.isEmpty else { return nil }
+
+        // Within a region — and as the last arm, across all of them — the
+        // group whose best series is freshest. Never the server's order: two
+        // Bulgarian groups (EUR and a national-currency listing) must resolve
+        // the same way on every open.
+        let regional = ["BG", "EU"].lazy
+            .map { region in candidates.filter { $0.first?.region.uppercased() == region } }
+            .first { !$0.isEmpty }
+        guard let group = (regional ?? candidates).min(by: { Self.fresher($0.freshest(), than: $1.freshest()) })
+        else { return nil }
+        return group.first(where: SeriesSource.isNationalAverage) ?? group.freshest()
+    }
+
+    /// Most recently observed, then the longer record, then the id: a series
+    /// observed last week says more about today than one that stopped in
+    /// spring, and a tie must not resolve on the order the server sent.
+    fileprivate static func fresher(_ left: PriceSeries?, than right: PriceSeries?) -> Bool {
+        guard let left else { return false }
+        guard let right else { return true }
+        let l = left.lastObservedAt ?? "", r = right.lastObservedAt ?? ""
+        if l != r { return l > r }
+        if left.points.count != right.points.count { return left.points.count > right.points.count }
+        return left.id < right.id
+    }
+
+    fileprivate func freshest() -> PriceSeries? {
+        self.min { Self.fresher($0, than: $1) }
+    }
+}
+
+/// How the lead price moved across the range on screen (#409): the owner
+/// chose the change over the chosen period, so «1 мес.» shows the month's and
+/// the number agrees with the line the farmer is looking at. The web's tile
+/// shows week-over-week; this is a deliberate divergence (PARITY.md).
+///
+/// From the first point in the range to the latest, in per cent of the
+/// first. Points are not evenly spaced (weekly EC, monthly Alpha Vantage), so
+/// it is endpoints, never a rate.
+struct PeriodChange: Equatable, Sendable {
+    let percent: Double
+
+    init?(_ series: PriceSeries) {
+        let dated = series.points.compactMap { point in point.day.map { ($0, point.price) } }
+            .sorted { $0.0 < $1.0 }
+        guard dated.count >= 2, let first = dated.first?.1, let last = dated.last?.1, first != 0 else { return nil }
+        percent = (last - first) / first * 100
+    }
+
+    /// Under a twentieth of a per cent reads «0,0 %» either way, so it is
+    /// said as no change rather than as a rise of nothing.
+    var isFlat: Bool { abs(percent) < 0.05 }
+
+    /// «▲ 4,2 % за 1 година», «▼ 1,3 % за 3 месеца», «Без промяна за 1 месец».
+    /// An arrow and a word, never a colour alone: a rise is good news for a
+    /// crop and bad news for diesel, so the screen does not say which.
+    func text(over range: PriceRange) -> String {
+        if isFlat { return "Без промяна \(range.span)" }
+        return "\(percent > 0 ? "▲" : "▼") \(Self.number(abs(percent))) % \(range.span)"
+    }
+
+    /// The same for VoiceOver, which reads «▲» as "black up-pointing triangle".
+    func spoken(over range: PriceRange) -> String {
+        if isFlat { return "Без промяна \(range.span)" }
+        return "\(percent > 0 ? "Нагоре" : "Надолу") с \(Self.number(abs(percent))) процента \(range.span)"
+    }
+
+    private static func number(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(1)).locale(BgDate.locale))
+    }
+}
+
+extension PriceRange {
+    /// «за 1 месец» — what the change is measured over, in words.
+    var span: String {
+        switch self {
+        case .month1: "за 1 месец"
+        case .month3: "за 3 месеца"
+        case .year1: "за 1 година"
+        case .all: "за целия период"
         }
     }
 }
@@ -209,54 +286,12 @@ struct PricesResponse: Decodable, Equatable, Sendable {
 /// `lastObservedAt` is a bare day, so they are only comparable in one fixed
 /// zone, and the device's zone is exactly the input being excluded.
 extension PricesResponse {
-    /// ONE series for a dashboard block, and how many it stands for.
-    ///
-    /// ── There is no such thing as "the price" ──
-    ///
-    /// Wheat arrives from two feeds in two currencies, and diesel returns four
-    /// series from one source of which two differ by 639 EUR per 1000 litres —
-    /// a little over fifty per cent. `PriceSeries.id` records that picking
-    /// either as "the" Bulgarian diesel price misprices fuel by half on the
-    /// screen a farmer plans a season with. So a block that shows one number
-    /// must say WHICH number, and must know how many it is standing in for.
-    ///
-    /// ── Grouped before ranked ──
-    ///
-    /// By (unit, currency) first, the same rule `SeriesGroup` enforces: ranking
-    /// across currencies would hand back a "best" series whose number cannot be
-    /// compared with the one it replaced. The LARGEST group wins, because that
-    /// is the mainstream quotation for the commodity — otherwise a single
-    /// outlier in another currency takes the block by being fresher, which is
-    /// how a USD monthly print would displace the weekly EUR series a Bulgarian
-    /// farm actually sells against.
-    ///
-    /// Then `rankedForDefaultDisplay`, so this and the Тенденции chart cannot
-    /// disagree about which series leads.
-    ///
-    /// Series with NO POINTS are dropped first: a block shows a latest price,
-    /// and a series with no observations has none. They still count toward
-    /// nothing — `outOf` counts what could have been shown.
-    var dashboardSeries: (series: PriceSeries, outOf: Int)? {
-        let withPoints = series.filter { !$0.points.isEmpty }
-        guard !withPoints.isEmpty else { return nil }
+    /// The one series Тенденции and Табло quote — see `lead()`.
+    var lead: PriceSeries? { series.lead() }
 
-        // The platform's typed price first, in whatever group it is: typed
-        // diesel is per litre, the bulletin per 1000 litres, so ranking inside
-        // the largest group would never see it (#1587).
-        if let typed = withPoints.first(where: \.isPlatformPrice) {
-            return (typed, withPoints.count)
-        }
-
-        let groups = Dictionary(grouping: withPoints) { "\($0.unit)|\($0.currency)" }
-        // Ties broken by id so the choice is stable across launches rather than
-        // depending on dictionary order — a price that changes which series it
-        // shows on every open is worse than either series alone.
-        guard let group = groups
-            .sorted(by: { ($0.value.count, $1.key) > ($1.value.count, $0.key) })
-            .first?.value,
-              let best = group.rankedForDefaultDisplay().first
-        else { return nil }
-        return (best, withPoints.count)
+    /// How old the lead's last observation is, both ends server-side.
+    var leadStaleDays: Int? {
+        lead.flatMap { Staleness.days(generatedAt: generatedAt, lastObservedAt: $0.lastObservedAt) }
     }
 }
 

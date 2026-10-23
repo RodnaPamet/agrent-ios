@@ -1,7 +1,8 @@
 import Charts
 import SwiftUI
 
-/// Price history, one chart per unit-and-currency.
+/// One commodity's price: the number, how it moved, its line, and where it
+/// comes from (#409).
 ///
 /// Every commodity name on this screen comes from
 /// `ChartableCommodity.label`, which resolves through `CommodityName` —
@@ -14,19 +15,6 @@ struct TrendsView: View {
         RoutedStack {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // TWO DIFFERENT AGES, and both belong on this screen.
-                //
-                // This one is how long ago THIS PHONE fetched. The orange
-                // line under each series is how long ago the MARKET was
-                // observed — eighty-four days for the reference series,
-                // against a payload that may be five minutes old.
-                //
-                // Every other screen in the app shows this banner and these
-                // two did not, which an offline run made obvious: the
-                // charts rendered perfectly from cache with nothing saying
-                // the data had not been refreshed. On the one screen whose
-                // whole subject is how current a number is, that was the
-                // worst place to have left it out.
                 controls
                 content
             }
@@ -114,228 +102,173 @@ struct TrendsView: View {
             ErrorState(message: message) { await store.loadPrices() }
 
         case .loaded:
-            let groups = store.groups
-            if groups.isEmpty {
+            if let lead = store.lead, let latest = store.latest {
+                priceCard(lead, latest: latest)
+            } else {
                 EmptyState(
                     "Няма котировки",
                     icon: "chart.line.uptrend.xyaxis",
                     message: "За избрания период няма налични цени за \(store.commodity.label)."
                 )
                 .frame(minHeight: 240)
-            } else {
-                ForEach(groups) { group in
-                    chartCard(group)
-                }
             }
         }
     }
 
-    // MARK: - One chart
+    // MARK: - The price
 
-    /// One unit and one currency per card.
+    /// ONE price, its line and one row (#409, owner 2026-10-23).
     ///
-    /// Wheat returns USD per metric ton from Alpha Vantage alongside EUR/t
-    /// from the EC feed. On a shared axis the gap between them draws as a
-    /// price movement when it is an exchange rate — so they get separate
-    /// cards and there is no axis on which they can be compared by eye.
-    private func chartCard(_ group: SeriesGroup) -> some View {
-        let visible = group.series.filter(store.isVisible)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(SeriesVocabulary.unitHeading(unit: group.unit, currency: group.currency))
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Palette.secondaryText)
-                Spacer(minLength: 8)
-                if group.series.count > visible.count {
-                    Text("\(visible.count) от \(group.series.count)")
-                        .font(.caption2)
-                        // See `AppMenu`: 1.73:1 in light. This one says the
-                        // chart is not showing everything.
-                        .foregroundStyle(Palette.secondaryText)
-                }
-            }
-
-            Chart {
-                ForEach(visible) { series in
-                    ForEach(series.points.indices, id: \.self) { index in
-                        let point = series.points[index]
-                        if let day = point.day {
-                            LineMark(
-                                x: .value("Дата", day),
-                                y: .value("Цена", point.price)
-                            )
-                            .foregroundStyle(by: .value("Серия", series.id))
-                            .interpolationMethod(.monotone)
-                        }
-                    }
-                }
-            }
-            // Explicit scale, so the line and its legend dot are the same
-            // colour. Left to the automatic scale they were not, and a
-            // legend that mislabels which line is which is worse than none.
-            .chartForegroundStyleScale(
-                domain: visible.map(\.id),
-                range: visible.map { store.colour(for: $0, in: group) }
-            )
-            .chartLegend(.hidden)
-            // Fitted to the data, not anchored at zero.
-            //
-            // Swift Charts includes zero by default, which for wheat at
-            // 157–229 spent two thirds of the chart on empty space and
-            // flattened a year of movement into a nearly straight line.
-            // These are prices: the question is how they moved, and the
-            // axis labels carry the absolute values for anyone who needs
-            // them.
-            .chartYScale(domain: yDomain(visible))
-            .chartXAxis {
-                // Three marks, not "as many as fit". `.automatic` counts
-                // them against the axis width without knowing how wide a
-                // Bulgarian month name gets — «септември» is nine
-                // characters where «May» is three.
-                AxisMarks(values: .automatic(desiredCount: 3)) { value in
-                    AxisGridLine()
-                    // Через BgDate, not a `.dateTime` format — the device
-                    // reports en_BG and would print English month names.
-                    // The CI guard rejects the other spelling outright.
-                    if let date = value.as(Date.self) {
-                        AxisValueLabel {
-                            Text(BgDate.dayMonth(date))
-                                .font(.caption2)
-                                .axisLabelScaling()
-                        }
-                    }
-                }
-            }
-            .chartYAxis {
-                AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                    AxisGridLine()
-                    if let number = value.as(Double.self) {
-                        AxisValueLabel {
-                            Text(Num.text(number))
-                                .font(.caption2)
-                                .axisLabelScaling()
-                        }
-                    }
-                }
-            }
-            .frame(height: 220)
-            // A chart is invisible to VoiceOver. The legend below carries
-            // every series' latest value and age as text, so the screen is
-            // not chart-only — but say what this is rather than leaving an
-            // unlabelled rectangle.
-            // The heading's words, not the raw pair: `EUR/1000l, EUR` was
-            // the doubled currency of #121 spoken, in English, by VoiceOver.
-            .accessibilityLabel("Графика на цените, \(SeriesVocabulary.unitHeading(unit: group.unit, currency: group.currency))")
-            .accessibilityHint("Стойностите са изброени под графиката")
-
-            ForEach(group.series) { series in
-                legendRow(series, in: group)
-            }
+    /// The screen used to draw three lines and list every quotation the
+    /// payload carried: twenty-four for wheat, each with a price, a day and an
+    /// amber age, some in the EC feed's English. The owner asked for a clear
+    /// price above the graph and at most one info row below it. Which price,
+    /// and why the others are not here, is `Array.lead()`.
+    private func priceCard(_ lead: PriceSeries, latest: PricePoint) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            headline(lead, latest: latest)
+            chart(lead)
+            infoRow(lead, latest: latest)
         }
         .padding(14)
         .background(Palette.Surface.card, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// The visible data's range with a margin, so no line is drawn on the
-    /// frame. Falls back to the automatic scale when there is nothing to
-    /// measure.
-    private func yDomain(_ series: [PriceSeries]) -> ClosedRange<Double> {
-        let prices = series.flatMap { $0.points.map(\.price) }
+    /// «184,29 евро на тон», and how it moved over the range on screen.
+    private func headline(_ lead: PriceSeries, latest: PricePoint) -> some View {
+        let unit = SeriesVocabulary.priceUnit(unit: lead.unit, currency: lead.currency)
+        let change = store.change
+        return VStack(alignment: .leading, spacing: 4) {
+            // Stacks at the accessibility sizes rather than truncating the
+            // number, which is the one thing on the screen that must be whole.
+            AdaptiveRow(spacing: 6) {
+                Text(Num.text(latest.price))
+                    .font(.largeTitle.weight(.bold))
+                    .monospacedDigit()
+                Text(unit)
+                    .font(.title3)
+                    .foregroundStyle(Palette.secondaryText)
+            }
+            if let change {
+                // An arrow and words, not red and green: a rise is good news
+                // for wheat and bad news for diesel (`PeriodChange.text`).
+                Text(change.text(over: store.range))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.secondaryText)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(A11y.sentence([
+            "\(Num.text(latest.price)) \(unit)",
+            change?.spoken(over: store.range),
+        ]))
+    }
+
+    private func chart(_ lead: PriceSeries) -> some View {
+        let points = store.leadPoints
+        return Chart {
+            ForEach(points.indices, id: \.self) { index in
+                LineMark(
+                    x: .value("Дата", points[index].day),
+                    y: .value("Цена", points[index].price)
+                )
+                .foregroundStyle(Palette.accent)
+                .interpolationMethod(.monotone)
+            }
+        }
+        // Fitted to the data, not anchored at zero.
+        //
+        // Swift Charts includes zero by default, which for wheat at
+        // 157–229 spent two thirds of the chart on empty space and
+        // flattened a year of movement into a nearly straight line.
+        // These are prices: the question is how they moved, and the
+        // axis labels carry the absolute values for anyone who needs
+        // them.
+        .chartYScale(domain: yDomain(points.map(\.price)))
+        .chartXAxis {
+            // Three marks, not "as many as fit". `.automatic` counts
+            // them against the axis width without knowing how wide a
+            // Bulgarian month name gets — «септември» is nine
+            // characters where «May» is three.
+            AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                AxisGridLine()
+                // Через BgDate, not a `.dateTime` format — the device
+                // reports en_BG and would print English month names.
+                // The CI guard rejects the other spelling outright.
+                if let date = value.as(Date.self) {
+                    AxisValueLabel {
+                        Text(BgDate.dayMonth(date))
+                            .font(.caption2)
+                            .axisLabelScaling()
+                    }
+                }
+            }
+        }
+        .chartYAxis {
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine()
+                if let number = value.as(Double.self) {
+                    AxisValueLabel {
+                        Text(Num.text(number))
+                            .font(.caption2)
+                            .axisLabelScaling()
+                    }
+                }
+            }
+        }
+        .frame(height: 220)
+        // A chart is invisible to VoiceOver. The headline above says the
+        // price and its change in words, so the chart says what it is and
+        // where it starts and ends.
+        .accessibilityLabel(chartSummary(points))
+    }
+
+    /// «Графика на цената за 1 година, от 176 до 184,29».
+    private func chartSummary(_ points: [(day: Date, price: Double)]) -> String {
+        guard let first = points.first, let last = points.last else { return "Графика на цената" }
+        return "Графика на цената \(store.range.span), от \(Num.text(first.price)) до \(Num.text(last.price))"
+    }
+
+    /// The visible data's range with a margin, so the line is not drawn on
+    /// the frame.
+    private func yDomain(_ prices: [Double]) -> ClosedRange<Double> {
         guard let low = prices.min(), let high = prices.max() else { return 0...1 }
         guard high > low else { return (low - 1)...(high + 1) }
         let margin = (high - low) * 0.12
         return (low - margin)...(high + margin)
     }
 
-    // MARK: - Legend
+    // MARK: - The one row under the chart
 
-    /// Each series as a row: what it is, its latest price, and how old.
-    private func legendRow(_ series: PriceSeries, in group: SeriesGroup) -> some View {
-        let visible = store.isVisible(series)
-        let latest = store.latest(series)
-        let stale = store.staleDays(series)
-
-        return Button {
-            store.toggle(series)
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Circle()
-                    .fill(visible ? store.colour(for: series, in: group) : Color(.tertiaryLabel))
-                    .frame(width: 9, height: 9)
-                    .padding(.top, 4)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(seriesTitle(series))
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(visible ? Color.primary : Palette.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if let latest, let day = latest.day {
-                        HStack(spacing: 6) {
-                            Text("\(Num.text(latest.price)) \(group.currency)")
-                                .font(.footnote.weight(.semibold))
-                            Text(BgDate.dayMonth(day))
-                                .font(.caption)
-                                .foregroundStyle(Palette.secondaryText)
-                        }
-                    }
-
-                    staleness(stale, typed: series.isPlatformPrice)
-
-                    if let count = latest?.count {
-                        // Only on listings-derived series, where it says how
-                        // many distinct farms the number came from. A price
-                        // from one seller is not a market.
-                        Text("от \(Plural.bg(count, "оферта", "оферти"))")
-                            .font(.caption2)
-                            .foregroundStyle(Palette.secondaryText)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(visible ? [.isButton, .isSelected] : .isButton)
-        // `combine` concatenates the price, the age and the series name into
-        // one phrase, which is the only thing Voice Control would accept. The
-        // series title is what is printed and what somebody would say.
-        .accessibilityInputLabels([seriesTitle(series)])
-        .accessibilityHint(visible ? "Скрива тази серия" : "Показва тази серия")
-    }
-
-    private func seriesTitle(_ series: PriceSeries) -> String {
-        var parts = [SeriesVocabulary.region(series.region)]
-        if let stage = SeriesVocabulary.stage(series.stage) { parts.append(stage) }
-        if let label = series.displayLabel, !label.isEmpty { parts.append(label) }
-        return parts.joined(separator: " · ")
-    }
-
-    /// How old the last observation is, in words.
+    /// «Средна за България · 27 юли», and «· преди 88 дни» in amber once the
+    /// price is three weeks old (`Staleness.concerning`).
     ///
-    /// Measured server-side to server-side — see `Staleness`. Said out loud
-    /// past three weeks because the real data needs it: wheat's reference
-    /// series was eighty-three days behind the payload that carried it,
-    /// under a chart that looked entirely current.
-    @ViewBuilder
-    private func staleness(_ days: Int?, typed: Bool) -> some View {
-        if let days {
-            if days >= Staleness.concerning {
-                Label(
-                    // The platform's price was typed, not observed (#1587),
-                    // and Табло says so in the same word.
-                    "\(typed ? "Въведена" : "Последно наблюдение") преди \(Plural.bg(days, "ден", "дни"))",
-                    systemImage: "exclamationmark.triangle"
-                )
-                .font(.caption)
-                .foregroundStyle(Palette.warning)
-                .fixedSize(horizontal: false, vertical: true)
+    /// TWO DIFFERENT AGES belong on this screen, and this is the market's:
+    /// eighty-eight days for wheat's national average, under a payload that
+    /// may be five minutes old. The phone's own fetch age is the banner's.
+    private func infoRow(_ lead: PriceSeries, latest: PricePoint) -> some View {
+        let source = SeriesSource.parts(of: lead)
+        let day = latest.day.map(BgDate.dayMonth)
+        let stale = store.staleDays.flatMap { $0 >= Staleness.concerning ? $0 : nil }
+        let age = stale.map { "преди \(Plural.bg($0, "ден", "дни"))" }
+        // One Text that wraps, not a row of them: a delivery point and an age
+        // run past a phone's width, and an HStack would cut the age off — the
+        // one part that is a warning.
+        let text = ([source.joined(separator: " · ")] + [day, age].compactMap { $0 }).joined(separator: " · ")
+        return Group {
+            if stale != nil {
+                Label(text, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(Palette.warning)
+            } else {
+                Text(text)
+                    .foregroundStyle(Palette.secondaryText)
             }
-        } else {
-            Text("Няма дата на последно наблюдение.")
-                .font(.caption)
-                .foregroundStyle(Palette.warning)
         }
+        .font(.footnote)
+        .fixedSize(horizontal: false, vertical: true)
+        // One element already, so its words are replaced rather than wrapped
+        // in a second one. Built from the parts: VoiceOver reads «·» aloud as
+        // "middle dot".
+        .accessibilityLabel(A11y.sentence(source + [day.map { "към \($0)" }, age]))
     }
 }

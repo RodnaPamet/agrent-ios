@@ -121,6 +121,10 @@ enum FixtureCatalogue {
     static let byPathAndQuery: [String: String] = table([
         (LocationsAPI.rateUnitsPath, "units-rate"),
         (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
+        // #409: Тенденции opens on 1 год. The same payload, because the
+        // screenshot is of the screen's shape — one price, one line, one row
+        // — not of a year's numbers.
+        (TrendsAPI.pricesPath(.wheat, range: .year1), "trends-prices"),
         (TrendsAPI.newsPath(.all), "trends-news"),
         // agrent-ios#231: the feed for the fixture person's topics, exactly
         // as `NewsStore` asks for it — sorted, no search, first page.

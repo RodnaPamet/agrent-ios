@@ -1214,7 +1214,8 @@ and they win over the API, for every farm, until cleared. Server: agri-saas
   upserts on its series and date. Clearing is per commodity, and clearing
   nothing is not an error.
 - **Табло and Тенденции** put the typed series (`source: "platform"`) first,
-  across unit groups (#266).
+  across unit groups (#266). Since #409 it's simply THE price on both: see
+  «Тенденции and Табло's price».
 
 **Unverified:** no price has been typed from the app. Nothing can be until
 the owner creates the platform farm and `PLATFORM_TENANT_SLUG` names it; the
@@ -1372,6 +1373,53 @@ caller of `.sensoryFeedback`.
 
 - **A tap on a parcel** (either map, or a row of the list under it) opens the parcel's history for every role, where it used to open «Ново мероприятие» for those who may record. Overlapping shapes still ask which parcel first.
 - **«Ново мероприятие» moved to the history**, as a bottom button for that parcel, shown to someone who may create an operation (`mayCreateOperations`). The route carries the parcel and its block (`ParcelInBlock`), so the button works while the history loads or fails. A history opened from Риск has no such button, as before.
+
+## Тенденции and Табло's price
+
+### Matched, with one divergence — one price, one line, one row (#409, owner 2026-10-23)
+
+The owner asked for "a clear price above the graph" and "max 1 info row
+below a graph". The screen used to draw three lines with no number above
+them, and listed every quotation in the payload underneath: 24 for wheat,
+each with a price, a day and an amber age. Some of those names were in the
+EC feed's English.
+
+**Which price, as on the web.** It follows agri-saas `trends-helpers.ts`
+(`selectPrimaryGroup`, `chartSeriesFor`, `leadSeriesOf`), implemented once as
+`Array.lead()`:
+1. Agrent's typed price comes first (#1587).
+2. Then one (region, currency, unit) group: Bulgaria, then the EU average,
+   then whichever reported last. A group of only our own listings is a last
+   resort.
+3. Inside the group, the national average where EC publishes one (wheat,
+   maize, barley). The owner chose it over the freshest quotation.
+4. Otherwise the freshest.
+
+Табло quotes the same series, so the two screens show one number.
+
+**The screen:**
+- The commodity, then the range, then a card.
+- The card shows the price large («208,62 евро на тон») and its change over
+  the chosen period («▲ 1,8 % за 1 година»), as an arrow and words, never a
+  colour.
+- Under it, one line, and one row: «Средна за България · 27 юли», amber with
+  «преди 88 дни» past three weeks.
+- The other quotations aren't on the screen, which is the owner's choice, as
+  on the web.
+
+**Never the feed's English** (`SeriesSource`):
+- EC stages are recognised loosely, the way the web's `isNationalAverage` is,
+  because EC has renamed them once already.
+- Delivery points become Bulgarian city names, and «Departure from farm…»
+  becomes «франко стопанство».
+- Anything unrecognised is left out rather than shown.
+- Табло's line under the price used to print the region code and the English
+  stage. It now uses the same name, and its «1 от N серии — вижте Тенденции за
+  всички» is gone, since Тенденции no longer lists them.
+
+**Divergence:** the web's tile shows the week-over-week change. The phone
+shows the change over the range on screen, which is the owner's choice
+(2026-10-23), so the number agrees with the line being looked at.
 
 ## Design status — the AX3 failures are FIXED
 
