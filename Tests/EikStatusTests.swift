@@ -165,7 +165,7 @@ final class EikStatusTests: XCTestCase {
     /// landed while the page was open shows on the save, not one GET later.
     func testASaveShowsTheStatusThePutReports() async throws {
         func profile(_ state: EikVerification?, municipality: String? = nil) -> FarmProfile {
-            FarmProfile(producerName: nil, eik: "000000000", egn: nil, address: nil,
+            FarmProfile(producerName: nil, eik: "000000000", address: nil,
                         settlement: nil, municipality: municipality,
                         registrationPlace: nil, registrationEkatte: nil,
                         odbhCity: nil, agricultureDirectorateCity: nil,

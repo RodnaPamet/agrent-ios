@@ -178,24 +178,21 @@ enum EikVerification: String, LenientDecodable, Sendable {
     static var unknownCase: Self { .unknown }
 }
 
-/// The БАБХ identity block. Ten fields, all null on this tenant.
+/// The БАБХ identity block. Nine fields, all null on this tenant.
 ///
-/// ── `egn` IS A NATIONAL IDENTITY NUMBER ──
+/// ── NO ЕГН (owner, 2026-10-24, #412) ──
 ///
-/// The most sensitive single field this app has modelled. Three things
-/// follow, and none is optional:
+/// "We don't collect that — only ЕИК or УРН." The model used to carry
+/// `egn`, a national identity number, masked with an explicit reveal. It is
+/// not modelled now, so nothing on the phone can show it or send it back, and
+/// the server erases the stored values (agri-saas, confirmed with the owner
+/// directly). A server that still sends the key is decoded without it.
 ///
-/// 1. Never a log line, a query parameter or a cache key. The existing
-///    rule, with the stakes raised.
-/// 2. Displayed MASKED, with an explicit reveal — see `FarmProfileView`.
-/// 3. It is in the response body, so `ResponseCache` writes it to disk
-///    like everything else. Not modelling it would not prevent that; the
-///    cache stores bytes. That is worth knowing rather than assuming the
-///    Swift is the boundary.
+/// The identifiers that remain (ЕИК, УРН) are never a log line, a query
+/// parameter or a cache key.
 struct FarmProfile: Decodable, Equatable, Sendable {
     let producerName: String?
     let eik: String?
-    let egn: String?
     let address: String?
     let settlement: String?
     let municipality: String?
@@ -206,17 +203,16 @@ struct FarmProfile: Decodable, Equatable, Sendable {
 
     // ── The holding, added 2026-09-27 with agri-saas#1141/#1145 ──
     //
-    // The ten above describe the PRODUCER — who they are and where they are
+    // The nine above describe the PRODUCER — who they are and where they are
     // registered. These three describe the HOLDING.
 
     /// УРН, the holding's registration number. `["string","null"]`.
     ///
     /// A state identifier, encrypted at rest server-side and arriving as
-    /// PLAINTEXT like `egn` and `eik` — so the rules in this file's header
-    /// apply to it in full: never a log line, a query parameter or a cache
-    /// key. It is NOT masked on screen: the owner's ruling is that ЕИК and
-    /// УРН are business identifiers appearing on public filings, while ЕГН is
-    /// the personal one and keeps its reveal.
+    /// PLAINTEXT like `eik` — so the rules in this file's header apply to it
+    /// in full: never a log line, a query parameter or a cache key. It is NOT
+    /// masked on screen: the owner's ruling is that ЕИК and УРН are business
+    /// identifiers appearing on public filings.
     let urn: String?
 
     /// Declared hectares. A NUMBER, and this is where the pattern in this
@@ -300,7 +296,7 @@ struct FarmProfile: Decodable, Equatable, Sendable {
     /// `sizeHa != nil` rather than `sizeHa != 0`, because a declared zero is
     /// still a declaration.
     var isEmpty: Bool {
-        let noText = [producerName, eik, egn, urn, address, settlement,
+        let noText = [producerName, eik, urn, address, settlement,
                       municipality, registrationPlace, registrationEkatte,
                       odbhCity, agricultureDirectorateCity]
             .allSatisfy { ($0 ?? "").trimmingCharacters(in: .whitespaces).isEmpty }

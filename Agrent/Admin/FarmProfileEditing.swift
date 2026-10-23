@@ -19,7 +19,7 @@ import Foundation
 //   ABSENT IS LEFT ALONE NOW (agri-saas#1176, fixed by #1181). It used to
 //   clear: the usecase mapped every field through `norm(input[k])` and
 //   `norm(undefined)` was null, so a body that left out `egn` erased the
-//   farm's ЕГН. The body below STILL carries every key it may send (twelve,
+//   farm's ЕГН. The body below STILL carries every key it may send (eleven,
 //   see the next paragraph) with explicit nulls — correct under both
 //   semantics, so it does not matter which server build answers, and it is
 //   the read-modify-write the web page does too. Swift's synthesised
@@ -36,14 +36,16 @@ import Foundation
 //   by Agrent staff verifying the farm's identity claim (P3.4/P3.9), because
 //   it reaches the ДНЕВНИК PDF and the БАБХ register export and a free-edit
 //   field let any ADMIN put an unchecked number there. So the body carries
-//   exactly TWELVE keys, `eik` absent. Absent is "left alone" under #1181's
+//   exactly ELEVEN keys, `eik` absent — and `egn` absent too since #412 (the
+//   owner, 2026-10-24: "we don't collect that"), left alone by the server
+//   until it erases the stored values itself. Absent is "left alone" under #1181's
 //   merge semantics, verified in `upsertFarmProfile` (`Object.hasOwn`), so
 //   leaving it out preserves the stored ЕИК rather than clearing it. The
 //   field stays READABLE: it is in the GET response and shown read-only.
 //
 //   THE REQUEST IS DOCUMENTED (#1178): `UpdateFarmProfileRequest` lists
 //   thirteen properties, none required, and the limits below match its
-//   `maxLength`s. The twelve sent are `FarmProfileText.writable` plus
+//   `maxLength`s. The eleven sent are `FarmProfileText.writable` plus
 //   `sizeHa` and `grainProduced`.
 //
 //   A NEGATIVE SIZE IS A 400, not a stored null. The usecase does refuse a
@@ -75,14 +77,13 @@ import Foundation
 /// twelfth field added in one place and forgotten in another is exactly how a
 /// body ends up omitting a key, and an omitted key is an erased one.
 enum FarmProfileText: String, CaseIterable, Sendable {
-    case producerName, egn, eik, urn, address, municipality, settlement,
+    case producerName, eik, urn, address, municipality, settlement,
          agricultureDirectorateCity, registrationPlace, registrationEkatte, odbhCity
 
     /// `admin.farmProfile.fields.*`, verbatim from agri-saas `messages/bg.json`.
     var label: String {
         switch self {
         case .producerName: "Земеделски производител (име/фирма)"
-        case .egn: "ЕГН"
         case .eik: "ЕИК"
         case .urn: "УРН в ИСАК (ДФЗ)"
         case .address: "Адрес по регистрация / на управление"
@@ -99,7 +100,7 @@ enum FarmProfileText: String, CaseIterable, Sendable {
     /// fields, `fieldHints.*` where one exists, nothing otherwise.
     var hint: String? {
         switch self {
-        case .egn, .eik:
+        case .eik:
             "Съхранява се криптирано."
         case .urn:
             // The web shows the encrypted note INSTEAD of this hint (its
@@ -107,9 +108,11 @@ enum FarmProfileText: String, CaseIterable, Sendable {
             // renders. Both are shown here: the hint is the one sentence that
             // stops a farmer typing their ЕИК into the УРН box. ДФЗ's УРН from
             // ИСАК, by the owner's ruling (agri-saas #1707); `fields.urn` and
-            // `fieldHints.urn` are pinned there as a pair (#1710).
+            // `fieldHints.urn` are pinned there as a pair (#1710). The web's
+            // hint ends «— различен от ЕИК и ЕГН.»; with no ЕГН field (#412)
+            // the phone says only what the box is not mistaken for now.
             "Съхранява се криптирано. Уникалният регистрационен номер от ДФЗ (ИСАК) "
-                + "— различен от ЕИК и ЕГН."
+                + "— различен от ЕИК."
         case .registrationPlace:
             "Където е регистрирано стопанството. Обикновено това е и складът за "
                 + "растителна продукция — самият склад се записва за всеки парцел поотделно."
@@ -123,7 +126,7 @@ enum FarmProfileText: String, CaseIterable, Sendable {
         switch self {
         case .producerName: 300
         case .address: 500
-        case .egn, .eik, .registrationEkatte: 20
+        case .eik, .registrationEkatte: 20
         case .urn: 40
         case .municipality, .settlement, .agricultureDirectorateCity,
              .registrationPlace, .odbhCity: 200
@@ -152,7 +155,6 @@ enum FarmProfileText: String, CaseIterable, Sendable {
     var wire: KeyPath<FarmProfile, String?> {
         switch self {
         case .producerName: \.producerName
-        case .egn: \.egn
         case .eik: \.eik
         case .urn: \.urn
         case .address: \.address
@@ -454,14 +456,8 @@ struct FarmProfileRebase: Equatable {
         for field in FarmProfileText.writable where draft[field] != before[field] {
             out[field] = draft[field]
             guard collided(draft[field], before[field], now[field]) else { continue }
-            if field == .egn {
-                // NEVER the value — the same rule as `FarmProfileSaveReport`:
-                // this is plain text on screen and in the accessibility tree.
-                collisions.append("«ЕГН» е променено и от друг потребител — проверете го.")
-            } else {
-                let theirs = now[field].isEmpty ? "празно" : "«\(now[field])»"
-                collisions.append("«\(field.label)»: друг потребител е записал \(theirs).")
-            }
+            let theirs = now[field].isEmpty ? "празно" : "«\(now[field])»"
+            collisions.append("«\(field.label)»: друг потребител е записал \(theirs).")
         }
         if draft.sizeHa != before.sizeHa {
             out.sizeHa = draft.sizeHa
@@ -523,11 +519,6 @@ enum FarmProfileSaveReport {
             guard typed != stored else { continue }
             if stored.isEmpty {
                 notes.append("«\(field.label)» не беше приет и е празен.")
-            } else if field == .egn {
-                // NEVER the value. This note is plain text on screen and in the
-                // accessibility tree, and the ЕГН's whole treatment is that it
-                // appears only behind an explicit reveal.
-                notes.append("«ЕГН» беше коригирано от сървъра — проверете го.")
             } else {
                 notes.append("«\(field.label)» е записано като «\(stored)».")
             }

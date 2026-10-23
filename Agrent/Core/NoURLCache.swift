@@ -12,7 +12,7 @@ import MapKit
 /// `Cache-Control: no-store` may be stored there, and agri-saas does not send
 /// `no-store` (an unauthenticated probe carries no `Cache-Control` at all).
 /// So everything the app was careful to keep OUT of `ResponseCache` — the
-/// staff directory and the farm's ЕГН/ЕИК/УРН (`AdminStore`), other farms'
+/// staff directory and the farm's ЕИК/УРН (`AdminStore`), other farms'
 /// messages (PARITY Gap 7, "nothing is cached on disk") — could land in
 /// Cache.db anyway, with the default file protection, surviving sign-out.
 /// Every decision about what to persist was being made twice, and the second

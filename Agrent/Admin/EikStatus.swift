@@ -105,7 +105,7 @@ struct EikStatus: Equatable, Sendable {
     /// passed through as stored.
     ///
     /// Not a national ID: the owner's ruling is that ЕИК is a business
-    /// identifier on public filings, so unlike the ЕГН it is spoken.
+    /// identifier on public filings, so it is spoken.
     static func spoken(eik: String?, state: EikVerification) -> String {
         let number = (eik ?? "").trimmingCharacters(in: .whitespaces)
         let said: String

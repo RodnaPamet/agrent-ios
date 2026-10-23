@@ -128,7 +128,7 @@ final class AdminStore {
                 // so the section says «още не са попълнени» rather than
                 // repeating a refusal the screen already shows.
                 profile = .loaded(
-                    FarmProfile(producerName: nil, eik: nil, egn: nil, address: nil,
+                    FarmProfile(producerName: nil, eik: nil, address: nil,
                                 settlement: nil, municipality: nil,
                                 registrationPlace: nil, registrationEkatte: nil,
                                 odbhCity: nil, agricultureDirectorateCity: nil,

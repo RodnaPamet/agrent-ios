@@ -13,13 +13,14 @@ import SwiftUI
 /// the route's zod schema for limits. The rules that make the write safe are
 /// in `FarmProfileEditing.swift`.
 ///
-/// ONE CARD, as the web has: «Идентификация на стопанството», thirteen
+/// ONE CARD, as the web has: «Идентификация на стопанството», twelve
 /// fields in the web's order, the web's paragraph under it. A producer /
 /// holding split was considered and not made — it would be an iOS invention
 /// over a page the web keeps whole.
 ///
 /// What is iOS-only, and why:
-///   - the ЕГН is masked with an explicit reveal, in view AND in edit (#110);
+///   - no ЕГН: the owner's ruling (2026-10-24, #412) is that it is not
+///     collected, so the web's field is left out here;
 ///   - the page covers itself in the app switcher (`privacyCover`);
 ///   - the size shows its decare equivalent, because every other area in
 ///     this app is in decares;
@@ -27,7 +28,6 @@ import SwiftUI
 ///   - after a save, anything the server changed is SAID, not just shown.
 struct FarmProfileView: View {
     let store: AdminStore
-    @State private var revealEGN = false
     @State private var editing = false
 
     var body: some View {
@@ -37,7 +37,7 @@ struct FarmProfileView: View {
                 // ONLY FOR A READER THE SERVER WOULD TAKE A WRITE FROM. GET and
                 // PUT share `admin.manage`, so `canEditProfile` is "the GET
                 // succeeded" — and never true over the all-null stand-in a 403
-                // produces, which an editor would write back as thirteen nulls.
+                // produces, which an editor would write back as twelve nulls.
                 if store.canEditProfile, store.profile.value != nil {
                     ToolbarItem(placement: .primaryAction) {
                         Button("Редактирай") { editing = true }
@@ -135,9 +135,7 @@ struct FarmProfileView: View {
         case .loaded(let profile, _):
             Section {
                 ForEach(FarmProfileText.allCases, id: \.self) { field in
-                    if field == .egn {
-                        egnField(profile.egn)
-                    } else if field == .eik {
+                    if field == .eik {
                         eikField(profile)
                     } else {
                         self.field(field.label, profile[keyPath: field.wire])
@@ -150,23 +148,6 @@ struct FarmProfileView: View {
             } footer: {
                 SectionFooter(Self.about)
             }
-        }
-    }
-
-    /// An EGN is a national identity number, and this is the one field where
-    /// the mobile context genuinely differs from the web's.
-    ///
-    /// The web renders it plainly, which is right on a laptop. A phone is
-    /// read over shoulders in a co-op office or a queue, so it is masked
-    /// with an explicit reveal — still shown, still one tap, and not sitting
-    /// on screen for anyone standing behind the operator.
-    ///
-    /// Masked by DIGIT COUNT, not by a fixed run of dots: showing the wrong
-    /// length would make a wrong value look plausible when revealed.
-    @ViewBuilder
-    private func egnField(_ egn: String?) -> some View {
-        if let egn, !egn.isEmpty {
-            EGNRow(egn: egn, reveal: $revealEGN)
         }
     }
 
@@ -255,61 +236,6 @@ struct FarmProfileView: View {
     }
 }
 
-/// The masked ЕГН, shared by the profile page and the editor so the two
-/// cannot disagree about what is spoken.
-///
-/// Moved unchanged from `AdminView`, accessibility treatment included.
-private struct EGNRow: View {
-    let egn: String
-    @Binding var reveal: Bool
-
-    var body: some View {
-        ValueRow("ЕГН") {
-            HStack(spacing: 10) {
-                Text(reveal ? egn : String(repeating: "•", count: egn.count))
-                    .font(.body.monospacedDigit())
-                Button(reveal ? "Скрий" : "Покажи") { reveal.toggle() }
-                    .font(.footnote)
-                    // The accent explicitly: `ValueRow` gives its value the
-                    // grey of a value, and this is a control, not a value.
-                    .foregroundStyle(Palette.accent)
-            }
-        }
-        // The number itself is never in the label. VoiceOver reads
-        // aloud, and a national ID spoken in a shared space is the
-        // same exposure this masking exists to avoid.
-        //
-        // ── AND `children: .ignore` SWALLOWED THE ONLY CONTROL ──
-        //
-        // Collapsing the row to one element discarded the «Покажи»
-        // Button with everything else, so the hint promised a double tap
-        // that did nothing: the element carried no action. The ЕГН could
-        // not be revealed by VoiceOver at all, the button was absent from
-        // the Switch Control and Full Keyboard focus order, and Voice
-        // Control had no element named «Покажи» to act on. Reachable only
-        // by a finger on the exact glyphs.
-        //
-        // Found by two independent lenses of an accessibility audit, which
-        // is the corroboration that made it worth trusting: the privacy
-        // instinct was right and the side effect was invisible from
-        // either one alone.
-        //
-        // The action restores it without putting the digits back into
-        // speech — the label still says only whether it is shown.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(reveal ? "ЕГН, показано" : "ЕГН, скрито")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { reveal.toggle() }
-        // What a Voice Control user SEES on the button, so «Покажи» works
-        // as spoken. The visible word is not in the accessibility label
-        // and would otherwise match nothing.
-        .accessibilityInputLabels(reveal
-            ? A11y.spokenNames("Скрий", "ЕГН", "Hide")
-            : A11y.spokenNames("Покажи", "ЕГН", "Show"))
-        .accessibilityHint(reveal ? "Скрива номера" : "Показва номера")
-    }
-}
-
 // MARK: - Edit
 
 /// The editor: one form, Отказ / Запази, the house sheet shape.
@@ -329,7 +255,6 @@ struct FarmProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: FarmProfileDraft
     @State private var newCrop = ""
-    @State private var revealEGN = false
     @State private var saving = false
     @State private var problems: [FarmProfileUpdate.Problem] = []
     @State private var failure: String?
@@ -405,9 +330,7 @@ struct FarmProfileEditView: View {
 
                 Section {
                     ForEach(FarmProfileText.allCases, id: \.self) { field in
-                        if field == .egn {
-                            egnEditor
-                        } else if !field.isWritable {
+                        if !field.isWritable {
                             readOnlyField(field)
                         } else {
                             textEditor(field)
@@ -475,7 +398,7 @@ struct FarmProfileEditView: View {
     /// as a suggestion elsewhere — a state identifier has no business in the
     /// predictive dictionary.
     /// (The ЕИК is an identifier too, but it is never typed into here.)
-    private static let identifiers: Set<FarmProfileText> = [.egn, .urn, .registrationEkatte]
+    private static let identifiers: Set<FarmProfileText> = [.urn, .registrationEkatte]
 
     /// The ЕИК: SHOWN, in its place in the web's order, and NOT EDITABLE
     /// (agri-saas#1352). The server refuses any body that would change it; only
@@ -530,52 +453,6 @@ struct FarmProfileEditView: View {
             if let hint = field.hint {
                 Text(hint).font(.caption).foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    /// The ЕГН stays masked here too until the farmer reveals it.
-    ///
-    /// NOT a `SecureField`, which looks like the obvious tool and is a trap:
-    /// a secure field CLEARS ITS WHOLE CONTENTS on the first keystroke after
-    /// it regains focus. One stray tap and a character would replace a stored
-    /// ЕГН. So: the masked row with «Покажи», and the plain field only after
-    /// an explicit reveal — the same one tap as on the profile page.
-    ///
-    /// A blank ЕГН needs no mask (there is nothing to hide), so the field is
-    /// offered straight away for a farm filling it in for the first time.
-    @ViewBuilder
-    private var egnEditor: some View {
-        let current = draft[.egn]
-        if current.isEmpty || revealEGN {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(FarmProfileText.egn.label)
-                    .font(.footnote).foregroundStyle(Palette.secondaryText)
-                    .accessibilityHidden(true)
-                HStack {
-                    TextField(FarmProfileText.egn.label, text: binding(.egn), prompt: .fieldPrompt("—"))
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .font(.body.monospacedDigit())
-                    if revealEGN {
-                        Button("Скрий") { revealEGN = false }
-                            .font(.footnote)
-                            .buttonStyle(.borderless)
-                            .accessibilityInputLabels(A11y.spokenNames("Скрий", "ЕГН", "Hide"))
-                    }
-                }
-                if let hint = FarmProfileText.egn.hint {
-                    Text(hint).font(.caption).foregroundStyle(Palette.secondaryText)
-                }
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 4) {
-                EGNRow(egn: current, reveal: $revealEGN)
-                // The web's «Съхранява се криптирано.» on all three encrypted
-                // fields, the masked state included.
-                if let hint = FarmProfileText.egn.hint {
-                    Text(hint).font(.caption).foregroundStyle(Palette.secondaryText)
-                }
             }
         }
     }
@@ -764,9 +641,9 @@ extension View {
     ///
     /// iOS photographs the screen as the app leaves the foreground and shows
     /// that picture in the switcher, to anyone holding the phone. On these
-    /// two screens the picture would hold an ЕИК, a УРН, an address and — if
-    /// revealed — an ЕГН. The overlay draws on `.inactive`, which is the
-    /// phase the snapshot is taken in.
+    /// two screens the picture would hold an ЕИК, a УРН and an address. The
+    /// overlay draws on `.inactive`, which is the phase the snapshot is
+    /// taken in.
     ///
     /// Local to the farm profile rather than app-wide: it is the one screen
     /// whose content is a person's identity documents, and covering every

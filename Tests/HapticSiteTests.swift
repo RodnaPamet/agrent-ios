@@ -53,8 +53,7 @@ final class WriteFeedbackTests: XCTestCase {
 final class ProfileSaveFeedbackTests: XCTestCase {
 
     private func profile(version: Int) -> FarmProfile {
-        FarmProfile(producerName: "Иван Петров", eik: nil, egn: nil,
-                    address: nil, settlement: nil, municipality: nil,
+        FarmProfile(producerName: "Иван Петров", eik: nil, address: nil, settlement: nil, municipality: nil,
                     registrationPlace: nil, registrationEkatte: nil,
                     odbhCity: nil, agricultureDirectorateCity: nil,
                     urn: nil, sizeHa: nil, grainProduced: [],

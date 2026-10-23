@@ -19,10 +19,9 @@ import XCTest
 final class FarmProfileLockTests: XCTestCase {
 
     private func profile(version: Int?, municipality: String? = "Плевен",
-                         egn: String? = "7501011234", sizeHa: Double? = 39.758,
+                         sizeHa: Double? = 39.758,
                          grain: [String] = ["пшеница"]) -> FarmProfile {
-        FarmProfile(producerName: "Иван Петров", eik: "203912345", egn: egn,
-                    address: nil, settlement: "Плевен", municipality: municipality,
+        FarmProfile(producerName: "Иван Петров", eik: "203912345", address: nil, settlement: "Плевен", municipality: municipality,
                     registrationPlace: nil, registrationEkatte: "56722",
                     odbhCity: nil, agricultureDirectorateCity: nil,
                     urn: "1234567", sizeHa: sizeHa, grainProduced: grain,
@@ -99,8 +98,8 @@ final class FarmProfileLockTests: XCTestCase {
     }
 
     /// The version rides on the body's builder, NOT in the JSON: the body
-    /// schema has no `version`, and the twelve keys stay twelve (`eik` is
-    /// never sent — agri-saas#1352).
+    /// schema has no `version`, and the eleven keys stay eleven (`eik` is
+    /// never sent — agri-saas#1352 — and no `egn` since #412).
     func testTheBuiltBodyCarriesTheLoadedVersionButDoesNotEncodeIt() throws {
         let body = try build(profile(version: 3)) { $0[.municipality] = "Ловеч" }
         XCTAssertEqual(body.expectedVersion, 3)
@@ -108,7 +107,8 @@ final class FarmProfileLockTests: XCTestCase {
             with: JSONEncoder().encode(body)) as? [String: Any])
         XCTAssertNil(json["version"])
         XCTAssertNil(json["eik"])
-        XCTAssertEqual(json.count, 12)
+        XCTAssertNil(json["egn"])
+        XCTAssertEqual(json.count, 11)
     }
 
     /// THE LOST UPDATE THIS PREVENTS. The store's copy moves under an open
@@ -264,18 +264,6 @@ final class FarmProfileLockTests: XCTestCase {
         XCTAssertEqual(r.collisions, [])
     }
 
-    /// The ЕГН is never echoed, here as in the save report.
-    func testAnEGNCollisionNeverCarriesTheNumber() {
-        let old = profile(version: 3)
-        var draft = FarmProfileDraft(old)
-        draft[.egn] = "8001011111"
-        let r = FarmProfileRebase.rebase(draft, from: old,
-                                         onto: profile(version: 4, egn: "9001012222"))
-        XCTAssertEqual(r.collisions.count, 1)
-        XCTAssertFalse(r.collisions.joined().contains("9001012222"))
-        XCTAssertFalse(r.collisions.joined().contains("8001011111"))
-    }
-
     func testSizeAndCropCollisionsAreNamed() {
         let old = profile(version: 3)
         var draft = FarmProfileDraft(old)
@@ -291,8 +279,7 @@ final class FarmProfileLockTests: XCTestCase {
     // MARK: - The ЕИК through a reload (agri-saas#1352)
 
     private func withEIK(_ eik: String?, version: Int) -> FarmProfile {
-        FarmProfile(producerName: "Иван Петров", eik: eik, egn: "7501011234",
-                    address: nil, settlement: "Плевен", municipality: "Плевен",
+        FarmProfile(producerName: "Иван Петров", eik: eik, address: nil, settlement: "Плевен", municipality: "Плевен",
                     registrationPlace: nil, registrationEkatte: "56722",
                     odbhCity: nil, agricultureDirectorateCity: nil,
                     urn: "1234567", sizeHa: 39.758, grainProduced: ["пшеница"],
@@ -319,7 +306,8 @@ final class FarmProfileLockTests: XCTestCase {
         let json = try XCTUnwrap(JSONSerialization.jsonObject(
             with: JSONEncoder().encode(body)) as? [String: Any])
         XCTAssertNil(json["eik"])
-        XCTAssertEqual(json.count, 12)
+        XCTAssertNil(json["egn"])
+        XCTAssertEqual(json.count, 11)
         XCTAssertEqual(json["municipality"] as? String, "Ловеч", "positive control")
     }
 
