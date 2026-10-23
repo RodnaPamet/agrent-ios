@@ -1874,10 +1874,11 @@ final class A11yShotsTests: XCTestCase {
         capture("01g-treatment-map-target", app: app)
     }
 
-    /// #395: a treatment's «Изтрий», the bar's «Отмени», and «Кошче». The
+    /// #395: a treatment's «Изтрий» and the bar's «Отмени» (no «Кошче» since
+    /// #411: what's deleted is deleted). The
     /// undo comes inside the window, so no delete is ever built; one that
     /// were would meet the seam's refusal of every write, never a server.
-    func testSwipeDeleteUndoAndTrash() {
+    func testSwipeDeleteAndUndo() {
         let app = XCUIApplication()
         app.launchArguments.append(Self.seamArgument)
         app.launch()
@@ -1896,14 +1897,7 @@ final class A11yShotsTests: XCTestCase {
         undo.tap()
         XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the row back")
 
-        app.buttons["Кошче"].tap()
-        XCTAssertTrue(app.navigationBars["Кошче"].waitForExistence(timeout: 10),
-                      "«Кошче» opened nothing\n\(app.debugDescription)")
-        XCTAssertTrue(app.staticTexts["Препарат Тест 250 ЕК"].waitForExistence(timeout: 10),
-                      "the withdrawn treatment isn't listed\n\(app.debugDescription)")
-        XCTAssertTrue(app.buttons["Възстанови"].firstMatch.exists, "no «Възстанови» on a row")
-        Thread.sleep(forTimeInterval: 1)
-        capture("01j-trash", app: app)
+        XCTAssertFalse(app.buttons["Кошче"].exists, "«Кошче» was removed (#411)")
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

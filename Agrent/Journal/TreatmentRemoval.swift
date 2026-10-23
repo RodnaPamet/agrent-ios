@@ -9,8 +9,14 @@ import Observation
 /// The row leaves the list the moment it is swiped, and the bar under the
 /// list says what went, with «Отмени». Only once the window closes does the
 /// delete go to the server. So «Отмени» needs no signal and leaves nothing
-/// behind: no audit event, no restore. «Кошче» is the way back afterwards,
-/// for as long as the server keeps the treatment.
+/// behind: no audit event, no restore.
+///
+/// ── And then it is gone ──
+///
+/// There is no way back after the window (owner, 2026-10-24: "what's deleted
+/// is deleted"). «Кошче» and its restore were removed (#411), and the server
+/// erases the treatment rather than hiding it. So the window is the only
+/// second chance, which is why it is longer under assistive technology.
 ///
 /// A second swipe inside the window sends the first one at once. The bar
 /// names one treatment, and an «Отмени» that silently stood for an earlier
@@ -36,8 +42,9 @@ import Observation
 ///
 /// After the delete the list is read again (`JournalChanges`). A cached page
 /// can still hold the row, so a sent handle stays hidden until the next
-/// FRESH read, which no longer lists it. If that read does list it, it was
-/// restored meanwhile from «Кошче» or the web, and it is shown again.
+/// FRESH read, which no longer lists it. If that read does list it, the
+/// server still has it, and the list's answer is shown rather than the
+/// phone's belief.
 ///
 /// The app closed inside the window sends nothing: the treatment is still on
 /// the server and in the list on the next launch, which errs on the side of
@@ -88,9 +95,8 @@ final class TreatmentRemoval {
     static let window: Duration = .seconds(5)
 
     /// Under VoiceOver or Switch Control. From the swiped row to «Отмени»
-    /// is several moves, and five seconds is gone before the bar is reached.
-    /// The announcement says what went and that «Кошче» has it, which holds
-    /// after any window.
+    /// is several moves, and five seconds is gone before the bar is reached —
+    /// and with no «Кошче» (#411), missing it means the record is gone.
     static let assistedWindow: Duration = .seconds(20)
 
     private let window: Duration
@@ -141,16 +147,10 @@ final class TreatmentRemoval {
 
     func dismissFailure() { failure = nil }
 
-    /// A fresh read of the list answered. Whatever was sent is either gone
-    /// from it or was put back meanwhile, so the list's own answer stands.
+    /// A fresh read of the list answered. Whatever was sent is gone from it,
+    /// or the server still has it, so the list's own answer stands.
     func listRead() {
         stages = stages.filter { $0.value == .waiting }
-    }
-
-    /// Restored from «Кошче»: shown again on the next read.
-    func restored(_ handle: String) {
-        guard stages[handle] == .sent else { return }
-        stages[handle] = nil
     }
 
     private func sendNow(_ handle: String) {
@@ -197,10 +197,10 @@ final class TreatmentRemoval {
         return "Изтрито: \(undoable.title), \(extent)"
     }
 
-    /// What VoiceOver says at the swipe: the bar's sentence, and the way
-    /// back that doesn't run out.
+    /// What VoiceOver says at the swipe: the bar's sentence, and that the
+    /// way back is «Отмени» and nothing else — there is no «Кошче» (#411).
     nonisolated static func announcement(_ undoable: Undoable) -> String {
-        "\(removedText(undoable)). Може да бъде възстановено от «Кошче»."
+        "\(removedText(undoable)). Може да се върне само с «Отмени», докато лентата е на екрана."
     }
 
     static let undoTitle = "Отмени"

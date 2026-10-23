@@ -767,11 +767,9 @@ enum UserMessage {
         // the same route and no longer answers this; an older one still can,
         // to a phone that asked before it was deployed.
         "TREATMENT_COMPLETE": "Мероприятието вече е записано изцяло, затова не може да бъде прекратено.",
-        // A Дневник row's «Изтрий» and «Кошче»'s «Възстанови» (agri-saas
-        // #2184, agrent-ios #395), in the server's own words, which the web
-        // shows. The phone offers both to someone who may write; this is
-        // the server's finer rule, the treatment's creator or an
-        // administrator.
+        // A Дневник row's «Изтрий» (agri-saas #2184, agrent-ios #395), in the
+        // server's own words, which the web shows. The phone offers it where
+        // the row's `mayDelete` says yes; this is the route checking again.
         "TREATMENT_DELETE_NOT_PERMITTED":
             "Само човекът, записал това мероприятие, или администратор на стопанството може да го премахне.",
         // Tasks of one treatment recorded by different people, so "its
