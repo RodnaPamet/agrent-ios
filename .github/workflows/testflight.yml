@@ -245,6 +245,30 @@ jobs:
             echo "App Store Connect processes it for 5–30 min before it appears under TestFlight."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # #407: the archive step created an Apple Development certificate whose
+      # private key exists only on this runner. Revoked here, whether or not
+      # the export succeeded, because at one per build the team reaches
+      # Apple's limit and the next archive cannot sign. Only a certificate
+      # whose serial is in THIS runner's keychain is touched — see the
+      # script. It never fails the run: the upload has already happened, and
+      # the summary says so if a certificate was left behind.
+      - name: Revoke this run's development certificate
+        if: always()
+        continue-on-error: true
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          if python3 .github/scripts/revoke-run-certificate.py; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "This run's development certificate was revoked (or none was created)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**A development certificate from this run is still on the account** — revoke it by hand (#407)." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
       - name: Remove the API key
         if: always()
         run: rm -rf "$RUNNER_TEMP/asc"

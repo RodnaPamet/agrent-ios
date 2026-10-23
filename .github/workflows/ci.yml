@@ -740,6 +740,14 @@ jobs:
           done
           echo "Generated files are untracked, as intended."
 
+      # The TestFlight workflow revokes the development certificate each run
+      # creates (#407). That step can only meet Apple on a real upload, so the
+      # parts that need no account — the ES256 signature, the serial match,
+      # leaving other teams' and distribution certificates alone — are checked
+      # here on every push, with a throwaway key and certificate.
+      - name: The certificate revoker's self-test
+        run: python3 .github/scripts/revoke-run-certificate.py --self-test
+
   test:
     name: Build and test
     runs-on: macos-15
