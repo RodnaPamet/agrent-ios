@@ -16,19 +16,20 @@ final class FarmProfileEditTests: XCTestCase {
     /// FARM_PROFILE_EIK_NOT_EDITABLE. Hard-coded rather than read from the
     /// spec at test time: the suite must not depend on another repository's
     /// branch.
-    private let twelve: Set<String> = [
-        "producerName", "egn", "urn", "address", "municipality", "settlement",
+    /// MINUS `egn` too since #412: the owner does not collect it, and an
+    /// absent key is left alone by the server, which erases it itself.
+    private let eleven: Set<String> = [
+        "producerName", "urn", "address", "municipality", "settlement",
         "agricultureDirectorateCity", "registrationPlace", "registrationEkatte",
         "odbhCity", "sizeHa", "grainProduced",
     ]
 
     private func profile(
-        producerName: String? = "Иван Петров", egn: String? = "7501011234",
-        eik: String? = "203912345", urn: String? = "1234567",
+        producerName: String? = "Иван Петров", eik: String? = "203912345", urn: String? = "1234567",
         address: String? = nil, sizeHa: Double? = 39.758,
         grain: [String] = ["пшеница", "царевица"]
     ) -> FarmProfile {
-        FarmProfile(producerName: producerName, eik: eik, egn: egn, address: address,
+        FarmProfile(producerName: producerName, eik: eik, address: address,
                     settlement: "Плевен", municipality: "Плевен",
                     registrationPlace: nil, registrationEkatte: "56722",
                     odbhCity: nil, agricultureDirectorateCity: nil,
@@ -67,32 +68,32 @@ final class FarmProfileEditTests: XCTestCase {
     // MARK: - The body: whole object, always
 
     /// agri-saas#1176. An absent key WAS nulled by the usecase until #1181
-    /// made it "left alone"; all twelve writable keys, every time, is correct
+    /// made it "left alone"; all eleven writable keys, every time, is correct
     /// under both and does not depend on which server build answers —
     /// including when every value is null, which is exactly when the
     /// synthesised `Encodable` would have dropped them all.
     func testTheBodyAlwaysCarriesAllTwelveWritableKeys() throws {
         let full = try json(body(profile()))
-        XCTAssertEqual(Set(full.keys), twelve)
-        XCTAssertEqual(full.count, 12)
+        XCTAssertEqual(Set(full.keys), eleven)
+        XCTAssertEqual(full.count, 11)
 
-        let empty = FarmProfile(producerName: nil, eik: nil, egn: nil, address: nil,
+        let empty = FarmProfile(producerName: nil, eik: nil, address: nil,
                                 settlement: nil, municipality: nil, registrationPlace: nil,
                                 registrationEkatte: nil, odbhCity: nil,
                                 agricultureDirectorateCity: nil, urn: nil, sizeHa: nil,
                                 grainProduced: [])
         let blank = try json(body(empty) { $0[.producerName] = "Ново стопанство" })
-        XCTAssertEqual(Set(blank.keys), twelve, "nil fields were omitted — and omitted is erased")
+        XCTAssertEqual(Set(blank.keys), eleven, "nil fields were omitted — and omitted is erased")
         XCTAssertNil(blank["eik"], "a null eik would clear a stored ЕИК, which is a 400")
-        XCTAssertTrue(blank["egn"] is NSNull)
+        XCTAssertNil(blank["egn"], "no ЕГН is ever sent (#412)")
         XCTAssertTrue(blank["sizeHa"] is NSNull)
         XCTAssertEqual(blank["grainProduced"] as? [String], [])
     }
 
-    /// Exactly the twelve: unknown keys are stripped server-side, so an
+    /// Exactly the eleven: unknown keys are stripped server-side, so an
     /// extra one would be a value the farmer believes saved and is not.
     func testTheBodyCarriesNothingElse() throws {
-        XCTAssertEqual(Set(try json(body(profile())).keys).subtracting(twelve), [])
+        XCTAssertEqual(Set(try json(body(profile())).keys).subtracting(eleven), [])
     }
 
     /// agri-saas#1352: the PUT refuses a body whose `eik` differs from the
@@ -123,12 +124,12 @@ final class FarmProfileEditTests: XCTestCase {
     /// Only the ЕИК is held back, and it is the only field shown read-only.
     func testTheEIKIsTheOnlyFieldNotWritable() {
         XCTAssertEqual(FarmProfileText.allCases.filter { !$0.isWritable }, [.eik])
-        XCTAssertEqual(FarmProfileText.writable.count, 10)
+        XCTAssertEqual(FarmProfileText.writable.count, 9, "ten until #412 removed the ЕГН")
         XCTAssertEqual(FarmProfileText.writable,
                        FarmProfileText.allCases.filter { $0 != .eik }, "the web's order moved")
     }
 
-    /// Read-modify-write: editing ONE field sends the other eleven exactly as
+    /// Read-modify-write: editing ONE field sends the other ten exactly as
     /// loaded — the case the wipe in #1176 was reproduced with.
     func testEditingOneFieldKeepsTheOtherTwelve() throws {
         let original = profile(grain: ["Пшеница", "царевица"])
@@ -148,7 +149,7 @@ final class FarmProfileEditTests: XCTestCase {
         let sent = try body(profile()) { $0[.urn] = "" }
         XCTAssertNil(sent.text[.urn] ?? nil)
         XCTAssertTrue(try json(sent)["urn"] is NSNull)
-        XCTAssertEqual(sent.text[.egn] ?? nil, "7501011234", "a neighbour was cleared too")
+        XCTAssertEqual(sent.text[.producerName] ?? nil, "Иван Петров", "a neighbour was cleared too")
 
         // Whitespace-only is empty to the server (trim → blank → null), so it
         // is a clear here as well rather than a value that silently becomes one.
@@ -231,7 +232,6 @@ final class FarmProfileEditTests: XCTestCase {
     /// `UpdateFarmProfileSchema`'s `.max(n)`, per field, in UTF-16 units.
     func testTheTextLimitsAreTheRoutes() {
         XCTAssertEqual(FarmProfileText.producerName.maxLength, 300)
-        XCTAssertEqual(FarmProfileText.egn.maxLength, 20)
         XCTAssertEqual(FarmProfileText.eik.maxLength, 20)
         XCTAssertEqual(FarmProfileText.urn.maxLength, 40)
         XCTAssertEqual(FarmProfileText.address.maxLength, 500)
@@ -245,13 +245,16 @@ final class FarmProfileEditTests: XCTestCase {
         }.isEmpty)
     }
 
-    /// No checksum, no digit count: the server takes any ЕГН up to 20
-    /// characters, and so does this. A foreign national's ЛНЧ or a typo the
-    /// farmer means to fix later must not be refused harder here than there.
-    func testTheEGNIsNotValidatedHarderThanTheServer() {
-        XCTAssertTrue(problems(profile()) { $0[.egn] = "12" }.isEmpty)
-        XCTAssertTrue(problems(profile()) { $0[.egn] = "ЛНЧ 1234567890" }.isEmpty)
+    /// No checksum, no digit count: the server takes any УРН up to 40
+    /// characters, and so does this.
+    func testTheURNIsNotValidatedHarderThanTheServer() {
         XCTAssertTrue(problems(profile()) { $0[.urn] = "BG203912345" }.isEmpty)
+    }
+
+    /// No ЕГН anywhere on the phone (#412): not a field, not a label.
+    func testThereIsNoEGNField() {
+        XCTAssertFalse(FarmProfileText.allCases.map(\.rawValue).contains("egn"))
+        XCTAssertFalse(FarmProfileText.allCases.contains { $0.label.contains("ЕГН") || ($0.hint ?? "").contains("ЕГН") })
     }
 
     // MARK: - Crops
@@ -328,16 +331,6 @@ final class FarmProfileEditTests: XCTestCase {
         draft[.producerName] = "<b>Иван</b>"
         let notes = FarmProfileSaveReport.notes(draft: draft, saved: profile(producerName: "Иван"))
         XCTAssertEqual(notes, ["«\(FarmProfileText.producerName.label)» е записано като «Иван»."])
-    }
-
-    /// The ЕГН is never written into a note — notes are plain on-screen text
-    /// and VoiceOver reads them.
-    func testANoteAboutTheEGNNeverCarriesTheNumber() {
-        var draft = FarmProfileDraft(profile())
-        draft[.egn] = "<i>7501011234</i>"
-        let notes = FarmProfileSaveReport.notes(draft: draft, saved: profile(egn: "7501011234"))
-        XCTAssertEqual(notes.count, 1)
-        XCTAssertFalse(notes.joined().contains("7501011234"))
     }
 
     // MARK: - Errors

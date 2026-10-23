@@ -150,7 +150,7 @@ struct AdminView: View {
 
     /// The producer's name as the row's value: it says WHICH farm, and it is
     /// the one field that appears on public filings anyway. Never an
-    /// identifier — the ЕИК, ЕГН and УРН stay one tap away, behind the page
+    /// identifier — the ЕИК and УРН stay one tap away, behind the page
     /// that knows how to show them.
     private var farmRow: some View {
         NavigationLink {

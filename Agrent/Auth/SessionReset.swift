@@ -108,7 +108,7 @@ import Foundation
 ///                                      name nothing of anybody's farm. Kept.
 ///
 ///   NOT singletons, and why they need nothing: every other store
-///   (`AdminStore` — the members list and the farm's ЕГН/ЕИК/УРН —
+///   (`AdminStore` — the members list and the farm's ЕИК/УРН —
 ///   `JournalStore`, `ExchangeInboxStore`, `ConversationStore`, …) is a
 ///   view's `@State`, and every view that owns one lives under `MainTabView`,
 ///   which `AgrentApp` tears down the moment `auth.state` leaves `.signedIn`.
