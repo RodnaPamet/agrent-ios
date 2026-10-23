@@ -158,9 +158,6 @@ enum FixtureCatalogue {
         // agrent-ios#399: the journal treatment's summary, whose one task is
         // the field-operation fixture's, so «Виж на картата» draws its lines.
         (TreatmentAPI.treatmentPath(fixtureTreatmentHandle), "treatment-summary"),
-        // agrent-ios#395: «Кошче». One row as #2184 first lists it (handle
-        // and dates only) and one with the summary the phone asked for.
-        (TreatmentTrashAPI.deletedPath, "treatments-deleted"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),

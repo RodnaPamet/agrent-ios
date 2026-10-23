@@ -1,7 +1,7 @@
 import XCTest
 @testable import Agrent
 
-/// A Дневник row's «Изтрий», its five seconds of «Отмени», and «Кошче»
+/// A Дневник row's «Изтрий» and its five seconds of «Отмени»
 /// (#395; agri-saas #2184). Nothing here reaches the server: every send is
 /// a closure that records what it was asked.
 @MainActor
@@ -122,8 +122,9 @@ final class TreatmentRemovalTests: XCTestCase {
     func testTheWindowIsTheWebsAndLongerUnderAssistiveTechnology() {
         XCTAssertEqual(TreatmentRemoval.window, .seconds(5))
         XCTAssertGreaterThan(TreatmentRemoval.assistedWindow, TreatmentRemoval.window)
-        XCTAssertTrue(TreatmentRemoval.announcement(.init(handle: "tg", title: "Препарат А")).contains("Кошче"),
-                      "the spoken sentence names the way back that doesn't run out")
+        let said = TreatmentRemoval.announcement(.init(handle: "tg", title: "Препарат А"))
+        XCTAssertTrue(said.contains("«Отмени»"), "the only way back is said")
+        XCTAssertFalse(said.contains("Кошче"), "there is no «Кошче» any more (#411)")
     }
 
     func testTheWindowClosingSendsItAndDropsThePhonesCopy() async throws {
@@ -188,70 +189,6 @@ final class TreatmentRemovalTests: XCTestCase {
         store.listRead()
         XCTAssertFalse(store.isHidden(entry("tg_sent")), "the list's own answer stands once it has one")
         XCTAssertTrue(store.isHidden(entry("tg_waiting")), "a row inside its window stays hidden")
-    }
-
-    func testARestoreFromTheTrashShowsItAgain() async {
-        let calls = Calls()
-        let store = removal(calls)
-        store.remove(entry())
-        await store.commit("tg_1")
-        store.restored("tg_1")
-        XCTAssertFalse(store.isHidden(entry()))
-    }
-
-    // MARK: - «Кошче»
-
-    private func fixture(_ name: String) throws -> Data {
-        try Data(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .appendingPathComponent("Fixtures/\(name).json"))
-    }
-
-    func testTheTrashReadsBothShapes() throws {
-        let rows = try TreatmentTrashAPI.decodeList(from: fixture("treatments-deleted"))
-        XCTAssertEqual(rows.map(\.id), ["tg_fixture_deleted_1", "tg_fixture_deleted_2"])
-        let full = rows[0]
-        XCTAssertEqual(TrashRow.title(full), "Препарат Тест 250 ЕК")
-        XCTAssertNotNil(full.deletedAt)
-        XCTAssertEqual(full.blockNames, ["Блок Север", "Блок Юг"])
-        XCTAssertEqual(TrashRow.lines(full).count, 3, "done, where, removed")
-        XCTAssertTrue(TrashRow.lines(full)[0].contains("дка"), "hectares on the wire, decares on screen")
-        XCTAssertFalse(TrashRow.lines(full, spoken: true)[0].contains("дка"), "said in words")
-        XCTAssertEqual(full.mayRestore, true)
-        XCTAssertTrue(TreatmentTrashView.mayRestore(full, me: me(id: "u")))
-
-        let bare = rows[1]
-        XCTAssertEqual(TrashRow.title(bare), "Мероприятие", "only the handle and the dates")
-        XCTAssertEqual(TrashRow.lines(bare).count, 2, "done, removed")
-        XCTAssertFalse(TreatmentTrashView.mayRestore(bare, me: me(id: "u")),
-                       "the server said no: «Възстанови» is not offered")
-        XCTAssertFalse(TreatmentTrashView.mayRestore(full, me: me(id: "u", canWrite: false)))
-    }
-
-    func testAFullTrashSaysItIsTheNewest() {
-        XCTAssertEqual(TreatmentTrashView.header(2), "2 изтрити мероприятия")
-        XCTAssertEqual(TreatmentTrashView.header(TreatmentTrashAPI.limit), "Последните 200 изтрити мероприятия")
-    }
-
-    func testOneOddRowCostsOnlyItself() throws {
-        let body = """
-        {"treatments": [
-          {"treatmentGroupId": "tg_a", "deletedAt": "not a date", "taskCount": "two",
-           "occurredOn": null, "deletedByUserId": null, "blockNames": "Блок"},
-          {"deletedAt": "2026-10-21T08:30:00.000Z", "taskCount": 1},
-          {"treatmentGroupId": "tg_b", "deletedAt": "2026-10-21T08:30:00Z", "taskCount": 1,
-           "occurredOn": "2026-10-20", "deletedByUserId": null, "kind": "FERTILIZE"}
-        ]}
-        """
-        let rows = try TreatmentTrashAPI.decodeList(from: Data(body.utf8))
-        XCTAssertEqual(rows.map(\.id), ["tg_a", "tg_b"], "a row with no handle cannot be restored, so it alone goes")
-        XCTAssertNil(rows[0].deletedAt)
-        XCTAssertEqual(rows[0].blockNames, [])
-        XCTAssertEqual(TrashRow.title(rows[1]), "Торене")
-    }
-
-    func testTheRoutesAreTheTreatmentsOwn() {
-        XCTAssertTrue(TreatmentTrashAPI.deletedPath.hasSuffix("/journal/treatments/deleted"))
-        XCTAssertTrue(TreatmentTrashAPI.restorePath("tg 1").hasSuffix("/journal/treatments/tg%201/restore"))
     }
 
     func testTheRefusalsAreBulgarian() {

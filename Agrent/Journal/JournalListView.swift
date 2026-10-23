@@ -17,8 +17,6 @@ struct JournalListView: View {
     @State private var changes = JournalChanges.shared
     /// Rows swiped away, inside their five seconds or just sent (#395).
     @State private var removal = TreatmentRemoval()
-    /// «Кошче» is up (#395).
-    @State private var trashing = false
     /// A swipe the server refused is being said (#395).
     @State private var refused = false
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
@@ -99,17 +97,6 @@ struct JournalListView: View {
                     .accessibilityLabel("Дневник (PDF)")
                     .accessibilityInputLabels(A11y.Spoken.farmRecord)
                 }
-                // Removed treatments, to restore (#395). For every role: the
-                // listing is a read, and a reader may want to see what went.
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        trashing = true
-                    } label: {
-                        Label("Кошче", systemImage: "trash")
-                    }
-                    .accessibilityLabel("Кошче")
-                    .accessibilityInputLabels(A11y.Spoken.trash)
-                }
             }
             // «Нов запис» is the two-step treatment record (#293). The saved
             // entry comes back from the server folded into one row, which
@@ -123,12 +110,6 @@ struct JournalListView: View {
             }
             .sheet(isPresented: $exportingRecord, onDismiss: FarmRecordAPI.removeGenerated) {
                 FarmRecordSheet()
-            }
-            .sheet(isPresented: $trashing) {
-                TreatmentTrashView { handle in
-                    removal.restored(handle)
-                    changes.changed()
-                }
             }
             .alert("Мероприятието не е изтрито", isPresented: $refused, presenting: removal.failure) { _ in
                 Button("Затвори", role: .cancel) { removal.dismissFailure() }

@@ -741,7 +741,7 @@ from the product. Seed treatment: not now.
 Offered and **not** chosen: PRZ's per-field layout by farming year, a crop
 record per block, and other activities with yield and cloning.
 
-### Matched — a swipe removes the whole treatment, with «Отмени» and «Кошче» (#395, owner 2026-10-22; agri-saas #2184)
+### Matched — a swipe removes the whole treatment, with «Отмени» and no way back after it (#395, owner 2026-10-22; #411, owner 2026-10-24; agri-saas #2184)
 
 The owner asked for the website's swipe-to-delete, on the phone too, and
 ruled what it removes: the **whole treatment**, every parcel and block,
@@ -755,7 +755,7 @@ before building the routes.
 - **It's offered** where the row's `mayDelete` says the server would allow it. The server computes that from the same predicate its route asserts with: the creator or an administrator, and a single author across the treatment's tasks. That last part refuses administrators too, so no creator field could express it. A cached row from before the field offers it to anyone who may write, and the server's refusal is shown.
 - **The row leaves the list at once.** A bar above «Нов запис» says what went and how much of the register that was, «Изтрито: Препарат, 3 парцела в 2 блока», since one row can stand for a dozen parcels (the web's toast names the count too, agri-saas #2192). It offers «Отмени» for five seconds, as on the web, and twenty under VoiceOver or Switch Control. Nothing is sent until the window closes, so «Отмени» needs no signal and leaves no audit event. A second swipe sends the first at once, so «Отмени» only ever stands for the treatment the bar names.
 - **Then** `DELETE /journal/treatments/{handle}` goes out. The phone's own copy in the outbox goes with it, because the server releases an unfinished treatment's key and a resend would record it again. A refusal brings the row back with the server's sentence. A 404 counts as done.
-- **«Кошче»**, from Дневник's toolbar, lists withdrawn treatments, newest first. The server sends at most 200 and doesn't page them. Each row shows the product, the day, the parcels, the area in decares and the blocks. Those come from the listing itself, since a withdrawn handle no longer resolves. «Възстанови» (`POST …/restore`) is offered where the row's `mayRestore` says yes, under the same gate. Restoring brings the treatment back to the list and the register exactly as recorded.
+- **No «Кошче»** (owner, 2026-10-24: "what's deleted is deleted", #411). The trash list and its restore are gone from the phone, and the 5-second «Отмени» is the only way back. On the server the owner chose to have the DELETE erase the treatment from the database, keeping only the audit line. That's agri-saas's to build, confirmed with the owner directly.
 
 **The server** has the routes since agri-saas #2184, live at 683d52a on
 2026-10-22. The web's swipe row and Trash view are still to come.
