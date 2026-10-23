@@ -116,8 +116,8 @@ final class DashboardStore {
     /// THREE MONTHS of history for one number.
     ///
     /// The block shows the latest price, so a shorter range would do — but the
-    /// range also decides which series look current, and `rankedForDefaultDisplay`
-    /// ranks on `lastObservedAt`. A one-week window on a monthly feed returns a
+    /// range also decides which series look current, and `lead()` falls back to
+    /// ranking on `lastObservedAt`. A one-week window on a monthly feed returns a
     /// series with no points and a null observation date, which would rank last
     /// and hand the block a stale line while a fresher one existed. The range
     /// that answers "what is it worth today" is not the shortest one.
@@ -132,12 +132,9 @@ final class DashboardStore {
         } publish: { [weak self] in self?.prices = $0 }
     }
 
-    /// The one series the price block shows, and how many it stands for.
-    ///
-    /// Forwards to `PricesResponse.dashboardSeries`, which is where the rule
-    /// lives so it can be tested without a loaded store — the selection is the
-    /// part that can be wrong, and `prices` is `private(set)`.
-    var chosenPriceSeries: (series: PriceSeries, outOf: Int)? {
-        prices.value?.dashboardSeries
+    /// The one series the price block shows: Тенденции's headline, by the
+    /// same rule (`Array.lead()`, #409), so the two screens quote one number.
+    var leadPrice: PriceSeries? {
+        prices.value?.lead
     }
 }

@@ -101,39 +101,24 @@ final class PriceSeriesIdentityTests: XCTestCase {
         XCTAssertEqual(Set(ids).count, ids.count)
     }
 
-    /// Wheat arrives as USD per metric ton AND as EUR/t. On one axis the
-    /// gap between them draws as a price movement when it is a exchange
-    /// rate — the same rule the exchange map enforces.
-    func testCurrenciesAreNeverGroupedTogether() async throws {
+    /// Wheat arrives as USD per metric ton AND as EUR/t. The lead is chosen
+    /// inside one (region, currency, unit) group, so a fresher USD print can
+    /// never hand the headline a number in another currency.
+    func testTheLeadNeverCrossesACurrency() async throws {
         let wheatJSON = """
         {"commodity":"wheat","range":"1y","generatedAt":"2026-09-22T20:03:25.529Z","series":[
-          {"source":"alpha-vantage","region":"GLOBAL","stage":null,"unit":"dollar per metric ton","currency":"USD","label":"Reference (Alpha Vantage)","lastObservedAt":"2026-07-01","points":[{"date":"2026-07-01","price":228.74}]},
+          {"source":"alpha-vantage","region":"GLOBAL","stage":null,"unit":"dollar per metric ton","currency":"USD","label":"Reference (Alpha Vantage)","lastObservedAt":"2026-09-01","points":[{"date":"2026-09-01","price":228.74}]},
           {"source":"ec-agrifood","region":"BG","stage":"Burgas - DEPPROD","unit":"EUR/t","currency":"EUR","label":"Breadmaking common wheat","lastObservedAt":"2026-07-20","points":[{"date":"2026-07-20","price":177}]}
         ]}
         """
-        let store = TrendsStore()
-        store.setPricesForTesting(try await decode(wheatJSON))
-        XCTAssertEqual(store.groups.count, 2, "USD and EUR must not share a chart")
-        for group in store.groups {
-            XCTAssertEqual(Set(group.series.map(\.currency)).count, 1)
-            XCTAssertEqual(Set(group.series.map(\.unit)).count, 1)
-        }
+        let lead = try await decode(wheatJSON).lead
+        XCTAssertEqual(lead?.currency, "EUR", "Bulgaria's EUR quote, not the fresher USD reference")
     }
 
-    /// Four diesel series, one unit, one currency — so ONE chart. The rule
-    /// splits on currency, not on series count, and a test that only ever
-    /// saw the splitting case would not prove that.
-    func testOneCurrencyStaysOneChart() async throws {
-        let store = TrendsStore()
-        store.setPricesForTesting(try await decode(dieselJSON))
-        XCTAssertEqual(store.groups.count, 1)
-        XCTAssertEqual(store.groups.first?.series.count, 3)
-    }
-
-    /// The chart holding the platform's typed price is drawn first (#1587):
-    /// typed diesel is per litre, so it is a chart of its own, and it is the
-    /// price the farm's figures use today.
-    func testThePlatformsChartComesFirst() async throws {
+    /// The platform's typed price leads (#1587): typed diesel is per litre,
+    /// so it is in a group of its own, and it is the price the farm's figures
+    /// use today.
+    func testThePlatformsPriceLeads() async throws {
         let json = """
         {"commodity":"diesel","range":"1y","generatedAt":"2026-09-22T20:03:25.529Z","series":[
           {"source":"oil-bulletin","region":"BG","stage":"without-tax","unit":"EUR/1000l","currency":"EUR","label":"Automotive gas oil","lastObservedAt":"2026-09-14","points":[{"date":"2026-09-14","price":1216.62}]},
@@ -142,19 +127,21 @@ final class PriceSeriesIdentityTests: XCTestCase {
         """
         let store = TrendsStore()
         store.setPricesForTesting(try await decode(json))
-        XCTAssertEqual(store.groups.map(\.unit), ["EUR/l", "EUR/1000l"])
+        XCTAssertEqual(store.lead?.source, "platform")
         XCTAssertEqual(SeriesVocabulary.unitHeading(unit: "EUR/l", currency: "EUR"), "евро на литър")
-        XCTAssertEqual(store.groups.first?.series.first?.headline(1.42), "1,42 евро на литър")
+        XCTAssertEqual(store.lead?.headline(1.42), "1,42 евро на литър")
+        XCTAssertEqual(SeriesSource.name(of: store.lead!), "Въведена от Agrent")
     }
 
-    /// Hiding every line leaves a full legend over an empty chart, which
-    /// reads as a load failure.
-    func testTheLastVisibleSeriesCannotBeHidden() async throws {
-        let store = TrendsStore()
-        store.setPricesForTesting(try await decode(dieselJSON))
-        let series = store.groups.first!.series
-        for one in series { store.toggle(one) }
-        XCTAssertEqual(series.filter(store.isVisible).count, 1)
+    /// Diesel's two Bulgarian tax bases are one group; the lead is one of
+    /// them, the same one on every open, and the row says which.
+    func testOneOfTwoComplementsIsChosenStably() async throws {
+        let first = try await decode(dieselJSON).lead
+        let again = try await decode(dieselJSON).lead
+        XCTAssertEqual(first?.region, "BG")
+        XCTAssertEqual(first?.id, again?.id)
+        XCTAssertTrue(["България · без данъци и акциз", "България · с данъци и акциз"]
+            .contains(SeriesSource.name(of: first!)))
     }
 }
 
@@ -408,91 +395,122 @@ final class SeriesVocabularyTests: XCTestCase {
     }
 }
 
-/// Default visibility, and the fact that it stops once the reader has an
-/// opinion.
+/// The one price Тенденции and Табло quote (#409, owner 2026-10-23): the web's
+/// rule, the national average first.
 @MainActor
-final class SeriesVisibilityTests: XCTestCase {
+final class LeadSeriesTests: XCTestCase {
 
-    /// Wheat's EUR/t group really does carry 23 series — the EC agri-food
-    /// feed quotes every member state, nine of them in Bulgaria. Shaped
-    /// like the real payload, at that scale.
-    private func manySeries() -> PricesResponse {
-        var series: [PriceSeries] = []
-        let regions = ["BG", "BG", "BG", "BG", "BG", "BG", "BG", "BG", "BG",
-                       "RO", "HU", "PL", "FR", "DE", "EL"]
-        for (index, region) in regions.enumerated() {
-            let json = """
-            {"source":"ec-agrifood","region":"\(region)","stage":"stage-\(index)",
-             "unit":"EUR/t","currency":"EUR","label":"L\(index)",
-             "lastObservedAt":"2026-0\(1 + index % 9)-01",
-             "points":[{"date":"2026-01-01","price":\(170 + index)}]}
-            """
-            series.append(try! JSONDecoder().decode(PriceSeries.self, from: Data(json.utf8)))
+    private func series(_ source: String = "ec-agrifood", region: String = "BG", stage: String? = nil,
+                        unit: String = "EUR/t", currency: String = "EUR", label: String? = nil,
+                        observed: String, prices: [Double] = [180]) -> PriceSeries {
+        let points = prices.enumerated().map { index, price in
+            #"{"date":"2026-0\#(1 + index % 9)-01","price":\#(price)}"#
+        }.joined(separator: ",")
+        let stageJSON = stage.map { "\"\($0)\"" } ?? "null"
+        let labelJSON = label.map { "\"\($0)\"" } ?? "null"
+        let json = """
+        {"source":"\(source)","region":"\(region)","stage":\(stageJSON),"unit":"\(unit)","currency":"\(currency)",
+         "label":\(labelJSON),"lastObservedAt":"\(observed)","points":[\(points)]}
+        """
+        return try! JSONDecoder().decode(PriceSeries.self, from: Data(json.utf8))
+    }
+
+    /// Wheat as production sends it, synthetic numbers: nine delivery points,
+    /// the national average, the EU average and the USD reference.
+    private func wheat(national: Bool = true) -> [PriceSeries] {
+        var all = ["Burgas", "Dobrich", "Varna", "Ruse", "Pleven"].map {
+            series(stage: "\($0) - DEPPROD", observed: "2026-07-20")
         }
-        return PricesResponse(
-            commodity: "wheat", range: "1y",
-            generatedAt: Date(timeIntervalSince1970: 1_790_000_000), series: series)
+        all.append(series(stage: "Departure from farm or from production area - on truck or other transport means",
+                          observed: "2026-08-03"))
+        if national { all.append(series(stage: "National Average - Not Specified", observed: "2026-07-27")) }
+        all.append(series(region: "EU", stage: "EU average", observed: "2026-08-10"))
+        all.append(series("alpha-vantage", region: "GLOBAL", unit: "dollar per metric ton", currency: "USD",
+                          observed: "2026-09-01"))
+        return all
     }
 
-    func testTheDefaultIsThreeLinesNotTwentyThree() {
-        let store = TrendsStore()
-        store.setPricesForTesting(manySeries(), applyDefaults: true)
-        let group = store.groups.first!
-        XCTAssertEqual(group.series.count, 15)
-        XCTAssertEqual(group.series.filter(store.isVisible).count, 3)
+    /// The owner's choice over the freshest quotation, which here is three
+    /// weeks newer: the national average answers "what is wheat worth".
+    func testTheNationalAverageLeads() {
+        let lead = wheat().lead()
+        XCTAssertEqual(lead?.stage, "National Average - Not Specified")
+        XCTAssertEqual(SeriesSource.name(of: lead!), "Средна за България")
     }
 
-    /// Bulgaria first — this is a Bulgarian farm.
-    func testTheDefaultPrefersBulgaria() {
-        let store = TrendsStore()
-        store.setPricesForTesting(manySeries(), applyDefaults: true)
-        let shown = store.groups.first!.series.filter(store.isVisible)
-        XCTAssertTrue(shown.allSatisfy { $0.region == "BG" }, shown.map(\.region).description)
+    /// Without one (sunflower has none), the freshest Bulgarian quotation.
+    func testWithoutItTheFreshestBulgarianOne() {
+        let lead = wheat(national: false).lead()
+        XCTAssertEqual(lead?.region, "BG")
+        XCTAssertTrue(lead?.stage?.hasPrefix("Departure from farm") ?? false)
+        XCTAssertEqual(SeriesSource.name(of: lead!), "България · франко стопанство")
     }
 
-    /// Freshest first: a series that stopped in spring says less about
-    /// today than one observed last week.
-    func testTheDefaultPrefersTheMostRecentlyObserved() {
-        let store = TrendsStore()
-        store.setPricesForTesting(manySeries(), applyDefaults: true)
-        let shown = store.groups.first!.series.filter(store.isVisible)
-        let hiddenBG = store.groups.first!.series
-            .filter { $0.region == "BG" && !store.isVisible($0) }
-        let newestHidden = hiddenBG.compactMap(\.lastObservedAt).max() ?? ""
-        for one in shown {
-            XCTAssertGreaterThanOrEqual(one.lastObservedAt ?? "", newestHidden)
-        }
+    /// Bulgaria, then the EU average, then whichever group reported last.
+    func testRegionsInOrder() {
+        let noBulgaria = wheat().filter { $0.region != "BG" }
+        XCTAssertEqual(noBulgaria.lead()?.region, "EU")
+        let onlyGlobal = wheat().filter { $0.region == "GLOBAL" }
+        XCTAssertEqual(onlyGlobal.lead()?.currency, "USD", "something rather than nothing")
     }
 
-    /// THE ONE THE COMMENT WAS WRONG ABOUT.
-    ///
-    /// `applyDefaultVisibility` runs on every load, so changing the range
-    /// re-derived the defaults and silently undid the reader's choice of
-    /// lines. The comment on `select(_ range:)` said the choice survived.
-    /// It did not.
-    func testAHandPickedSelectionSurvivesAReload() async {
-        let store = TrendsStore()
-        store.setPricesForTesting(manySeries(), applyDefaults: true)
-        let hiddenOne = store.groups.first!.series.first { !store.isVisible($0) }!
-        store.toggle(hiddenOne)
-        XCTAssertTrue(store.isVisible(hiddenOne))
-
-        // A second payload arriving — what a range change does.
-        store.setPricesForTesting(manySeries(), applyDefaults: true)
-        XCTAssertTrue(store.isVisible(hiddenOne),
-                      "reloading threw away the reader's choice of series")
+    /// Our own users' asking prices are not the market, unless they are all
+    /// there is.
+    func testOwnListingsAreALastResort() {
+        let listings = series("listings", observed: "2026-09-20")
+        let withQuote = [listings, series(region: "EU", observed: "2026-07-01")]
+        XCTAssertEqual(withQuote.lead()?.source, "ec-agrifood")
+        XCTAssertEqual([listings].lead()?.source, "listings")
     }
 
-    /// Changing commodity DOES reset: a series id from wheat means nothing
-    /// under diesel.
-    func testChangingCommodityResetsTheChoice() async {
-        let store = TrendsStore()
-        store.setPricesForTesting(manySeries(), applyDefaults: true)
-        let hiddenOne = store.groups.first!.series.first { !store.isVisible($0) }!
-        store.toggle(hiddenOne)
-        store.commodity = .diesel
-        store.resetSeriesChoiceForTesting()
-        store.setPricesForTesting(manySeries(), applyDefaults: true)
-        XCTAssertFalse(store.isVisible(hiddenOne))
+    func testNothingToQuote() {
+        XCTAssertNil([series(observed: "2026-09-01", prices: [])].lead())
+        XCTAssertNil([PriceSeries]().lead())
+    }
+
+    /// A tie resolves the same way whatever order the server sent.
+    func testATieIsStable() {
+        let a = series(stage: "Burgas - DEPPROD", observed: "2026-07-20")
+        let b = series(stage: "Varna - DEPPROD", observed: "2026-07-20")
+        XCTAssertEqual([a, b].lead()?.id, [b, a].lead()?.id)
+    }
+
+    // MARK: - The change over the period
+
+    func testTheChangeIsFirstToLatest() throws {
+        let rise = try XCTUnwrap(PeriodChange(series(observed: "2026-03-01", prices: [176, 180, 183.5])))
+        XCTAssertEqual(rise.percent, (183.5 - 176) / 176 * 100, accuracy: 0.0001)
+        XCTAssertEqual(rise.text(over: .year1), "▲ 4,3 % за 1 година")
+        XCTAssertEqual(rise.spoken(over: .year1), "Нагоре с 4,3 процента за 1 година")
+        let fall = try XCTUnwrap(PeriodChange(series(observed: "2026-02-01", prices: [200, 190])))
+        XCTAssertEqual(fall.text(over: .month1), "▼ 5,0 % за 1 месец")
+        let flat = try XCTUnwrap(PeriodChange(series(observed: "2026-02-01", prices: [200, 200.05])))
+        XCTAssertEqual(flat.text(over: .month3), "Без промяна за 3 месеца")
+    }
+
+    func testOnePointHasNoChange() {
+        XCTAssertNil(PeriodChange(series(observed: "2026-01-01", prices: [180])))
+    }
+
+    // MARK: - Where it comes from, in Bulgarian
+
+    func testSourcesAreBulgarian() {
+        XCTAssertEqual(SeriesSource.name(of: series(stage: "Burgas - DEPPROD", observed: "2026-07-20")), "Бургас")
+        XCTAssertEqual(SeriesSource.name(of: series(stage: "Stara Zagora - DEPPROD", observed: "2026-07-20")),
+                       "Стара Загора")
+        XCTAssertEqual(SeriesSource.name(of: series("oil-bulletin", stage: "with-tax", observed: "2026-09-14")),
+                       "България · с данъци и акциз")
+        XCTAssertEqual(SeriesSource.name(of: series("listings", observed: "2026-09-14")), "Обявите в Agrent")
+        XCTAssertEqual(SeriesSource.name(of: series("synthetic", label: "Синтетична борсова цена", observed: "2026-09-14")),
+                       "България · Синтетична борсова цена")
+    }
+
+    /// An English stage or label the phone does not know is LEFT OUT: the
+    /// region alone is true, an untranslated sentence is the defect.
+    func testUnknownEnglishNeverReachesTheScreen() {
+        let odd = series(stage: "Delivered free at frontier - by rail", label: "Breadmaking common wheat",
+                         observed: "2026-07-20")
+        XCTAssertEqual(SeriesSource.name(of: odd), "България")
+        XCTAssertEqual(SeriesSource.name(of: series(stage: "Gotham - DEPPROD", observed: "2026-07-20")), "България")
     }
 }

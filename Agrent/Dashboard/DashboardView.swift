@@ -117,7 +117,7 @@ struct DashboardView: View {
     private func hasData(_ block: DashboardBlock) -> Bool {
         switch block {
         case .briefing: store.briefing.value != nil || store.briefing.isFailed
-        case .grainPrice: store.chosenPriceSeries != nil || store.prices.isFailed
+        case .grainPrice: store.leadPrice != nil || store.prices.isFailed
         case .journal: !(store.ag.value?.recentJournal.isEmpty ?? true)
         case .taskTrend: !(store.taskTrend.value?.trend.isEmpty ?? true)
         case .tasks: !(store.ag.value?.myTasks.isEmpty ?? true)
@@ -241,45 +241,35 @@ struct DashboardView: View {
 
     // MARK: - Цена на избрана култура
 
-    /// ONE series, named, with how many it stands for — never "the price".
+    /// ONE series, named — Тенденции's headline (#409), never "the price"
+    /// without saying whose.
     @ViewBuilder
     private var priceSection: some View {
-        if let chosen = store.chosenPriceSeries, let latest = chosen.series.points.last {
+        if let lead = store.leadPrice, let latest = lead.points.last {
             Section(titled: preferences.priceCommodity.label) {
                 VStack(alignment: .leading, spacing: 4) {
                     // Тенденции's unit wording, not a `currency/unit` of our
                     // own: every input's unit already carries its currency,
                     // and interpolating read «1216,62 EUR/EUR/1000l» (#121).
-                    Text(chosen.series.headline(latest.price))
+                    Text(lead.headline(latest.price))
                         .font(.title3.weight(.semibold))
 
-                    // The series' own identity, because two Bulgarian diesel
-                    // series differ by over fifty per cent and a bare number
-                    // would be one of them pretending to be both.
-                    Text(A11y.sentence([
-                        chosen.series.displayLabel,
-                        chosen.series.region,
-                        chosen.series.stage,
-                    ]))
-                    .font(.caption)
-                    .foregroundStyle(Palette.secondaryText)
+                    // Whose number, in Bulgarian (`SeriesSource`): two
+                    // Bulgarian diesel series differ by over fifty per cent,
+                    // and this line used to print the region code and the EC
+                    // feed's English stage.
+                    Text(SeriesSource.name(of: lead))
+                        .font(.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                        .accessibilityLabel(A11y.sentence(SeriesSource.parts(of: lead)))
 
                     if let age = Staleness.days(
                         generatedAt: store.prices.value?.generatedAt ?? Date(),
-                        lastObservedAt: chosen.series.lastObservedAt) {
+                        lastObservedAt: lead.lastObservedAt) {
                         // Typed, not observed: the platform's price says so.
-                        Text("\(chosen.series.isPlatformPrice ? "Въведена" : "Отчетена") преди \(Plural.bg(age, "ден", "дни"))")
+                        Text("\(lead.isPlatformPrice ? "Въведена" : "Отчетена") преди \(Plural.bg(age, "ден", "дни"))")
                             .font(.caption)
                             .foregroundStyle(age >= Staleness.concerning ? Palette.warning : Palette.secondaryText)
-                    }
-
-                    if chosen.outOf > 1 {
-                        Text("1 от \(chosen.outOf) серии — вижте Тенденции за всички.")
-                            .font(.caption2)
-                            // `.tertiary` is 1.73:1 on a white row. This
-                            // sentence is the only thing telling a farmer the
-                            // number above is one of several.
-                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
                 .pageRow()

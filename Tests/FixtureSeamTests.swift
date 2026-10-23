@@ -131,6 +131,7 @@ final class FixtureSeamTests: XCTestCase {
              "dashboard-task-trend"),
             (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
             (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
+            (TrendsAPI.pricesPath(.wheat, range: .year1), "trends-prices"),
             (TrendsAPI.newsPath(.all), "trends-news"),
             // #231: the topics' feed, the catalogue and the choices.
             (TrendsAPI.newsPath(tags: ["subsidies", "wheat"], query: nil, cursor: nil), "trends-news-mine"),
@@ -211,7 +212,9 @@ final class FixtureSeamTests: XCTestCase {
             // not answer a maize chart, and «Всички» must not answer a
             // category filter. Each is a different request and has no payload.
             TrendsAPI.pricesPath(.maize, range: .month3),
-            TrendsAPI.pricesPath(.wheat, range: .year1),
+            // 1 год. is answered since #409 (Тенденции opens on it); «Всички»
+            // is still a different request with no payload.
+            TrendsAPI.pricesPath(.wheat, range: .all),
             TrendsAPI.newsPath(.policy),
             // #138: only the ONE field operation has lines; and a line's
             // MARK path is a write, which no fixture may ever answer — the

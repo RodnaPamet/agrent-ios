@@ -70,9 +70,8 @@ final class DashboardScreenTests: XCTestCase {
         let chosen = response([
             series("ec", region: "EL", lastObserved: "2026-09-25", points: 20),
             series("ec", region: "BG", lastObserved: "2026-09-20", points: 20),
-        ]).dashboardSeries
-        XCTAssertEqual(chosen?.series.region, "BG")
-        XCTAssertEqual(chosen?.outOf, 2)
+        ]).lead
+        XCTAssertEqual(chosen?.region, "BG")
     }
 
     /// Freshest first, then the longest record: a series observed last week says
@@ -82,14 +81,14 @@ final class DashboardScreenTests: XCTestCase {
         let chosen = response([
             series("a", region: "BG", lastObserved: "2026-05-01", points: 200),
             series("b", region: "BG", lastObserved: "2026-09-25", points: 8),
-        ]).dashboardSeries
-        XCTAssertEqual(chosen?.series.source, "b")
+        ]).lead
+        XCTAssertEqual(chosen?.source, "b")
 
         let tie = response([
             series("short", region: "BG", lastObserved: "2026-09-25", points: 8),
             series("long", region: "BG", lastObserved: "2026-09-25", points: 80),
-        ]).dashboardSeries
-        XCTAssertEqual(tie?.series.source, "long")
+        ]).lead
+        XCTAssertEqual(tie?.source, "long")
     }
 
     /// THE ONE THAT KEEPS THE NUMBER HONEST.
@@ -107,10 +106,9 @@ final class DashboardScreenTests: XCTestCase {
                    lastObserved: "2026-09-18", points: 40),
             series("av", region: "GLOBAL", currency: "USD",
                    lastObserved: "2026-09-25", points: 12),
-        ]).dashboardSeries
+        ]).lead
 
-        XCTAssertEqual(chosen?.series.currency, "EUR")
-        XCTAssertEqual(chosen?.outOf, 3, "it still says it is one of three")
+        XCTAssertEqual(chosen?.currency, "EUR")
     }
 
     /// A series with no observations has no latest price, so it cannot be the
@@ -120,14 +118,13 @@ final class DashboardScreenTests: XCTestCase {
         let chosen = response([
             series("fresh-but-empty", region: "BG", lastObserved: "2026-09-25", points: 0),
             series("older-with-data", region: "BG", lastObserved: "2026-09-01", points: 10),
-        ]).dashboardSeries
-        XCTAssertEqual(chosen?.series.source, "older-with-data")
-        XCTAssertEqual(chosen?.outOf, 1)
+        ]).lead
+        XCTAssertEqual(chosen?.source, "older-with-data")
 
         XCTAssertNil(response([
             series("empty", region: "BG", lastObserved: "2026-09-25", points: 0),
-        ]).dashboardSeries)
-        XCTAssertNil(response([]).dashboardSeries)
+        ]).lead)
+        XCTAssertNil(response([]).lead)
     }
 
     /// The platform's typed price (#1587, option A) takes the block from any
@@ -139,52 +136,49 @@ final class DashboardScreenTests: XCTestCase {
             series("oil-bulletin", region: "BG", stage: "with-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
             series("platform", region: "BG", unit: "EUR/l", lastObserved: "2026-09-20", points: 1),
             series("oil-bulletin", region: "EL", stage: "without-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
-        ]).dashboardSeries
-        XCTAssertEqual(chosen?.series.source, "platform")
-        XCTAssertEqual(chosen?.outOf, 4)
-        XCTAssertEqual(chosen?.series.displayLabel, "Въведена от Agrent")
+        ]).lead
+        XCTAssertEqual(chosen?.source, "platform")
+        XCTAssertEqual(chosen?.displayLabel, "Въведена от Agrent")
         // Positive control: without it, the bulletin leads as before.
         XCTAssertEqual(response([
             series("oil-bulletin", region: "BG", stage: "without-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
             series("oil-bulletin", region: "BG", stage: "with-tax", unit: "EUR/1000l", lastObserved: "2026-09-25", points: 20),
-        ]).dashboardSeries?.series.source, "oil-bulletin")
+        ]).lead?.source, "oil-bulletin")
     }
 
     /// Inside one unit too: a typed wheat price older and shorter than the
     /// feed's still leads, because typed wins until it is cleared.
     func testThePlatformsTypedPriceLeadsItsOwnGroup() {
-        let ranked = [
+        let lead = [
             series("ec-agrifood", region: "BG", unit: "EUR/t", lastObserved: "2026-09-25", points: 20),
             series("platform", region: "BG", unit: "EUR/t", lastObserved: "2026-09-01", points: 1),
-        ].rankedForDefaultDisplay()
-        XCTAssertEqual(ranked.map(\.source), ["platform", "ec-agrifood"])
+        ].lead()
+        XCTAssertEqual(lead?.source, "platform")
     }
 
-    /// Stable across launches. Two groups of equal size must not swap by
-    /// dictionary order — a block that shows a different series every time it
-    /// opens is worse than either series alone.
-    func testAnEqualSizedTieIsStable() {
+    /// Stable across launches. Two Bulgarian groups of equal standing must not
+    /// swap by the order the server sent — a block that shows a different
+    /// series every time it opens is worse than either series alone.
+    func testAnEqualTieIsStable() {
         let list = [
             series("eur", region: "BG", currency: "EUR", lastObserved: "2026-09-25", points: 10),
             series("usd", region: "BG", currency: "USD", lastObserved: "2026-09-25", points: 10),
         ]
-        let first = response(list).dashboardSeries?.series.id
+        let first = response(list).lead?.id
         for _ in 0..<50 {
-            XCTAssertEqual(response(list).dashboardSeries?.series.id, first)
-            XCTAssertEqual(response(list.reversed()).dashboardSeries?.series.id, first)
+            XCTAssertEqual(response(list).lead?.id, first)
+            XCTAssertEqual(response(list.reversed()).lead?.id, first)
         }
     }
 
-    /// The extracted ranking is what the Тенденции chart uses, so the two
-    /// screens cannot disagree about which series leads. Falls back to the whole
-    /// list rather than to nothing when no BG or GLOBAL series exists — an empty
-    /// chart under a full legend is worse than a foreign price honestly labelled.
-    func testRankingFallsBackRatherThanReturningNothing() {
+    /// Табло and Тенденции quote one number: the same rule. With no Bulgarian
+    /// or EU series it falls back to whichever reported last rather than to
+    /// nothing — a foreign price honestly labelled beats an empty block.
+    func testTheLeadFallsBackRatherThanReturningNothing() {
         let foreign = [
             series("ec", region: "EL", lastObserved: "2026-09-25", points: 10),
             series("ec", region: "RO", lastObserved: "2026-09-26", points: 10),
         ]
-        XCTAssertEqual(foreign.rankedForDefaultDisplay().count, 2)
-        XCTAssertEqual(foreign.rankedForDefaultDisplay().first?.region, "RO")
+        XCTAssertEqual(foreign.lead()?.region, "RO")
     }
 }
