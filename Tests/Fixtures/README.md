@@ -385,9 +385,11 @@ is ASCII so the query is the same string however it's escaped.
 
 `treatment-definition.json`: `GET /journal/treatments/tg_fixture_1/definition`,
 the `TreatmentDefinition` «Коригирай» starts from, for the same treatment
-(«Тестов хербицид»). SYNTHETIC: the parcels are `locations-parcels.json`'s
-three by id and name, one of them with a partial treated area so the form
-shows both «Целият парцел» and an area. The product and unit ids, the
+(«Тестов хербицид»). SYNTHETIC: two of `locations-parcels.json`'s three parcels,
+by id and name, one with a partial treated area. The form shows both a
+whole parcel and an area, and offers the block's third, SYNTH-3, to add
+(agri-saas #2304). The journal row still says three parcels: the screens
+that read it are not the ones this fixture feeds. The product and unit ids, the
 registration number and the version follow no real format. The correction
 itself (`PUT` on the same path) is a write and stays `501 WRITE_REFUSED`.
 

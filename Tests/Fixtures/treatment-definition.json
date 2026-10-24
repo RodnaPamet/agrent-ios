@@ -19,7 +19,6 @@
   "phenophase": null,
   "lines": [
     { "parcelId": "par_holes", "parcelName": "SYNTH-1", "locationId": "loc_synthetic_1", "treatedAreaHa": null },
-    { "parcelId": "par_simple", "parcelName": "SYNTH-2", "locationId": "loc_synthetic_1", "treatedAreaHa": 1.2 },
-    { "parcelId": "par_nogeom", "parcelName": "SYNTH-3", "locationId": "loc_synthetic_1", "treatedAreaHa": null }
+    { "parcelId": "par_simple", "parcelName": "SYNTH-2", "locationId": "loc_synthetic_1", "treatedAreaHa": 1.2 }
   ]
 }

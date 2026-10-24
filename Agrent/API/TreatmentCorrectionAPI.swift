@@ -19,11 +19,12 @@ import Foundation
 ///
 /// ── What can be corrected ──
 ///
-/// Everything the form records (agri-saas #2293): the date, the product,
-/// the dose, the pest, the growth stage, the quarantine period, the
-/// technique and each parcel's treated area. Not the parcel SET: adding or
-/// dropping one is refused with 400 `TREATMENT_CORRECTION_FIELD_UNSUPPORTED`
-/// (`parcels`), so the phone keeps the list as recorded.
+/// Everything the form records (agri-saas #2293, #2304): the date, the
+/// product, the dose, the pest, the growth stage, the quarantine period, the
+/// technique, and the parcels with each one's treated area. A parcel may be
+/// dropped, or added from the treatment's own blocks; not every parcel
+/// (`TREATMENT_CORRECTION_WOULD_EMPTY`), and not one of another block
+/// (`TREATMENT_CORRECTION_NEW_BLOCK`).
 enum TreatmentCorrectionAPI {
     static func definitionPath(_ handle: String) -> String {
         "\(TreatmentAPI.treatmentPath(handle))/definition"
@@ -134,6 +135,11 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
     struct Line: Decodable, Equatable, Sendable {
         let parcelId: String
         let parcelName: String
+        /// The parcel's block: the treatment's blocks are the only ones a
+        /// correction may add a parcel in (agri-saas #2304). Never null on a
+        /// real treatment (`Parcel.locationId` is NOT NULL); optional until
+        /// the spec narrows it.
+        var locationId: String? = nil
         /// Hectares. NIL MEANS THE WHOLE PARCEL, not an empty value.
         let treatedAreaHa: Double?
     }

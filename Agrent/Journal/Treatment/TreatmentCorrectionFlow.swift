@@ -4,9 +4,9 @@ import SwiftUI
 /// read from the server and prefilled; «Проверка» with each change before
 /// and after; «Запази».
 ///
-/// Two steps where «Ново мероприятие» has three. The parcel step is folded
-/// into the first: the parcel SET can't be corrected (agri-saas #2293), only
-/// the treated area of each, which the first step lists.
+/// Two steps where «Ново мероприятие» has three: the parcel step is folded
+/// into the first, as a ticked list of the treatment's own blocks' parcels
+/// (agri-saas #2304) above each ticked parcel's treated area.
 ///
 /// The form starts from `GET …/definition`, not from the journal row: the
 /// row carries no version, and a correction made against a version is the
@@ -29,6 +29,9 @@ struct TreatmentCorrectionFlow: View {
     @State private var draft: TreatmentCorrection.Draft?
     /// The farm's products and dose units, as «Ново мероприятие» reads them.
     @State private var reference = OperationReferenceStore()
+    /// The treatment's blocks and their parcels, read once the definition
+    /// names them.
+    @State private var blocks = TreatmentBlocks()
     @State private var loadFailure: String?
     /// The way to «Проверка», by value: what it reads back is the draft,
     /// which is in hand before the push (#384's empty page can't happen).
@@ -43,7 +46,7 @@ struct TreatmentCorrectionFlow: View {
         NavigationStack(path: $path) {
             Group {
                 if let draft = Binding($draft) {
-                    TreatmentCorrectionForm(draft: draft, reference: reference,
+                    TreatmentCorrectionForm(draft: draft, reference: reference, blocks: blocks,
                                             onNext: { failure = nil; path = [.check] },
                                             onCancel: { dismiss() })
                 } else if let loadFailure {
@@ -84,6 +87,12 @@ struct TreatmentCorrectionFlow: View {
         do {
             draft = TreatmentCorrection.Draft(try await TreatmentCorrectionAPI.definition(handle),
                                               unitSymbol: row.doseUnit?.recorded)
+            // The form is up by now; the blocks' other parcels join the list
+            // when they come, unticked.
+            if let ids = draft?.blockIDs {
+                await blocks.load(blockIDs: ids)
+                draft?.offer(blocks.blocks)
+            }
         } catch {
             loadFailure = UserMessage.text(for: error)
         }
