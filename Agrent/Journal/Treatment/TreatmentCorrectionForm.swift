@@ -4,15 +4,15 @@ import SwiftUI
 /// server can correct editable (agrent-ios #392, owner 2026-10-24).
 ///
 /// In «Ново мероприятие»'s order, so each field is where it was typed, and
-/// everything it recorded is correctable since agri-saas #2293. Two things
-/// are kept as recorded:
-/// - the parcel SET, which a correction can't change; each parcel's treated
-///   area can;
-/// - the kind, and a water rate, which the phone's form never recorded:
-///   left out of the body, so the server keeps them.
+/// everything it recorded is correctable (agri-saas #2293, #2304). The
+/// parcels are its parcel step folded in: a ticked list per block, then each
+/// ticked parcel's treated area. Only the treatment's own blocks are listed,
+/// as a correction can't add another. Kept as recorded: the kind, and a
+/// water rate, which the phone's form never records.
 struct TreatmentCorrectionForm: View {
     @Binding var draft: TreatmentCorrection.Draft
     let reference: OperationReferenceStore
+    let blocks: TreatmentBlocks
     let onNext: () -> Void
     let onCancel: () -> Void
 
@@ -106,20 +106,41 @@ struct TreatmentCorrectionForm: View {
                 }
             }
 
-            Section {
-                ForEach(draft.original.lines, id: \.parcelId) { line in
-                    // Decares, as on «Ново мероприятие»'s parcel step.
-                    FieldRow(line.parcelName, spoken: "Третирана площ на \(line.parcelName) в декари") {
-                        TextField("дка", text: $draft.areaTexts[typed: line.parcelId],
-                                  prompt: .fieldPrompt(TreatmentCorrection.wholeParcel))
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                    }
+            ForEach(blockSections, id: \.id) { block in
+                Section {
+                    ForEach(block.parcels) { parcel in parcelRow(parcel) }
+                } header: {
+                    SectionHeader(block.name)
                 }
-            } header: {
-                SectionHeader("Третирана площ, дка")
-            } footer: {
-                SectionFooter(TreatmentCorrection.parcelsNote)
+            }
+
+            if !draft.chosenParcels.isEmpty {
+                Section {
+                    ForEach(draft.chosenParcels) { parcel in
+                        // Decares, as on «Ново мероприятие»'s parcel step, the
+                        // parcel's own area as the prompt where it's known.
+                        let own = parcel.areaHa.map(Area.init(hectares:))
+                        FieldRow(parcel.name, spoken: "Третирана площ на \(parcel.name) в декари") {
+                            TextField("дка", text: $draft.areaTexts[typed: parcel.id],
+                                      prompt: .fieldPrompt(own?.number ?? TreatmentCorrection.wholeParcel))
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                } header: {
+                    SectionHeader("Третирана площ, дка")
+                } footer: {
+                    SectionFooter("\(TreatmentCorrection.areasNote) \(TreatmentCorrection.parcelsNote)")
+                }
+            }
+
+            if blocks.failed {
+                Section {
+                    Text(Self.blocksFailed)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Section {
@@ -151,5 +172,55 @@ struct TreatmentCorrectionForm: View {
         }
     }
 
+    /// The parcels by block, in the order the treatment names its blocks,
+    /// each headed by the block's name.
+    private var blockSections: [(id: String, name: String, parcels: [TreatmentCorrection.Draft.ParcelChoice])] {
+        var order = draft.blockIDs
+        if draft.parcels.contains(where: { $0.blockID == nil }) { order.append("") }
+        return order.map { id in
+            let name = blocks.blocks.first { $0.id == id }?.name?.recorded ?? "Блок"
+            return (id, name, draft.parcels.filter { ($0.blockID ?? "") == id })
+        }
+    }
+
+    /// One parcel, ticked when the correction keeps or adds it: the parcel
+    /// step's row, one tap to change.
+    private func parcelRow(_ parcel: TreatmentCorrection.Draft.ParcelChoice) -> some View {
+        let picked = draft.chosen.contains(parcel.id)
+        let area = parcel.areaHa.map(Area.init(hectares:))
+        return Button {
+            if picked { draft.chosen.remove(parcel.id) } else { draft.chosen.insert(parcel.id) }
+        } label: {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(parcel.name)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let area {
+                        Text(area.text)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.secondaryText)
+                    }
+                }
+                Spacer(minLength: 8)
+                if picked {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Palette.accent)
+                        .accessibilityHidden(true)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(A11y.sentence([parcel.name, area?.spoken]))
+        .accessibilityAddTraits(picked ? .isSelected : [])
+        .accessibilityInputLabels([parcel.name])
+    }
+
     private static let nextNote = "На следващата стъпка проверете промените, преди да ги запазите."
+    /// The blocks' parcels couldn't be read: the recorded ones are still
+    /// listed and correctable, and nothing can be added until they are.
+    static let blocksFailed = "Другите парцели на блоковете не можаха да се заредят. "
+        + "Записаните парцели могат да се коригират; за да добавите парцел, отворете корекцията отново."
 }

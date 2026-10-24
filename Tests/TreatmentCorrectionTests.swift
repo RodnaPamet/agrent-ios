@@ -198,6 +198,82 @@ final class TreatmentCorrectionTests: XCTestCase {
         XCTAssertEqual(form.problems(now: Self.today).first, .doseMissing)
     }
 
+    // MARK: - The parcel set (agri-saas #2304)
+
+    private func setDraft() -> TreatmentCorrection.Draft {
+        draft(definition(lines: [
+            .init(parcelId: "p1", parcelName: "Парцел 1", locationId: "b1", treatedAreaHa: nil),
+            .init(parcelId: "p2", parcelName: "Парцел 2", locationId: "b1", treatedAreaHa: 1.2),
+            .init(parcelId: "p4", parcelName: "Парцел 4", locationId: "b2", treatedAreaHa: nil),
+        ]))
+    }
+
+    /// A block's parcels as `/locations/{id}/parcels` lists them.
+    private func block(_ id: String, _ parcels: [(String, String, Double?)]) throws -> TreatmentBlocks.Block {
+        let rows = parcels.map { #"{"id":"\#($0.0)","name":"\#($0.1)","areaHa":\#($0.2.map { "\($0)" } ?? "null")}"# }
+        let decoded = try JSONDecoder().decode([Parcel].self, from: Data("[\(rows.joined(separator: ","))]".utf8))
+        return TreatmentBlocks.Block(id: id, name: "Блок \(id)", parcels: decoded)
+    }
+
+    /// Only the treatment's own blocks, in the order its lines name them.
+    func testOnlyTheTreatmentsBlocksAreRead() {
+        XCTAssertEqual(setDraft().blockIDs, ["b1", "b2"])
+    }
+
+    /// The blocks' other parcels are offered unticked, after the recorded
+    /// ones; each recorded parcel learns its own area.
+    func testTheBlocksOfferTheirOtherParcels() throws {
+        var form = setDraft()
+        form.offer([try block("b1", [("p1", "Парцел 1", 2), ("p2", "Парцел 2", 1.5), ("p3", "Парцел 3", 0.8)]),
+                    try block("b2", [("p4", "Парцел 4", nil)])])
+        XCTAssertEqual(form.parcels.map(\.id), ["p1", "p2", "p4", "p3"])
+        XCTAssertEqual(form.parcels.first?.areaHa, 2)
+        XCTAssertEqual(form.chosen, ["p1", "p2", "p4"], "an offered parcel isn't ticked")
+        XCTAssertEqual(form.changed, [], "offering changes nothing")
+    }
+
+    /// A parcel dropped: the set goes out without it, and «Проверка» says so.
+    func testAParcelDropped() throws {
+        var form = setDraft()
+        form.chosen.remove("p2")
+        let parcels = try XCTUnwrap(try json(form.body)["parcels"] as? [[String: Any]])
+        XCTAssertEqual(parcels.map { $0["parcelId"] as? String }, ["p1", "p4"])
+        XCTAssertEqual(form.changes.map(\.label), ["Премахнат парцел"])
+        XCTAssertEqual(form.changes.first?.before, "Парцел 2")
+    }
+
+    /// A parcel of the same block added, with its own area: in the set, and
+    /// read back with what it's added as.
+    func testAParcelAdded() throws {
+        var form = setDraft()
+        form.offer([try block("b1", [("p1", "Парцел 1", 2), ("p2", "Парцел 2", 1.5), ("p3", "Парцел 3", 0.8)])])
+        form.chosen.insert("p3")
+        form.areaTexts["p3"] = "5"
+        let parcels = try XCTUnwrap(try json(form.body)["parcels"] as? [[String: Any]])
+        XCTAssertEqual(parcels.map { $0["parcelId"] as? String }, ["p1", "p2", "p4", "p3"])
+        XCTAssertEqual(form.changes.map(\.label), ["Добавен парцел"])
+        XCTAssertEqual(form.changes.first?.after, "Парцел 3 — \(Area(hectares: 0.5).text)")
+    }
+
+    /// Larger than the parcel, said before the PUT; within the register's
+    /// rounding isn't larger.
+    func testAnAreaLargerThanTheParcelIsSaid() throws {
+        var form = setDraft()
+        form.offer([try block("b1", [("p1", "Парцел 1", 2), ("p2", "Парцел 2", 1.5)])])
+        form.areaTexts["p1"] = "25"
+        XCTAssertEqual(form.problems(now: Self.today).first, .areaTooLarge("Парцел 1", Area(hectares: 2).text))
+        form.areaTexts["p1"] = "20"
+        XCTAssertEqual(form.problems(now: Self.today), [.nothingChanged], "the whole parcel, typed")
+    }
+
+    /// Every parcel unticked is a withdrawal, which «Изтрий» does.
+    func testTheLastParcelCantGo() {
+        var form = setDraft()
+        form.chosen = []
+        XCTAssertEqual(form.problems(now: Self.today).first, .noParcels)
+        XCTAssertTrue(TreatmentCorrection.Draft.Problem.noParcels.text.contains("«Изтрий»"))
+    }
+
     /// The recorded unit is a choice even when the farm's list doesn't hold
     /// it, so the picker can show it chosen.
     func testTheRecordedUnitIsAChoice() throws {
@@ -357,6 +433,17 @@ final class TreatmentCorrectionTests: XCTestCase {
         XCTAssertEqual(form.doseUnit.symbol, "кг/дка")
         XCTAssertEqual(TreatmentCorrection.Draft(self.definition(), unitSymbol: "л/дка").doseUnit.symbol, "л/дка",
                        "the row's, where the definition has none")
+    }
+
+    /// A changed set is «Парцели», with every parcel as it was.
+    func testASetCorrectionSaysWhatTheParcelsWere() async throws {
+        let previous = previousJSON().replacingOccurrences(
+            of: #""lines":[]"#,
+            with: #""lines":[{"parcelId":"p1","parcelName":"Парцел 1","locationId":"b1","treatedAreaHa":null}]"#)
+        let read = try await trail(#"{"treatmentGroupId":"tg_1","version":2,"corrections":[{"correctedAt":"2026-10-25T08:00:00.000Z","correctedBy":null,"changedFields":["parcels","treatedAreaHa"],"previous":"# + previous + "}]}")
+        let was = TreatmentCorrection.was(try XCTUnwrap(read.corrections.first))
+        XCTAssertEqual(was.map(\.label), ["Парцели"], "one line for the set and its areas")
+        XCTAssertEqual(TreatmentCorrection.wasText(was[0]), "Беше: Парцел 1 — \(TreatmentCorrection.wholeParcel)")
     }
 
     /// The areas as they were, every parcel, from the definition's own lines.

@@ -804,9 +804,10 @@ interactively.
   - the date, pest, Фенофаза/BBCH, quarantine period (with the earliest harvest worked out again) and technique;
   - **the product**, typed and matched against the farm's catalogue with its suggestions, as on «Ново мероприятие». A correction sends it by id, so only a product the farm has can be chosen. A new name says «… не е в каталога на стопанството». The kind isn't corrected, so a fertilising takes a fertiliser;
   - **the dose**, its amount and unit, which «Проверка» reads back as one line;
-  - **each parcel's treated area**, in decares, where an empty field is the whole parcel.
-- **Kept as recorded:** the parcel SET, which a correction can't change («Парцели не се добавят и не се премахват с корекция.»); the kind; and the water rate, which the phone never recorded and leaves out of the body. Before #2293 the product, dose and parcels were shown locked.
-- **No parcel step:** the areas are on step one, and the set can't move.
+  - **the parcels** (agri-saas #2304): a ticked list per block, as on «Ново мероприятие»'s parcel step. A recorded parcel can be unticked, and the block's other parcels can be ticked to add them. Only the treatment's own blocks are listed, read from the definition's `lines[].locationId`, because the ДНЕВНИК prints one table per block and a parcel of another block would be a treatment never recorded (`TREATMENT_CORRECTION_NEW_BLOCK` can't come from the phone). Unticking every parcel is said («Остава поне един парцел…») and points to «Изтрий»;
+  - **each ticked parcel's treated area**, in decares, where empty is the whole parcel and so is the parcel's own size typed back. A larger area than the parcel is said before the save.
+- **Kept as recorded:** the kind, and the water rate, which the phone never recorded and leaves out of the body. Before #2293 the product, dose and parcels were shown locked; before #2304 the set was.
+- **No parcel step:** the parcels are on step one.
 - **Step two, «Проверка»**, lists only the changes, each as «Беше: …» and «Става: …», above «Проверете данните.» and «Запази».
 - **What goes out:** `PUT …/definition` under `If-Match: <group version>`, carrying ONLY the changed fields. A cleared field goes out as an explicit `null`; an untouched one is left out, which the server reads as unchanged. So a stored technique outside the seven isn't rewritten. «Напред» stays dimmed until something changes («Няма промени за запазване.»).
 - **Someone else corrected it first** (409 `STALE_DATA`): said, «Запази» is disabled, and «Зареди отново» loads the current values, dropping this correction's changes as the sentence says.

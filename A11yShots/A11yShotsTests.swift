@@ -625,8 +625,8 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("01h-treatment-correction-check", app: app)
 
-        // Back to the form, to its foot: each parcel's treated area, one of
-        // them typed, the others the whole parcel (agri-saas #2293).
+        // Back to the form, to its foot: the block's parcels ticked, its third
+        // offered (agri-saas #2304), then each ticked one's treated area.
         app.buttons["BackButton"].firstMatch.tap()
         // The stage field kept its keyboard; a return closes it, as a
         // single-line field's does, so the areas aren't under it.
@@ -634,8 +634,10 @@ final class A11yShotsTests: XCTestCase {
             app.typeText("\n")
             Thread.sleep(forTimeInterval: 0.5)
         }
-        let area = app.textFields
-            .matching(NSPredicate(format: "placeholderValue == %@", "Целият парцел"))
+        // The block's third parcel, offered and not ticked, is the list's
+        // last row; under it, the areas.
+        let area = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "SYNTH-3"))
             .firstMatch
         var down = 0
         while !area.exists, down < 6 {
@@ -643,7 +645,7 @@ final class A11yShotsTests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.5)
             down += 1
         }
-        XCTAssertTrue(area.exists, "no treated-area field on the form")
+        XCTAssertTrue(area.exists, "the block's other parcel isn't offered")
         XCTAssertTrue(scrollWhollyIntoView(area, in: app), "the form would not scroll the areas into view")
         Thread.sleep(forTimeInterval: 1)
         capture("01j-treatment-correction-areas", app: app)

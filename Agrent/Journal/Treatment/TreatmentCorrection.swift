@@ -31,10 +31,12 @@ enum TreatmentCorrection {
     /// The definition doesn't carry the parcel's area, so it says so in words.
     static let wholeParcel = "Целият парцел"
 
-    /// What a correction still can't do: add or drop a parcel (agri-saas
-    /// #2293). The areas inside the set can change.
+    /// What the parcel list offers, and why no more (agri-saas #2304): the
+    /// ДНЕВНИК prints one table per block, so a parcel of a block the
+    /// treatment never had would be a treatment never recorded.
     static let parcelsNote =
-        "Празното поле е целият парцел. Парцели не се добавят и не се премахват с корекция."
+        "Добавят се само парцели от блоковете на това мероприятие. Друг блок се записва като отделно мероприятие."
+    static let areasNote = "Празното поле е целият парцел."
 
     /// Someone else corrected it after the form was opened (409 `STALE_DATA`).
     /// Their correction stands; this one would have overwritten it unseen.
@@ -145,6 +147,23 @@ enum TreatmentCorrection {
         /// Each parcel's treated area as typed, in decares, by parcel id.
         /// Empty is the whole parcel.
         var areaTexts: [String: String]
+        /// The treatment's parcels as recorded, then the other parcels of its
+        /// blocks once they are read (`offer`), each block's together.
+        private(set) var parcels: [ParcelChoice]
+        /// The parcels ticked: the set the correction keeps (agri-saas #2304).
+        var chosen: Set<String>
+
+        /// A parcel the list can show: recorded on the treatment, or in one of
+        /// its blocks. `areaHa` is the parcel's own, nil until its block is
+        /// read or when it has none.
+        struct ParcelChoice: Equatable, Sendable, Identifiable {
+            let id: String
+            let name: String
+            let blockID: String?
+            var areaHa: Double?
+            /// On the treatment as recorded.
+            let recorded: Bool
+        }
 
         /// A dose unit by id, with the symbol the picker shows.
         struct DoseUnit: Hashable, Sendable {
@@ -178,6 +197,10 @@ enum TreatmentCorrection {
                 areas[line.parcelId] = line.treatedAreaHa.map { Area(hectares: $0).number } ?? ""
             }
             areaTexts = areas
+            parcels = definition.lines.map {
+                ParcelChoice(id: $0.parcelId, name: $0.parcelName, blockID: $0.locationId, areaHa: nil, recorded: true)
+            }
+            chosen = Set(definition.lines.map(\.parcelId))
         }
 
         var kind: TreatmentDraft.Kind { original.treatmentKind ?? .spray }
@@ -242,18 +265,70 @@ enum TreatmentCorrection {
 
         // MARK: The parcels
 
+        /// The blocks the definition's lines are in, in the order they first
+        /// appear: the only blocks a correction may add a parcel in.
+        var blockIDs: [String] {
+            var seen = Set<String>()
+            return original.lines.compactMap(\.locationId).filter { seen.insert($0).inserted }
+        }
+
+        /// The blocks' parcels, read: each recorded parcel's own area filled
+        /// in, and the blocks' other parcels offered after the recorded ones,
+        /// unticked, block by block in the blocks' order.
+        mutating func offer(_ blocks: [TreatmentBlocks.Block]) {
+            var byID: [String: Parcel] = [:]
+            for block in blocks { for parcel in block.parcels { byID[parcel.id] = parcel } }
+            for index in parcels.indices where parcels[index].recorded {
+                parcels[index].areaHa = byID[parcels[index].id]?.areaHa
+            }
+            var known = Set(parcels.map(\.id))
+            for block in blocks {
+                let sorted = block.parcels.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                for parcel in sorted where known.insert(parcel.id).inserted {
+                    parcels.append(ParcelChoice(id: parcel.id, name: parcel.name, blockID: block.id,
+                                                areaHa: parcel.areaHa, recorded: false))
+                }
+            }
+        }
+
+        /// The ticked parcels, in the list's order.
+        var chosenParcels: [ParcelChoice] { parcels.filter { chosen.contains($0.id) } }
+
         /// A parcel's typed area: nil for the whole parcel, and not valid
         /// when it isn't an area over zero.
-        func area(of line: TreatmentDefinition.Line) -> (valid: Bool, area: Area?) {
-            guard let text = areaTexts[line.parcelId]?.recorded else { return (true, nil) }
+        func area(of id: String) -> (valid: Bool, area: Area?) {
+            guard let text = areaTexts[id]?.recorded else { return (true, nil) }
             guard let area = Area.parse(decares: text), area.wireHectares > 0 else { return (false, nil) }
             return (true, area)
         }
 
+        /// The area that goes out: the typed one, or nil for the whole parcel,
+        /// which is also what a typed area within the register's rounding of
+        /// the parcel's own is, as on «Ново мероприятие» (`treatedAreas`).
+        /// Typing the shown size back is no change.
+        func sentArea(_ id: String) -> Area? {
+            guard let typed = area(of: id).area else { return nil }
+            if let own = parcels.first(where: { $0.id == id })?.areaHa.map(Area.init(hectares:)),
+               !typed.differs(from: own) { return nil }
+            return typed
+        }
+
+        /// Larger than the parcel, by more than the register rounds: the
+        /// server refuses it (`TREATMENT_AREA_EXCEEDS_PARCEL`, inclusive).
+        /// A parcel whose own area isn't known takes any area.
+        private func tooLarge(_ parcel: ParcelChoice) -> Area? {
+            guard let typed = area(of: parcel.id).area, let own = parcel.areaHa.map(Area.init(hectares:)),
+                  typed.wireHectares > own.wireHectares, typed.differs(from: own) else { return nil }
+            return own
+        }
+
+        private var setChanged: Bool { chosen != Set(original.lines.map(\.parcelId)) }
+
+        /// A kept parcel whose area moved.
         private func areaChanged(_ line: TreatmentDefinition.Line) -> Bool {
-            let typed = area(of: line)
-            guard typed.valid else { return false }
-            switch (typed.area, line.treatedAreaHa.map(Area.init(hectares:))) {
+            guard chosen.contains(line.parcelId) else { return false }
+            guard area(of: line.parcelId).valid else { return false }
+            switch (sentArea(line.parcelId), line.treatedAreaHa.map(Area.init(hectares:))) {
             case (nil, nil): return false
             case let (now?, was?): return now.differs(from: was)
             default: return true
@@ -319,7 +394,7 @@ enum TreatmentCorrection {
                 }
                 if technique != Self.slug(original.applicationTechnique) { out.append(.applicationTechnique) }
             }
-            if original.lines.contains(where: areaChanged) { out.append(.parcels) }
+            if setChanged || original.lines.contains(where: areaChanged) { out.append(.parcels) }
             return out
         }
 
@@ -328,8 +403,8 @@ enum TreatmentCorrection {
                  productItemId: product?.id ?? original.productItemId,
                  targetNote: targetNote, doseValue: dose ?? original.doseValue, doseUnitId: doseUnit.id,
                  phenophase: phenophase, quarantinePeriodDays: quarantine.days, applicationTechnique: technique,
-                 parcels: original.lines.map { Body.ParcelArea(parcelId: $0.parcelId,
-                                                               treatedAreaHa: area(of: $0).area?.wireHectares) })
+                 parcels: chosenParcels.map { Body.ParcelArea(parcelId: $0.id,
+                                                              treatedAreaHa: sentArea($0.id)?.wireHectares) })
         }
 
         enum Problem: Equatable, Sendable {
@@ -344,6 +419,10 @@ enum TreatmentCorrection {
             case quarantineMissing
             case phenophaseTooLong
             case area(String)
+            case areaTooLarge(String, String)
+            /// Every parcel unticked: that is withdrawing the treatment, which
+            /// «Изтрий» on the journal row does (`TREATMENT_CORRECTION_WOULD_EMPTY`).
+            case noParcels
             case nothingChanged
 
             var text: String {
@@ -359,6 +438,9 @@ enum TreatmentCorrection {
                 case .quarantineMissing: TreatmentDraft.Problem.quarantineMissing.text
                 case .phenophaseTooLong: TreatmentDraft.Problem.phenophaseTooLong.text
                 case .area(let name): "Въведете площ над нула за «\(name)» или оставете полето празно."
+                case .areaTooLarge(let name, let whole): "Площта на «\(name)» е по-голяма от парцела (\(whole))."
+                case .noParcels:
+                    "Остава поне един парцел. За да премахнете цялото мероприятие, използвайте «Изтрий» в Дневник."
                 case .nothingChanged: "Няма промени за запазване."
                 }
             }
@@ -413,8 +495,11 @@ enum TreatmentCorrection {
                     found.append(.quarantineMissing)
                 }
             }
-            if let line = original.lines.first(where: { !area(of: $0).valid }) {
-                found.append(.area(line.parcelName))
+            if chosen.isEmpty { found.append(.noParcels) }
+            if let parcel = chosenParcels.first(where: { !area(of: $0.id).valid }) {
+                found.append(.area(parcel.name))
+            } else if let parcel = chosenParcels.first(where: { tooLarge($0) != nil }), let own = tooLarge(parcel) {
+                found.append(.areaTooLarge(parcel.name, own.text))
             }
             if found.isEmpty, changed.isEmpty { found.append(.nothingChanged) }
             return found
@@ -462,10 +547,22 @@ enum TreatmentCorrection {
                                       before: ApplicationTechnique.display(original.applicationTechnique),
                                       after: ApplicationTechnique.display(technique)))
                 case .parcels:
-                    for line in original.lines where areaChanged(line) {
-                        out.append(Change(id: "area:\(line.parcelId)", label: "Площ — \(line.parcelName)",
-                                          before: Self.areaText(line.treatedAreaHa.map(Area.init(hectares:))),
-                                          after: Self.areaText(area(of: line).area)))
+                    // In the list's order: a recorded parcel dropped or its
+                    // area moved, then each one added.
+                    for parcel in parcels {
+                        let line = original.lines.first { $0.parcelId == parcel.id }
+                        let kept = chosen.contains(parcel.id)
+                        if line != nil, !kept {
+                            out.append(Change(id: "drop:\(parcel.id)", label: "Премахнат парцел",
+                                              before: parcel.name, after: nil))
+                        } else if let line, areaChanged(line) {
+                            out.append(Change(id: "area:\(parcel.id)", label: "Площ — \(parcel.name)",
+                                              before: Self.areaText(line.treatedAreaHa.map(Area.init(hectares:))),
+                                              after: Self.areaText(sentArea(parcel.id))))
+                        } else if line == nil, kept {
+                            out.append(Change(id: "add:\(parcel.id)", label: "Добавен парцел", before: nil,
+                                              after: "\(parcel.name) — \(Self.areaText(sentArea(parcel.id)))"))
+                        }
                     }
                 }
             }
@@ -548,10 +645,10 @@ extension TreatmentCorrection {
         if changed.contains("applicationTechnique") {
             out.append(line("Техника", ApplicationTechnique.display(before?.applicationTechnique)))
         }
-        if changed.contains("treatedAreaHa") {
-            // Every parcel's area as it was, from the definition's own lines:
-            // the trail says what the set was, not which line moved.
-            out.append(line("Третирана площ", before.map { previous in
+        if !changed.isDisjoint(with: ["parcels", "treatedAreaHa"]) {
+            // Every parcel and its area as it was, from the definition's own
+            // lines: the trail says what the set was, not which line moved.
+            out.append(line(changed.contains("parcels") ? "Парцели" : "Третирана площ", before.map { previous in
                 previous.lines
                     .map { "\($0.parcelName) — \(Draft.areaText($0.treatedAreaHa.map(Area.init(hectares:))))" }
                     .joined(separator: ", ")
@@ -586,7 +683,12 @@ extension JournalTreatment {
         // A corrected area changes the total, which can't be worked out
         // here: a whole parcel's area isn't in the definition. Left out until
         // the journal is read again rather than shown as it was.
-        if saved.areaChanged { row.totalAreaHa = nil }
+        if saved.areaChanged {
+            row.totalAreaHa = nil
+            // The set may have moved too; the blocks' names wait for the
+            // journal to be read again, as the total does.
+            row.parcelCount = corrected.lines.count
+        }
         row.targetNote = corrected.targetNote
         row.phenophase = corrected.phenophase
         row.applicationTechnique = corrected.applicationTechnique

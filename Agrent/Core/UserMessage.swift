@@ -774,14 +774,16 @@ enum UserMessage {
             "Само човекът, записал това мероприятие, или администратор на стопанството може да го премахне.",
         // «Коригирай» (agri-saas #2283/#2287, agrent-ios #392), in the
         // server's own words. The phone offers it where the row allows; these
-        // are the route checking again. A changed product, dose or parcel is
-        // never sent, so the second should not come; if it does, it says
-        // what to do.
+        // are the route checking again.
         "TREATMENT_EDIT_NOT_PERMITTED":
             "Само човекът, който е записал това третиране, или администратор на стопанството може да го коригира.",
-        "TREATMENT_CORRECTION_FIELD_UNSUPPORTED":
-            "Това поле още не може да се коригира. Дозата, продуктът, разходът на работен разтвор и списъкът с "
-            + "парцели се променят, като премахнете мероприятието и го запишете наново.",
+        // The parcel set (agri-saas #2304). The phone offers neither, so these
+        // are the route checking again, or another client's refusal.
+        "TREATMENT_CORRECTION_WOULD_EMPTY":
+            "Корекцията не може да премахне всички парцели. Вместо това премахнете мероприятието.",
+        "TREATMENT_CORRECTION_NEW_BLOCK":
+            "Корекцията може да добави парцел само в блок, който това мероприятие вече покрива. "
+            + "Запишете другия блок като отделно мероприятие.",
         "TREATMENT_TITLE_REQUIRED":
             "Мероприятието трябва да има наименование. Изчистете другите полета или премахнете мероприятието.",
         // Tasks of one treatment recorded by different people, so "its
