@@ -54,6 +54,8 @@ import SwiftUI
 /// The other writes — a cost, a listing, a journal entry, a product, an
 /// insurance request, a member invitation — close onto a list that shows the
 /// new row, which is its own confirmation, and none is work done in a field.
+/// A treatment's «Коригирай» (#392) closes onto its entry showing the
+/// corrected values, likewise.
 /// Adding one is a line at its call site and a line in `HapticSiteTests`;
 /// fewer is the point, so each needs its own reason.
 ///

@@ -782,10 +782,30 @@ period, then «Добави», or «Редактирай данните» to go 
 - **«Добави»** is the same save as before: same key, same outbox. «Редактирай данните» goes back to step one with everything kept.
 - **The target button on step two's map** (#398, owner 2026-10-22): each press frames the next parcel with an outline, and VoiceOver says which. It's the same control as on Блокове (`ParcelTargetButton`), and «Нова задача»'s «Парцели» map has it too.
 - **«Виж на картата» on a recorded treatment** (#399, owner 2026-10-22), on its journal entry and on the saved screen: the treated parcels on a map, all highlighted, with the target button, and listed by block below. A row frames its parcel. The parcels come from the treatment's tasks (`taskIds`, then each `/field-operations/{taskId}`), cache first. The saved screen already holds them and makes no read.
-- **Above «Добави»:** «Проверете данните. След записване вписването в ДНЕВНИКА не може да се редактира.», word for word as the website's step 3 (#2174), confirmed by backend 1 with the owner (owner, 2026-10-22). Recorded treatments stay final, so #392 isn't planned. There's no confirmation tick, the owner's choice for both surfaces.
+- **Above «Добави»:** «Проверете данните.», word for word as the website's step 3 (#2174). Until 2026-10-24 it went on «След записване вписването в ДНЕВНИКА не може да се редактира.». The owner then made recorded treatments correctable (#392) and had that sentence dropped from both surfaces in the same release. The web's half is backend 1's. There's no confirmation tick, the owner's choice for both surfaces.
 - **Not shown: remaining stock.** A ДНЕВНИК treatment deducts none (agri-saas #1740), and the owner didn't choose it.
 
 **The web** has had the same step since agri-saas #2174, live at f8a1e65 on 2026-10-22. It shows the same sentence, and neither surface has a tick, as the owner chose. Two differences remain, both deliberate: the web titles the step «Нов запис — проверка» to match its sibling steps (the phone's navigation bar gives that context), and only the phone shows the amount of product needed.
+
+### «Коригирай» on a recorded treatment (#392, owner 2026-10-24)
+
+The owner reversed "recorded treatments stay final" (2026-10-22) on
+2026-10-24, with backend 1 (agri-saas #2279) and then here, asked
+interactively.
+
+**iOS**: «Коригирай» on a treatment's journal entry, below «Виж на картата»:
+- **Who:** the treatment's creator and the farm's administrators, as the server rules it (creator or admin, one author). Decided from the row's `mayDelete`, the same rule today. The row is to carry its own `mayCorrect`, asked for and agreed by backend 1, because agri-saas #2280 may narrow the withdrawal again. It is never decided by probing `GET …/definition`, which 403s for anyone who may not correct.
+- **Step one** is the treatment as recorded, read from `GET …/definition`, in «Ново мероприятие»'s order. Editable: the date, the pest, Фенофаза/BBCH, the quarantine period (with the earliest harvest worked out again) and the technique. **Locked**, and shown with «Препаратът, дозата и парцелите не могат да се коригират все още.»: the product and its registration number, the dose, and the parcels with their treated area («Целият парцел» where none was typed). The server refuses those today (`TREATMENT_CORRECTION_FIELD_UNSUPPORTED`). They unlock when it allows them; the owner put that next on the server, before the «Забележка» note.
+- **No parcel step:** nothing on it can change yet.
+- **Step two, «Проверка»**, lists only the changes, each as «Беше: …» and «Става: …», above «Проверете данните.» and «Запази».
+- **What goes out:** `PUT …/definition` under `If-Match: <group version>`, carrying ONLY the changed fields. A cleared field goes out as an explicit `null`; an untouched one is left out, which the server reads as unchanged. So a stored technique outside the seven isn't rewritten. «Напред» stays dimmed until something changes («Няма промени за запазване.»).
+- **Someone else corrected it first** (409 `STALE_DATA`): said, «Запази» is disabled, and «Зареди отново» loads the current values, dropping this correction's changes as the sentence says.
+- **After the save:** the entry shows the corrected values at once, and the journal reads again.
+- A field a spraying requires (the pest, the period) may not be emptied if it was filled. One an older record never captured may stay empty.
+
+**Not yet:** «Коригирано на … от …» with the previous values, which the owner asked for on 2026-10-22. It needs the trail read backend 1 is building: the latest correction, readable by anyone who can see the treatment.
+
+**The web:** the route has been on the server since agri-saas #2287. The website's editor is backend 1's, and drops its «Проверка» sentence in the same release.
 
 **Фенофаза/BBCH** (#363, agri-saas #2083, live 2026-10-20) is optional on
 every spraying, after the dose, as in PRZ. It's free text up to 64

@@ -118,7 +118,7 @@ final class A11yShotsTests: XCTestCase {
             case "09a-crop-costs": captureCropCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "01c-journal-filter": captureJournalFilter(app)
-            case "01e-journal-treatment": captureJournalTreatment(app)
+            case "01e-journal-treatment", "01g-treatment-correction": captureJournalTreatment(app)
             case "17-new-entry": captureNewEntryForm(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "19c-public-profile": capturePublicProfile(app)
@@ -552,7 +552,64 @@ final class A11yShotsTests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
             capture("01f-journal-treatment-pdf", app: app)
         }
+        captureTreatmentCorrection(app)
         goBack(app, to: "Земеделски дневник")
+    }
+
+    /// The same treatment's «Коригирай» (#392): the form prefilled from
+    /// `treatment-definition.json`, the product, dose and parcels locked;
+    /// then a growth stage typed and «Проверка» with that one change. Left
+    /// by «Отказ»: «Запази» is a write to a farm's register, and the seam
+    /// would refuse it anyway.
+    private func captureTreatmentCorrection(_ app: XCUIApplication) {
+        let correct = app.buttons["Коригирай"]
+        XCTAssertTrue(correct.waitForExistence(timeout: 5), "the treatment offers no «Коригирай»")
+        // Below the tab bar at every size: `isHittable` says yes there, and
+        // the tap lands on the bar.
+        XCTAssertTrue(scrollWhollyIntoView(correct, in: app), "the page would not scroll «Коригирай» into view")
+        correct.tap()
+
+        // The prefill's own line under the locked product, near the top: the
+        // parcel rows further down are combined and may not be built yet.
+        let locked = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Препаратът, дозата и парцелите"))
+            .firstMatch
+        guard locked.waitForExistence(timeout: 10) else {
+            XCTFail("«Коригирай» opened without its definition:\n\(app.debugDescription)")
+            return
+        }
+        Thread.sleep(forTimeInterval: 1)
+        capture("01g-treatment-correction", app: app)
+
+        // By its title or its prompt: with a prompt given, the field can be
+        // exposed under the prompt, as «Количество» is under «0».
+        let stage = app.textFields
+            .matching(NSPredicate(format: "label == %@ OR placeholderValue BEGINSWITH %@",
+                                  "Фенофаза/BBCH", "напр. BBCH"))
+            .firstMatch
+        var swipes = 0
+        while !stage.exists, swipes < 6 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            swipes += 1
+        }
+        XCTAssertTrue(stage.exists, "no «Фенофаза/BBCH» field")
+        XCTAssertTrue(scrollWhollyIntoView(stage, in: app), "the form would not scroll the stage into view")
+        stage.tap()
+        stage.typeText("BBCH 31")
+        let next = app.buttons["Напред"]
+        XCTAssertTrue(next.isEnabled, "one change, and «Напред» still dimmed")
+        next.tap()
+
+        let change = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Фенофаза/BBCH: беше няма, става BBCH 31"))
+            .firstMatch
+        XCTAssertTrue(change.waitForExistence(timeout: 5), "«Проверка» doesn't read the change back")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01h-treatment-correction-check", app: app)
+
+        app.buttons["Отказ"].firstMatch.tap()
+        XCTAssertTrue(correct.waitForExistence(timeout: 5), "«Отказ» didn't close the correction")
     }
 
     // MARK: - «Култура» (agrent-ios#245)

@@ -274,6 +274,7 @@ final class SpokenVocabularyTests: XCTestCase {
             A11y.Spoken.complete, A11y.Spoken.completeTask,
             A11y.Spoken.download, A11y.Spoken.farmRecord,
             A11y.Spoken.filters, A11y.Spoken.show,
+            A11y.Spoken.correctTreatment, A11y.Spoken.reload,
         ]
         let bulgarian = all.map { $0[0].lowercased() }
         XCTAssertEqual(Set(bulgarian).count, bulgarian.count, "a Bulgarian name is used twice: \(bulgarian)")

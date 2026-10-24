@@ -164,6 +164,9 @@ enum FixtureCatalogue {
         // agrent-ios#399: the journal treatment's summary, whose one task is
         // the field-operation fixture's, so «Виж на картата» draws its lines.
         (TreatmentAPI.treatmentPath(fixtureTreatmentHandle), "treatment-summary"),
+        // agrent-ios#392: «Коригирай»'s prefill for the same treatment. Its
+        // PUT, the correction, is a write: `WRITE_REFUSED`, as every write.
+        (TreatmentCorrectionAPI.definitionPath(fixtureTreatmentHandle), "treatment-definition"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),
