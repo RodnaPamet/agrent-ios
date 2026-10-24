@@ -58,9 +58,10 @@ struct FarmFigures: Equatable, Sendable {
                             area: \.perArea.areaDca, currency: \.priceCurrency)
         cost = Self.figure(rows, rate: \.perArea.attributableCostPerDca,
                            area: \.perArea.landDca, currency: \.perArea.costCurrency)
-        // Not a crop whose cost rate was refused (agri-saas #2259): its
-        // margin subtracts a sum the server would not state.
-        margin = Self.figure(rows, rate: \.perArea.shownMarginPerDca,
+        // Not a crop whose cost cannot be subtracted (agri-saas #2259): a
+        // refused cost rate, or a cost in another currency than the price.
+        // agri-saas's own fold keeps the same checks (`farm-per-area.ts`).
+        margin = Self.figure(rows, rate: \.shownMarginPerDca,
                              area: \.perArea.areaDca, currency: \.priceCurrency)
     }
 
