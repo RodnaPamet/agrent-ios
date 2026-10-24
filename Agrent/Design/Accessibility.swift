@@ -198,6 +198,10 @@ enum A11y {
         static let deleteTreatment = spokenNames("Изтрий", "Delete")
         /// The bar that follows it, for five seconds before it is sent.
         static let undo = spokenNames("Отмени", "Undo")
+        /// A recorded treatment's «Коригирай» (#392).
+        static let correctTreatment = spokenNames("Коригирай", "Корекция", "Correct")
+        /// A correction met one someone else made first: load what is there.
+        static let reload = spokenNames("Зареди отново", "Reload")
         /// A list's filter button, Борса's and the Дневник's (#252). Its
         /// name stays the same when a filter is on; that state is its value.
         static let filters = spokenNames("Филтри", "Filters")

@@ -38,6 +38,11 @@ import SwiftUI
 /// (`UnfinishedTreatmentSection`). That is the treatment route's own DELETE,
 /// for incomplete treatments only. An entry's DELETE stays off the phone.
 ///
+/// And a second (owner, 2026-10-24): «Коригирай» on a recorded treatment,
+/// for its creator and the farm's administrators (#392). That is the
+/// treatment's own correction route (`TreatmentCorrectionAPI`), under the
+/// treatment's version, never the entry's PUT/PATCH.
+///
 /// ── A treatment, and its ДНЕВНИК again (#320) ──
 ///
 /// A folded treatment's row carries what was done — product, dose, period,
@@ -61,8 +66,21 @@ struct JournalDetailView: View {
     /// The journal's own stack: «Виж на картата» pushes a route onto it (#399).
     @Environment(\.pushRoute) private var pushRoute
 
+    @State private var people = CurrentUserStore.shared
+    @State private var correcting = false
+    /// What «Коригирай» saved, shown over the row this screen was opened
+    /// with: the route carries a value, so the list reading again does not
+    /// reach it.
+    @State private var corrected: TreatmentDefinition?
+
     private var treatment: JournalTreatment? {
-        entry.treatment.flatMap { $0.isTreatment ? $0 : nil }
+        guard let row = entry.treatment, row.isTreatment else { return nil }
+        return corrected.map(row.applying) ?? row
+    }
+
+    /// The day, as corrected when it was.
+    private var occurredAt: Date? {
+        corrected?.occurredOn.flatMap(BgDate.parseISODay) ?? entry.occurredAt
     }
 
     var body: some View {
@@ -81,6 +99,23 @@ struct JournalDetailView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.large)
                     .accessibilityInputLabels(A11y.Spoken.seeOnMap)
+                }
+                if let treatment, let handle = treatment.treatmentGroupId?.recorded,
+                   TreatmentCorrection.offered(entry, to: people.user) {
+                    Button {
+                        correcting = true
+                    } label: {
+                        Label(TreatmentCorrection.actionTitle, systemImage: "pencil").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityInputLabels(A11y.Spoken.correctTreatment)
+                    .sheet(isPresented: $correcting) {
+                        TreatmentCorrectionFlow(handle: handle, row: treatment) { saved in
+                            corrected = saved
+                            AccessibilityNotification.Announcement("Корекцията е запазена.").post()
+                        }
+                    }
                 }
                 if let handle = treatment?.treatmentGroupId?.recorded {
                     UnfinishedTreatmentSection(handle: handle)
@@ -124,7 +159,7 @@ struct JournalDetailView: View {
                 // shares an HStack with the chip and breaks mid-word once
                 // Dynamic Type is turned up; here nothing competes for the
                 // width, and `fixedSize` stops the stack squeezing it.
-                Text(entry.occurredAt.map(BgDate.full) ?? LogEntry.noDate)
+                Text(occurredAt.map(BgDate.full) ?? LogEntry.noDate)
                     .font(.body)
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)

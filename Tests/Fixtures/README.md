@@ -381,6 +381,16 @@ is ASCII so the query is the same string however it's escaped.
 | a parcel with four holes and one without, both drawable | `parcels` 0–1 |
 | the total equals the parcels' sum | `crops[0].areaHaTotal` |
 
+## A recorded treatment's correction (agrent-ios#392)
+
+`treatment-definition.json`: `GET /journal/treatments/tg_fixture_1/definition`,
+the `TreatmentDefinition` «Коригирай» starts from, for the same treatment
+(«Тестов хербицид»). SYNTHETIC: the parcels are `locations-parcels.json`'s
+three by id and name, one of them with a partial treated area so the form
+shows both «Целият парцел» and an area. The product and unit ids, the
+registration number and the version follow no real format. The correction
+itself (`PUT` on the same path) is a write and stays `501 WRITE_REFUSED`.
+
 ## A recorded treatment's map (agrent-ios#399)
 
 `treatment-summary.json`: `GET /journal/treatments/tg_fixture_1`, the

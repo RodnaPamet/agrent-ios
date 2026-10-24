@@ -127,11 +127,13 @@ struct TreatmentCheckView: View {
         }
     }
 
-    /// Said where «Добави» is decided (owner, 2026-10-22): a recorded
-    /// treatment can't be edited, so this screen is the place to catch a
-    /// mistake. The website's review step (agri-saas #2174) says the same
-    /// words; the two surfaces don't word one rule two ways.
-    nonisolated static let finalNote = "Проверете данните. След записване вписването в ДНЕВНИКА не може да се редактира."
+    /// Said where «Добави» is decided. Until 2026-10-24 it went on: «След
+    /// записване вписването в ДНЕВНИКА не може да се редактира.» The owner
+    /// made recorded treatments correctable that day («Коригирай», #392), so
+    /// the second sentence went, here and on the website's review step
+    /// (agri-saas #2174), in the same release: the two surfaces don't word
+    /// one rule two ways.
+    nonisolated static let finalNote = "Проверете данните."
 
     private var actions: some View {
         VStack(spacing: 8) {

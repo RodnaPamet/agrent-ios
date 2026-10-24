@@ -772,6 +772,18 @@ enum UserMessage {
         // the row's `mayDelete` says yes; this is the route checking again.
         "TREATMENT_DELETE_NOT_PERMITTED":
             "Само човекът, записал това мероприятие, или администратор на стопанството може да го премахне.",
+        // «Коригирай» (agri-saas #2283/#2287, agrent-ios #392), in the
+        // server's own words. The phone offers it where the row allows; these
+        // are the route checking again. A changed product, dose or parcel is
+        // never sent, so the second should not come; if it does, it says
+        // what to do.
+        "TREATMENT_EDIT_NOT_PERMITTED":
+            "Само човекът, който е записал това третиране, или администратор на стопанството може да го коригира.",
+        "TREATMENT_CORRECTION_FIELD_UNSUPPORTED":
+            "Това поле още не може да се коригира. Дозата, продуктът, разходът на работен разтвор и списъкът с "
+            + "парцели се променят, като премахнете мероприятието и го запишете наново.",
+        "TREATMENT_TITLE_REQUIRED":
+            "Мероприятието трябва да има наименование. Изчистете другите полета или премахнете мероприятието.",
         // Tasks of one treatment recorded by different people, so "its
         // creator" names nobody and only an administrator can sort it out.
         "TREATMENT_MIXED_AUTHORSHIP":

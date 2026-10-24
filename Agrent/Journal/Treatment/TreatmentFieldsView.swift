@@ -179,7 +179,7 @@ struct TreatmentFieldsView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private static let pestExample = "напр. Листни въшки"
+    static let pestExample = "напр. Листни въшки"
     static let phenophaseExample = "напр. BBCH 31 или братене"
     /// Where it goes, as the farmer will see it on the printed sheet
     /// (agri-saas #2089): not in the chemical table, which has no such
@@ -187,7 +187,7 @@ struct TreatmentFieldsView: View {
     /// as derived from the treatment rather than a separate inspection.
     static let phenophaseNote = "По избор. В ДНЕВНИКА се отпечатва в таблицата за обследване, "
         + "на ред, отбелязан като изведен от мероприятието."
-    private static let harvestNote =
+    static let harvestNote =
         "Най-ранната дата за прибиране е датата на третирането плюс карантинния срок."
     private static let areaNote =
         "На следващата стъпка изберете културата и парцелите. Площта се изчислява от тях."
