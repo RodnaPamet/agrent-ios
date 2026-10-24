@@ -815,7 +815,7 @@ interactively.
 
 **«Корекции»** on the entry, under its facts (agri-saas #2292, `GET …/corrections`). It is what the owner asked for on 2026-10-22:
 - one line per correction, newest first: «Коригирано на 24 октомври 2026 г. в 21:40 от …», with no «от …» when the server can't name anyone (it never sends an id);
-- each changed field with «Беше: …», read from the correction's `previous` definition. A treated area lists every parcel's area as it was. The dose and water rate show only «Променено» until the definition carries its units' symbols (agri-saas #2298, open). A field this build has no name for is left out;
+- each changed field with «Беше: …», read from the correction's `previous` definition. A treated area lists every parcel's area as it was. The dose and water rate are said with their unit, «Беше: 0,15 л/дка», from the symbols the definition carries since agri-saas #2298. A correction filed before then stored no symbol, and is only named («Променено»), since a rate without its unit could be any unit. A field this build has no name for is left out;
 - readable by anyone who can see the treatment, an inspector included (a read gate, where the prefill is a write gate);
 - nothing shown while it loads, if it can't be read, or when nobody has corrected the treatment. Read again after «Запази».
 
