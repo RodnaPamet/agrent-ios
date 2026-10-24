@@ -227,15 +227,17 @@ final class UserMessageHTTPTests: XCTestCase {
             "IF_MATCH_EMPTY", "IF_MATCH_MALFORMED", "IF_MATCH_WEAK_TAG", "INSURANCE_PRODUCT_UNKNOWN",
             "INSURANCE_QUOTE_INVALID", "INVALID_EQUIPMENT", "INVALID_FARM_PAYLOAD", "INVALID_FILE",
             "INVALID_LIMIT", "INVALID_LOCATION", "INVALID_PLANTING", "INVALID_REVIEW_ACTION",
-            "INVALID_TAB_ORDER", "ITEM_NAME_ALREADY_EXISTS", "JOURNAL_ENTRY_NOT_DELETED",
-            "JOURNAL_ENTRY_NOT_FOUND", "JOURNAL_ENTRY_NOT_SOFT_DELETED", "JOURNAL_FILE_LINK_NOT_FOUND",
+            "INVALID_TAB_ORDER", "ITEM_NAME_ALREADY_EXISTS",
+            "JOURNAL_ENTRY_NOT_FOUND", "JOURNAL_FILE_LINK_NOT_FOUND",
             "JOURNAL_TITLE_REQUIRED", "LISTING_NOT_FOUND", "LOCATION_NOT_FOUND", "MESSAGE_NOT_FOUND",
             "NOTES_TOO_LONG", "NOT_A_FIELD_OPERATION_TASK", "OPERATION_NOT_ASSIGNED_TO_YOU",
             "OPERATION_PARCEL_NOT_FOUND", "PARCELS_NOT_IN_LOCATION", "PRODUCT_IS_SAMPLE_ARCHETYPE",
             "TASK_NOT_AWAITING_REVIEW", "THREAD_NOT_A_PARTY", "THREAD_NOT_FOUND", "WATER_RATE_UNIT_NOT_FOUND",
             "WATER_RATE_UNIT_REQUIRED", "WEED_ENTRIES_TOO_MANY", "WEED_NAME_TOO_LONG",
         ]
-        XCTAssertEqual(measured.count, 52)
+        // 52 until agri-saas #2254 retired the journal's restore and purge,
+        // and their two codes with them.
+        XCTAssertEqual(measured.count, 50)
         for code in measured {
             let text = UserMessage.httpText(status: 400, code: code, message: placeholder)
             XCTAssertNotEqual(text, placeholder, "\(code) has no sentence here")

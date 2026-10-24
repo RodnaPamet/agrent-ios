@@ -989,8 +989,9 @@ enum UserMessage {
         // Journal.
         "JOURNAL_TITLE_REQUIRED": "Въведете заглавие на записа.",
         "JOURNAL_ENTRY_NOT_FOUND": "Записът в дневника не е намерен. Може да е изтрит.",
-        "JOURNAL_ENTRY_NOT_DELETED": "Записът в дневника не е изтрит, затова няма какво да се възстанови.",
-        "JOURNAL_ENTRY_NOT_SOFT_DELETED": "Записът в дневника трябва първо да бъде изтрит.",
+        // No JOURNAL_ENTRY_NOT_DELETED or …_NOT_SOFT_DELETED any more: they
+        // were the restore's and the purge's, retired with «Кошче» (agri-saas
+        // #2254; the owner, 2026-10-24: "what's deleted is deleted").
         "JOURNAL_FILE_LINK_NOT_FOUND": "Файлът вече не е прикачен към този запис.",
         // Field operations: creating one, and reviewing it.
         "LOCATION_NOT_FOUND": "Блокът не е намерен. Може да е изтрит.",

@@ -26,11 +26,12 @@ import SwiftUI
 ///
 /// ── Why it is read-only ──
 ///
-/// The server offers PUT/PATCH, DELETE, /restore and /purge on an entry. None
-/// is wired up here on purpose: they are writes against a legally-filed
-/// register, and which of them belongs on a phone — and behind what
-/// confirmation — is a decision to take deliberately, in its own change, not
-/// a button to add because the endpoint happened to exist.
+/// The server offers PUT/PATCH and DELETE on an entry — /restore and /purge
+/// were retired with «Кошче» (agri-saas #2254, 2026-10-24), and a DELETE now
+/// erases. Neither is wired up here on purpose: they are writes against a
+/// legally-filed register, and which of them belongs on a phone — and behind
+/// what confirmation — is a decision to take deliberately, in its own change,
+/// not a button to add because the endpoint happened to exist.
 ///
 /// One such decision was taken (owner, 2026-10-15): an administrator may
 /// abandon a treatment the server can't finish, from here
