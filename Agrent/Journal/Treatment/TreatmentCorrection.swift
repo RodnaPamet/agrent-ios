@@ -7,16 +7,22 @@ import Foundation
 /// API is `TreatmentCorrectionAPI`; the screens are `TreatmentCorrectionFlow`.
 enum TreatmentCorrection {
 
-    /// The journal row's own answer, never a probe of the write-gated GET.
+    /// The journal row's own answer (`mayCorrect`, agri-saas #2292), never a
+    /// probe of the write-gated GET.
     ///
-    /// The server's rule for a correction is the withdrawal's: creator or
-    /// administrator, and one author across the treatment's tasks (agri-saas
-    /// #2283). The row's `mayDelete` is computed from that rule, so it stands
-    /// in until the row carries a flag of its own. That is asked for, because
-    /// agri-saas #2280 may narrow the withdrawal again and the two would then
-    /// differ. The route checks again either way, and its refusal is read out.
+    /// The rule is the withdrawal's today: creator or administrator, and one
+    /// author across the treatment's tasks. It is its own field, and is NOT
+    /// read through `mayDelete`, because agri-saas #2280 may narrow the
+    /// withdrawal now that it is irreversible. A fallback to `mayDelete` would
+    /// then hide «Коригирай» from creators who may still correct.
+    ///
+    /// Only an explicit `false` hides it. An absent flag is a page cached
+    /// before the field existed, and the route checks again either way.
     nonisolated static func offered(_ entry: LogEntry, to me: CurrentUser?) -> Bool {
-        TreatmentRemoval.offered(entry, to: me)
+        guard let treatment = entry.treatment, treatment.isTreatment,
+              treatment.treatmentGroupId != nil,
+              let me, me.mayWrite else { return false }
+        return treatment.mayCorrect ?? true
     }
 
     static let actionTitle = "Коригирай"
@@ -32,19 +38,6 @@ enum TreatmentCorrection {
         "Някой друг е коригирал мероприятието междувременно. Заредете го отново, "
         + "за да видите сегашните стойности. Вашите промени няма да бъдат запазени."
     static let reloadTitle = "Зареди отново"
-
-    /// The server's sentence, except where its wording is about deleting.
-    ///
-    /// `TREATMENT_MIXED_AUTHORSHIP` is shared with the withdrawal, and its
-    /// text says the treatment can't be REMOVED, which is not what was asked
-    /// here. A correction is refused for administrators too, so it doesn't
-    /// send anyone to one.
-    static func text(for error: Error) -> String {
-        if case APIClient.APIError.http(_, "TREATMENT_MIXED_AUTHORSHIP", _, _, _) = error {
-            return "Това мероприятие е записано от повече от един човек, затова не може да се коригира."
-        }
-        return UserMessage.text(for: error)
-    }
 
     // MARK: - The body
 
@@ -254,6 +247,80 @@ enum TreatmentCorrection {
                 }
             }
         }
+    }
+}
+
+extension TreatmentCorrection {
+
+    // MARK: - The trail
+
+    /// «Коригирано на … в … от …» (owner, 2026-10-22). The time too, as two
+    /// corrections on one day are told apart by it. The name is left out
+    /// when the server can't give one, and never replaced by an id.
+    static func correctedLine(_ entry: TreatmentCorrectionTrail.Entry) -> String {
+        let when = "Коригирано на \(BgDate.full(entry.correctedAt)) в \(BgDate.time(entry.correctedAt))"
+        guard let who = entry.correctedBy?.recorded else { return when }
+        return "\(when) от \(who)"
+    }
+
+    /// One field a correction changed: its label, and what it said before.
+    struct Was: Equatable, Sendable, Identifiable {
+        let label: String
+        /// What it said before; nil when it was empty.
+        let value: String?
+        /// False where this build can't show the earlier value (the dose,
+        /// whose unit the definition names by id), or the definition before
+        /// was unreadable: then the field is named as changed, with no value.
+        let shown: Bool
+        var id: String { label }
+    }
+
+    /// The changed fields in the form's order, each once: the dose's value
+    /// and unit are one line, as on the form, and so are the water rate's.
+    /// A field this build has no name for is left out rather than shown by
+    /// its server name.
+    static func was(_ entry: TreatmentCorrectionTrail.Entry) -> [Was] {
+        let changed = Set(entry.changedFields)
+        let before = entry.previous
+        func line(_ label: String, _ value: String?) -> Was {
+            Was(label: label, value: value, shown: before != nil)
+        }
+        func named(_ label: String) -> Was { Was(label: label, value: nil, shown: false) }
+        var out: [Was] = []
+        if changed.contains("occurredOn") {
+            out.append(line("Дата", before?.occurredOn.flatMap(BgDate.parseISODay).map(BgDate.full)))
+        }
+        if changed.contains("title") { out.append(named("Наименование")) }
+        if changed.contains("productItemId") {
+            out.append(line(before?.treatmentKind?.inputLabel ?? "Препарат", before?.productName.recorded))
+        }
+        if changed.contains("targetNote") { out.append(line("Вредител", before?.targetNote?.recorded)) }
+        if !changed.isDisjoint(with: ["doseValue", "doseUnitId"]) { out.append(named("Доза")) }
+        if !changed.isDisjoint(with: ["waterRateValue", "waterRateUnitId"]) {
+            out.append(named("Разход на работен разтвор"))
+        }
+        if changed.contains("phenophase") { out.append(line("Фенофаза/BBCH", before?.phenophase?.recorded)) }
+        if changed.contains("quarantinePeriodDays") {
+            out.append(line("Карантинен срок", before?.quarantinePeriodDays.map { Plural.bg($0, "ден", "дни") }))
+        }
+        if changed.contains("applicationTechnique") {
+            out.append(line("Техника", ApplicationTechnique.display(before?.applicationTechnique)))
+        }
+        if !changed.isDisjoint(with: ["parcels", "treatedAreaHa"]) { out.append(named("Третирана площ")) }
+        return out
+    }
+
+    /// The line under a field: what it was, or only that it changed.
+    static func wasText(_ was: Was) -> String {
+        was.shown ? "Беше: \(was.value ?? "—")" : "Променено"
+    }
+
+    /// One correction as VoiceOver reads it: a dash is read as nothing.
+    static func spoken(_ entry: TreatmentCorrectionTrail.Entry) -> String {
+        let fields = was(entry).map { was in
+            was.shown ? "\(was.label): беше \(was.value ?? "няма")" : "\(was.label): променено"
+        }
+        return ([correctedLine(entry)] + fields).joined(separator: ". ")
     }
 }
 

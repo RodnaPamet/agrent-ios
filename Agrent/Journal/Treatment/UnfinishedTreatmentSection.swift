@@ -12,6 +12,15 @@ import SwiftUI
 /// answered, if it can't be reached, and for a finished treatment, which is
 /// almost every one, so the screen stays as it was for them.
 ///
+/// ── The entry's screen reads it (#428) ──
+///
+/// This view used to read for itself, from a `.task` on a `Group` holding
+/// only `if let progress, !progress.complete { … }`. Before the read that
+/// Group holds no view, and a modifier on no view never runs, so the read
+/// never started and the section never showed. Now `JournalDetailView`
+/// reads (`read`) and draws this only for an unfinished treatment. An empty
+/// stack to hang the read on would add its spacing to every treatment.
+///
 /// ── Who is offered the abandon ──
 ///
 /// ADMIN only on the server (`assertCanAdmin`), and here on its `canAdmin`
@@ -20,9 +29,10 @@ import SwiftUI
 /// included, so it sits behind a confirmation that says so.
 struct UnfinishedTreatmentSection: View {
     let handle: String
+    /// The entry's reading, and this section's after a refused abandon.
+    @Binding var progress: TreatmentProgress?
     var recorder: TreatmentRecorder = LiveTreatmentRecorder()
 
-    @State private var progress: TreatmentProgress?
     @State private var confirming = false
     @State private var abandoning = false
     @State private var failure: String?
@@ -31,12 +41,15 @@ struct UnfinishedTreatmentSection: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        Group {
-            if let progress, !progress.complete {
-                unfinished(progress)
-            }
+        if let progress, !progress.complete {
+            unfinished(progress)
         }
-        .task(id: handle) { await read() }
+    }
+
+    /// How far the server got: nil when it holds nothing, can't be reached,
+    /// or the answer can't be read. Each of those shows nothing.
+    static func read(_ handle: String, with recorder: TreatmentRecorder = LiveTreatmentRecorder()) async -> TreatmentProgress? {
+        try? await recorder.progress(of: handle)
     }
 
     private func unfinished(_ progress: TreatmentProgress) -> some View {
@@ -113,10 +126,6 @@ struct UnfinishedTreatmentSection: View {
 
     static let restNotSent = "Останалите не са записани."
 
-    private func read() async {
-        progress = try? await recorder.progress(of: handle)
-    }
-
     private func abandon() async {
         abandoning = true
         failure = nil
@@ -130,7 +139,7 @@ struct UnfinishedTreatmentSection: View {
             failure = text
             // Finished meanwhile, perhaps: read again, and a complete one
             // stops offering the abandon.
-            await read()
+            progress = await Self.read(handle, with: recorder)
         }
     }
 }

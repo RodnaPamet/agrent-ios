@@ -755,6 +755,11 @@ waits for the updated app, as a queued spray does. The owner chose this on
     ДНЕВНИК entries that go with it.
   - Everyone else is told only an administrator can.
   - The abandon also drops the phone's own copy, so nothing resends it.
+  - **Until #428 (2026-10-24) the entry's screen never asked.** The section read
+    from a `.task` on a `Group` that held no view before the answer, so the
+    read never ran and no build showed the warning or the button. That was
+    found on the fixture seam, not on a device. The screen now reads it, and
+    `EmptyGroupTaskTests` fails on that shape anywhere in the app.
   - **The web:** has no button for the abandon as of 2026-10-15; the route
     is API-only. Its outbox now resends a short treatment (#1870), but says
     nothing about it: a web farmer sees the server's row with fewer parcels
@@ -794,7 +799,7 @@ The owner reversed "recorded treatments stay final" (2026-10-22) on
 interactively.
 
 **iOS**: «Коригирай» on a treatment's journal entry, below «Виж на картата»:
-- **Who:** the treatment's creator and the farm's administrators, as the server rules it (creator or admin, one author). Decided from the row's `mayDelete`, the same rule today. The row is to carry its own `mayCorrect`, asked for and agreed by backend 1, because agri-saas #2280 may narrow the withdrawal again. It is never decided by probing `GET …/definition`, which 403s for anyone who may not correct.
+- **Who:** the treatment's creator and the farm's administrators, as the server rules it (creator or admin, one author). Decided from the row's own `mayCorrect` (agri-saas #2292), and never from `mayDelete`. The two agree today, but agri-saas #2280 may narrow the withdrawal again, and a fallback would then hide «Коригирай» from creators who may still correct. Only an explicit `false` hides it; an absent field is a page cached before it existed. It is never decided by probing `GET …/definition`, which 403s for anyone who may not correct.
 - **Step one** is the treatment as recorded, read from `GET …/definition`, in «Ново мероприятие»'s order. Editable: the date, the pest, Фенофаза/BBCH, the quarantine period (with the earliest harvest worked out again) and the technique. **Locked**, and shown with «Препаратът, дозата и парцелите не могат да се коригират все още.»: the product and its registration number, the dose, and the parcels with their treated area («Целият парцел» where none was typed). The server refuses those today (`TREATMENT_CORRECTION_FIELD_UNSUPPORTED`). They unlock when it allows them; the owner put that next on the server, before the «Забележка» note.
 - **No parcel step:** nothing on it can change yet.
 - **Step two, «Проверка»**, lists only the changes, each as «Беше: …» and «Става: …», above «Проверете данните.» and «Запази».
@@ -803,7 +808,11 @@ interactively.
 - **After the save:** the entry shows the corrected values at once, and the journal reads again.
 - A field a spraying requires (the pest, the period) may not be emptied if it was filled. One an older record never captured may stay empty.
 
-**Not yet:** «Коригирано на … от …» with the previous values, which the owner asked for on 2026-10-22. It needs the trail read backend 1 is building: the latest correction, readable by anyone who can see the treatment.
+**«Корекции»** on the entry, under its facts (agri-saas #2292, `GET …/corrections`). It is what the owner asked for on 2026-10-22:
+- one line per correction, newest first: «Коригирано на 24 октомври 2026 г. в 21:40 от …», with no «от …» when the server can't name anyone (it never sends an id);
+- each changed field with «Беше: …», read from the correction's `previous` definition. The dose, water rate and treated area show only «Променено», because the definition names a dose unit by id. A field this build has no name for is left out;
+- readable by anyone who can see the treatment, an inspector included (a read gate, where the prefill is a write gate);
+- nothing shown while it loads, if it can't be read, or when nobody has corrected the treatment. Read again after «Запази».
 
 **The web:** the route has been on the server since agri-saas #2287. The website's editor is backend 1's, and drops its «Проверка» sentence in the same release.
 

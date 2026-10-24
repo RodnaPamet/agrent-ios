@@ -81,7 +81,7 @@ struct TreatmentCorrectionFlow: View {
         do {
             draft = TreatmentCorrection.Draft(try await TreatmentCorrectionAPI.definition(handle))
         } catch {
-            loadFailure = TreatmentCorrection.text(for: error)
+            loadFailure = UserMessage.text(for: error)
         }
     }
 
@@ -113,7 +113,7 @@ struct TreatmentCorrectionFlow: View {
             stale = true
             failure = TreatmentCorrection.staleText
         } catch {
-            failure = TreatmentCorrection.text(for: error)
+            failure = UserMessage.text(for: error)
         }
     }
 }

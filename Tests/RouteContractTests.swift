@@ -205,7 +205,8 @@ final class RouteContractTests: XCTestCase {
             ("TreatmentAPI.swift", [TreatmentAPI.recordPath, TreatmentAPI.treatmentPath("{treatmentGroupId}"),
                                     TreatmentAPI.documentPath("{treatmentGroupId}")]),
             // «Коригирай»: the prefill and the correction, one path (#392).
-            ("TreatmentCorrectionAPI.swift", [TreatmentCorrectionAPI.definitionPath("{treatmentGroupId}")]),
+            ("TreatmentCorrectionAPI.swift", [TreatmentCorrectionAPI.definitionPath("{treatmentGroupId}"),
+                                              TreatmentCorrectionAPI.correctionsPath("{treatmentGroupId}")]),
             ("ExchangeAPI.swift", [
                 ExchangeAPI.listingsPath,
                 ExchangeAPI.listingsPath(ExchangeQuery(text: "q", minTonnes: 1, maxTonnes: 2, cursor: "c")),

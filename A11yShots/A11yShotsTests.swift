@@ -118,7 +118,8 @@ final class A11yShotsTests: XCTestCase {
             case "09a-crop-costs": captureCropCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "01c-journal-filter": captureJournalFilter(app)
-            case "01e-journal-treatment", "01g-treatment-correction": captureJournalTreatment(app)
+            case "01e-journal-treatment", "01g-treatment-correction", "01i-treatment-trail":
+                captureJournalTreatment(app)
             case "17-new-entry": captureNewEntryForm(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "19c-public-profile": capturePublicProfile(app)
@@ -552,8 +553,22 @@ final class A11yShotsTests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
             capture("01f-journal-treatment-pdf", app: app)
         }
+        captureTreatmentTrail(app)
         captureTreatmentCorrection(app)
         goBack(app, to: "Земеделски дневник")
+    }
+
+    /// The same entry's «Корекции» (agri-saas #2292): `treatment-corrections.json`'s
+    /// one correction, who and when, and what the pest and the period were.
+    private func captureTreatmentTrail(_ app: XCUIApplication) {
+        let corrected = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Коригирано на"))
+            .firstMatch
+        XCTAssertTrue(corrected.waitForExistence(timeout: 10), "the entry shows no «Корекции»")
+        XCTAssertTrue(corrected.label.contains("Вредител: беше Плевели"), corrected.label)
+        XCTAssertTrue(scrollWhollyIntoView(corrected, in: app), "the page would not scroll «Корекции» into view")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01i-treatment-trail", app: app)
     }
 
     /// The same treatment's «Коригирай» (#392): the form prefilled from

@@ -1,0 +1,34 @@
+{
+  "treatmentGroupId": "tg_fixture_1",
+  "version": 2,
+  "corrections": [
+    {
+      "correctedAt": "2026-09-18T07:15:00.000Z",
+      "correctedBy": "Синтетичен потребител",
+      "changedFields": ["targetNote", "quarantinePeriodDays"],
+      "previous": {
+        "treatmentGroupId": "tg_fixture_1",
+        "version": 1,
+        "kind": "SPRAY",
+        "occurredOn": "2026-09-16",
+        "title": "Тестов хербицид",
+        "applicationTechnique": "boom",
+        "targetNote": "Плевели",
+        "productItemId": "itm_fixture_herbicide",
+        "productName": "Тестов хербицид",
+        "pppRegistrationNo": "SYNTH-0001",
+        "doseValue": 0.15,
+        "doseUnitId": "unit_fixture_l_per_dca",
+        "waterRateValue": null,
+        "waterRateUnitId": null,
+        "quarantinePeriodDays": 21,
+        "phenophase": null,
+        "lines": [
+          { "parcelId": "par_holes", "parcelName": "SYNTH-1", "locationId": "loc_synthetic_1", "treatedAreaHa": null },
+          { "parcelId": "par_simple", "parcelName": "SYNTH-2", "locationId": "loc_synthetic_1", "treatedAreaHa": 1.2 },
+          { "parcelId": "par_nogeom", "parcelName": "SYNTH-3", "locationId": "loc_synthetic_1", "treatedAreaHa": null }
+        ]
+      }
+    }
+  ]
+}

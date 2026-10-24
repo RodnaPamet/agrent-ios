@@ -19,10 +19,12 @@ import SwiftUI
 /// itself carries. If freshness ever has to be exact here, the endpoint
 /// exists.
 ///
-/// The one read is a treatment's progress (`UnfinishedTreatmentSection`,
-/// #326): whether every parcel it was sent for reached the register, which
-/// the row can't say. It adds no spinner and no empty state. Until it
-/// answers, and if it can't, the screen is what it was.
+/// A treatment's entry makes two reads, neither with a spinner or an empty
+/// state. Until each answers, and if it can't, the screen is what it was:
+/// - its progress (`UnfinishedTreatmentSection`, #326): whether every parcel
+///   it was sent for reached the register, which the row can't say;
+/// - its corrections (`TreatmentCorrectionsSection`, #392): «Коригирано на
+///   … от …» and what each field said before.
 ///
 /// ── Why it is read-only ──
 ///
@@ -72,6 +74,13 @@ struct JournalDetailView: View {
     /// with: the route carries a value, so the list reading again does not
     /// reach it.
     @State private var corrected: TreatmentDefinition?
+    /// Bumped by each save, so «Корекции» reads the newest one in.
+    @State private var trailRevision = 0
+    /// The treatment's corrections (agri-saas #2292); nil until read.
+    @State private var trail: TreatmentCorrectionTrail?
+    /// How far the server got with it (#326); nil until read. Read here,
+    /// not by its section, for the reason `UnfinishedTreatmentSection` gives.
+    @State private var progress: TreatmentProgress?
 
     private var treatment: JournalTreatment? {
         guard let row = entry.treatment, row.isTreatment else { return nil }
@@ -88,6 +97,11 @@ struct JournalDetailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 facts
+                if let trail, !trail.corrections.isEmpty {
+                    // Under the facts it qualifies (#392): what they said
+                    // before, and who changed them when.
+                    TreatmentCorrectionsSection(trail: trail)
+                }
                 if let treatment, let handle = treatment.treatmentGroupId?.recorded {
                     // Which parcels, and where (#399, owner 2026-10-22): the
                     // row above says only how many.
@@ -113,12 +127,15 @@ struct JournalDetailView: View {
                     .sheet(isPresented: $correcting) {
                         TreatmentCorrectionFlow(handle: handle, row: treatment) { saved in
                             corrected = saved
+                            trailRevision += 1
                             AccessibilityNotification.Announcement("Корекцията е запазена.").post()
                         }
                     }
                 }
                 if let handle = treatment?.treatmentGroupId?.recorded {
-                    UnfinishedTreatmentSection(handle: handle)
+                    if let progress, !progress.complete {
+                        UnfinishedTreatmentSection(handle: handle, progress: $progress)
+                    }
                     TreatmentDocumentAction(handle: handle)
                 }
                 notes
@@ -128,6 +145,26 @@ struct JournalDetailView: View {
             .padding(.vertical, 16)
         }
         .inlineTitle("Запис")
+        .task(id: TrailKey(handle: treatment?.treatmentGroupId?.recorded, revision: trailRevision)) {
+            await readTrail()
+        }
+        .task(id: treatment?.treatmentGroupId?.recorded) {
+            guard let handle = treatment?.treatmentGroupId?.recorded else { return }
+            progress = await UnfinishedTreatmentSection.read(handle)
+        }
+    }
+
+    private struct TrailKey: Hashable {
+        let handle: String?
+        let revision: Int
+    }
+
+    /// «Корекции», for any treatment: the read is open to everyone who can
+    /// see it. A failure keeps what was there, which is nothing at first.
+    private func readTrail() async {
+        guard let handle = treatment?.treatmentGroupId?.recorded,
+              let read = try? await TreatmentCorrectionAPI.corrections(handle) else { return }
+        trail = read
     }
 
     // MARK: - Header

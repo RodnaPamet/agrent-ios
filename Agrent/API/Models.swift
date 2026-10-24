@@ -206,12 +206,18 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// too, and no field on one row could say that. Advisory: the route
     /// checks again. Nil from a server, or a cached page, older than it.
     var mayDelete: Bool?
+    /// Whether THIS person may correct it («Коригирай», agri-saas #2292).
+    /// The same rule as `mayDelete` today, and deliberately its own field:
+    /// see `TreatmentCorrection.offered`. Nil from a server, or a cached
+    /// page, older than it.
+    var mayCorrect: Bool?
 
     init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
          totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil,
          kind: String? = nil, doseValue: Decimal? = nil, doseUnit: String? = nil,
          targetNote: String? = nil, applicationTechnique: String? = nil,
-         quarantinePeriodDays: Int? = nil, phenophase: String? = nil, mayDelete: Bool? = nil) {
+         quarantinePeriodDays: Int? = nil, phenophase: String? = nil, mayDelete: Bool? = nil,
+         mayCorrect: Bool? = nil) {
         self.treatmentGroupId = treatmentGroupId
         self.productName = productName
         self.parcelCount = parcelCount
@@ -226,6 +232,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         self.quarantinePeriodDays = quarantinePeriodDays
         self.phenophase = phenophase
         self.mayDelete = mayDelete
+        self.mayCorrect = mayCorrect
     }
 
     init(from decoder: any Decoder) throws {
@@ -244,6 +251,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         quarantinePeriodDays = (try? c?.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)) ?? nil
         phenophase = (try? c?.decodeIfPresent(String.self, forKey: .phenophase)) ?? nil
         mayDelete = (try? c?.decodeIfPresent(Bool.self, forKey: .mayDelete)) ?? nil
+        mayCorrect = (try? c?.decodeIfPresent(Bool.self, forKey: .mayCorrect)) ?? nil
     }
 
     /// A row that stands for parcels, rather than an entry folded to itself.
