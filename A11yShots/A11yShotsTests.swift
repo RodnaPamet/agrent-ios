@@ -130,9 +130,9 @@ final class A11yShotsTests: XCTestCase {
             case "06-news": captureNews(app)
             case "16-profile": captureProfile(app)
             case "17-farm-wizard": captureFarmWizard(app)
-            case "09d-farm-directory":
+            case "09d-farm-search":
                 openTheExchange(app)
-                captureFarmDirectory(app)
+                captureFarmSearch(app)
             case "13-listing-message-party":
                 openTheExchange(app)
                 captureListingWithMessageParty(app)
@@ -960,7 +960,7 @@ final class A11yShotsTests: XCTestCase {
         capture("09-exchange", app: app)
         captureExchangeMap(app)
         captureMyListings(app)
-        captureFarmDirectory(app)
+        captureFarmSearch(app)
 
         captureListingWithMessageParty(app)
         captureInboxAndConversation(app)
@@ -991,24 +991,43 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20), "Борса showed nothing")
     }
 
-    /// «Ферми» (`farm-directory.json`), pushed from Борса's bar (#323): a
-    /// farm's name, tagline, oblast and crops, the long row wrapping at AX
-    /// sizes. A GET only. No farm is tapped: its page is the real web's,
-    /// loaded outside the seam. Popped back to Борса at once.
-    private func captureFarmDirectory(_ app: XCUIApplication) {
-        let farms = app.buttons["Ферми"]
-        guard farms.waitForExistence(timeout: 5) else {
-            XCTFail("no «Ферми» on Борса's bar — is social.public-profile on in auth-me.json?")
+    /// Борса's one search finds farms (2026-10-24; `farm-directory.json`):
+    /// «Синтетично» typed and searched, and the «Ферми» section above the
+    /// listings shows the farm — its name, tagline, oblast and crops, the
+    /// long row wrapping at AX sizes. A GET only. No farm is tapped: its page
+    /// is the real web's, loaded outside the seam. The search is cleared
+    /// after, so the board is back as it was.
+    private func captureFarmSearch(_ app: XCUIApplication) {
+        // The search is «Обяви»'s; the step before this one leaves «Моите
+        // обяви» open.
+        let browse = labelled("Обяви", in: app.buttons)
+        if browse.waitForExistence(timeout: 5) { browse.tap() }
+        // By its label: a vertical-axis TextField reaches the tree as a text
+        // VIEW, with the search-field trait, not as a text field.
+        // Two can match — an off-screen copy has an infinite frame — so the
+        // one on screen.
+        let fields = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ AND elementType != %d", "Търсене",
+                                  XCUIElement.ElementType.image.rawValue))
+        _ = fields.firstMatch.waitForExistence(timeout: 5)
+        guard let field = fields.allElementsBoundByIndex.first(where: { $0.isHittable }) else {
+            XCTFail("no search field on Борса")
             return
         }
-        farms.tap()
+        field.tap()
+        field.typeText("Синтетично\n")
         // A row is one element whose label is its spoken sentence, which
         // starts with the farm's name.
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Синтетично стопанство"))
         XCTAssertTrue(row.firstMatch.waitForExistence(timeout: 10),
-                      "«Ферми» showed no farms — farm-directory.json did not load")
-        capture("09d-farm-directory", app: app)
-        goBack(app, to: "Борса")
+                      "the search showed no farms — is social.public-profile on in auth-me.json?")
+        capture("09d-farm-search", app: app)
+        let clear = app.buttons["Изчисти търсенето"]
+        if clear.waitForExistence(timeout: 3) { clear.tap() }
+        if field.exists {
+            field.tap()
+            field.typeText("\n")
+        }
     }
 
     /// «Моите обяви» (`exchange-my-listings.json`), the seller's own rows:
@@ -1097,14 +1116,13 @@ final class A11yShotsTests: XCTestCase {
         goBack(app, to: "Борса")
     }
 
-    /// «Съобщения» → the inbox → `thr_synthetic_1`.
+    /// «Съобщения» on Борса's bar (2026-10-24; a section until then) → the
+    /// inbox → `thr_synthetic_1`.
     private func captureInboxAndConversation(_ app: XCUIApplication) {
-        // A segment «Съобщения (2)» when four fit, a chip «Съобщения» (count
-        // in its VALUE) when they do not or at an accessibility size —
-        // `ExchangeSectionPicker`. `labelled` answers both.
+        // The count is the button's VALUE, so its label is «Съобщения».
         let section = labelled("Съобщения", in: app.buttons)
         XCTAssertTrue(section.waitForExistence(timeout: 10),
-                      "no «Съобщения» segment or chip on Борса")
+                      "no «Съобщения» on Борса's bar")
         section.tap()
 
         let thread = app.descendants(matching: .any)

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// «Съобщения», Борса's fourth section: the person's OWN conversations —
+/// «Съобщения», pushed from Борса's bar (`ExchangeInboxScreen`; a section
+/// in the row under the title until 2026-10-24): the person's OWN conversations —
 /// since agri-saas #1323 not the farm's shared inbox — newest first, as the
 /// server orders them (PARITY GAP 7).
 ///

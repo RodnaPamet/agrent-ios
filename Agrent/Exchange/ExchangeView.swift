@@ -1,16 +1,16 @@
 import SwiftUI
 
 struct ExchangeView: View {
+    /// Three sections. «Съобщения» was a fourth until 2026-10-24, when the
+    /// owner moved it to the bar, in the place of «Ферми».
     enum Tab: String, CaseIterable, Identifiable {
-        case browse, mine, inquiries, messages
+        case browse, mine, inquiries
         var id: String { rawValue }
         var label: String {
             switch self {
             case .browse: "Обяви"
             case .mine: "Моите обяви"
             case .inquiries: "Моите заявки"
-            // PARITY GAP 7. The web's fourth section; iOS had three.
-            case .messages: "Съобщения"
             }
         }
     }
@@ -19,8 +19,10 @@ struct ExchangeView: View {
     @State private var listings = ExchangeListingsStore()
     @State private var mine = MyListingsStore()
     @State private var inquiries = MyInquiriesStore()
-    @State private var inbox = ExchangeInboxStore()
     @State private var unread = ExchangeUnreadStore.shared
+    /// The farms the board's search found (owner, 2026-10-24).
+    @State private var farms = BoardFarmsStore()
+    @State private var farmPage: InAppPage?
     @State private var posting = false
     @State private var flags = FeatureFlags.shared
 
@@ -54,23 +56,24 @@ struct ExchangeView: View {
                             }
                         }
                     }
-                    // The farm directory (#323), on every section: it's
-                    // about who trades here, not about one list. Hidden
-                    // while the server hides it (`FarmDirectoryAPI`).
-                    if flags.isOn(FarmBrandAPI.flag) {
-                        // Primary, not secondary: on a phone a secondary
-                        // item folds into a «…» menu, and the owner asked for
-                        // a button on the bar.
-                        ToolbarItem(placement: .primaryAction) {
-                            NavigationLink(value: AppRoute.farmDirectory) {
-                                Label("Ферми", systemImage: "house.and.flag")
-                            }
-                            .accessibilityInputLabels(A11y.Spoken.farms)
-                        }
-                    }
+                    // «Съобщения» (owner, 2026-10-24), where «Ферми» was: on
+                    // every section, since a conversation is about trading
+                    // here rather than about one list. The farms moved into
+                    // the board's search. Primary, not secondary: on a phone
+                    // a secondary item folds into a «…» menu.
+                    ToolbarItem(placement: .primaryAction) { messagesButton }
                 }
                 .sheet(isPresented: $posting) {
                     NewListingView { Task { await mine.load() } }
+                }
+                .sheet(item: $farmPage) { page in
+                    InAppBrowser(url: page.url).ignoresSafeArea()
+                }
+                // The farm section asks the directory what the board just
+                // asked the server: on a search, a map tap or a clear.
+                .onChange(of: listings.lastAsked) { _, asked in
+                    guard let asked, flags.isOn(FarmBrandAPI.flag) else { farms.clear(); return }
+                    Task { await farms.load(text: asked.text, regions: asked.regions) }
                 }
                 .task { await loadCurrent() }
                 .onChange(of: tab) { Task { await loadCurrent() } }
@@ -81,7 +84,7 @@ struct ExchangeView: View {
     @ViewBuilder
     private var stack: some View {
         VStack(spacing: 0) {
-            ExchangeSectionPicker(selection: $tab, unread: unread.count)
+            ExchangeSectionPicker(selection: $tab)
                 .padding(.horizontal)
                 .padding(.bottom, 8)
 
@@ -92,7 +95,10 @@ struct ExchangeView: View {
                 // board is a network round trip per character otherwise, on
                 // a connection this app assumes is bad, and every keystroke
                 // would also be a line in the unified log.
-                SearchField(text: $listings.query.text, prompt: "Търсене по култура или регион") {
+                // Short enough for one line on a phone: the longer «Търсене по
+                // култура, регион или ферма» wrapped and doubled the field's
+                // height. The magnifier says it is a search.
+                SearchField(text: $listings.query.text, prompt: "Култура, регион или ферма") {
                     Task { await listings.load() }
                 }
                 .padding(.horizontal)
@@ -103,7 +109,6 @@ struct ExchangeView: View {
             case .browse: browse
             case .mine: myListings
             case .inquiries: myInquiries
-            case .messages: ExchangeInboxView(store: inbox, showListings: { tab = .browse })
             }
         }
         // THE STRIP AROUND THE SECTION PICKER. Each list below paints the
@@ -120,7 +125,6 @@ struct ExchangeView: View {
         case .browse: listings.state.freshness
         case .mine: mine.state.freshness
         case .inquiries: inquiries.state.freshness
-        case .messages: inbox.state.freshness
         }
     }
 
@@ -129,9 +133,6 @@ struct ExchangeView: View {
         case .browse: if listings.state.value == nil { await listings.load() }
         case .mine: if mine.state.value == nil { await mine.load() }
         case .inquiries: if inquiries.state.value == nil { await inquiries.load() }
-        // Nothing here: the inbox runs its own loop — load, then poll — for
-        // exactly as long as it is on screen. See `ExchangeInboxView`.
-        case .messages: break
         }
     }
 
@@ -186,6 +187,7 @@ struct ExchangeView: View {
                     }
                     .pageRow()
                 }
+                farmsSection
                 // The table is GLOBAL — every tenant sees every active
                 // listing, and that IS the product. Saying so once is cheaper
                 // than a heading that quietly implies these are the user's,
@@ -215,9 +217,63 @@ struct ExchangeView: View {
             listings: listings.rows,
             selectedRegions: listings.query.regions,
             onToggleRegion: { code in Task { await listings.toggleRegion(code) } },
-            onClearRegions: { Task { await listings.clearRegions() } }
+            onClearRegions: { Task { await listings.clearRegions() } },
+            farms: farms.hits,
+            onOpenFarm: openFarm
         )
         .refreshable { await PullToRefresh.bounded { await listings.load() } }
+    }
+
+    // MARK: - Farms, from the same search (owner, 2026-10-24)
+
+    /// The farms the search found, above the listings: someone who typed a
+    /// farm's name is looking for that farm first. Nothing at all when the
+    /// search found none — the board is the listings.
+    @ViewBuilder
+    private var farmsSection: some View {
+        if !farms.hits.isEmpty {
+            Section {
+                ForEach(farms.hits) { hit in
+                    FarmLink(hit: hit) { openFarm(hit) }
+                }
+            } header: {
+                SectionHeader("Ферми")
+            } footer: {
+                SectionFooter {
+                    if let footer = BoardFarmsStore.footer(count: farms.hits.count) { Text(footer) }
+                }
+            }
+            .pageRow()
+        }
+    }
+
+    private func openFarm(_ hit: FarmDirectoryHit) {
+        farmPage = InAppPage.farm(handle: hit.handle)
+    }
+
+    /// «Съобщения» with the unread count on it — the count the section chip
+    /// used to carry, so a waiting reply is as visible from «Моите обяви».
+    private var messagesButton: some View {
+        NavigationLink(value: AppRoute.exchangeInbox) {
+            // The count BESIDE the icon, not a badge over its corner: the bar
+            // draws its items in a capsule that clips anything outside it, so
+            // an overlaid badge was not there at all.
+            HStack(spacing: 3) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                if unread.count > 0 {
+                    Text(unread.count > 99 ? "99+" : "\(unread.count)")
+                        .font(.footnote.weight(.bold))
+                        .monospacedDigit()
+                }
+            }
+        }
+        // The NAME without the count, so Voice Control's «Съобщения» keeps
+        // matching as the count changes; the count is the value.
+        .accessibilityLabel("Съобщения")
+        .accessibilityValue(unread.count > 0
+            ? Plural.bg(unread.count, "непрочетен разговор", "непрочетени разговора")
+            : "")
+        .accessibilityInputLabels(A11y.Spoken.messages)
     }
 
     /// PARITY GAP 2. The board sent no query string at all, so it showed an
@@ -384,7 +440,6 @@ struct ExchangeView: View {
 /// Not seen on a device; see ROADMAP.md's known-unverified list.
 struct ExchangeSectionPicker: View {
     @Binding var selection: ExchangeView.Tab
-    let unread: Int
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityDifferentiateWithoutColor) private var withoutColor
@@ -441,7 +496,6 @@ struct ExchangeSectionPicker: View {
             }
             .onAppear { reveal(selection, proxy, animated: false) }
             .onChange(of: selection) { _, new in reveal(new, proxy, animated: true) }
-            .onChange(of: unread) { reveal(selection, proxy, animated: false) }
         }
         .scrollIndicators(.hidden)
         // One container of buttons for VoiceOver, named as the picker was.
@@ -483,19 +537,11 @@ struct ExchangeSectionPicker: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-        // The NAME without the count, so Voice Control's «Съобщения» keeps
-        // matching as the count changes; the count is the value.
         .accessibilityLabel(tab.label)
-        .accessibilityValue(tab == .messages && unread > 0
-            ? Plural.bg(unread, "непрочетен разговор", "непрочетени разговора")
-            : "")
     }
 
-    /// The count lives in the label, where the web has no count at all, so
-    /// the section is findable from any of the other three.
-    private func label(for tab: ExchangeView.Tab) -> String {
-        tab == .messages ? MessagingPolicy.counted(tab.label, unread: unread) : tab.label
-    }
+    /// The unread count moved to «Съобщения» on the bar (2026-10-24).
+    private func label(for tab: ExchangeView.Tab) -> String { tab.label }
 }
 
 struct ListingRow: View {

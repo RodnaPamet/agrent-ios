@@ -138,6 +138,7 @@ final class FixtureSeamTests: XCTestCase {
             (TrendsAPI.newsPath(tags: ["subsidies", "wheat"], query: nil, cursor: nil), "trends-news-mine"),
             // #323: «Ферми» unfiltered.
             (FarmDirectoryAPI.searchPath(FarmDirectoryQuery()), "farm-directory"),
+            (FarmDirectoryAPI.searchPath(FarmDirectoryQuery(text: "Синтетично")), "farm-directory"),
             (TrendsAPI.newsTagsPath, "trends-news-tags"),
             (NewsPreferencesAPI.path, "news-preferences"),
             // agrent-ios#138 — the field-operation task and its lines.

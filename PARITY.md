@@ -280,6 +280,19 @@ OTHER farm sees:
   and none has been opened. Under the UI test seam every one of these is
   answered 501, which is the backstop, not the rule.
 
+### Divergence — «Съобщения» on Борса's bar, three sections in the row (owner, 2026-10-24)
+
+The web has «Съобщения» as a fourth section beside «Обяви / Моите обяви /
+Моите заявки». The owner moved it to Борса's bar, in the place «Ферми» had.
+- **Pushed as its own screen** (`ExchangeInboxScreen`, `AppRoute.exchangeInbox`),
+  with the unread count beside the icon. A badge over the icon's corner was
+  clipped by the bar's capsule.
+- **VoiceOver:** the count is the button's value, so Voice Control's
+  «Съобщения» keeps matching as it changes.
+- **Three sections fit a phone** as segments now. Four needed chips.
+- **The inbox polls only while on screen,** as it did as a section, and an
+  empty inbox's «Към обявите» goes back to the board.
+
 ### Gap 7 — no messaging — CLOSED 2026-09-30
 
 Web `exchange/threads` (121) + `exchange/threads/[threadId]` (321) · iOS
@@ -1313,20 +1326,26 @@ and the first real write is the owner's.
 The server's directory is `GET /api/public/farms` (P6.8, agri-saas #1817,
 live since 12.31.0). It's anonymous and behind the same flag.
 
-- **Where (owner):** a «Ферми» button on Борса's bar, on every section,
-  shown only when `social.public-profile` is on.
+- **Where (owner, 2026-10-24):** in Борса's one search, «Култура, регион или
+  ферма». The separate «Ферми» screen behind a bar button is gone. The farms
+  the search finds sit in a «Ферми» section above the listings, and under
+  the map in the map view. With nothing typed and no oblast chosen there is
+  no farm section. It only searches while `social.public-profile` is on.
+- **Narrowed by the board's own filters (owner):** the directory's `q`
+  matches only a farm's name, so the typed text is read first
+  (`BoardFarmSearch`):
+  - a crop («пшеница», `wheat`, a unique prefix) goes as `crop=`;
+  - an oblast goes as `oblast=`;
+  - anything else goes as `q=`.
+
+  The oblasti tapped on the map narrow the farms too. The directory takes
+  one, so it's one request per oblast, merged. The «Ферми» screen's own
+  oblast and crop menus went with it.
 - **A farm opens as its web page (owner):** `/f/{handle}` in Safari's view
   inside the app. The server has no JSON read of one farm's page, so a
   native screen would have had no description.
-- **Search and filters:** a name search on submit (the server matches
-  Cyrillic, and Latin through the name's transliteration); oblast from the
-  28 names; crop from the crops the answers carried. A fixed crop list
-  can't be offered: the server matches a crop against what each farm
-  typed, ignoring case but nothing else (agri-saas #2069). So the menu
-  has one choice per crop whatever its case («Пшеница», «пшеница»), and
-  a variety such as «Пшеница (мека)» is its own (#356).
 - **At most 50, no paging:** the server's bound. A full answer says to
-  narrow by oblast or crop.
+  narrow the search.
 - **Not cached:** a farm that withdraws leaves the directory at once.
 
 **Unverified:** no published farm has been listed. The flag is off and no

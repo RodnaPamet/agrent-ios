@@ -26,6 +26,9 @@ struct ExchangeMapView: View {
     /// A tap on an oblast: on if it was off, off if it was on (the web's toggle).
     var onToggleRegion: (String) -> Void = { _ in }
     var onClearRegions: () -> Void = {}
+    /// The farms the board's search found (2026-10-24), under the map.
+    var farms: [FarmDirectoryHit] = []
+    var onOpenFarm: (FarmDirectoryHit) -> Void = { _ in }
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -62,6 +65,17 @@ struct ExchangeMapView: View {
             // map were the system's grouped grey — black in dark mode, under
             // a green page (#156).
             .pageRow()
+
+            if !farms.isEmpty {
+                Section {
+                    ForEach(farms) { hit in
+                        FarmLink(hit: hit) { onOpenFarm(hit) }
+                    }
+                } header: {
+                    SectionHeader("Ферми")
+                }
+                .pageRow()
+            }
 
             if regions.isEmpty {
                 Section {
