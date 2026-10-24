@@ -167,6 +167,8 @@ enum FixtureCatalogue {
         // agrent-ios#392: «Коригирай»'s prefill for the same treatment. Its
         // PUT, the correction, is a write: `WRITE_REFUSED`, as every write.
         (TreatmentCorrectionAPI.definitionPath(fixtureTreatmentHandle), "treatment-definition"),
+        // agri-saas #2292: its corrections, one, so «Корекции» shows.
+        (TreatmentCorrectionAPI.correctionsPath(fixtureTreatmentHandle), "treatment-corrections"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),

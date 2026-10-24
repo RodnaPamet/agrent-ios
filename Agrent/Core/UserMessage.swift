@@ -785,10 +785,12 @@ enum UserMessage {
         "TREATMENT_TITLE_REQUIRED":
             "Мероприятието трябва да има наименование. Изчистете другите полета или премахнете мероприятието.",
         // Tasks of one treatment recorded by different people, so "its
-        // creator" names nobody and only an administrator can sort it out.
+        // creator" names nobody. Refused for «Изтрий» and «Коригирай» alike,
+        // administrators included, so the server's words since agri-saas
+        // #2292 name both and send nobody to an administrator.
         "TREATMENT_MIXED_AUTHORSHIP":
-            "Това мероприятие е записано от повече от един човек и не може да се премахне наведнъж. "
-            + "Обърнете се към администратор.",
+            "Това мероприятие е записано от повече от един човек, затова не може да бъде коригирано или "
+            + "премахнато наведнъж. Ограничението важи и за администраторите.",
 
         // «Публичен профил» (agrent-ios #323, agri-saas #1865/#1871). The
         // address is the one field another farm can refuse: the taken case

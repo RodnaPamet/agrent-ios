@@ -391,6 +391,12 @@ shows both «Целият парцел» and an area. The product and unit ids, 
 registration number and the version follow no real format. The correction
 itself (`PUT` on the same path) is a write and stays `501 WRITE_REFUSED`.
 
+`treatment-corrections.json`: `GET …/tg_fixture_1/corrections`, its trail.
+SYNTHETIC: one correction, by an invented «Синтетичен потребител», which set
+the quarantine period to 30 days from 21 and the pest from «Плевели». Its
+`previous` is the definition above with those two values, so «Корекции»
+shows each with what it was.
+
 ## A recorded treatment's map (agrent-ios#399)
 
 `treatment-summary.json`: `GET /journal/treatments/tg_fixture_1`, the

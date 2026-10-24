@@ -163,30 +163,86 @@ final class TreatmentCorrectionTests: XCTestCase {
 
     // MARK: - Who, and what is said
 
-    /// The withdrawal's rule, from the row: never a probe of the write-gated
-    /// read. An absent flag (a cached page) is not a refusal.
+    /// The row's own `mayCorrect`, never `mayDelete`: the two may part
+    /// (agri-saas #2280). An absent flag (a cached page) is not a refusal.
     func testItIsOfferedWhereTheRowAllows() {
-        func entry(_ mayDelete: Bool?) -> LogEntry {
+        func entry(correct: Bool?, delete: Bool?) -> LogEntry {
             LogEntry(id: "e", type: .inputApplication, status: .done, title: "Препарат А", occurredAt: nil,
-                     treatment: JournalTreatment(treatmentGroupId: "tg_1", parcelCount: 1, mayDelete: mayDelete))
+                     treatment: JournalTreatment(treatmentGroupId: "tg_1", parcelCount: 1,
+                                                 mayDelete: delete, mayCorrect: correct))
         }
         func me(canWrite: Bool) -> CurrentUser {
             CurrentUser(id: "u", name: nil, email: nil, role: nil,
                         permissions: CurrentUser.Permissions(canWrite: canWrite, canAdmin: false))
         }
-        XCTAssertTrue(TreatmentCorrection.offered(entry(true), to: me(canWrite: true)))
-        XCTAssertTrue(TreatmentCorrection.offered(entry(nil), to: me(canWrite: true)))
-        XCTAssertFalse(TreatmentCorrection.offered(entry(false), to: me(canWrite: true)))
-        XCTAssertFalse(TreatmentCorrection.offered(entry(true), to: me(canWrite: false)))
+        let writer = me(canWrite: true)
+        XCTAssertTrue(TreatmentCorrection.offered(entry(correct: true, delete: true), to: writer))
+        XCTAssertTrue(TreatmentCorrection.offered(entry(correct: nil, delete: nil), to: writer))
+        XCTAssertFalse(TreatmentCorrection.offered(entry(correct: false, delete: true), to: writer),
+                       "may delete, may not correct: the correction's own flag decides")
+        XCTAssertTrue(TreatmentCorrection.offered(entry(correct: true, delete: false), to: writer),
+                      "deletion narrowed: still correctable")
+        XCTAssertTrue(TreatmentCorrection.offered(entry(correct: nil, delete: false), to: writer),
+                      "no fallback to mayDelete")
+        XCTAssertFalse(TreatmentCorrection.offered(entry(correct: true, delete: true), to: me(canWrite: false)))
     }
 
-    /// The server's mixed-authorship sentence is about deleting; here it's
-    /// said about correcting. Every other refusal is the server's own.
-    func testAMixedAuthorshipRefusalIsAboutCorrecting() {
-        let mixed = APIClient.APIError.http(status: 409, code: "TREATMENT_MIXED_AUTHORSHIP", message: nil)
-        XCTAssertTrue(TreatmentCorrection.text(for: mixed).contains("не може да се коригира"))
+    /// One sentence for both refusals since agri-saas #2292: it names
+    /// correcting and removing, and sends nobody to an administrator, who
+    /// is bound too.
+    func testAMixedAuthorshipRefusalNamesBoth() {
+        let mixed = UserMessage.text(for: APIClient.APIError.http(status: 409, code: "TREATMENT_MIXED_AUTHORSHIP", message: nil))
+        XCTAssertTrue(mixed.contains("коригирано или премахнато"), mixed)
+        XCTAssertFalse(mixed.contains("Обърнете се към администратор"), mixed)
         let refused = APIClient.APIError.http(status: 403, code: "TREATMENT_EDIT_NOT_PERMITTED", message: nil)
-        XCTAssertEqual(TreatmentCorrection.text(for: refused), UserMessage.text(for: refused))
         XCTAssertTrue(UserMessage.text(for: refused).hasSuffix("може да го коригира."))
+    }
+
+    // MARK: - «Корекции» (agri-saas #2292)
+
+    private func trail(_ json: String) async throws -> TreatmentCorrectionTrail {
+        try await APIClient.shared.decode(Data(json.utf8), as: TreatmentCorrectionTrail.self)
+    }
+
+    private func previousJSON(pest: String = "Плевели", quarantine: String = "21") -> String {
+        #"{"treatmentGroupId":"tg_1","version":1,"kind":"SPRAY","occurredOn":"2026-09-16","title":"А","applicationTechnique":"boom","targetNote":"\#(pest)","productItemId":"i","productName":"Препарат А","pppRegistrationNo":null,"doseValue":1,"doseUnitId":"u","waterRateValue":null,"waterRateUnitId":null,"quarantinePeriodDays":\#(quarantine),"phenophase":null,"lines":[]}"#
+    }
+
+    /// Each field with what it was, in the form's order; the dose, whose
+    /// unit the definition names by id, only as changed.
+    func testACorrectionSaysWhatEachFieldWas() async throws {
+        let read = try await trail(#"{"treatmentGroupId":"tg_1","version":2,"corrections":[{"correctedAt":"2026-10-24T18:40:00.000Z","correctedBy":"Иван Иванов","changedFields":["quarantinePeriodDays","targetNote","doseValue","doseUnitId","somethingNew"],"previous":"# + previousJSON() + "}]}")
+        let entry = try XCTUnwrap(read.corrections.first)
+        let was = TreatmentCorrection.was(entry)
+        XCTAssertEqual(was.map(\.label), ["Вредител", "Доза", "Карантинен срок"],
+                       "the form's order; the dose once; an unknown field left out")
+        XCTAssertEqual(TreatmentCorrection.wasText(was[0]), "Беше: Плевели")
+        XCTAssertEqual(TreatmentCorrection.wasText(was[1]), "Променено")
+        XCTAssertEqual(TreatmentCorrection.wasText(was[2]), "Беше: \(Plural.bg(21, "ден", "дни"))")
+        let line = TreatmentCorrection.correctedLine(entry)
+        XCTAssertTrue(line.hasPrefix("Коригирано на \(BgDate.full(entry.correctedAt)) в "), line)
+        XCTAssertTrue(line.hasSuffix(" от Иван Иванов"), line)
+        XCTAssertTrue(TreatmentCorrection.spoken(entry).contains("Вредител: беше Плевели"))
+    }
+
+    /// No name, no «от …», never an id. An unreadable `previous` costs the
+    /// "was" values, not the correction or the rest of the trail.
+    func testATrailReadsWithoutANameOrAPreviousDefinition() async throws {
+        let read = try await trail(#"{"treatmentGroupId":"tg_1","version":3,"corrections":[{"correctedAt":"2026-10-24T18:40:00.000Z","correctedBy":null,"changedFields":["phenophase"],"previous":{"shape":"unknown"}},{"correctedAt":"2026-10-23T08:00:00.000Z","correctedBy":"  ","changedFields":["phenophase"],"previous":null}]}"#)
+        XCTAssertEqual(read.corrections.count, 2)
+        for entry in read.corrections {
+            XCTAssertFalse(TreatmentCorrection.correctedLine(entry).contains(" от "))
+            XCTAssertEqual(TreatmentCorrection.was(entry).map(TreatmentCorrection.wasText), ["Променено"])
+        }
+    }
+
+    /// The fixture the screenshot shows, read as the screen reads it.
+    func testTheFixtureTrail() async throws {
+        let bundle = Bundle(for: Self.self)
+        let url = try XCTUnwrap(bundle.url(forResource: "treatment-corrections", withExtension: "json")
+            ?? bundle.url(forResource: "Fixtures/treatment-corrections", withExtension: "json"))
+        let read = try await APIClient.shared.decode(try Data(contentsOf: url), as: TreatmentCorrectionTrail.self)
+        let was = TreatmentCorrection.was(try XCTUnwrap(read.corrections.first))
+        XCTAssertEqual(was.map(TreatmentCorrection.wasText), ["Беше: Плевели", "Беше: \(Plural.bg(21, "ден", "дни"))"])
     }
 }

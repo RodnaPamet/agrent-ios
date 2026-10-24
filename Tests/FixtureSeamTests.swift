@@ -432,6 +432,7 @@ final class FixtureSeamTests: XCTestCase {
         ("treatment-summary", { _ = try TreatmentAPI.taskIDs(from: $0) }),
         // #392: «Коригирай»'s prefill.
         ("treatment-definition", { _ = try await APIClient.shared.decode($0, as: TreatmentDefinition.self) }),
+        ("treatment-corrections", { _ = try await APIClient.shared.decode($0, as: TreatmentCorrectionTrail.self) }),
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),
         ("costs-defaults", { _ = try await APIClient.shared.decode($0, as: OverheadDefaults.self) }),

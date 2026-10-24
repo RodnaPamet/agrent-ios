@@ -24,6 +24,7 @@
         "productName": "Тестов хербицид",
         "parcelCount": 3,
         "mayDelete": true,
+        "mayCorrect": true,
         "totalAreaHa": 4.2,
         "blockNames": [
           "Блок 2",

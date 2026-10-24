@@ -40,6 +40,59 @@ enum TreatmentCorrectionAPI {
         try await APIClient.shared.put(definitionPath(handle), body: correction,
                                        ifMatch: version, as: TreatmentDefinition.self)
     }
+
+    /// The treatment's corrections, newest first (agri-saas #2292).
+    ///
+    /// A READ gate, where the prefill is a write gate: anyone who can see the
+    /// treatment can see that it was corrected and what it said before. That
+    /// is who the owner asked it for (#392, 2026-10-22): an inspector reading
+    /// a filed register.
+    static func correctionsPath(_ handle: String) -> String {
+        "\(TreatmentAPI.treatmentPath(handle))/corrections"
+    }
+
+    static func corrections(_ handle: String) async throws -> TreatmentCorrectionTrail {
+        try await APIClient.shared.get(correctionsPath(handle), as: TreatmentCorrectionTrail.self)
+    }
+}
+
+/// `GET …/corrections`: who corrected the treatment, when, which fields, and
+/// the whole definition as it stood before. At most 50, newest first.
+struct TreatmentCorrectionTrail: Decodable, Equatable, Sendable {
+    let treatmentGroupId: String
+    /// The treatment's CURRENT version.
+    let version: Int
+    let corrections: [Entry]
+
+    struct Entry: Decodable, Equatable, Sendable {
+        let correctedAt: Date
+        /// A display name, never an id. Nil when no one can be named: a job
+        /// with no actor, or an account since removed.
+        let correctedBy: String?
+        /// The server's field names (`occurredOn`, `phenophase`, …).
+        let changedFields: [String]
+        /// The definition before this correction. Read leniently: a stored
+        /// one this build can't read costs only its "was" values, not the
+        /// fact that a correction happened, nor the rest of the trail.
+        let previous: TreatmentDefinition?
+
+        private enum CodingKeys: String, CodingKey { case correctedAt, correctedBy, changedFields, previous }
+
+        init(correctedAt: Date, correctedBy: String?, changedFields: [String], previous: TreatmentDefinition?) {
+            self.correctedAt = correctedAt
+            self.correctedBy = correctedBy
+            self.changedFields = changedFields
+            self.previous = previous
+        }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            correctedAt = try c.decode(Date.self, forKey: .correctedAt)
+            correctedBy = try c.decodeIfPresent(String.self, forKey: .correctedBy)
+            changedFields = (try? c.decode([String].self, forKey: .changedFields)) ?? []
+            previous = (try? c.decodeIfPresent(TreatmentDefinition.self, forKey: .previous)) ?? nil
+        }
+    }
 }
 
 /// A recorded treatment as `GET …/definition` serves it, read for what the
