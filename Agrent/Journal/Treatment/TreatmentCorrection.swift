@@ -27,10 +27,14 @@ enum TreatmentCorrection {
 
     static let actionTitle = "Коригирай"
 
-    /// What can't be corrected yet, said where it is shown locked.
-    static func lockedNote(_ kind: TreatmentDraft.Kind) -> String {
-        "\(kind == .fertilize ? "Торът" : "Препаратът"), дозата и парцелите не могат да се коригират все още."
-    }
+    /// A line with no treated area of its own: the parcel was treated whole.
+    /// The definition doesn't carry the parcel's area, so it says so in words.
+    static let wholeParcel = "Целият парцел"
+
+    /// What a correction still can't do: add or drop a parcel (agri-saas
+    /// #2293). The areas inside the set can change.
+    static let parcelsNote =
+        "Празното поле е целият парцел. Парцели не се добавят и не се премахват с корекция."
 
     /// Someone else corrected it after the form was opened (409 `STALE_DATA`).
     /// Their correction stands; this one would have overwritten it unseen.
@@ -38,6 +42,16 @@ enum TreatmentCorrection {
         "Някой друг е коригирал мероприятието междувременно. Заредете го отново, "
         + "за да видите сегашните стойности. Вашите промени няма да бъдат запазени."
     static let reloadTitle = "Зареди отново"
+
+    /// What a save hands the entry's screen: the corrected definition, and
+    /// what it can't say by itself. The dose unit's symbol is the form's
+    /// choice, as the definition names the unit by id. Whether an area moved
+    /// decides whether the row's total area still holds.
+    struct Saved: Equatable, Sendable {
+        let definition: TreatmentDefinition
+        let unitSymbol: String?
+        let areaChanged: Bool
+    }
 
     // MARK: - The body
 
@@ -50,29 +64,53 @@ enum TreatmentCorrection {
     /// goes out as an explicit `null`. A synthesized `Encodable` would drop
     /// it instead, and the server would read that as "unchanged".
     ///
-    /// The product, dose and parcels are never sent: the form can't change
-    /// them, and an unchanged one would only be compared and ignored.
+    /// The parcels go out only when an area changed, and then every one of
+    /// them, the set as recorded: a different set is refused.
     struct Body: Encodable, Equatable, Sendable {
         enum Field: String, CodingKey, CaseIterable, Sendable {
-            case occurredOn, targetNote, phenophase, quarantinePeriodDays, applicationTechnique
+            case occurredOn, productItemId, targetNote, doseValue, doseUnitId
+            case phenophase, quarantinePeriodDays, applicationTechnique, parcels
+        }
+
+        struct ParcelArea: Encodable, Equatable, Sendable {
+            let parcelId: String
+            /// Hectares. Nil is the whole parcel, sent as `null`: the key is
+            /// required.
+            let treatedAreaHa: Double?
+
+            private enum CodingKeys: String, CodingKey { case parcelId, treatedAreaHa }
+
+            func encode(to encoder: any Encoder) throws {
+                var c = encoder.container(keyedBy: CodingKeys.self)
+                try c.encode(parcelId, forKey: .parcelId)
+                try c.encodeOrNull(treatedAreaHa, forKey: .treatedAreaHa)
+            }
         }
 
         let fields: Set<Field>
         let occurredOn: String
+        let productItemId: String
         let targetNote: String?
+        let doseValue: Decimal
+        let doseUnitId: String
         let phenophase: String?
         let quarantinePeriodDays: Int?
         let applicationTechnique: String?
+        let parcels: [ParcelArea]
 
         func encode(to encoder: any Encoder) throws {
             var c = encoder.container(keyedBy: Field.self)
             for field in Field.allCases where fields.contains(field) {
                 switch field {
                 case .occurredOn: try c.encode(occurredOn, forKey: field)
+                case .productItemId: try c.encode(productItemId, forKey: field)
                 case .targetNote: try c.encodeOrNull(targetNote, forKey: field)
+                case .doseValue: try c.encode(doseValue, forKey: field)
+                case .doseUnitId: try c.encode(doseUnitId, forKey: field)
                 case .phenophase: try c.encodeOrNull(phenophase, forKey: field)
                 case .quarantinePeriodDays: try c.encodeOrNull(quarantinePeriodDays, forKey: field)
                 case .applicationTechnique: try c.encodeOrNull(applicationTechnique, forKey: field)
+                case .parcels: try c.encode(parcels, forKey: field)
                 }
             }
         }
@@ -83,27 +121,144 @@ enum TreatmentCorrection {
     /// The form's fields, started from the definition as recorded.
     struct Draft: Equatable, Sendable {
         let original: TreatmentDefinition
+        /// The recorded dose unit's symbol, from the journal row: the
+        /// definition names the unit by id.
+        let originalUnitSymbol: String?
         var date: Date
+        /// The trade name, typed and matched against the farm's catalogue,
+        /// as on «Ново мероприятие». Only a product the farm has can be
+        /// chosen: a correction sends it by id (`resolve`).
+        var productText: String
+        /// The farm's product the typed name is, when it isn't the recorded
+        /// one. Set by `resolve`.
+        private(set) var product: InputItem?
+        /// Why the typed name can't be used, when it can't. Set by `resolve`.
+        private(set) var productIssue: ProductIssue?
+        var doseText: String
+        var doseUnit: DoseUnit
         var pestText: String
         var phenophaseText: String
         var quarantineText: String
         /// A slug (`ApplicationTechnique`), or a stored value outside the
         /// seven, kept as it is. Nil when none was recorded.
         var technique: String?
+        /// Each parcel's treated area as typed, in decares, by parcel id.
+        /// Empty is the whole parcel.
+        var areaTexts: [String: String]
 
-        init(_ definition: TreatmentDefinition, today: Date = Date()) {
+        /// A dose unit by id, with the symbol the picker shows.
+        struct DoseUnit: Hashable, Sendable {
+            let id: String
+            let symbol: String?
+        }
+
+        enum ProductIssue: Equatable, Sendable {
+            /// The catalogue isn't in hand yet.
+            case loading
+            case notInCatalogue
+            case wrongKind(String)
+            case sample(String)
+        }
+
+        init(_ definition: TreatmentDefinition, unitSymbol: String? = nil, today: Date = Date()) {
             original = definition
+            originalUnitSymbol = unitSymbol
             date = definition.occurredOn.flatMap(BgDate.parseISODay) ?? today
+            productText = definition.productName
+            doseText = Self.doseText(definition.doseValue)
+            doseUnit = DoseUnit(id: definition.doseUnitId, symbol: unitSymbol)
             pestText = definition.targetNote ?? ""
             phenophaseText = definition.phenophase ?? ""
             quarantineText = definition.quarantinePeriodDays.map(String.init) ?? ""
             technique = Self.slug(definition.applicationTechnique)
+            var areas: [String: String] = [:]
+            for line in definition.lines {
+                areas[line.parcelId] = line.treatedAreaHa.map { Area(hectares: $0).number } ?? ""
+            }
+            areaTexts = areas
         }
 
         var kind: TreatmentDraft.Kind { original.treatmentKind ?? .spray }
 
         /// The fields only a spraying has, as on «Ново мероприятие».
         var spraying: Bool { kind == .spray }
+
+        // MARK: The product
+
+        /// The typed name against the farm's catalogue. The recorded name
+        /// needs no catalogue: it is the product as recorded. A name the
+        /// catalogue doesn't have can't be sent, because a correction names
+        /// the product by id; recording a treatment is what adds a product.
+        mutating func resolve(in catalogue: [InputItem]?) {
+            product = nil
+            productIssue = nil
+            let name = TypedProduct.cleaned(productText)
+            guard !name.isEmpty, name != original.productName else { return }
+            guard let catalogue else {
+                productIssue = .loading
+                return
+            }
+            switch TypedProduct.classify(productText, spraying: spraying, catalogue: catalogue) {
+            case .existing(let item):
+                if item.id != original.productItemId { product = item }
+            case .wrongKind(let item): productIssue = .wrongKind(item.name)
+            case .sample(let item): productIssue = .sample(item.name)
+            case .new: productIssue = .notInCatalogue
+            case .empty: break
+            }
+        }
+
+        // MARK: The dose
+
+        var dose: Decimal? { TreatmentDraft.decimal(doseText) }
+
+        /// «0,15», up to the column's four places, as the journal row writes
+        /// a dose. Comma or point both read back (`TreatmentDraft.decimal`).
+        static func doseText(_ value: Decimal) -> String {
+            value.formatted(.number.precision(.fractionLength(0...4)).grouping(.never).locale(BgDate.locale))
+        }
+
+        /// The picker's choices: the farm's dose units, and the recorded one
+        /// first when it is none of them, or it couldn't be shown as chosen.
+        func unitOptions(_ units: [Unit]) -> [DoseUnit] {
+            let known = units.map { DoseUnit(id: $0.id, symbol: $0.symbol) }
+            return known.contains { $0.id == original.doseUnitId }
+                ? known
+                : [DoseUnit(id: original.doseUnitId, symbol: originalUnitSymbol)] + known
+        }
+
+        /// The recorded unit's symbol from the farm's units, once they are
+        /// in hand, for a row that had none to give.
+        mutating func name(units: [Unit]) {
+            guard doseUnit.symbol == nil, let unit = units.first(where: { $0.id == doseUnit.id }) else { return }
+            doseUnit = DoseUnit(id: unit.id, symbol: unit.symbol)
+        }
+
+        private func doseLine(_ value: Decimal, _ symbol: String?) -> String {
+            symbol.map { "\(Self.doseText(value)) \($0)" } ?? Self.doseText(value)
+        }
+
+        // MARK: The parcels
+
+        /// A parcel's typed area: nil for the whole parcel, and not valid
+        /// when it isn't an area over zero.
+        func area(of line: TreatmentDefinition.Line) -> (valid: Bool, area: Area?) {
+            guard let text = areaTexts[line.parcelId]?.recorded else { return (true, nil) }
+            guard let area = Area.parse(decares: text), area.wireHectares > 0 else { return (false, nil) }
+            return (true, area)
+        }
+
+        private func areaChanged(_ line: TreatmentDefinition.Line) -> Bool {
+            let typed = area(of: line)
+            guard typed.valid else { return false }
+            switch (typed.area, line.treatedAreaHa.map(Area.init(hectares:))) {
+            case (nil, nil): return false
+            case let (now?, was?): return now.differs(from: was)
+            default: return true
+            }
+        }
+
+        // MARK: The other fields
 
         /// A known technique by its slug whatever its case, so `Boom` and
         /// `boom` are one choice and an untouched one counts as unchanged.
@@ -145,42 +300,63 @@ enum TreatmentCorrection {
             return TreatmentCheck.earliestHarvest(after: date, days: days)
         }
 
+        // MARK: What changed
+
         /// What differs from the record, in the form's order.
         var changed: [Body.Field] {
             var out: [Body.Field] = []
             if day != original.occurredOn { out.append(.occurredOn) }
-            guard spraying else { return out }
-            if targetNote != original.targetNote?.recorded { out.append(.targetNote) }
-            if phenophase != original.phenophase?.recorded { out.append(.phenophase) }
-            if quarantine.valid, quarantine.days != original.quarantinePeriodDays {
-                out.append(.quarantinePeriodDays)
+            if product != nil { out.append(.productItemId) }
+            if spraying, targetNote != original.targetNote?.recorded { out.append(.targetNote) }
+            if let dose, dose != original.doseValue { out.append(.doseValue) }
+            if doseUnit.id != original.doseUnitId { out.append(.doseUnitId) }
+            if spraying {
+                if phenophase != original.phenophase?.recorded { out.append(.phenophase) }
+                if quarantine.valid, quarantine.days != original.quarantinePeriodDays {
+                    out.append(.quarantinePeriodDays)
+                }
+                if technique != Self.slug(original.applicationTechnique) { out.append(.applicationTechnique) }
             }
-            if technique != Self.slug(original.applicationTechnique) { out.append(.applicationTechnique) }
+            if original.lines.contains(where: areaChanged) { out.append(.parcels) }
             return out
         }
 
         var body: Body {
-            Body(fields: Set(changed), occurredOn: day, targetNote: targetNote, phenophase: phenophase,
-                 quarantinePeriodDays: quarantine.days, applicationTechnique: technique)
+            Body(fields: Set(changed), occurredOn: day,
+                 productItemId: product?.id ?? original.productItemId,
+                 targetNote: targetNote, doseValue: dose ?? original.doseValue, doseUnitId: doseUnit.id,
+                 phenophase: phenophase, quarantinePeriodDays: quarantine.days, applicationTechnique: technique,
+                 parcels: original.lines.map { Body.ParcelArea(parcelId: $0.parcelId,
+                                                               treatedAreaHa: area(of: $0).area?.wireHectares) })
         }
 
         enum Problem: Equatable, Sendable {
             case futureDate
+            case productMissing
+            case product(String)
             case pestMissing
             case pestTooLong
+            case doseMissing
+            case doseNotPositive
             case quarantineInvalid
             case quarantineMissing
             case phenophaseTooLong
+            case area(String)
             case nothingChanged
 
             var text: String {
                 switch self {
                 case .futureDate: TreatmentDraft.Problem.futureDate.text
+                case .productMissing: TreatmentDraft.Problem.productMissing.text
+                case .product(let sentence): sentence
                 case .pestMissing: TreatmentDraft.Problem.pestMissing.text
                 case .pestTooLong: "Вредителят е твърде дълъг — до \(Draft.pestMaxLength) знака."
+                case .doseMissing: TreatmentDraft.Problem.doseMissing.text
+                case .doseNotPositive: TreatmentDraft.Problem.doseNotPositive.text
                 case .quarantineInvalid: "Карантинният срок е цяло число дни — от 0 до 365."
                 case .quarantineMissing: TreatmentDraft.Problem.quarantineMissing.text
                 case .phenophaseTooLong: TreatmentDraft.Problem.phenophaseTooLong.text
+                case .area(let name): "Въведете площ над нула за «\(name)» или оставете полето празно."
                 case .nothingChanged: "Няма промени за запазване."
                 }
             }
@@ -189,7 +365,8 @@ enum TreatmentCorrection {
         /// The server's cap on `targetNote` (`CorrectDiaryTreatment`).
         static let pestMaxLength = 500
 
-        /// Everything in the way of «Напред», first problem first.
+        /// Everything in the way of «Напред», first problem first, in the
+        /// form's order.
         ///
         /// A field a spraying's record requires may not be emptied if it was
         /// filled. One that was never captured, on a record older than the
@@ -199,9 +376,32 @@ enum TreatmentCorrection {
             var found: [Problem] = []
             let calendar = Calendar(identifier: .gregorian)
             if calendar.startOfDay(for: date) > calendar.startOfDay(for: now) { found.append(.futureDate) }
+            if TypedProduct.cleaned(productText).isEmpty {
+                found.append(.productMissing)
+            } else if let issue = productIssue {
+                switch issue {
+                case .loading:
+                    found.append(.product("Каталогът на стопанството още се зарежда."))
+                case .notInCatalogue:
+                    found.append(.product("«\(TypedProduct.cleaned(productText))» не е в каталога на стопанството. "
+                                          + "С корекция се избира продукт от каталога."))
+                case .wrongKind(let name):
+                    // The kind isn't corrected: a fertilising takes a fertiliser.
+                    found.append(.product("«\(name)» не е тор. Изберете тор от каталога на стопанството."))
+                case .sample(let name):
+                    found.append(.product("«\(name)» е образцов продукт. Въведете истинското търговско наименование."))
+                }
+            }
             if spraying {
                 if targetNote == nil, original.targetNote?.recorded != nil { found.append(.pestMissing) }
                 if let note = targetNote, note.count > Self.pestMaxLength { found.append(.pestTooLong) }
+            }
+            if let dose {
+                if dose <= 0 { found.append(.doseNotPositive) }
+            } else {
+                found.append(.doseMissing)
+            }
+            if spraying {
                 if let stage = phenophase, stage.count > TreatmentDraft.phenophaseMaxLength {
                     found.append(.phenophaseTooLong)
                 }
@@ -211,42 +411,66 @@ enum TreatmentCorrection {
                     found.append(.quarantineMissing)
                 }
             }
+            if let line = original.lines.first(where: { !area(of: $0).valid }) {
+                found.append(.area(line.parcelName))
+            }
             if found.isEmpty, changed.isEmpty { found.append(.nothingChanged) }
             return found
         }
 
-        /// One changed field, as «Проверка» reads it back. Nil is a field
-        /// left empty, which the screen says in words.
+        /// One change, as «Проверка» reads it back. Nil is a field left
+        /// empty, which the screen says in words.
         struct Change: Equatable, Sendable, Identifiable {
-            let field: Body.Field
+            let id: String
             let label: String
             let before: String?
             let after: String?
-            var id: Body.Field { field }
         }
 
         var changes: [Change] {
-            changed.map { field in
+            let fields = changed
+            var out: [Change] = []
+            for field in fields {
                 switch field {
                 case .occurredOn:
-                    Change(field: field, label: "Дата",
-                           before: original.occurredOn.flatMap(BgDate.parseISODay).map(BgDate.full),
-                           after: BgDate.full(date))
+                    out.append(Change(id: field.rawValue, label: "Дата",
+                                      before: original.occurredOn.flatMap(BgDate.parseISODay).map(BgDate.full),
+                                      after: BgDate.full(date)))
+                case .productItemId:
+                    out.append(Change(id: field.rawValue, label: kind.inputLabel,
+                                      before: original.productName, after: product?.name))
                 case .targetNote:
-                    Change(field: field, label: "Вредител", before: original.targetNote?.recorded, after: targetNote)
+                    out.append(Change(id: field.rawValue, label: "Вредител",
+                                      before: original.targetNote?.recorded, after: targetNote))
+                case .doseValue, .doseUnitId:
+                    // One line for the two, as on the form.
+                    guard !out.contains(where: { $0.id == "dose" }) else { continue }
+                    out.append(Change(id: "dose", label: "Доза",
+                                      before: doseLine(original.doseValue, originalUnitSymbol),
+                                      after: doseLine(dose ?? original.doseValue, doseUnit.symbol)))
                 case .phenophase:
-                    Change(field: field, label: "Фенофаза/BBCH", before: original.phenophase?.recorded, after: phenophase)
+                    out.append(Change(id: field.rawValue, label: "Фенофаза/BBCH",
+                                      before: original.phenophase?.recorded, after: phenophase))
                 case .quarantinePeriodDays:
-                    Change(field: field, label: "Карантинен срок",
-                           before: original.quarantinePeriodDays.map { Plural.bg($0, "ден", "дни") },
-                           after: quarantine.days.map { Plural.bg($0, "ден", "дни") })
+                    out.append(Change(id: field.rawValue, label: "Карантинен срок",
+                                      before: original.quarantinePeriodDays.map { Plural.bg($0, "ден", "дни") },
+                                      after: quarantine.days.map { Plural.bg($0, "ден", "дни") }))
                 case .applicationTechnique:
-                    Change(field: field, label: "Техника",
-                           before: ApplicationTechnique.display(original.applicationTechnique),
-                           after: ApplicationTechnique.display(technique))
+                    out.append(Change(id: field.rawValue, label: "Техника",
+                                      before: ApplicationTechnique.display(original.applicationTechnique),
+                                      after: ApplicationTechnique.display(technique)))
+                case .parcels:
+                    for line in original.lines where areaChanged(line) {
+                        out.append(Change(id: "area:\(line.parcelId)", label: "Площ — \(line.parcelName)",
+                                          before: Self.areaText(line.treatedAreaHa.map(Area.init(hectares:))),
+                                          after: Self.areaText(area(of: line).area)))
+                    }
                 }
             }
+            return out
         }
+
+        static func areaText(_ area: Area?) -> String { area?.text ?? TreatmentCorrection.wholeParcel }
     }
 }
 
@@ -306,7 +530,15 @@ extension TreatmentCorrection {
         if changed.contains("applicationTechnique") {
             out.append(line("Техника", ApplicationTechnique.display(before?.applicationTechnique)))
         }
-        if !changed.isDisjoint(with: ["parcels", "treatedAreaHa"]) { out.append(named("Третирана площ")) }
+        if changed.contains("treatedAreaHa") {
+            // Every parcel's area as it was, from the definition's own lines:
+            // the trail says what the set was, not which line moved.
+            out.append(line("Третирана площ", before.map { previous in
+                previous.lines
+                    .map { "\($0.parcelName) — \(Draft.areaText($0.treatedAreaHa.map(Area.init(hectares:))))" }
+                    .joined(separator: ", ")
+            }))
+        }
         return out
     }
 
@@ -327,8 +559,16 @@ extension TreatmentCorrection {
 extension JournalTreatment {
     /// The row as the correction left it, until the journal is read again:
     /// the entry's screen holds the row it was opened with.
-    func applying(_ corrected: TreatmentDefinition) -> JournalTreatment {
+    func applying(_ saved: TreatmentCorrection.Saved) -> JournalTreatment {
+        let corrected = saved.definition
         var row = self
+        row.productName = corrected.productName
+        row.doseValue = corrected.doseValue
+        row.doseUnit = saved.unitSymbol ?? row.doseUnit
+        // A corrected area changes the total, which can't be worked out
+        // here: a whole parcel's area isn't in the definition. Left out until
+        // the journal is read again rather than shown as it was.
+        if saved.areaChanged { row.totalAreaHa = nil }
         row.targetNote = corrected.targetNote
         row.phenophase = corrected.phenophase
         row.applicationTechnique = corrected.applicationTechnique

@@ -8,16 +8,26 @@ final class TreatmentCorrectionTests: XCTestCase {
 
     private func definition(kind: String = "SPRAY", occurredOn: String? = "2026-09-16",
                             technique: String? = "boom", pest: String? = "Плевели",
-                            quarantine: Int? = 30, phenophase: String? = nil) -> TreatmentDefinition {
+                            quarantine: Int? = 30, phenophase: String? = nil,
+                            lines: [TreatmentDefinition.Line] = [
+                                .init(parcelId: "p1", parcelName: "Парцел 1", treatedAreaHa: nil),
+                            ]) -> TreatmentDefinition {
         TreatmentDefinition(
             treatmentGroupId: "tg_1", version: 4, kind: kind, occurredOn: occurredOn,
-            applicationTechnique: technique, targetNote: pest, productName: "Препарат А",
-            pppRegistrationNo: nil, quarantinePeriodDays: quarantine, phenophase: phenophase,
-            lines: [.init(parcelId: "p1", parcelName: "Парцел 1", treatedAreaHa: nil)])
+            applicationTechnique: technique, targetNote: pest, productItemId: "itm_a", productName: "Препарат А",
+            pppRegistrationNo: nil, doseValue: Decimal(string: "0.15")!, doseUnitId: "u_l",
+            quarantinePeriodDays: quarantine, phenophase: phenophase, lines: lines)
     }
 
     private func draft(_ definition: TreatmentDefinition? = nil) -> TreatmentCorrection.Draft {
-        TreatmentCorrection.Draft(definition ?? self.definition(), today: Self.today)
+        TreatmentCorrection.Draft(definition ?? self.definition(), unitSymbol: "л/дка", today: Self.today)
+    }
+
+    /// The farm's catalogue as `/items` serves it: two products and a
+    /// fertiliser.
+    private func catalogue() throws -> [InputItem] {
+        let json = #"[{"id":"itm_a","name":"Препарат А","category":"PESTICIDE","defaultUnit":null,"createdByUserId":"u"},{"id":"itm_b","name":"Препарат Б","category":"PESTICIDE","defaultUnit":null,"createdByUserId":"u"},{"id":"itm_t","name":"Тор В","category":"FERTILIZER","defaultUnit":null,"createdByUserId":"u"}]"#
+        return try JSONDecoder().decode([InputItem].self, from: Data(json.utf8))
     }
 
     private static let today = BgDate.parseISODay("2026-10-24")!
@@ -122,13 +132,105 @@ final class TreatmentCorrectionTests: XCTestCase {
 
     /// A fertilising has no pest, stage, period or technique on its form, so
     /// none of them can change.
-    func testAFertilisingCorrectsItsDateOnly() {
+    func testAFertilisingHasNoSprayingFields() {
         var form = draft(definition(kind: "FERTILIZE", technique: nil, pest: nil, quarantine: nil))
         XCTAssertFalse(form.spraying)
         form.pestText = "Не се показва"
+        form.quarantineText = "abc"
         XCTAssertEqual(form.changed, [])
-        XCTAssertEqual(TreatmentCorrection.lockedNote(form.kind),
-                       "Торът, дозата и парцелите не могат да се коригират все още.")
+        XCTAssertEqual(form.problems(now: Self.today), [.nothingChanged])
+    }
+
+    // MARK: - The product, the dose and the areas (agri-saas #2293)
+
+    /// By id, and only one the farm has: a correction can't create a product.
+    func testTheProductIsChosenFromTheCatalogue() throws {
+        var form = draft()
+        form.productText = "Препарат Б"
+        form.resolve(in: nil)
+        XCTAssertEqual(form.problems(now: Self.today).first, .product("Каталогът на стопанството още се зарежда."))
+        form.resolve(in: try catalogue())
+        XCTAssertEqual(form.changed, [.productItemId])
+        XCTAssertEqual(try json(form.body)["productItemId"] as? String, "itm_b")
+        XCTAssertEqual(form.changes.first?.after, "Препарат Б")
+
+        form.productText = "Нещо ново"
+        form.resolve(in: try catalogue())
+        XCTAssertEqual(form.changed, [], "a name the farm hasn't got is no change")
+        XCTAssertTrue(form.problems(now: Self.today).first?.text.contains("не е в каталога") == true)
+
+        form.productText = "препарат а"
+        form.resolve(in: try catalogue())
+        XCTAssertEqual(form.changed, [], "the recorded product, typed in another case")
+        XCTAssertEqual(form.problems(now: Self.today), [.nothingChanged])
+    }
+
+    func testAFertilisingTakesAFertiliser() throws {
+        var form = draft(definition(kind: "FERTILIZE", technique: nil, pest: nil, quarantine: nil))
+        form.productText = "Препарат Б"
+        form.resolve(in: try catalogue())
+        XCTAssertEqual(form.problems(now: Self.today).first?.text,
+                       "«Препарат Б» не е тор. Изберете тор от каталога на стопанството.")
+        form.productText = "Тор В"
+        form.resolve(in: try catalogue())
+        XCTAssertEqual(form.changed, [.productItemId])
+    }
+
+    /// The value and the unit are one line on «Проверка», and each goes out
+    /// only when it moved.
+    func testTheDoseAndItsUnit() throws {
+        var form = draft()
+        XCTAssertEqual(form.doseText, "0,15")
+        form.doseText = "0,150"
+        XCTAssertEqual(form.changed, [], "the same number, written otherwise")
+        form.doseText = "0,2"
+        form.doseUnit = .init(id: "u_ml", symbol: "мл/дка")
+        let sent = try json(form.body)
+        XCTAssertEqual(sent.keys.sorted(), ["doseUnitId", "doseValue"])
+        XCTAssertEqual((sent["doseValue"] as? NSNumber)?.doubleValue ?? 0, 0.2, accuracy: 1e-9)
+        XCTAssertEqual(form.changes.map(\.label), ["Доза"])
+        XCTAssertEqual(form.changes.first?.before, "0,15 л/дка")
+        XCTAssertEqual(form.changes.first?.after, "0,2 мл/дка")
+        form.doseText = "0"
+        XCTAssertEqual(form.problems(now: Self.today).first, .doseNotPositive)
+        form.doseText = ""
+        XCTAssertEqual(form.problems(now: Self.today).first, .doseMissing)
+    }
+
+    /// The recorded unit is a choice even when the farm's list doesn't hold
+    /// it, so the picker can show it chosen.
+    func testTheRecordedUnitIsAChoice() throws {
+        let units = try JSONDecoder().decode([Agrent.Unit].self, from: Data(#"[{"id":"u_ml","key":"ml_per_dca","name":null,"symbol":"мл/дка","measure":"RATE"}]"#.utf8))
+        let form = draft()
+        XCTAssertEqual(form.unitOptions(units).map(\.id), ["u_l", "u_ml"])
+    }
+
+    /// One area moved: every parcel goes out, the set as recorded, a whole
+    /// parcel as an explicit null.
+    func testAnAreaChangeSendsTheWholeSet() throws {
+        var form = draft(definition(lines: [
+            .init(parcelId: "p1", parcelName: "Парцел 1", treatedAreaHa: nil),
+            .init(parcelId: "p2", parcelName: "Парцел 2", treatedAreaHa: 1.2),
+        ]))
+        XCTAssertEqual(form.areaTexts["p2"], Area(hectares: 1.2).number, "shown in decares")
+        XCTAssertEqual(form.changed, [])
+        form.areaTexts["p1"] = "5"
+        let sent = try json(form.body)
+        XCTAssertEqual(sent.keys.sorted(), ["parcels"])
+        let parcels = try XCTUnwrap(sent["parcels"] as? [[String: Any]])
+        XCTAssertEqual(parcels.map { $0["parcelId"] as? String }, ["p1", "p2"])
+        XCTAssertEqual((parcels[0]["treatedAreaHa"] as? NSNumber)?.doubleValue ?? 0, 0.5, accuracy: 1e-9)
+        XCTAssertEqual((parcels[1]["treatedAreaHa"] as? NSNumber)?.doubleValue ?? 0, 1.2, accuracy: 1e-9)
+        XCTAssertEqual(form.changes.map(\.label), ["Площ — Парцел 1"])
+        XCTAssertEqual(form.changes.first?.before, TreatmentCorrection.wholeParcel)
+
+        form.areaTexts["p1"] = nil
+        form.areaTexts["p2"] = nil
+        let whole = try XCTUnwrap(try json(form.body)["parcels"] as? [[String: Any]])
+        XCTAssertTrue(whole[1]["treatedAreaHa"] is NSNull, "the whole parcel again, said as null")
+
+        form.areaTexts["p2"] = "0"
+        XCTAssertEqual(form.problems(now: Self.today).first, .area("Парцел 2"))
     }
 
     // MARK: - «Проверка»
@@ -154,11 +256,18 @@ final class TreatmentCorrectionTests: XCTestCase {
         let row = JournalTreatment(treatmentGroupId: "tg_1", parcelCount: 1, earliestHarvestOn: "2026-10-16",
                                    targetNote: "Плевели", quarantinePeriodDays: 30)
         let corrected = definition(quarantine: 14, phenophase: "BBCH 31")
-        let shown = row.applying(corrected)
+        let shown = row.applying(.init(definition: corrected, unitSymbol: "л/дка", areaChanged: false))
         XCTAssertEqual(shown.quarantinePeriodDays, 14)
         XCTAssertEqual(shown.phenophase, "BBCH 31")
         XCTAssertEqual(shown.earliestHarvestOn, "2026-09-30")
-        XCTAssertNil(row.applying(definition(quarantine: nil)).earliestHarvestOn, "no period, no date")
+        XCTAssertEqual(shown.doseText, "0,15 л/дка")
+        XCTAssertEqual(shown.foldedProduct, "Препарат А")
+        XCTAssertNil(row.applying(.init(definition: definition(quarantine: nil), unitSymbol: nil, areaChanged: false))
+            .earliestHarvestOn, "no period, no date")
+        let area = JournalTreatment(treatmentGroupId: "tg_1", parcelCount: 1, totalAreaHa: 4.2)
+        XCTAssertEqual(area.applying(.init(definition: corrected, unitSymbol: nil, areaChanged: false)).totalAreaHa, 4.2)
+        XCTAssertNil(area.applying(.init(definition: corrected, unitSymbol: nil, areaChanged: true)).totalAreaHa,
+                     "a moved area leaves the total unknown, not as it was")
     }
 
     // MARK: - Who, and what is said
@@ -223,6 +332,18 @@ final class TreatmentCorrectionTests: XCTestCase {
         XCTAssertTrue(line.hasPrefix("Коригирано на \(BgDate.full(entry.correctedAt)) в "), line)
         XCTAssertTrue(line.hasSuffix(" от Иван Иванов"), line)
         XCTAssertTrue(TreatmentCorrection.spoken(entry).contains("Вредител: беше Плевели"))
+    }
+
+    /// The areas as they were, every parcel, from the definition's own lines.
+    func testAnAreaCorrectionSaysWhatTheAreasWere() async throws {
+        let previous = previousJSON().replacingOccurrences(
+            of: #""lines":[]"#,
+            with: #""lines":[{"parcelId":"p1","parcelName":"Парцел 1","locationId":null,"treatedAreaHa":null},{"parcelId":"p2","parcelName":"Парцел 2","locationId":null,"treatedAreaHa":1.2}]"#)
+        let read = try await trail(#"{"treatmentGroupId":"tg_1","version":2,"corrections":[{"correctedAt":"2026-10-24T18:40:00.000Z","correctedBy":null,"changedFields":["treatedAreaHa"],"previous":"# + previous + "}]}")
+        let was = TreatmentCorrection.was(try XCTUnwrap(read.corrections.first))
+        XCTAssertEqual(was.map(\.label), ["Третирана площ"])
+        XCTAssertEqual(TreatmentCorrection.wasText(was[0]),
+                       "Беше: Парцел 1 — \(TreatmentCorrection.wholeParcel), Парцел 2 — \(Area(hectares: 1.2).text)")
     }
 
     /// No name, no «от …», never an id. An unreadable `previous` costs the
