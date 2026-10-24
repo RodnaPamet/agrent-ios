@@ -96,8 +96,9 @@ struct TreatmentCorrectionTrail: Decodable, Equatable, Sendable {
 }
 
 /// A recorded treatment as `GET …/definition` serves it, read for what the
-/// correction form shows and changes. The water rate is not read: the
-/// phone's form never recorded one, and leaves it as it is.
+/// correction form shows and changes, and as each correction's `previous`
+/// in the trail. The water rate is read for the trail only: the phone's form
+/// never records one, and leaves it as it is.
 struct TreatmentDefinition: Decodable, Equatable, Sendable {
     let treatmentGroupId: String
     /// The group's version, sent back as `If-Match`. 0 for a treatment
@@ -117,6 +118,13 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
     /// A number on the wire, read through `WireDecimal` as every dose is.
     let doseValue: Decimal
     let doseUnitId: String
+    /// The dose unit's symbol, beside its id (agri-saas #2298). Optional:
+    /// a correction filed before it stored a `previous` without it, and a
+    /// trail keeps what was stored.
+    let doseUnitSymbol: String?
+    /// The water rate, for the trail's «Беше: …». Nil is none recorded.
+    let waterRateValue: Decimal?
+    let waterRateUnitSymbol: String?
     /// As captured on the day. Nil means nothing was captured, which the
     /// form shows as empty, never as the product's current period.
     let quarantinePeriodDays: Int?
@@ -136,7 +144,8 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
 extension TreatmentDefinition {
     private enum CodingKeys: String, CodingKey {
         case treatmentGroupId, version, kind, occurredOn, applicationTechnique, targetNote
-        case productItemId, productName, pppRegistrationNo, doseValue, doseUnitId
+        case productItemId, productName, pppRegistrationNo, doseValue, doseUnitId, doseUnitSymbol
+        case waterRateValue, waterRateUnitSymbol
         case quarantinePeriodDays, phenophase, lines
     }
 
@@ -154,6 +163,9 @@ extension TreatmentDefinition {
         pppRegistrationNo = try c.decodeIfPresent(String.self, forKey: .pppRegistrationNo)
         doseValue = try c.decode(WireDecimal.self, forKey: .doseValue).value
         doseUnitId = try c.decode(String.self, forKey: .doseUnitId)
+        doseUnitSymbol = (try? c.decodeIfPresent(String.self, forKey: .doseUnitSymbol)) ?? nil
+        waterRateValue = ((try? c.decodeIfPresent(WireDecimal.self, forKey: .waterRateValue)) ?? nil)?.value
+        waterRateUnitSymbol = (try? c.decodeIfPresent(String.self, forKey: .waterRateUnitSymbol)) ?? nil
         quarantinePeriodDays = try c.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)
         phenophase = try c.decodeIfPresent(String.self, forKey: .phenophase)
         lines = try c.decode([Line].self, forKey: .lines)

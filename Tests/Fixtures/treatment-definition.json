@@ -11,6 +11,8 @@
   "pppRegistrationNo": "SYNTH-0001",
   "doseValue": 0.15,
   "doseUnitId": "unit_fixture_l_per_dca",
+  "doseUnitSymbol": "л/дка",
+  "waterRateUnitSymbol": null,
   "waterRateValue": null,
   "waterRateUnitId": null,
   "quarantinePeriodDays": 30,

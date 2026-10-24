@@ -16,6 +16,7 @@ final class TreatmentCorrectionTests: XCTestCase {
             treatmentGroupId: "tg_1", version: 4, kind: kind, occurredOn: occurredOn,
             applicationTechnique: technique, targetNote: pest, productItemId: "itm_a", productName: "Препарат А",
             pppRegistrationNo: nil, doseValue: Decimal(string: "0.15")!, doseUnitId: "u_l",
+            doseUnitSymbol: nil, waterRateValue: nil, waterRateUnitSymbol: nil,
             quarantinePeriodDays: quarantine, phenophase: phenophase, lines: lines)
     }
 
@@ -332,6 +333,30 @@ final class TreatmentCorrectionTests: XCTestCase {
         XCTAssertTrue(line.hasPrefix("Коригирано на \(BgDate.full(entry.correctedAt)) в "), line)
         XCTAssertTrue(line.hasSuffix(" от Иван Иванов"), line)
         XCTAssertTrue(TreatmentCorrection.spoken(entry).contains("Вредител: беше Плевели"))
+    }
+
+    /// A rate is said with its unit (agri-saas #2298), or only named: a
+    /// `previous` stored before the symbol existed has none.
+    func testADoseCorrectionSaysWhatTheDoseWas() async throws {
+        let withUnit = previousJSON().replacingOccurrences(
+            of: #""doseUnitId":"u","#, with: #""doseUnitId":"u","doseUnitSymbol":"л/дка","waterRateUnitSymbol":null,"#)
+        let read = try await trail(#"{"treatmentGroupId":"tg_1","version":3,"corrections":[{"correctedAt":"2026-10-25T08:00:00.000Z","correctedBy":null,"changedFields":["doseValue","waterRateValue","waterRateUnitId"],"previous":"# + withUnit + #"},{"correctedAt":"2026-10-24T08:00:00.000Z","correctedBy":null,"changedFields":["doseValue"],"previous":"# + previousJSON() + "}]}")
+        let newer = TreatmentCorrection.was(read.corrections[0])
+        XCTAssertEqual(newer.map(TreatmentCorrection.wasText), ["Беше: 1 л/дка", "Беше: —"],
+                       "the dose with its unit; no water rate before")
+        XCTAssertEqual(TreatmentCorrection.was(read.corrections[1]).map(TreatmentCorrection.wasText), ["Променено"],
+                       "stored before the symbol: named only")
+    }
+
+    /// The form takes the definition's own symbol over the row's.
+    func testTheFormTakesTheDefinitionsUnitSymbol() async throws {
+        let json = previousJSON().replacingOccurrences(of: #""doseUnitId":"u","#,
+                                                       with: #""doseUnitId":"u","doseUnitSymbol":"кг/дка","#)
+        let definition = try await APIClient.shared.decode(Data(json.utf8), as: TreatmentDefinition.self)
+        let form = TreatmentCorrection.Draft(definition, unitSymbol: "л/дка", today: Self.today)
+        XCTAssertEqual(form.doseUnit.symbol, "кг/дка")
+        XCTAssertEqual(TreatmentCorrection.Draft(self.definition(), unitSymbol: "л/дка").doseUnit.symbol, "л/дка",
+                       "the row's, where the definition has none")
     }
 
     /// The areas as they were, every parcel, from the definition's own lines.

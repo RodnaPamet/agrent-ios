@@ -162,11 +162,13 @@ enum TreatmentCorrection {
 
         init(_ definition: TreatmentDefinition, unitSymbol: String? = nil, today: Date = Date()) {
             original = definition
-            originalUnitSymbol = unitSymbol
+            // The definition's own symbol first (agri-saas #2298); the
+            // journal row's before it existed.
+            originalUnitSymbol = definition.doseUnitSymbol?.recorded ?? unitSymbol
             date = definition.occurredOn.flatMap(BgDate.parseISODay) ?? today
             productText = definition.productName
             doseText = Self.doseText(definition.doseValue)
-            doseUnit = DoseUnit(id: definition.doseUnitId, symbol: unitSymbol)
+            doseUnit = DoseUnit(id: definition.doseUnitId, symbol: definition.doseUnitSymbol?.recorded ?? unitSymbol)
             pestText = definition.targetNote ?? ""
             phenophaseText = definition.phenophase ?? ""
             quarantineText = definition.quarantinePeriodDays.map(String.init) ?? ""
@@ -492,9 +494,10 @@ extension TreatmentCorrection {
         let label: String
         /// What it said before; nil when it was empty.
         let value: String?
-        /// False where this build can't show the earlier value (the dose,
-        /// whose unit the definition names by id), or the definition before
-        /// was unreadable: then the field is named as changed, with no value.
+        /// False where the earlier value can't be shown (a rate stored
+        /// without its unit's symbol, a field with no value to read), or the
+        /// definition before was unreadable: then the field is named as
+        /// changed, with no value.
         let shown: Bool
         var id: String { label }
     }
@@ -519,9 +522,24 @@ extension TreatmentCorrection {
             out.append(line(before?.treatmentKind?.inputLabel ?? "Препарат", before?.productName.recorded))
         }
         if changed.contains("targetNote") { out.append(line("Вредител", before?.targetNote?.recorded)) }
-        if !changed.isDisjoint(with: ["doseValue", "doseUnitId"]) { out.append(named("Доза")) }
+        // A rate is said with its unit or not at all: «Беше: 0,15» could be
+        // any unit. A `previous` stored before agri-saas #2298 has no symbol,
+        // so it is only named.
+        if !changed.isDisjoint(with: ["doseValue", "doseUnitId"]) {
+            if let before, let symbol = before.doseUnitSymbol?.recorded {
+                out.append(line("Доза", "\(Draft.doseText(before.doseValue)) \(symbol)"))
+            } else {
+                out.append(named("Доза"))
+            }
+        }
         if !changed.isDisjoint(with: ["waterRateValue", "waterRateUnitId"]) {
-            out.append(named("Разход на работен разтвор"))
+            if let before, before.waterRateValue == nil {
+                out.append(line("Разход на работен разтвор", nil))
+            } else if let before, let value = before.waterRateValue, let symbol = before.waterRateUnitSymbol?.recorded {
+                out.append(line("Разход на работен разтвор", "\(Draft.doseText(value)) \(symbol)"))
+            } else {
+                out.append(named("Разход на работен разтвор"))
+            }
         }
         if changed.contains("phenophase") { out.append(line("Фенофаза/BBCH", before?.phenophase?.recorded)) }
         if changed.contains("quarantinePeriodDays") {
