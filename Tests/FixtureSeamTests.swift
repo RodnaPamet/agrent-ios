@@ -132,6 +132,7 @@ final class FixtureSeamTests: XCTestCase {
             (DashboardAPI.fieldBriefingPath, "dashboard-field-briefing"),
             (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
             (TrendsAPI.pricesPath(.wheat, range: .year1), "trends-prices"),
+            (ExchangeAPI.listingsPath(ExchangeQuery(regions: ["BG-15"])), "exchange-listings-pleven"),
             (TrendsAPI.newsPath(.all), "trends-news"),
             // #231: the topics' feed, the catalogue and the choices.
             (TrendsAPI.newsPath(tags: ["subsidies", "wheat"], query: nil, cursor: nil), "trends-news-mine"),
@@ -434,6 +435,7 @@ final class FixtureSeamTests: XCTestCase {
         ("costs-defaults-crop", { _ = try await APIClient.shared.decode($0, as: CropCostDefaults.self) }),
         ("costs-machinery", { _ = try await APIClient.shared.decode($0, as: MachineryDepreciation.self) }),
         ("exchange-listings", { _ = try await ExchangeAPI.decodeListings(from: $0) }),
+        ("exchange-listings-pleven", { _ = try await ExchangeAPI.decodeListings(from: $0) }),
         ("exchange-my-listings", { _ = try await ExchangeAPI.decodeMyListings(from: $0) }),
         ("exchange-threads", { _ = try await ExchangeAPI.decodeThreads(from: $0) }),
         ("exchange-thread", { _ = try await ExchangeAPI.decodeThread(from: $0) }),

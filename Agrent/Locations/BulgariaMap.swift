@@ -46,6 +46,36 @@ struct BulgariaMap {
         let iso: String
         let points: [CGPoint]
         var id: String { iso }
+
+        /// Is the point inside? Ray casting on the polygon, in the map's own
+        /// space. Борса's tap filter (#417) asks it of every oblast; 28
+        /// polygons of a few hundred points each is nothing per tap.
+        func contains(_ point: CGPoint) -> Bool {
+            var inside = false
+            var j = points.count - 1
+            for i in points.indices {
+                let a = points[i], b = points[j]
+                if (a.y > point.y) != (b.y > point.y),
+                   point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x {
+                    inside.toggle()
+                }
+                j = i
+            }
+            return inside
+        }
+
+        /// The mean of the outline's points: inside every oblast this map has,
+        /// none of which is crescent-shaped. Only where an accessibility
+        /// element needs a place and no listing gives one.
+        var centre: CGPoint {
+            let sum = points.reduce(CGPoint.zero) { CGPoint(x: $0.x + $1.x, y: $0.y + $1.y) }
+            return CGPoint(x: sum.x / CGFloat(points.count), y: sum.y / CGFloat(points.count))
+        }
+    }
+
+    /// The oblast under a point in the map's space, or nil outside Bulgaria.
+    func oblast(at point: CGPoint) -> Oblast? {
+        oblasti.first { $0.contains(point) }
     }
 
     private struct Projection: Decodable {

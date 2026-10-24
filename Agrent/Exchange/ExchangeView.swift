@@ -146,6 +146,11 @@ struct ExchangeView: View {
         case .failed(let message):
             failure(message) { await listings.load() }
 
+        // The map stays when a region filter empties the board (#417): the
+        // oblast that was tapped on has to stay there to be tapped off.
+        case .loaded where showMap && !listings.query.regions.isEmpty:
+            mapView
+
         case .loaded(_, _) where listings.rows.isEmpty:
             // A filtered no-result is NOT the same statement as an empty
             // board, and saying the wrong one is a claim about the market
@@ -169,11 +174,18 @@ struct ExchangeView: View {
             }
 
         case .loaded where showMap:
-            ExchangeMapView(listings: listings.rows)
-                .refreshable { await PullToRefresh.bounded { await listings.load() } }
+            mapView
 
         case .loaded:
             List {
+                if !listings.query.regions.isEmpty {
+                    Section {
+                        RegionFilterSummary(regions: listings.query.regions) {
+                            Task { await listings.clearRegions() }
+                        }
+                    }
+                    .pageRow()
+                }
                 // The table is GLOBAL — every tenant sees every active
                 // listing, and that IS the product. Saying so once is cheaper
                 // than a heading that quietly implies these are the user's,
@@ -195,6 +207,17 @@ struct ExchangeView: View {
             .refreshable { await PullToRefresh.bounded { await listings.load() } }
             .pageBackground()
         }
+    }
+
+    /// The map, filtering the board by oblast as the web's does (#417).
+    private var mapView: some View {
+        ExchangeMapView(
+            listings: listings.rows,
+            selectedRegions: listings.query.regions,
+            onToggleRegion: { code in Task { await listings.toggleRegion(code) } },
+            onClearRegions: { Task { await listings.clearRegions() } }
+        )
+        .refreshable { await PullToRefresh.bounded { await listings.load() } }
     }
 
     /// PARITY GAP 2. The board sent no query string at all, so it showed an

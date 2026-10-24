@@ -88,6 +88,20 @@ final class ExchangeListingsStore {
         query = ExchangeQuery()
         await load()
     }
+
+    /// An oblast tapped on the map (#417): on if it was off, off if it was on.
+    func toggleRegion(_ code: String) async {
+        query = query.togglingRegion(code)
+        await load()
+    }
+
+    /// «Изчисти» on the region summary: the other filters stay.
+    func clearRegions() async {
+        guard !query.regions.isEmpty else { return }
+        query.regions = []
+        query.cursor = nil
+        await load()
+    }
 }
 
 @Observable
