@@ -174,6 +174,8 @@ enum A11y {
         /// The house search field (#164) and its clear button.
         static let search = spokenNames("Търсене", "Search")
         static let clearSearch = spokenNames("Изчисти търсенето", "Clear search")
+        /// Борса's region summary (#417): the oblasti chosen on the map.
+        static let clearRegions = spokenNames("Изчисти областите", "Clear regions")
         static let block = spokenNames("Блокирай", "Block")
         static let unblock = spokenNames("Отблокирай", "Unblock")
         /// Retract one of the person's OWN messages (per person since agri-saas #1323).

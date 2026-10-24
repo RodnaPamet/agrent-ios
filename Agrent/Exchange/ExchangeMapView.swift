@@ -20,6 +20,12 @@ import SwiftUI
 /// invites being read as "where", and this one means "which oblast".
 struct ExchangeMapView: View {
     let listings: [ExchangeListing]
+    /// The oblasti the board is filtered to (#417). Drawn in green, as the
+    /// web draws its selection in emerald.
+    var selectedRegions: [String] = []
+    /// A tap on an oblast: on if it was off, off if it was on (the web's toggle).
+    var onToggleRegion: (String) -> Void = { _ in }
+    var onClearRegions: () -> Void = {}
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -29,6 +35,12 @@ struct ExchangeMapView: View {
 
     var body: some View {
         List {
+            if !selectedRegions.isEmpty {
+                Section {
+                    RegionFilterSummary(regions: selectedRegions, onClear: onClearRegions)
+                }
+                .pageRow()
+            }
             Section {
                 if let map {
                     canvas(map)
@@ -43,7 +55,7 @@ struct ExchangeMapView: View {
                         .foregroundStyle(Palette.secondaryText)
                 }
             } footer: {
-                SectionFooter("Маркерите показват област, не точно местоположение.")
+                SectionFooter("Докоснете област, за да видите само обявите в нея. Маркерите показват област, не точно местоположение.")
             }
             // Every section on the page colour, as Борса's list view draws
             // its rows (`pageRow`). Without it the region sections under the
@@ -53,7 +65,9 @@ struct ExchangeMapView: View {
 
             if regions.isEmpty {
                 Section {
-                    Text("Няма обяви с посочена област.")
+                    Text(selectedRegions.isEmpty
+                         ? "Няма обяви с посочена област."
+                         : "Няма обяви в избраните области.")
                         .font(.footnote)
                         .foregroundStyle(Palette.secondaryText)
                 }
@@ -137,7 +151,18 @@ struct ExchangeMapView: View {
         5 + sqrt(Double(count)) * 3.5
     }
 
+    /// The map's point under a tap, undoing `place` — the same arithmetic run
+    /// backwards, so the hit-test and the drawing cannot disagree.
+    nonisolated static func unplace(_ p: CGPoint, in size: CGSize, map: BulgariaMap) -> CGPoint {
+        let scale = min(size.width / map.width, size.height / map.height)
+        let dx = (size.width - map.width * scale) / 2
+        let dy = (size.height - map.height * scale) / 2
+        return CGPoint(x: (p.x - dx) / scale, y: (p.y - dy) / scale)
+    }
+
     private func canvas(_ map: BulgariaMap) -> some View {
+        let selected = Set(selectedRegions)
+        return GeometryReader { geometry in
         Canvas { context, size in
             func place(_ p: CGPoint) -> CGPoint { Self.place(p, in: size, map: map) }
 
@@ -147,16 +172,19 @@ struct ExchangeMapView: View {
                 path.addLines(oblast.points.map(place))
                 path.closeSubpath()
                 let active = withOffers.contains(oblast.iso)
+                let chosen = selected.contains(oblast.iso)
                 context.fill(
                     path,
-                    with: .color(active
+                    with: .color(chosen
+                        ? Palette.success.opacity(contrast == .increased ? 0.6 : 0.42)
+                        : active
                         ? Palette.accent.opacity(contrast == .increased ? 0.45 : 0.28)
                         : Palette.RegionMap.idleFill)
                 )
                 context.stroke(
                     path,
-                    with: .color(Palette.RegionMap.boundary),
-                    lineWidth: contrast == .increased ? 1.2 : 0.7
+                    with: .color(chosen ? Palette.success : Palette.RegionMap.boundary),
+                    lineWidth: chosen ? 1.6 : (contrast == .increased ? 1.2 : 0.7)
                 )
             }
 
@@ -180,6 +208,16 @@ struct ExchangeMapView: View {
             }
         }
         .background(Palette.Surface.page)
+        // The web map's filter (#417): a tap on an oblast toggles it. Not a
+        // Button per polygon — 28 irregular shapes have no rectangle to be —
+        // so the tap is hit-tested against the bundled geometry, and the
+        // accessibility proxies below carry the same toggle as an action.
+        .contentShape(Rectangle())
+        .onTapGesture(coordinateSpace: .local) { location in
+            let point = Self.unplace(location, in: geometry.size, map: map)
+            if let oblast = map.oblast(at: point) { onToggleRegion(oblast.iso) }
+        }
+        }
         // A Canvas is one opaque rectangle to VoiceOver, and this one's
         // whole content is positional. Each region becomes its own element
         // so the map is navigable rather than merely announced.
@@ -206,8 +244,16 @@ struct ExchangeMapView: View {
     ///
     /// Placed at the marker, sized to the marker, with a 44pt floor so a
     /// one-listing oblast is not a 16pt target.
+    ///
+    /// Each carries the map's filter as its action (#417): a double tap, a
+    /// switch press or «Плевен» said aloud toggles the oblast, and the
+    /// selected trait says which are on. An oblast chosen with nothing left in
+    /// it still has an element — at its centre — so it can be turned off.
     private func proxies(_ map: BulgariaMap) -> some View {
-        GeometryReader { geometry in
+        let selected = Set(selectedRegions)
+        let withOffers = Set(regions.map(\.regionCode))
+        let emptyChosen = map.oblasti.filter { selected.contains($0.iso) && !withOffers.contains($0.iso) }
+        return GeometryReader { geometry in
             ForEach(regions) { region in
                 if let first = region.listings.first,
                    let lat = first.lat, let lon = first.lon {
@@ -215,14 +261,29 @@ struct ExchangeMapView: View {
                         map.point(lat: lat, lon: lon), in: geometry.size, map: map
                     )
                     let side = max(44, Self.markerRadius(region.count) * 2)
-                    Color.clear
+                    proxy(code: region.regionCode, label: region.accessibilityText,
+                          name: region.name, chosen: selected.contains(region.regionCode))
                         .frame(width: side, height: side)
                         .position(centre)
-                        .accessibilityElement()
-                        .accessibilityLabel(region.accessibilityText)
                 }
             }
+            ForEach(emptyChosen) { oblast in
+                let name = BulgarianRegion.name(code: oblast.iso) ?? oblast.iso
+                proxy(code: oblast.iso, label: A11y.sentence([name, "няма обяви"]), name: name, chosen: true)
+                    .frame(width: 44, height: 44)
+                    .position(Self.place(oblast.centre, in: geometry.size, map: map))
+            }
         }
+    }
+
+    private func proxy(code: String, label: String, name: String, chosen: Bool) -> some View {
+        Color.clear
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
+            .accessibilityHint(chosen ? "Премахва областта от филтъра" : "Показва само обявите в тази област")
+            .accessibilityInputLabels([name])
+            .accessibilityAction { onToggleRegion(code) }
     }
 }
 

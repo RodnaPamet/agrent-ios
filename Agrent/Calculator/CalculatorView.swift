@@ -117,29 +117,13 @@ struct CalculatorView: View {
             }
 
         case .loaded(let payload, _):
-            // «Всички» or one crop (owner, 2026-10-24), remembered per farm.
-            // Only «Всички» lists every crop; one crop is that crop and the
-            // farm's costs, which carry no crop to split them by.
-            let scope = store.scope.resolved(for: payload.rows)
             List {
-                if payload.rows.count > 1 {
-                    scopePicker(payload.rows, showing: scope).pageRow()
+                farmSection(payload).pageRow()
+                ForEach(payload.rows) { row in
+                    rowSection(row).pageRow()
                 }
-                switch scope {
-                case .all:
-                    farmSection(payload).pageRow()
-                    ForEach(payload.rows) { row in
-                        rowSection(row).pageRow()
-                    }
-                    costsSection.pageRow()
-                    footnotes(payload).pageRow()
-                case .crop(let commodity):
-                    if let row = payload.rows.first(where: { $0.commodity == commodity }) {
-                        // The dropdown above already names it.
-                        rowSection(row, named: false).pageRow()
-                    }
-                    costsSection.pageRow()
-                }
+                costsSection.pageRow()
+                footnotes(payload).pageRow()
             }
             .pageBackground()
             .refreshable {
@@ -205,128 +189,38 @@ struct CalculatorView: View {
             Text("Показани \(page.items.count) от " + Plural.bg(total, "разход", "разхода") + ".")
         }
     }
-    // MARK: - «Всички» or one crop
-
-    /// The stateful dropdown (owner, 2026-10-24): «Всички» on top, then every
-    /// crop. Only on a farm with more than one crop — with one, «Всички»
-    /// would be that crop again (`CalculatorScope.resolved`).
-    private func scopePicker(_ rows: [CalculatorRow], showing scope: CalculatorScope) -> some View {
-        let label = Self.scopeLabel(scope)
-        return Menu {
-            scopeButton("Всички", .all, showing: scope)
-            Section(titled: "Култури") {
-                ForEach(rows) { row in
-                    scopeButton(CommodityName.canonical(row.commodity) ?? row.commodity,
-                                .crop(row.commodity), showing: scope)
-                }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Text(label).font(.title3.weight(.semibold))
-                Image(systemName: "chevron.down").font(.footnote.weight(.semibold))
-            }
-            .foregroundStyle(Palette.accent)
-            // The whole row, not the label's glyphs: it is the control that
-            // decides what the whole screen shows, and a tap beside the word
-            // used to do nothing.
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .accessibilityLabel("Култура: \(label)")
-        .accessibilityHint("Избира дали калкулаторът показва цялото стопанство или една култура")
-        .accessibilityInputLabels(A11y.Spoken.crop)
-    }
-
-    private func scopeButton(_ title: String, _ value: CalculatorScope, showing scope: CalculatorScope) -> some View {
-        Button {
-            store.choose(value)
-        } label: {
-            if value == scope {
-                Label(title, systemImage: "checkmark")
-            } else {
-                Text(title)
-            }
-        }
-    }
-
-    static func scopeLabel(_ scope: CalculatorScope) -> String {
-        switch scope {
-        case .all: "Всички"
-        case .crop(let commodity): CommodityName.canonical(commodity) ?? commodity
-        }
-    }
-
     // MARK: - Farm totals
 
-    /// «Всички»'s block: the farm's net worth, as the server totals it, then
-    /// the lines a crop shows added up across the farm (`FarmFigures`) —
-    /// area, and value, cost and margin per decare weighted by area. Each
-    /// figure names the crops it leaves out.
     @ViewBuilder
     private func farmSection(_ payload: CalculatorPayload) -> some View {
-        let figures = FarmFigures(rows: payload.rows)
-        let currencies = payload.farm.totals.count
-        // When every figure leaves out the same crops — the usual case, a crop
-        // with no market price — it is said once at the end rather than under
-        // each of four lines.
-        let common = FarmFigures.commonOmission(netWorth: payload.farm.totals.map(\.refusedCommodities),
-                                                figures: [figures.value, figures.cost, figures.margin])
-        Section(titled: "Общо за стопанството") {
-            ForEach(payload.farm.totals) { total in
-                ValueRow(currencies > 1 ? "Нетна стойност (\(total.currency))" : "Нетна стойност") {
-                    Text(Money.text(total.netWorth, total.currency))
-                        .font(.headline)
+        // Shown when there is a total OR a crop left out of every total: a
+        // farm whose crops all lack a market price has no total at all, and a
+        // missing section would hide exactly the crops it should name.
+        if !payload.farm.totals.isEmpty || !payload.farm.refusedWithoutCurrency.isEmpty {
+            Section(titled: "Общо за стопанството") {
+                ForEach(payload.farm.totals) { total in
+                    ValueRow(total.currency) {
+                        Text(Money.text(total.netWorth, total.currency))
+                            .font(.headline)
+                    }
+                    if !total.refusedCommodities.isEmpty {
+                        // Naming what is NOT in the total matters more than the
+                        // total: a number that silently omits a crop reads as
+                        // complete.
+                        Text("Без: \(Self.cropNames(total.refusedCommodities))")
+                            .font(.footnote)
+                            .foregroundStyle(Palette.secondaryText)
+                    }
                 }
-                if common == nil, !total.refusedCommodities.isEmpty {
-                    // Naming what is NOT in the total matters more than the
-                    // total: a number that silently omits a crop reads as
-                    // complete.
-                    Text("Без: \(Self.cropNames(total.refusedCommodities))")
+                if !payload.farm.refusedWithoutCurrency.isEmpty {
+                    // In no currency's total, so no row above names them —
+                    // the same reasoning, for crops with no price at all.
+                    Text("Без пазарна цена: \(Self.cropNames(payload.farm.refusedWithoutCurrency))")
                         .font(.footnote)
                         .foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            if !payload.farm.refusedWithoutCurrency.isEmpty {
-                // In no currency's total, so no row above names them —
-                // the same reasoning, for crops with no price at all.
-                Text("Без пазарна цена: \(Self.cropNames(payload.farm.refusedWithoutCurrency))")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            ValueRow("Площ") {
-                Text("\(Num.text(figures.areaDca)) дка")
-            }
-            rateRows("Стойност / дка", figures.value, sayWithout: common == nil) { Num.text($0.perDca) }
-            rateRows("Разход / дка", figures.cost, sayWithout: common == nil) { Money.text($0.perDca, $0.currency) }
-            rateRows("Марж / дка", figures.margin, sayWithout: common == nil) {
-                // As a crop's own line: an upper bound is said to be one.
-                $0.atMost ? "най-много \(Num.text($0.perDca))" : Num.text($0.perDca)
-            }
-            if let common {
-                Text("Без: \(Self.cropNames(common))")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    /// One figure, a line per currency, and the crops it leaves out. Nothing
-    /// at all when no crop has it: each crop's own section says why.
-    @ViewBuilder
-    private func rateRows(_ label: String, _ figure: FarmFigures.Figure, sayWithout: Bool,
-                          text: @escaping (FarmFigures.Rate) -> String) -> some View {
-        ForEach(figure.rates) { rate in
-            ValueRow(figure.rates.count > 1 ? "\(label) (\(rate.currency ?? "—"))" : label) {
-                Text(text(rate))
-            }
-        }
-        if sayWithout, !figure.isEmpty, !figure.without.isEmpty {
-            Text("Без: \(Self.cropNames(figure.without))")
-                .font(.footnote)
-                .foregroundStyle(Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -338,7 +232,7 @@ struct CalculatorView: View {
     // MARK: - One commodity
 
     @ViewBuilder
-    private func rowSection(_ row: CalculatorRow, named: Bool = true) -> some View {
+    private func rowSection(_ row: CalculatorRow) -> some View {
         Section {
             if let net = row.netWorth {
                 ValueRow("Нетна стойност") {
@@ -425,13 +319,7 @@ struct CalculatorView: View {
         } header: {
             SectionHeader {
                 HStack {
-                    // Gold (owner, 2026-10-24): the crop's name is what the
-                    // eye looks for in a list of crops, and in the header grey
-                    // it read as one more label.
-                    if named {
-                        Text(CommodityName.canonical(row.commodity) ?? row.commodity)
-                            .foregroundStyle(Palette.accent)
-                    }
+                    Text(CommodityName.canonical(row.commodity) ?? row.commodity)
                     Spacer()
                     UncertaintyBadge(row.netUncertainty)
                 }

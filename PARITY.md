@@ -62,32 +62,6 @@ in agri-saas, served to the app by `GET /api/t/:slug/grain/calculator`.
 That makes parity here measurable exactly: which payload fields does each
 side render?
 
-### Divergence — «Всички» or one crop, from a dropdown (owner, 2026-10-24)
-
-**The web** shows the farm's net worth on top, then ONE crop at a time
-picked from a strip of crops, plus a margin-per-decare comparison card.
-
-**The phone**, as the owner asked, has a stateful dropdown at the top:
-**«Всички»**, then every crop. It's remembered per farm on this phone, and
-falls back to «Всички» when the remembered crop is no longer grown. With
-one crop the dropdown isn't shown.
-- **«Всички»:** the whole-farm block, then every crop listed as before, then
-  «Разходи» and «Извън изчислението».
-  - The farm block is the net worth (the server's totals per currency), the
-    area, and value, cost and margin per дка (`FarmFigures`).
-  - Each figure is weighted by the area it is per: value and margin by the
-    yield-covered area, cost by the land, as the server divides them (#1606).
-  - It is never mixed across currencies: one line per currency.
-  - It says which crops it leaves out, once when every figure leaves out the
-    same ones.
-- **One crop:** its figures (the dropdown names it), then the farm's
-  «Разходи», which carry no crop to split them by.
-- **Crop names** in the list are gold, not the header grey.
-
-The farm figures per дка are the phone's own arithmetic over the payload's
-rows. The server doesn't publish them, so the web has nothing to compare
-them against.
-
 ### «Нов разход»: «Култура» or «Общи» first (#245, owner 2026-10-09)
 
 «Общи», the farm's overheads, was «Режийни» until the owner renamed it the
@@ -207,6 +181,31 @@ is the correct mobile shape, not a shortfall. Four do not fit a phone's
 segmented control (measured: they ask for 464pt where an iPhone 17 has
 370), so on a phone they are a scrolling row of chips, the parcel map's
 precedent; see `ExchangeSectionPicker`.
+
+### Matched — tap an oblast on the map to filter the board (#417, owner 2026-10-24)
+
+The owner asked for the exchange map to be "clickable to filter like the web
+one". **The web** (`ExchangeMap.tsx`) toggles an oblast in its region filter on
+a click, paints the chosen ones emerald, and narrows the listings to them.
+
+**iOS:**
+- **Tapping an oblast toggles it,** and several can be on at once. The tap is
+  hit-tested against the bundled geometry, using the drawing's own transform
+  run backwards.
+- **Chosen oblasti are drawn in green.** The server answers
+  `GET /exchange/listings?region=BG-15,…`, the spec's CSV of ISO codes, sorted
+  so the same choice is the same request.
+- **The filter carries to the list.** Above both, «Област: Плевен» /
+  «Области: …» says so, with «Изчисти». It also counts for «Изчисти
+  филтрите».
+- **An empty result keeps the map,** so the oblast that was tapped on can be
+  tapped off.
+- **The map's accessibility elements carry the same toggle as an action.**
+  VoiceOver, Switch Control and Voice Control («Плевен») can filter, and the
+  selected trait says which oblasti are on. An oblast chosen with nothing left
+  in it still has an element, so it can be turned off.
+- **Not ported:** the web's zoom, its aggregated price chips, and its
+  cheapest-offer ring.
 
 ### Gap 2 — no search, no filter, no pagination — CLOSED 2026-09-22
 

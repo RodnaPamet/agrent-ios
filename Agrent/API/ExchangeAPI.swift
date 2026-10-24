@@ -35,6 +35,11 @@ enum ExchangeAPI {
         if let q = query.escaped(query.text) { items.append("q=\(q)") }
         if let min = query.minTonnes { items.append("minTonnes=\(min)") }
         if let max = query.maxTonnes { items.append("maxTonnes=\(max)") }
+        // CSV of ISO codes, as the spec documents it. Each code is escaped
+        // on its own so the comma stays the separator the server splits on.
+        if !query.regions.isEmpty {
+            items.append("region=" + query.regions.compactMap { query.escaped($0) }.joined(separator: ","))
+        }
         if let cursor = query.escaped(query.cursor) { items.append("cursor=\(cursor)") }
         return "\(base)/listings?" + items.joined(separator: "&")
     }
@@ -405,13 +410,30 @@ struct ExchangeQuery: Equatable, Sendable {
     var text: String = ""
     var minTonnes: Int?
     var maxTonnes: Int?
+    /// Oblasti (`BG-15` …) chosen by tapping the map (#417, the web's region
+    /// filter). Kept sorted, so the same choice is the same path — and the
+    /// same request — whatever order they were tapped in.
+    var regions: [String] = []
     var cursor: String?
     var limit: Int = 50
 
     /// Any filter at all, which is what the "clear" affordance keys on.
     var isFiltered: Bool {
         !text.trimmingCharacters(in: .whitespaces).isEmpty
-            || minTonnes != nil || maxTonnes != nil
+            || minTonnes != nil || maxTonnes != nil || !regions.isEmpty
+    }
+
+    /// The same query with one oblast added, or removed if it was on — the
+    /// web map's toggle.
+    func togglingRegion(_ code: String) -> ExchangeQuery {
+        var copy = self
+        if let index = copy.regions.firstIndex(of: code) {
+            copy.regions.remove(at: index)
+        } else {
+            copy.regions = (copy.regions + [code]).sorted()
+        }
+        copy.cursor = nil
+        return copy
     }
 
     /// The same query with paging reset. A filter change must NOT carry the

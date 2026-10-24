@@ -1788,47 +1788,35 @@ final class A11yShotsTests: XCTestCase {
         capture("05c-risk-insure", app: app)
     }
 
-    // MARK: - Калкулатор: «Всички» or one crop (owner 2026-10-24)
+    // MARK: - Борса: the map filters the board (agrent-ios#417)
 
-    /// The dropdown, «Всички» with the farm block on top and every crop under
-    /// it, then one crop alone. Ends back on «Всички», since the choice is
-    /// remembered across launches and the next run should start where this
-    /// one did.
-    func testCalculatorAllAndOneCrop() {
+    /// Борса → «Покажи карта» → Плевен: the oblast turns green, the summary
+    /// says «Област: Плевен», and the board under the map is the filter's
+    /// answer. Ends on the list with no filter, since the view is remembered.
+    func testExchangeMapFiltersByRegion() {
         let app = XCUIApplication()
         app.launchArguments.append(Self.seamArgument)
         app.launch()
         assertSeamActive(app)
-        let tab = labelled("Калкулатор", in: app.tabBars.buttons)
-        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        let tab = labelled("Борса", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Борса» tab")
         tab.tap()
-        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Култура:'")).firstMatch
-        XCTAssertTrue(picker.waitForExistence(timeout: 20), "no crop dropdown\n\(app.debugDescription)")
-
-        choose("Всички", from: picker, in: app)
-        XCTAssertTrue(app.staticTexts["Общо за стопанството"].waitForExistence(timeout: 5),
-                      "«Всички» has no farm block\n\(app.debugDescription)")
+        let toMap = app.buttons["Покажи карта"]
+        if toMap.waitForExistence(timeout: 10) { toMap.tap() }
+        // The map's proxy is the Button; the region row under the map has
+        // the same words and no action.
+        let pleven = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Плевен'")).firstMatch
+        XCTAssertTrue(pleven.waitForExistence(timeout: 15), "no Плевен on the map\n\(app.debugDescription)")
+        pleven.tap()
+        let summary = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Област: Плевен'")).firstMatch
+        XCTAssertTrue(summary.waitForExistence(timeout: 10), "the tap did not filter\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
-        capture("09c-calculator-all", app: app)
+        capture("06b-exchange-map-filtered", app: app)
 
-        choose("Пшеница", from: picker, in: app)
-        XCTAssertTrue(app.buttons["Култура: Пшеница"].waitForExistence(timeout: 5),
-                      "the dropdown does not say «Пшеница»\n\(app.debugDescription)")
-        XCTAssertFalse(app.staticTexts["Общо за стопанството"].exists, "one crop shows no farm block")
-        Thread.sleep(forTimeInterval: 1)
-        capture("09d-calculator-one-crop", app: app)
-
-        choose("Всички", from: app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Култура:'")).firstMatch,
-               in: app)
-    }
-
-    /// Opens a SwiftUI `Menu` and taps one of its items, waiting for the menu
-    /// to animate in — an immediate tap finds nothing.
-    private func choose(_ item: String, from menu: XCUIElement, in app: XCUIApplication) {
-        menu.tap()
-        let entry = app.buttons.matching(NSPredicate(format: "label == %@", item)).firstMatch
-        XCTAssertTrue(entry.waitForExistence(timeout: 5), "the menu has no «\(item)»\n\(app.debugDescription)")
-        entry.tap()
+        app.buttons["Изчисти областите"].firstMatch.tap()
+        XCTAssertFalse(summary.waitForExistence(timeout: 3), "«Изчисти» left the filter on")
+        let toList = app.buttons["Покажи списък"]
+        if toList.waitForExistence(timeout: 5) { toList.tap() }
     }
 
     // MARK: - Тенденции: one price, one line, one row (agrent-ios#409)

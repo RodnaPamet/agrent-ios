@@ -121,6 +121,9 @@ enum FixtureCatalogue {
     static let byPathAndQuery: [String: String] = table([
         (LocationsAPI.rateUnitsPath, "units-rate"),
         (TrendsAPI.pricesPath(.wheat, range: .month3), "trends-prices"),
+        // #417: the board filtered to Плевен from the map, so the screenshot
+        // shows the filter's own answer rather than the unfiltered board.
+        (ExchangeAPI.listingsPath(ExchangeQuery(regions: ["BG-15"])), "exchange-listings-pleven"),
         // #409: Тенденции opens on 1 год. The same payload, because the
         // screenshot is of the screen's shape — one price, one line, one row
         // — not of a year's numbers.
