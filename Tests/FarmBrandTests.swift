@@ -237,9 +237,12 @@ final class FarmBrandTests: XCTestCase {
     func testTheConsentIsTheWebsTextAtItsVersion() {
         XCTAssertEqual(PublishingConsent.version, "v2")
         let hash = SHA256.hash(data: Data(PublishingConsent.body.utf8)).map { String(format: "%02x", $0) }.joined()
-        XCTAssertEqual(hash, "1d2f6a5a4a4c56d9e82ac61603da43040b75f25b6e6c1cd8211cfe440ce3708f",
+        // The web's text at agri-saas 7c1904dfb: ЕГН out of the "not
+        // published" sentence, version still v2 (#2257).
+        XCTAssertEqual(hash, "830f6250d28875a3e65dbdb63c5861eb46b5f7c5bc75e4e173c0b117e8111185",
                        "the consent text changed: copy the web's text AND its version together")
-        XCTAssertTrue(PublishingConsent.body.contains("ЕГН"), "positive control: it is the consent text")
+        XCTAssertTrue(PublishingConsent.body.contains("ЕИК"), "positive control: it is the consent text")
+        XCTAssertFalse(PublishingConsent.body.contains("ЕГН"), "the product does not hold one (#2257)")
     }
 
     /// Only an agreement to THIS version counts. One to another text, or a

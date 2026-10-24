@@ -62,6 +62,32 @@ in agri-saas, served to the app by `GET /api/t/:slug/grain/calculator`.
 That makes parity here measurable exactly: which payload fields does each
 side render?
 
+### Divergence — «Всички» or one crop, from a dropdown (owner, 2026-10-24)
+
+**The web** shows the farm's net worth on top, then ONE crop at a time
+picked from a strip of crops, plus a margin-per-decare comparison card.
+
+**The phone**, as the owner asked, has a stateful dropdown at the top:
+**«Всички»**, then every crop. It's remembered per farm on this phone, and
+falls back to «Всички» when the remembered crop is no longer grown. With
+one crop the dropdown isn't shown.
+- **«Всички»:** the whole-farm block, then every crop listed as before, then
+  «Разходи» and «Извън изчислението».
+  - The farm block is the net worth (the server's totals per currency), the
+    area, and value, cost and margin per дка (`FarmFigures`).
+  - Each figure is weighted by the area it is per: value and margin by the
+    yield-covered area, cost by the land, as the server divides them (#1606).
+  - It is never mixed across currencies: one line per currency.
+  - It says which crops it leaves out, once when every figure leaves out the
+    same ones.
+- **One crop:** its figures (the dropdown names it), then the farm's
+  «Разходи», which carry no crop to split them by.
+- **Crop names** in the list are gold, not the header grey.
+
+The farm figures per дка are the phone's own arithmetic over the payload's
+rows. The server doesn't publish them, so the web has nothing to compare
+them against.
+
 ### «Нов разход»: «Култура» or «Общи» first (#245, owner 2026-10-09)
 
 «Общи», the farm's overheads, was «Режийни» until the owner renamed it the

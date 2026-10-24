@@ -8,9 +8,17 @@ import Foundation
 /// The owner chose the web's wording and version for the phone rather than
 /// a text of the phone's own. These are agri-saas `messages/bg.json`
 /// `admin.publicProfile.consent*` and `CONSENT_TEXT_VERSION` in
-/// `admin/public-profile/PublicProfileClient.tsx`, at 87a90fa (#1895). v2 is
+/// `admin/public-profile/PublicProfileClient.tsx`, at 7c1904dfb (#2257). v2 is
 /// the owner's review of v1: it adds the paragraph saying the address itself
 /// is public and ends up printed.
+///
+/// ── Edited at v2, on purpose (agri-saas #2257, 2026-10-24) ──
+///
+/// ЕГН left the "НЕ се публикуват" sentence when the product stopped holding
+/// it (owner, 2026-10-24). The web kept the version at v2: a new one blocks
+/// every published farm until it agrees again, and nothing that becomes
+/// PUBLIC changed — that is the test for a bump, not whether characters did.
+/// So the phone copies the text and keeps v2 too.
 ///
 /// ── The version is what makes the record mean something ──
 ///
@@ -33,7 +41,7 @@ enum PublishingConsent {
     static let body = """
         Публикуването прави страницата на стопанството достъпна за всеки в интернет, без профил и без вход.
 
-        Публично се виждат: публичното име, краткото описание, текстът «За стопанството», областта и културите. НЕ се публикуват ЕГН, ЕИК, адрес, община или населено място — тези данни остават само във Вашия профил.
+        Публично се виждат: публичното име, краткото описание, текстът «За стопанството», областта и културите. НЕ се публикуват ЕИК, адрес, община или населено място — тези данни остават само във Вашия профил.
 
         Публичният адрес, който избирате — например app.agrent.bg/f/pobeda — също е публичен и е самата връзка към страницата. Изберете го внимателно: той се отпечатва върху материали и се препраща в съобщения, които след това не можете да редактирате.
 
