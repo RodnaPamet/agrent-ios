@@ -315,7 +315,8 @@ final class PerAreaWordingTests: XCTestCase {
                          costAreaDca: Double? = nil) -> PerArea {
         PerArea(areaDca: areaDca, costAreaDca: costAreaDca, standingValuePerDca: nil,
                 attributableCostPerDca: nil, marginPerDca: margin, uncertainty: uncertainty,
-                refusalCode: refusal, costCurrency: nil, costRefusalCode: nil)
+                refusalCode: refusal, costCurrency: nil, costRefusalCode: nil,
+                marginRefusalCode: nil)
     }
 
     /// «Площ» is the land the cost per dca divides (agri-saas #1606). On a
@@ -352,9 +353,9 @@ final class PerAreaWordingTests: XCTestCase {
 
     /// An upper bound shown bare reads as measured.
     func testAnUpperBoundMarginSaysSo() {
-        XCTAssertEqual(perArea(margin: 12.5, uncertainty: .atMost).marginText, "най-много \(Num.text(12.5))")
-        XCTAssertEqual(perArea(margin: 12.5).marginText, Num.text(12.5))
-        XCTAssertNil(perArea().marginText)
+        XCTAssertEqual(perArea(margin: 12.5, uncertainty: .atMost).marginText(priceCurrency: nil), "най-много \(Num.text(12.5))")
+        XCTAssertEqual(perArea(margin: 12.5).marginText(priceCurrency: nil), Num.text(12.5))
+        XCTAssertNil(perArea().marginText(priceCurrency: nil))
     }
 
     func testAPartialMarginIsCalledUnderstated() {

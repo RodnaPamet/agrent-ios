@@ -125,10 +125,73 @@ final class CalculatorScopeTests: XCTestCase {
         perArea["costRefusalCode"] = "COST_CURRENCY_MIXED"
         refused["perArea"] = perArea
         let rows = try await payload([refused, row("BARLEY", area: 100, value: 100, cost: 30, margin: 70)]).rows
-        XCTAssertNil(rows[0].perArea.marginText, "the crop's own line")
+        XCTAssertNil(rows[0].perArea.marginText(priceCurrency: rows[0].priceCurrency), "the crop's own line")
+        XCTAssertEqual(rows[0].perArea.marginRefusalText(priceCurrency: rows[0].priceCurrency),
+                       Self.mixed, "a server before #2272 sends no reason; this one is worked out")
+        XCTAssertNil(rows[1].perArea.marginRefusalCode, "a server before #2272 sends none")
         let margin = FarmFigures(rows: rows).margin
         XCTAssertEqual(margin.rates.first?.perDca ?? 0, 70, accuracy: 0.0001, "only barley's")
         XCTAssertEqual(margin.without, ["WHEAT"])
+    }
+
+    private static let mixed =
+        "Разходите за тази култура са в повече от една валута, затова маржът на декар не се изчислява — изваждането им би го изкривило."
+    private static let mismatch =
+        "Разходите за тази култура са в различна валута от пазарната цена, затова маржът на декар не се изчислява — не се прилага обменен курс."
+
+    /// agri-saas #2259's other half: the costs in ONE currency, not the
+    /// price's. The cost rate stands, since 20 BGN a decare is a good figure;
+    /// the margin subtracts it from a value in EUR, so it does not.
+    func testAMarginAcrossTwoCurrenciesIsNotShown() async throws {
+        let rows = try await payload([
+            row("WHEAT", area: 100, value: 50, cost: 20, margin: 30, currency: "EUR", costCurrency: "BGN"),
+            row("BARLEY", area: 100, value: 100, cost: 30, margin: 70, currency: "EUR", costCurrency: "EUR"),
+        ]).rows
+        XCTAssertEqual(rows[0].perArea.costText, Money.text(20, "BGN"), "the cost rate is not refused")
+        XCTAssertNil(rows[0].perArea.marginText(priceCurrency: rows[0].priceCurrency))
+        XCTAssertEqual(rows[0].perArea.marginRefusalText(priceCurrency: rows[0].priceCurrency), Self.mismatch)
+        XCTAssertEqual(rows[1].perArea.marginText(priceCurrency: rows[1].priceCurrency), Num.text(70),
+                       "positive control: one currency on both sides")
+        XCTAssertNil(rows[1].perArea.marginRefusalText(priceCurrency: rows[1].priceCurrency))
+        let margin = FarmFigures(rows: rows).margin
+        XCTAssertEqual(margin.rates.map(\.perDca), [70])
+        XCTAssertEqual(margin.without, ["WHEAT"])
+    }
+
+    /// A cost with no currency is in the farm's own, as net worth assumes.
+    /// The journal never writes one, so refusing it would take the margin off
+    /// every farm that records its costs there.
+    func testACostWithNoCurrencyAgreesWithThePrice() async throws {
+        let rows = try await payload([
+            row("WHEAT", area: 100, value: 50, cost: 20, margin: 30, currency: "EUR", costCurrency: nil),
+        ]).rows
+        XCTAssertEqual(rows[0].shownMarginPerDca, 30)
+    }
+
+    /// From agri-saas #2272 the server names the reason itself. The value
+    /// side's is said once, above, in a sentence that names the margin too.
+    func testTheServersMarginReasonIsSaid() async throws {
+        func refused(_ commodity: String, _ code: String, value: String? = nil) throws -> [String: Any] {
+            var r = try row(commodity, area: 100, value: value == nil ? 50 : nil, cost: nil, margin: nil)
+            var perArea = try XCTUnwrap(r["perArea"] as? [String: Any])
+            perArea["marginRefusalCode"] = code
+            perArea["refusalCode"] = value ?? NSNull()
+            r["perArea"] = perArea
+            return r
+        }
+        let rows = try await payload([
+            refused("WHEAT", "COST_CURRENCY_MIXED"),
+            refused("BARLEY", "NO_STANDING_CROP_VALUE", value: "NO_STANDING_CROP_VALUE"),
+            refused("MAIZE", "SOME_FUTURE_CODE"),
+        ]).rows
+        let said = rows.map { $0.perArea.marginRefusalText(priceCurrency: $0.priceCurrency) }
+        XCTAssertEqual(said[0], Self.mixed)
+        XCTAssertNil(said[1], "said already by the value side's note")
+        XCTAssertTrue(rows[1].perArea.refusalText?.contains("маржът на декар") == true,
+                      rows[1].perArea.refusalText ?? "nil")
+        XCTAssertEqual(said[2], "Маржът на декар не може да се изчисли.",
+                       "a code this build does not know still says something")
+        XCTAssertTrue(rows.allSatisfy { $0.shownMarginPerDca == nil })
     }
 
     // MARK: - The scope

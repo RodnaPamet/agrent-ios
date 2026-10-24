@@ -383,8 +383,10 @@ struct CalculatorView: View {
             } else if let refusal = row.perArea.costRefusalText {
                 RefusalNote(text: refusal)
             }
-            if let margin = row.perArea.marginText {
+            if let margin = row.perArea.marginText(priceCurrency: row.priceCurrency) {
                 ValueRow("Марж / дка") { Text(margin) }
+            } else if let refusal = row.perArea.marginRefusalText(priceCurrency: row.priceCurrency) {
+                RefusalNote(text: refusal)
             }
             if let partial = row.perArea.partialNote {
                 Text(partial)

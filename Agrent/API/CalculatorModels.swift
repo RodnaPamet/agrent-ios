@@ -172,6 +172,11 @@ struct CalculatorRow: Decodable, Equatable, Sendable, Identifiable {
     /// The web computes this client-side too (`CalculatorClient.tsx:473`), so
     /// deriving it matches rather than diverges.
     var expectedTonnes: Double { standingCropExpectedKg / 1000 }
+
+    /// The margin per decare when it may be shown: the value is in
+    /// `priceCurrency`, so that is what a cost must agree with to be
+    /// subtracted. See `PerArea.marginRefusal`.
+    var shownMarginPerDca: Double? { perArea.shownMargin(priceCurrency: priceCurrency) }
 }
 
 /// Per-decare figures.
@@ -213,6 +218,10 @@ struct PerArea: Decodable, Equatable, Sendable {
     /// (#1614). A separate vocabulary from `refusalCode`, which explains
     /// value and margin: the cost rate can be refused while they stand.
     let costRefusalCode: String?
+    /// Why `marginPerDca` is nil, and non-nil exactly when it is (agri-saas
+    /// #2272). The value side's codes, the cost side's, and one of its own,
+    /// `COST_PRICE_CURRENCY_MISMATCH`. nil from a server before it.
+    let marginRefusalCode: String?
 }
 
 extension PerArea {
@@ -257,20 +266,77 @@ extension PerArea {
 
     /// The margin as the web writes it: «най-много …» when it is an upper
     /// bound (`uncertaintyAtMost`). A bare figure there reads as measured.
-    var marginText: String? {
-        shownMarginPerDca.map { uncertainty == .atMost ? "най-много \(Num.text($0))" : Num.text($0) }
+    func marginText(priceCurrency: String?) -> String? {
+        shownMargin(priceCurrency: priceCurrency)
+            .map { uncertainty == .atMost ? "най-много \(Num.text($0))" : Num.text($0) }
     }
 
-    /// The margin, unless the cost rate it subtracts was refused.
-    ///
-    /// agri-saas #2259: with a crop's costs in two currencies the server
-    /// withholds `attributableCostPerDca` (`COST_CURRENCY_MIXED`) and still
-    /// publishes a `marginPerDca` computed from the blended sum, labelled
-    /// exact. A margin whose cost could not be stated is no margin, so it is
-    /// not shown — whichever way the server fixes it.
-    var shownMarginPerDca: Double? {
-        costRefusalCode == nil ? marginPerDca : nil
+    /// The margin, unless the cost it subtracts cannot be subtracted.
+    func shownMargin(priceCurrency: String?) -> Double? {
+        marginRefusal(priceCurrency: priceCurrency) == nil ? marginPerDca : nil
     }
+
+    /// Why there is no margin per decare, as a code; nil when there is one.
+    ///
+    /// agri-saas #2259: a server before #2272 published `marginPerDca`
+    /// whenever the VALUE side could be computed, even when the cost could
+    /// not be subtracted from it. Two cases, both a figure in no currency at
+    /// all:
+    ///
+    /// - the cost rate refused — costs in two currencies
+    ///   (`COST_CURRENCY_MIXED`), or one of the other cost-side reasons;
+    /// - costs in ONE currency that is not the price's
+    ///   (`COST_PRICE_CURRENCY_MISMATCH`). The cost rate stands there, since
+    ///   «20,00 EUR» is a good figure (#1606); only the subtraction is wrong.
+    ///   The server's own test: both currencies named, and different. A cost
+    ///   with no currency is the farm's display currency and agrees, as net
+    ///   worth assumes.
+    ///
+    /// From #2272 the server says so itself, and the checks here stay anyway:
+    /// they make a server of either age read the same, and the margin is a
+    /// figure that is wrong in units when it is wrong at all.
+    func marginRefusal(priceCurrency: String?) -> String? {
+        if let marginRefusalCode { return marginRefusalCode }
+        guard marginPerDca != nil else { return refusalCode }
+        if let costRefusalCode { return costRefusalCode }
+        if let costCurrency, let priceCurrency, costCurrency != priceCurrency {
+            return "COST_PRICE_CURRENCY_MISMATCH"
+        }
+        return nil
+    }
+
+    /// Why «Марж / дка» is missing, in the web's words
+    /// (`grain.calculator.marginPerDca*`, agri-saas #2272); nil when it is
+    /// shown, or when `refusalText` has said it already.
+    ///
+    /// The web says the reason once, on the margin line, for all six codes.
+    /// This screen already shows the value side's reason above, as
+    /// `refusalText`, and that sentence names the margin too («…стойността и
+    /// маржът на декар не се изчисляват»). So the margin line adds a sentence
+    /// only for the other reasons. The words are the web's; the place differs
+    /// because this layout has a value line that explains itself and the
+    /// web's has none. Don't "fix" it back to all six: it would print the
+    /// same sentence twice.
+    ///
+    /// The cost-side codes have their own sentences here rather than the
+    /// cost line's: those say the COST per decare is not computed, which is
+    /// true but is not what this line is about.
+    func marginRefusalText(priceCurrency: String?) -> String? {
+        guard let code = marginRefusal(priceCurrency: priceCurrency), code != refusalCode else { return nil }
+        return Self.marginRefusals[code] ?? "Маржът на декар не може да се изчисли."
+    }
+
+    /// `messages/bg/app.json` `grain.calculator`, word for word.
+    private static let marginRefusals: [String: String] = [
+        "COST_CURRENCY_MIXED":
+            "Разходите за тази култура са в повече от една валута, затова маржът на декар не се изчислява — изваждането им би го изкривило.",
+        "COST_CURRENCY_UNRECORDED":
+            "Валутата на арендата не е записана в договора, затова маржът на декар не се изчислява.",
+        "NO_OCCUPIED_AREA":
+            "Няма парцел, записан с тази култура, затова разходът не може да бъде отнесен и маржът на декар не се изчислява.",
+        "COST_PRICE_CURRENCY_MISMATCH":
+            "Разходите за тази култура са в различна валута от пазарната цена, затова маржът на декар не се изчислява — не се прилага обменен курс.",
+    ]
 
     /// The web's `perAreaPartial`: the cost takes in plantings with no yield
     /// estimate, so the margin is understated.

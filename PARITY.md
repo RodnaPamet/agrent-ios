@@ -88,6 +88,27 @@ The farm figures per дка are the phone's own arithmetic over the payload's
 rows. The server doesn't publish them, so the web has nothing to compare
 them against.
 
+### Matched — a margin the cost can't be subtracted from (agri-saas #2259, #2272)
+
+A crop's «Марж / дка» is not shown when its cost can't be subtracted from
+its value:
+- the cost rate was refused (costs in two currencies, the lease currency
+  unrecorded, no parcel with the crop);
+- or the costs are all in ONE currency that isn't the price's. The cost rate
+  still shows in its own currency.
+
+The farm block's margin leaves such a crop out and names it. A server from
+#2272 on sends the reason as `marginRefusalCode`. With an older one the phone
+works out the same reason from the cost refusal and the two currencies, so
+build 18.1 already hid the two-currency margin. The farm fold on the web
+(`farm-per-area.ts`) makes the same checks.
+
+**One divergence in where the reason is said.** The web says it once, on the
+margin line, for all six codes. The phone says the value side's reason above
+the figures, as before, in a sentence that names the margin too. So its
+margin line adds the web's sentence only for the four other codes, and never
+says the same thing twice.
+
 ### «Нов разход»: «Култура» or «Общи» first (#245, owner 2026-10-09)
 
 «Общи», the farm's overheads, was «Режийни» until the owner renamed it the
