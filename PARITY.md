@@ -800,8 +800,13 @@ interactively.
 
 **iOS**: «Коригирай» on a treatment's journal entry, below «Виж на картата»:
 - **Who:** the treatment's creator and the farm's administrators, as the server rules it (creator or admin, one author). Decided from the row's own `mayCorrect` (agri-saas #2292), and never from `mayDelete`. The two agree today, but agri-saas #2280 may narrow the withdrawal again, and a fallback would then hide «Коригирай» from creators who may still correct. Only an explicit `false` hides it; an absent field is a page cached before it existed. It is never decided by probing `GET …/definition`, which 403s for anyone who may not correct.
-- **Step one** is the treatment as recorded, read from `GET …/definition`, in «Ново мероприятие»'s order. Editable: the date, the pest, Фенофаза/BBCH, the quarantine period (with the earliest harvest worked out again) and the technique. **Locked**, and shown with «Препаратът, дозата и парцелите не могат да се коригират все още.»: the product and its registration number, the dose, and the parcels with their treated area («Целият парцел» where none was typed). The server refuses those today (`TREATMENT_CORRECTION_FIELD_UNSUPPORTED`). They unlock when it allows them; the owner put that next on the server, before the «Забележка» note.
-- **No parcel step:** nothing on it can change yet.
+- **Step one** is the treatment as recorded, read from `GET …/definition`, in «Ново мероприятие»'s order. Since agri-saas #2293 everything it recorded is correctable:
+  - the date, pest, Фенофаза/BBCH, quarantine period (with the earliest harvest worked out again) and technique;
+  - **the product**, typed and matched against the farm's catalogue with its suggestions, as on «Ново мероприятие». A correction sends it by id, so only a product the farm has can be chosen. A new name says «… не е в каталога на стопанството». The kind isn't corrected, so a fertilising takes a fertiliser;
+  - **the dose**, its amount and unit, which «Проверка» reads back as one line;
+  - **each parcel's treated area**, in decares, where an empty field is the whole parcel.
+- **Kept as recorded:** the parcel SET, which a correction can't change («Парцели не се добавят и не се премахват с корекция.»); the kind; and the water rate, which the phone never recorded and leaves out of the body. Before #2293 the product, dose and parcels were shown locked.
+- **No parcel step:** the areas are on step one, and the set can't move.
 - **Step two, «Проверка»**, lists only the changes, each as «Беше: …» and «Става: …», above «Проверете данните.» and «Запази».
 - **What goes out:** `PUT …/definition` under `If-Match: <group version>`, carrying ONLY the changed fields. A cleared field goes out as an explicit `null`; an untouched one is left out, which the server reads as unchanged. So a stored technique outside the seven isn't rewritten. «Напред» stays dimmed until something changes («Няма промени за запазване.»).
 - **Someone else corrected it first** (409 `STALE_DATA`): said, «Запази» is disabled, and «Зареди отново» loads the current values, dropping this correction's changes as the sentence says.
@@ -810,7 +815,7 @@ interactively.
 
 **«Корекции»** on the entry, under its facts (agri-saas #2292, `GET …/corrections`). It is what the owner asked for on 2026-10-22:
 - one line per correction, newest first: «Коригирано на 24 октомври 2026 г. в 21:40 от …», with no «от …» when the server can't name anyone (it never sends an id);
-- each changed field with «Беше: …», read from the correction's `previous` definition. The dose, water rate and treated area show only «Променено», because the definition names a dose unit by id. A field this build has no name for is left out;
+- each changed field with «Беше: …», read from the correction's `previous` definition. A treated area lists every parcel's area as it was. The dose and water rate show only «Променено» until the definition carries its units' symbols (agri-saas #2298, open). A field this build has no name for is left out;
 - readable by anyone who can see the treatment, an inspector included (a read gate, where the prefill is a write gate);
 - nothing shown while it loads, if it can't be read, or when nobody has corrected the treatment. Read again after «Запази».
 

@@ -4,28 +4,31 @@ import SwiftUI
 /// read from the server and prefilled; «Проверка» with each change before
 /// and after; «Запази».
 ///
-/// Two steps where «Ново мероприятие» has three: the parcel step is left
-/// out because nothing on it can be corrected yet. The parcels are shown,
-/// locked, on the first.
+/// Two steps where «Ново мероприятие» has three. The parcel step is folded
+/// into the first: the parcel SET can't be corrected (agri-saas #2293), only
+/// the treated area of each, which the first step lists.
 ///
 /// The form starts from `GET …/definition`, not from the journal row: the
 /// row carries no version, and a correction made against a version is the
 /// one that can't silently overwrite someone else's (409 `STALE_DATA`).
 struct TreatmentCorrectionFlow: View {
     let handle: String
-    /// The journal row, for the dose as it writes it.
+    /// The journal row, for the dose unit's symbol: the definition names the
+    /// unit by id.
     let row: JournalTreatment
     /// The corrected treatment, for the screen underneath to show at once.
     ///
     /// No haptic either way (`WriteFeedback`'s sites): the sheet closes onto
     /// the entry showing the corrected values, which is its own
     /// confirmation, and a refusal stays on «Проверка», said and in red.
-    let onCorrected: (TreatmentDefinition) -> Void
+    let onCorrected: (TreatmentCorrection.Saved) -> Void
 
     static let title = "Корекция"
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: TreatmentCorrection.Draft?
+    /// The farm's products and dose units, as «Ново мероприятие» reads them.
+    @State private var reference = OperationReferenceStore()
     @State private var loadFailure: String?
     /// The way to «Проверка», by value: what it reads back is the draft,
     /// which is in hand before the push (#384's empty page can't happen).
@@ -40,7 +43,7 @@ struct TreatmentCorrectionFlow: View {
         NavigationStack(path: $path) {
             Group {
                 if let draft = Binding($draft) {
-                    TreatmentCorrectionForm(draft: draft, doseText: row.doseText, doseSpoken: row.doseSpoken,
+                    TreatmentCorrectionForm(draft: draft, reference: reference,
                                             onNext: { failure = nil; path = [.check] },
                                             onCancel: { dismiss() })
                 } else if let loadFailure {
@@ -79,7 +82,8 @@ struct TreatmentCorrectionFlow: View {
     private func load() async {
         loadFailure = nil
         do {
-            draft = TreatmentCorrection.Draft(try await TreatmentCorrectionAPI.definition(handle))
+            draft = TreatmentCorrection.Draft(try await TreatmentCorrectionAPI.definition(handle),
+                                              unitSymbol: row.doseUnit?.recorded)
         } catch {
             loadFailure = UserMessage.text(for: error)
         }
@@ -107,7 +111,8 @@ struct TreatmentCorrectionFlow: View {
             // The list behind the entry reads again; the entry's own screen
             // shows the corrected values from `onCorrected` until then.
             JournalChanges.shared.changed()
-            onCorrected(corrected)
+            onCorrected(TreatmentCorrection.Saved(definition: corrected, unitSymbol: draft.doseUnit.symbol,
+                                                  areaChanged: draft.changed.contains(.parcels)))
             dismiss()
         } catch APIClient.APIError.conflict {
             stale = true

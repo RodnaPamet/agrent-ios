@@ -19,11 +19,11 @@ import Foundation
 ///
 /// ── What can be corrected ──
 ///
-/// Today: the date, the pest, the growth stage, the quarantine period and
-/// the technique (and the title, which this app's form doesn't have). A
-/// changed product, dose or parcel list is refused with 400
-/// `TREATMENT_CORRECTION_FIELD_UNSUPPORTED`. The phone shows those locked
-/// rather than offering a change the server would refuse (owner, 2026-10-24).
+/// Everything the form records (agri-saas #2293): the date, the product,
+/// the dose, the pest, the growth stage, the quarantine period, the
+/// technique and each parcel's treated area. Not the parcel SET: adding or
+/// dropping one is refused with 400 `TREATMENT_CORRECTION_FIELD_UNSUPPORTED`
+/// (`parcels`), so the phone keeps the list as recorded.
 enum TreatmentCorrectionAPI {
     static func definitionPath(_ handle: String) -> String {
         "\(TreatmentAPI.treatmentPath(handle))/definition"
@@ -96,8 +96,8 @@ struct TreatmentCorrectionTrail: Decodable, Equatable, Sendable {
 }
 
 /// A recorded treatment as `GET …/definition` serves it, read for what the
-/// correction form shows. The product, dose and water rate ids are not
-/// read: the form never sends them back (`TreatmentCorrection.Body`).
+/// correction form shows and changes. The water rate is not read: the
+/// phone's form never recorded one, and leaves it as it is.
 struct TreatmentDefinition: Decodable, Equatable, Sendable {
     let treatmentGroupId: String
     /// The group's version, sent back as `If-Match`. 0 for a treatment
@@ -109,8 +109,14 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
     let occurredOn: String?
     let applicationTechnique: String?
     let targetNote: String?
+    /// The farm's product, by id: a correction changes it by id too
+    /// (agri-saas #2293), so only to one the farm already has.
+    let productItemId: String
     let productName: String
     let pppRegistrationNo: String?
+    /// A number on the wire, read through `WireDecimal` as every dose is.
+    let doseValue: Decimal
+    let doseUnitId: String
     /// As captured on the day. Nil means nothing was captured, which the
     /// form shows as empty, never as the product's current period.
     let quarantinePeriodDays: Int?
@@ -125,4 +131,31 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
     }
 
     var treatmentKind: TreatmentDraft.Kind? { TreatmentDraft.Kind(rawValue: kind) }
+}
+
+extension TreatmentDefinition {
+    private enum CodingKeys: String, CodingKey {
+        case treatmentGroupId, version, kind, occurredOn, applicationTechnique, targetNote
+        case productItemId, productName, pppRegistrationNo, doseValue, doseUnitId
+        case quarantinePeriodDays, phenophase, lines
+    }
+
+    // In an extension, so the memberwise initialiser stays for tests.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        treatmentGroupId = try c.decode(String.self, forKey: .treatmentGroupId)
+        version = try c.decode(Int.self, forKey: .version)
+        kind = try c.decode(String.self, forKey: .kind)
+        occurredOn = try c.decodeIfPresent(String.self, forKey: .occurredOn)
+        applicationTechnique = try c.decodeIfPresent(String.self, forKey: .applicationTechnique)
+        targetNote = try c.decodeIfPresent(String.self, forKey: .targetNote)
+        productItemId = try c.decode(String.self, forKey: .productItemId)
+        productName = try c.decode(String.self, forKey: .productName)
+        pppRegistrationNo = try c.decodeIfPresent(String.self, forKey: .pppRegistrationNo)
+        doseValue = try c.decode(WireDecimal.self, forKey: .doseValue).value
+        doseUnitId = try c.decode(String.self, forKey: .doseUnitId)
+        quarantinePeriodDays = try c.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)
+        phenophase = try c.decodeIfPresent(String.self, forKey: .phenophase)
+        lines = try c.decode([Line].self, forKey: .lines)
+    }
 }

@@ -73,7 +73,7 @@ struct JournalDetailView: View {
     /// What «Коригирай» saved, shown over the row this screen was opened
     /// with: the route carries a value, so the list reading again does not
     /// reach it.
-    @State private var corrected: TreatmentDefinition?
+    @State private var corrected: TreatmentCorrection.Saved?
     /// Bumped by each save, so «Корекции» reads the newest one in.
     @State private var trailRevision = 0
     /// The treatment's corrections (agri-saas #2292); nil until read.
@@ -89,7 +89,7 @@ struct JournalDetailView: View {
 
     /// The day, as corrected when it was.
     private var occurredAt: Date? {
-        corrected?.occurredOn.flatMap(BgDate.parseISODay) ?? entry.occurredAt
+        corrected?.definition.occurredOn.flatMap(BgDate.parseISODay) ?? entry.occurredAt
     }
 
     var body: some View {
@@ -172,7 +172,10 @@ struct JournalDetailView: View {
     /// The operator's own words, at the size of a thing being read rather
     /// than a thing being scanned.
     private var header: some View {
-        Text(entry.displayTitle)
+        // The treatment's product as corrected, when it was: the title is
+        // the product (`displayTitle`), and the server retitles a corrected
+        // product's entries (agri-saas #2293).
+        Text(treatment?.foldedProduct ?? entry.displayTitle)
             .font(.title2.weight(.semibold))
             .foregroundStyle(.primary)
             .fixedSize(horizontal: false, vertical: true)

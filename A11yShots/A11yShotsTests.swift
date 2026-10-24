@@ -118,7 +118,8 @@ final class A11yShotsTests: XCTestCase {
             case "09a-crop-costs": captureCropCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
             case "01c-journal-filter": captureJournalFilter(app)
-            case "01e-journal-treatment", "01g-treatment-correction", "01i-treatment-trail":
+            case "01e-journal-treatment", "01g-treatment-correction", "01i-treatment-trail",
+                 "01j-treatment-correction-areas":
                 captureJournalTreatment(app)
             case "17-new-entry": captureNewEntryForm(app)
             case "19-admin-prices": captureAdminPrices(app)
@@ -572,8 +573,9 @@ final class A11yShotsTests: XCTestCase {
     }
 
     /// The same treatment's «Коригирай» (#392): the form prefilled from
-    /// `treatment-definition.json`, the product, dose and parcels locked;
-    /// then a growth stage typed and «Проверка» with that one change. Left
+    /// `treatment-definition.json`, every recorded field correctable
+    /// (agri-saas #2293); then a growth stage typed and «Проверка» with that
+    /// one change. Left
     /// by «Отказ»: «Запази» is a write to a farm's register, and the seam
     /// would refuse it anyway.
     private func captureTreatmentCorrection(_ app: XCUIApplication) {
@@ -584,10 +586,10 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(scrollWhollyIntoView(correct, in: app), "the page would not scroll «Коригирай» into view")
         correct.tap()
 
-        // The prefill's own line under the locked product, near the top: the
-        // parcel rows further down are combined and may not be built yet.
+        // The product section's own line, near the top: the parcel rows
+        // further down may not be built yet.
         let locked = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH %@", "Препаратът, дозата и парцелите"))
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "С корекция се избира продукт"))
             .firstMatch
         guard locked.waitForExistence(timeout: 10) else {
             XCTFail("«Коригирай» opened without its definition:\n\(app.debugDescription)")
@@ -622,6 +624,29 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(change.waitForExistence(timeout: 5), "«Проверка» doesn't read the change back")
         Thread.sleep(forTimeInterval: 1)
         capture("01h-treatment-correction-check", app: app)
+
+        // Back to the form, to its foot: each parcel's treated area, one of
+        // them typed, the others the whole parcel (agri-saas #2293).
+        app.buttons["BackButton"].firstMatch.tap()
+        // The stage field kept its keyboard; a return closes it, as a
+        // single-line field's does, so the areas aren't under it.
+        if app.keyboards.firstMatch.waitForExistence(timeout: 2) {
+            app.typeText("\n")
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        let area = app.textFields
+            .matching(NSPredicate(format: "placeholderValue == %@", "Целият парцел"))
+            .firstMatch
+        var down = 0
+        while !area.exists, down < 6 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            down += 1
+        }
+        XCTAssertTrue(area.exists, "no treated-area field on the form")
+        XCTAssertTrue(scrollWhollyIntoView(area, in: app), "the form would not scroll the areas into view")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01j-treatment-correction-areas", app: app)
 
         app.buttons["Отказ"].firstMatch.tap()
         XCTAssertTrue(correct.waitForExistence(timeout: 5), "«Отказ» didn't close the correction")
