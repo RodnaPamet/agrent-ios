@@ -25,7 +25,7 @@ struct RegionFilterSummary: View {
 
     /// In Bulgarian, by `BulgarianRegion`: never the code, never the
     /// server's English.
-    static func text(_ regions: [String]) -> String {
+    nonisolated static func text(_ regions: [String]) -> String {
         let names = regions.map { BulgarianRegion.name(code: $0) ?? $0 }
         return (names.count == 1 ? "Област: " : "Области: ") + names.joined(separator: ", ")
     }
