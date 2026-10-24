@@ -15,10 +15,16 @@ final class ExchangeListingsStore {
 
     var hasMore: Bool { nextCursor != nil }
 
+    /// The query the board last asked the server, so the farm section can
+    /// ask the directory the same question (`BoardFarmSearch`) — on a
+    /// search, a map tap or a clear, not on every keystroke in the field.
+    private(set) var lastAsked: ExchangeQuery?
+
     func load() async {
         if state.value == nil { state = .loading }
         loadMoreError = nil
         let first = query.firstPage
+        lastAsked = first
 
         // ONLY THE UNFILTERED FIRST PAGE IS CACHED, and the reason is the
         // offline case rather than tidiness. `CachedResource` keys on the

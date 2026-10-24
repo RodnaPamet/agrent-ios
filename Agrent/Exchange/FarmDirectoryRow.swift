@@ -60,3 +60,20 @@ struct FarmDirectoryRow: View {
         ])
     }
 }
+
+/// A farm the board's search found (2026-10-24): its row, opening the farm's
+/// public page in Safari's view inside the app, as the «Ферми» screen did.
+struct FarmLink: View {
+    let hit: FarmDirectoryHit
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            FarmDirectoryRow(hit: hit)
+        }
+        .buttonStyle(.plain)
+        // A tap leaves Борса for a web page: said, because nothing in the
+        // row's words says it.
+        .accessibilityHint("Отваря страницата на фермата.")
+    }
+}

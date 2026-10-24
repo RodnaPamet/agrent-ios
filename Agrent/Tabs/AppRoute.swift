@@ -41,8 +41,10 @@ enum AppRoute: Hashable, Sendable {
     /// it, which used to be what a tap on the map opened. Nil from Риск,
     /// which has never offered it.
     case parcelHistory(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil)
-    /// «Ферми», the published farms (#323). Carries nothing: it's one list.
-    case farmDirectory
+    /// «Съобщения», from Борса's bar (owner, 2026-10-24). Carries nothing: it
+    /// is the person's one inbox. «Ферми» had this place until the directory
+    /// moved into the board's search.
+    case exchangeInbox
     /// A recorded treatment's parcels on a map (#399), read by its handle.
     case treatmentMap(handle: String, title: String)
 
@@ -55,7 +57,7 @@ enum AppRoute: Hashable, Sendable {
         case .taskID(let id): hasher.combine("taskID"); hasher.combine(id)
         case .location(let location): hasher.combine("location"); hasher.combine(location.id)
         case .parcelHistory(let parcelID, _, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
-        case .farmDirectory: hasher.combine("farmDirectory")
+        case .exchangeInbox: hasher.combine("exchangeInbox")
         case .treatmentMap(let handle, _): hasher.combine("treatmentMap"); hasher.combine(handle)
         }
     }
@@ -65,7 +67,7 @@ enum AppRoute: Hashable, Sendable {
     var home: AppSurface {
         switch self {
         case .journalEntry, .treatmentMap: .journal
-        case .listing, .conversation, .farmDirectory: .exchange
+        case .listing, .conversation, .exchangeInbox: .exchange
         case .task, .taskID: .tasks
         case .location: .locations
         case .parcelHistory: .farmRisk
@@ -86,7 +88,7 @@ enum AppRoute: Hashable, Sendable {
         case .location(let location): ParcelMapView(location: location)
         case .parcelHistory(let parcelID, let parcelName, let recordIn):
             ParcelHistoryView(parcelID: parcelID, parcelName: parcelName, recordIn: recordIn)
-        case .farmDirectory: FarmDirectoryView()
+        case .exchangeInbox: ExchangeInboxScreen()
         case .treatmentMap(let handle, let title): TreatmentMapView(handle: handle, title: title)
         }
     }

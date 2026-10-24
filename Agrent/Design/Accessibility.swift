@@ -202,7 +202,9 @@ enum A11y {
         /// name stays the same when a filter is on; that state is its value.
         static let filters = spokenNames("Филтри", "Filters")
         /// Борса's «Ферми», the directory of published farms (#323).
-        static let farms = spokenNames("Ферми", "Farms")
+        /// Борса's bar, where «Ферми» was until the farms moved into the
+        /// board's search (2026-10-24).
+        static let messages = spokenNames("Съобщения", "Messages")
         /// The filter sheet's «Покажи»: show the list the filter describes.
         static let show = spokenNames("Покажи", "Show")
         static let signOut = spokenNames("Изход", "Sign out")

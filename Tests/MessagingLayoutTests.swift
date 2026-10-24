@@ -7,15 +7,16 @@ import XCTest
 ///
 /// Measured through the real row — SwiftUI's horizontal `ScrollView` is a
 /// `UIScrollView` underneath — hosted in a window at a phone's width, in the
-/// simulator this suite runs in; not on a device. «Съобщения» is the LAST of
-/// the four, so "fully in view" is "the row is scrolled to its end".
+/// simulator this suite runs in; not on a device. «Моите заявки» is the LAST
+/// of the three since «Съобщения» moved to the bar (2026-10-24), so "fully in
+/// view" is "the row is scrolled to its end".
 @MainActor
 final class ExchangeSectionChipRevealTests: XCTestCase {
 
     private func chipRow(selected: ExchangeView.Tab, width: CGFloat = 402) -> (UIScrollView?, UIWindow) {
         // AX3 forces the chips (see `ExchangeSectionPickerTests`), and makes
-        // four of them overflow a phone for certain.
-        let root = ExchangeSectionPicker(selection: .constant(selected), unread: 3)
+        // three of them overflow a phone for certain.
+        let root = ExchangeSectionPicker(selection: .constant(selected))
             .padding(.horizontal)
             .environment(\.dynamicTypeSize, .accessibility3)
             .environment(\.locale, Locale(identifier: "bg_BG"))
@@ -41,19 +42,19 @@ final class ExchangeSectionChipRevealTests: XCTestCase {
         return nil
     }
 
-    /// The bug: «Съобщения» selected and the row left at its start, so the
+    /// The bug: the last chip selected and the row left at its start, so the
     /// chip was clipped at the right edge.
     func testTheLastChipWhenSelectedIsScrolledFullyIntoView() throws {
-        let (row, window) = chipRow(selected: .messages)
+        let (row, window) = chipRow(selected: .inquiries)
         defer { window.isHidden = true }
         let scroll = try XCTUnwrap(row, "no UIScrollView under the chip row")
         // The row must actually overflow, or this proves nothing.
         XCTAssertGreaterThan(scroll.contentSize.width, scroll.bounds.width,
-                             "the four chips fit — this window proves nothing")
+                             "the three chips fit — this window proves nothing")
         XCTAssertGreaterThan(scroll.contentOffset.x, 0, "the row never scrolled")
         XCTAssertGreaterThanOrEqual(scroll.contentOffset.x + scroll.bounds.width,
                                     scroll.contentSize.width - 1,
-                                    "«Съобщения» is not fully in view")
+                                    "«Моите заявки» is not fully in view")
     }
 
     /// The control: the first chip selected leaves the row at its start —
@@ -134,7 +135,6 @@ final class MessagingLayoutSourceTests: XCTestCase {
         XCTAssertTrue(row.contains("chip(tab).id(tab)"))
         XCTAssertTrue(row.contains(".onAppear { reveal(selection"))
         XCTAssertTrue(row.contains(".onChange(of: selection)"))
-        XCTAssertTrue(row.contains(".onChange(of: unread)"))
         XCTAssertTrue(row.contains("proxy.scrollTo(tab, anchor: nil)"))
         XCTAssertTrue(row.contains("animated && !reduceMotion"))
         XCTAssertFalse(row.contains("onScrollGeometryChange"), "iOS 18")

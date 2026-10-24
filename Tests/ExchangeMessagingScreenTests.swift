@@ -420,8 +420,8 @@ final class MessagingSourceTests: XCTestCase {
 @MainActor
 final class ExchangeSectionPickerTests: XCTestCase {
 
-    private func segmentedControls(size: DynamicTypeSize, unread: Int, width: CGFloat) -> Int {
-        let root = ExchangeSectionPicker(selection: .constant(.browse), unread: unread)
+    private func segmentedControls(size: DynamicTypeSize, width: CGFloat) -> Int {
+        let root = ExchangeSectionPicker(selection: .constant(.browse))
             .padding(.horizontal)
             .environment(\.dynamicTypeSize, size)
             .environment(\.locale, Locale(identifier: "bg_BG"))
@@ -442,19 +442,20 @@ final class ExchangeSectionPickerTests: XCTestCase {
     /// Where there is room the segments stay — the positive control that
     /// this probe can find a segmented control at all.
     func testAWideScreenKeepsTheSegments() {
-        XCTAssertEqual(segmentedControls(size: .large, unread: 3, width: 1000), 1)
+        XCTAssertEqual(segmentedControls(size: .large, width: 1000), 1)
     }
 
-    /// An iPhone 17 is 402pt wide; four Bulgarian segments ask for about 464.
-    /// Truncated segments are what this replaces, so a phone gets the chips —
-    /// with or without a count in the label.
-    func testAPhoneGetsTheChipsRatherThanTruncatedSegments() {
-        XCTAssertEqual(segmentedControls(size: .large, unread: 0, width: 402), 0)
-        XCTAssertEqual(segmentedControls(size: .large, unread: 3, width: 402), 0)
+    /// An iPhone 17 is 402pt wide. Four Bulgarian segments asked for about
+    /// 464, so a phone got chips; with «Съобщения» on the bar (2026-10-24)
+    /// three fit, and the phone gets the segments. A narrow phone still gets
+    /// chips rather than truncated segments.
+    func testThreeSectionsFitAPhoneAsSegments() {
+        XCTAssertEqual(segmentedControls(size: .large, width: 402), 1)
+        XCTAssertEqual(segmentedControls(size: .large, width: 240), 0, "too narrow: chips, not truncated segments")
     }
 
     /// At the accessibility sizes the chips are unconditional.
     func testTheAccessibilitySizesGetTheChips() {
-        XCTAssertEqual(segmentedControls(size: .accessibility3, unread: 3, width: 1000), 0)
+        XCTAssertEqual(segmentedControls(size: .accessibility3, width: 1000), 0)
     }
 }

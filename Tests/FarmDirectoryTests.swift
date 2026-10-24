@@ -1,8 +1,8 @@
 import XCTest
 @testable import Agrent
 
-/// «Ферми» (agrent-ios #323): the directory's query, its answer, the crop
-/// filter's choices, what a row says, and where the screen is offered.
+/// The farm directory (agrent-ios #323): its query, its answer, what a row
+/// says, and that Борса's search asks it only behind the flag (#419).
 /// Synthetic values throughout; nothing here reaches a network.
 final class FarmDirectoryTests: XCTestCase {
 
@@ -78,36 +78,6 @@ final class FarmDirectoryTests: XCTestCase {
         XCTAssertNoThrow(try FarmDirectoryAPI.decodeHits(from: Data("[]".utf8)))
     }
 
-    // MARK: - The crop filter's choices
-
-    /// Bulgarian order whatever the phone's language, and the spelling kept
-    /// as the farm typed it.
-    func testCropsAreInBulgarianOrderWithTheirCaseKept() {
-        XCTAssertEqual(FarmDirectoryStore.sorted(["ябълки", "ечемик", "царевица", "люцерна"]),
-                       ["ечемик", "люцерна", "царевица", "ябълки"])
-        XCTAssertEqual(FarmDirectoryStore.sorted(["ябълки", "Ечемик"]), ["Ечемик", "ябълки"],
-                       "case doesn't move a crop")
-    }
-
-    /// The server ignores case (agri-saas #2069), so «Пшеница» and
-    /// «пшеница» are one choice: the first spelling seen, later answers
-    /// included.
-    func testSpellingsThatDifferOnlyInCaseAreOneChoice() {
-        XCTAssertEqual(FarmDirectoryStore.merged([], with: ["Пшеница", "ечемик", "пшеница", "ПШЕНИЦА"]),
-                       ["ечемик", "Пшеница"])
-        XCTAssertEqual(FarmDirectoryStore.merged(["Пшеница"], with: ["пшеница", "Ечемик"]),
-                       ["Ечемик", "Пшеница"], "a later answer's spelling doesn't replace the first")
-        let known = ["Пшеница"]
-        XCTAssertEqual(FarmDirectoryStore.merged(known, with: ["пшеница"]), known, "nothing new, nothing changes")
-    }
-
-    /// Case only: a named variety is a different crop on the server too,
-    /// so it stays its own choice.
-    func testAVarietyIsStillItsOwnChoice() {
-        XCTAssertEqual(FarmDirectoryStore.merged(["пшеница"], with: ["Пшеница (мека)", "слънчоглед"]),
-                       ["пшеница", "Пшеница (мека)", "слънчоглед"])
-    }
-
     // MARK: - The row and the screen
 
     func testARowSaysWhatItPrints() {
@@ -120,13 +90,6 @@ final class FarmDirectoryTests: XCTestCase {
                        "Само име.")
     }
 
-    /// The server stops at 50 with no next page: a full answer says how to
-    /// reach the rest.
-    func testAFullAnswerSaysHowToNarrowIt() {
-        XCTAssertTrue(FarmDirectoryView.footer(count: FarmDirectoryAPI.limit).contains("Стеснете"))
-        XCTAssertFalse(FarmDirectoryView.footer(count: 3).contains("Стеснете"))
-    }
-
     /// A farm opens as its web page, and only a web address opens: Safari's
     /// view raises on any other scheme.
     func testOnlyAWebPageOpens() throws {
@@ -137,21 +100,17 @@ final class FarmDirectoryTests: XCTestCase {
         XCTAssertFalse(InAppBrowser.opens(try XCTUnwrap(URL(string: "agrent://f/test-farm"))))
     }
 
-    func testTheDirectoryBelongsToTheExchange() {
-        XCTAssertEqual(AppRoute.farmDirectory.home, .exchange)
-        XCTAssertEqual(AppRoute.farmDirectory, AppRoute.farmDirectory)
-    }
-
-    /// Behind the flag every P6 route answers 404 on, as the editor is.
-    func testTheButtonIsBehindTheFlag() throws {
+    /// The board's farm search runs behind the flag every P6 route answers
+    /// 404 on, as the editor is (#323): with it off, Борса shows no farms.
+    func testTheFarmSearchIsBehindTheFlag() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let exchange = try String(contentsOf: root.appendingPathComponent("Agrent/Exchange/ExchangeView.swift"),
                                   encoding: .utf8)
         XCTAssertTrue(exchange.contains("struct ExchangeView"), "positive control")
-        let gate = try XCTUnwrap(exchange.range(of: "if flags.isOn(FarmBrandAPI.flag) {"))
-        let link = try XCTUnwrap(exchange.range(of: "NavigationLink(value: AppRoute.farmDirectory)"))
-        XCTAssertLessThan(gate.lowerBound, link.lowerBound)
-        XCTAssertEqual(exchange.components(separatedBy: "AppRoute.farmDirectory").count, 2,
-                       "offered once, behind the gate")
+        let gate = try XCTUnwrap(exchange.range(of: "flags.isOn(FarmBrandAPI.flag) else { farms.clear(); return }"))
+        let load = try XCTUnwrap(exchange.range(of: "await farms.load("))
+        XCTAssertLessThan(gate.lowerBound, load.lowerBound)
+        XCTAssertEqual(exchange.components(separatedBy: "await farms.load(").count, 2, "searched from one place")
+        XCTAssertFalse(exchange.contains("AppRoute.farmDirectory"), "the «Ферми» screen is gone")
     }
 }

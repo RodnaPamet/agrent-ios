@@ -139,6 +139,9 @@ enum FixtureCatalogue {
         // agrent-ios#323: «Ферми» as it opens, unfiltered. A search or a
         // filter is another question, and `NO_FIXTURE` is its true answer.
         (FarmDirectoryAPI.searchPath(FarmDirectoryQuery()), "farm-directory"),
+        // Борса's search for «Синтетично» (2026-10-24): a name, so `q=`. The
+        // same answer, since the screenshot is of the «Ферми» section's shape.
+        (FarmDirectoryAPI.searchPath(FarmDirectoryQuery(text: "Синтетично")), "farm-directory"),
         // agrent-ios#365: Членове's pending invitations, the members PATH
         // with `?view=invites`. Here, by its query, or the members payload
         // would answer it.
