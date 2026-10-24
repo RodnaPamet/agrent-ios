@@ -1837,6 +1837,49 @@ final class A11yShotsTests: XCTestCase {
         if toList.waitForExistence(timeout: 5) { toList.tap() }
     }
 
+    // MARK: - Калкулатор: «Всички» or one crop (owner 2026-10-24)
+
+    /// The dropdown, «Всички» with the farm block on top and every crop under
+    /// it, then one crop alone. Ends back on «Всички», since the choice is
+    /// remembered across launches and the next run should start where this
+    /// one did.
+    func testCalculatorAllAndOneCrop() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let tab = labelled("Калкулатор", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        tab.tap()
+        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Култура:'")).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 20), "no crop dropdown\n\(app.debugDescription)")
+
+        choose("Всички", from: picker, in: app)
+        XCTAssertTrue(app.staticTexts["Общо за стопанството"].waitForExistence(timeout: 5),
+                      "«Всички» has no farm block\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09c-calculator-all", app: app)
+
+        choose("Пшеница", from: picker, in: app)
+        XCTAssertTrue(app.buttons["Култура: Пшеница"].waitForExistence(timeout: 5),
+                      "the dropdown does not say «Пшеница»\n\(app.debugDescription)")
+        XCTAssertFalse(app.staticTexts["Общо за стопанството"].exists, "one crop shows no farm block")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09d-calculator-one-crop", app: app)
+
+        choose("Всички", from: app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Култура:'")).firstMatch,
+               in: app)
+    }
+
+    /// Opens a SwiftUI `Menu` and taps one of its items, waiting for the menu
+    /// to animate in — an immediate tap finds nothing.
+    private func choose(_ item: String, from menu: XCUIElement, in app: XCUIApplication) {
+        menu.tap()
+        let entry = app.buttons.matching(NSPredicate(format: "label == %@", item)).firstMatch
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "the menu has no «\(item)»\n\(app.debugDescription)")
+        entry.tap()
+    }
+
     // MARK: - Тенденции: one price, one line, one row (agrent-ios#409)
 
     /// The owner's screenshot had a chart with no number above it and a

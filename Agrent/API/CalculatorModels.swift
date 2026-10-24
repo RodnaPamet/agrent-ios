@@ -258,7 +258,18 @@ extension PerArea {
     /// The margin as the web writes it: «най-много …» when it is an upper
     /// bound (`uncertaintyAtMost`). A bare figure there reads as measured.
     var marginText: String? {
-        marginPerDca.map { uncertainty == .atMost ? "най-много \(Num.text($0))" : Num.text($0) }
+        shownMarginPerDca.map { uncertainty == .atMost ? "най-много \(Num.text($0))" : Num.text($0) }
+    }
+
+    /// The margin, unless the cost rate it subtracts was refused.
+    ///
+    /// agri-saas #2259: with a crop's costs in two currencies the server
+    /// withholds `attributableCostPerDca` (`COST_CURRENCY_MIXED`) and still
+    /// publishes a `marginPerDca` computed from the blended sum, labelled
+    /// exact. A margin whose cost could not be stated is no margin, so it is
+    /// not shown — whichever way the server fixes it.
+    var shownMarginPerDca: Double? {
+        costRefusalCode == nil ? marginPerDca : nil
     }
 
     /// The web's `perAreaPartial`: the cost takes in plantings with no yield
