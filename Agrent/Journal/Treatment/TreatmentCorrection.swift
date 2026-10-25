@@ -19,7 +19,7 @@ enum TreatmentCorrection {
     /// Only an explicit `false` hides it. An absent flag is a page cached
     /// before the field existed, and the route checks again either way.
     nonisolated static func offered(_ entry: LogEntry, to me: CurrentUser?) -> Bool {
-        guard let treatment = entry.treatment, treatment.isTreatment, treatment.isChemicalTreatment,
+        guard let treatment = entry.treatment, treatment.isTreatment, treatment.isApplication,
               treatment.treatmentGroupId != nil,
               let me, me.mayWrite else { return false }
         return treatment.mayCorrect ?? true
@@ -223,7 +223,7 @@ enum TreatmentCorrection {
                 productIssue = .loading
                 return
             }
-            switch TypedProduct.classify(productText, spraying: spraying, catalogue: catalogue) {
+            switch TypedProduct.classify(productText, use: kind.use, catalogue: catalogue) {
             case .existing(let item):
                 if item.id != original.productItemId { product = item }
             case .wrongKind(let item): productIssue = .wrongKind(item.name)
@@ -451,6 +451,16 @@ enum TreatmentCorrection {
             }
         }
 
+        /// A product of another kind, on a correction: the kind stays, so the
+        /// person is sent back to the catalogue, never to another kind.
+        static func wrongKindText(_ name: String, kind: TreatmentDraft.Kind) -> String {
+            switch kind {
+            case .fertilize: "«\(name)» не е тор. Изберете тор от каталога на стопанството."
+            case .seed: "«\(name)» не е семе. Изберете сорт от каталога на стопанството."
+            case .spray: "«\(name)» е семе. Изберете препарат от каталога на стопанството."
+            }
+        }
+
         /// The server's cap on `targetNote` (`CorrectDiaryTreatment`).
         static let pestMaxLength = 500
 
@@ -466,7 +476,7 @@ enum TreatmentCorrection {
             let calendar = Calendar(identifier: .gregorian)
             if calendar.startOfDay(for: date) > calendar.startOfDay(for: now) { found.append(.futureDate) }
             if TypedProduct.cleaned(productText).isEmpty {
-                found.append(.productMissing)
+                found.append(kind == .seed ? .product(kind.productMissingText) : .productMissing)
             } else if let issue = productIssue {
                 switch issue {
                 case .loading:
@@ -475,8 +485,8 @@ enum TreatmentCorrection {
                     found.append(.product("«\(TypedProduct.cleaned(productText))» не е в каталога на стопанството. "
                                           + "С корекция се избира продукт от каталога."))
                 case .wrongKind(let name):
-                    // The kind isn't corrected: a fertilising takes a fertiliser.
-                    found.append(.product("«\(name)» не е тор. Изберете тор от каталога на стопанството."))
+                    // The kind isn't corrected: each takes its own kind of product.
+                    found.append(.product(Self.wrongKindText(name, kind: kind)))
                 case .sample(let name):
                     found.append(.product("«\(name)» е образцов продукт. Въведете истинското търговско наименование."))
                 }
@@ -537,7 +547,7 @@ enum TreatmentCorrection {
                 case .doseValue, .doseUnitId:
                     // One line for the two, as on the form.
                     guard !out.contains(where: { $0.id == "dose" }) else { continue }
-                    out.append(Change(id: "dose", label: "Доза",
+                    out.append(Change(id: "dose", label: kind.doseWord,
                                       before: doseLine(original.doseValue, originalUnitSymbol),
                                       after: doseLine(dose ?? original.doseValue, doseUnit.symbol)))
                 case .phenophase:

@@ -43,7 +43,7 @@ struct TreatmentCheckView: View {
     /// «Площ» on other work, which treats nothing (#439).
     nonisolated static func areaWord(_ record: TreatmentRecord) -> String {
         if record.activity != nil { return "Площ" }
-        return record.kind == .spray ? "Третирана площ" : "Наторена площ"
+        return record.kind.areaWord
     }
 
     /// «1 250 кг», the harvest as typed.
@@ -70,7 +70,7 @@ struct TreatmentCheckView: View {
                 if record.activity == nil {
                     ValueRow(record.kind.inputLabel) { Text(record.productName) }
                     if let pest = record.pest { ValueRow("Вредител") { Text(pest) } }
-                    ValueRow("Доза") { Text(dose).accessibilityLabel(doseSpoken) }
+                    ValueRow(record.kind.doseWord) { Text(dose).accessibilityLabel(doseSpoken) }
                     if let stage = record.phenophase { ValueRow("Фенофаза/BBCH") { Text(stage) } }
                     if let technique = record.technique { ValueRow("Техника") { Text(technique.label) } }
                 }
@@ -93,7 +93,7 @@ struct TreatmentCheckView: View {
             if record.activity == nil {
             Section {
                 if let amount {
-                    ValueRow(record.kind == .spray ? "Нужен препарат" : "Нужен тор") {
+                    ValueRow(record.kind.neededWord) {
                         Text(amount.text).accessibilityLabel(amount.spoken)
                     }
                 } else {

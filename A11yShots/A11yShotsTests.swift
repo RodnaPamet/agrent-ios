@@ -1228,6 +1228,17 @@ final class A11yShotsTests: XCTestCase {
         app.buttons["BackButton"].firstMatch.tap()
         app.buttons["BackButton"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Вид"].waitForExistence(timeout: 5), "not back on the form")
+
+        // «Сеитба» (agri-saas #2368): the seed and its rate, none of a
+        // spraying's own fields.
+        app.buttons["Вид"].tap()
+        let sow = app.buttons["Сеитба"]
+        XCTAssertTrue(sow.waitForExistence(timeout: 5), "no «Сеитба» in «Вид»")
+        sow.tap()
+        XCTAssertTrue(app.textFields["Сорт"].waitForExistence(timeout: 5), "no «Сорт» field on a sowing")
+        XCTAssertFalse(app.staticTexts["Вредител"].exists, "a pest on a sowing")
+        Thread.sleep(forTimeInterval: 1)
+        capture("17d-new-sowing", app: app)
     }
 
     /// The listing detail with «Съобщение до продавача» on it — photographed,

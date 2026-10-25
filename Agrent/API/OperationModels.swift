@@ -36,6 +36,10 @@ struct InputItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
     /// "tidies" it into an allowlist.
     var isFertilizer: Bool { category.uppercased() == "FERTILIZER" }
 
+    /// A seed variety (`ItemCategory.SEED`): what «Сеитба» sows, and what no
+    /// other kind takes (agri-saas #2368).
+    var isSeed: Bool { category.uppercased() == "SEED" }
+
     /// A seeded placeholder rather than a real product.
     ///
     /// 22 of this tenant's 24 items are archetypes: deliberate, because a

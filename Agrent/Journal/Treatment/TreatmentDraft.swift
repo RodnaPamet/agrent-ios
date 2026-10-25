@@ -22,10 +22,69 @@ struct TreatmentDraft: Equatable, Sendable {
     enum Kind: String, CaseIterable, Identifiable, Sendable {
         case spray = "SPRAY"
         case fertilize = "FERTILIZE"
+        /// «Сеитба»: a seed variety at a rate (#439; agri-saas #2368, owner
+        /// 2026-10-25). It goes the treatments' way, with its seed, but it is
+        /// in neither БАБХ table, so it has no per-entry ДНЕВНИК page.
+        case seed = "SEED"
         var id: String { rawValue }
-        var label: String { self == .spray ? "Пръскане" : "Торене" }
-        /// The input's own word, as the ДНЕВНИК's two tables name it.
-        var inputLabel: String { self == .spray ? "Препарат" : "Тор" }
+        var label: String {
+            switch self {
+            case .spray: "Пръскане"
+            case .fertilize: "Торене"
+            case .seed: "Сеитба"
+            }
+        }
+        /// The input's own word, as the ДНЕВНИК's tables name it.
+        var inputLabel: String {
+            switch self {
+            case .spray: "Препарат"
+            case .fertilize: "Тор"
+            case .seed: "Семена"
+            }
+        }
+        /// Which of the farm's products this kind takes (`TypedProduct.Use`).
+        var use: TypedProduct.Use {
+            switch self {
+            case .spray: .product
+            case .fertilize: .fertilizer
+            case .seed: .seed
+            }
+        }
+        /// In the БАБХ register: plant protection and fertilising, never a
+        /// sowing (owner, 2026-10-25).
+        var isInBabhRegister: Bool { self != .seed }
+        /// «Третирана площ», «Наторена площ», «Засята площ».
+        var areaWord: String {
+            switch self {
+            case .spray: "Третирана площ"
+            case .fertilize: "Наторена площ"
+            case .seed: "Засята площ"
+            }
+        }
+        /// «Нужен препарат» on «Проверка»: the amount the dose comes to.
+        var neededWord: String {
+            switch self {
+            case .spray: "Нужен препарат"
+            case .fertilize: "Нужен тор"
+            case .seed: "Нужни семена"
+            }
+        }
+        /// The product field's name: a sowing's is its variety.
+        var productField: String { self == .seed ? "Сорт" : "Търговско наименование" }
+        /// The dose's: a sowing's is its seeding rate.
+        var doseWord: String { self == .seed ? "Сеитбена норма" : "Доза" }
+        /// Nothing typed for the product.
+        var productMissingText: String { self == .seed ? "Въведете сорта." : "Въведете препарат или тор." }
+
+        /// What a product of another kind is told, typed under this one:
+        /// where it belongs instead.
+        func wrongKindText(_ item: InputItem) -> String {
+            if item.isSeed { return "«\(item.name)» е семе. Запишете го като «Сеитба»." }
+            switch self {
+            case .seed: return "«\(item.name)» не е семе. Изберете сорт от каталога или въведете нов."
+            case .fertilize, .spray: return "«\(item.name)» не е тор. Запишете го като «Пръскане»."
+            }
+        }
     }
 
     var kind: Kind = .spray
@@ -106,7 +165,7 @@ struct TreatmentDraft: Equatable, Sendable {
         guard let catalogue else {
             return TypedProduct.cleaned(productText).isEmpty ? .empty : .new
         }
-        return TypedProduct.classify(productText, spraying: kind == .spray, catalogue: catalogue)
+        return TypedProduct.classify(productText, use: kind.use, catalogue: catalogue)
     }
 
     var dose: Decimal? { Self.decimal(doseText) }
@@ -196,9 +255,9 @@ struct TreatmentDraft: Equatable, Sendable {
         let typed = typed(in: catalogue)
         switch typed {
         case .empty:
-            found.append(.productMissing)
+            found.append(kind == .seed ? .product(kind.productMissingText) : .productMissing)
         case .wrongKind(let item):
-            found.append(.product("«\(item.name)» не е тор. Запишете го като «Пръскане»."))
+            found.append(.product(kind.wrongKindText(item)))
         case .sample(let item):
             found.append(.product("«\(item.name)» е образцов продукт. Въведете истинското търговско наименование."))
         case .new where TypedProduct.isTooLong(productText):

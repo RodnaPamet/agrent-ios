@@ -855,7 +855,7 @@ The form's note says that.
 - A harvest also asks for one total in kg, never split by parcel (owner).
 - It is posted to `POST …/journal/activities` under the same key, landing and replay rules as a treatment, and waits in the outbox the same way without signal.
 - The saved screen offers no ДНЕВНИК PDF: other work prints in the farm's diary (#436).
-- Not sowing. A sowing applies a seed product at a rate, so it isn't bare work (owner with backend 1, 2026-10-25), and the activities route takes only the three. It comes to «Нов запис» once the treatments route takes a seed product (asked).
+- **«Сеитба»** (agri-saas #2368, owner 2026-10-25) is a treatment kind, not bare work: a seed variety at a rate, posted to `POST /journal/treatments` with `kind: SEED`. Its product match takes only seed items, and a new name creates a seed. A spraying no longer takes a seed (the server refuses one). It has no pest, period, BBCH or technique. It is in neither БАБХ table, so it has no «Изтегли PDF» (the route answers `NOT_IN_BABH_REGISTER`) and prints only in the farm's diary. It is correctable like a treatment: the row's two gates are `isApplication` (correction, finishing: spraying, fertilising, sowing) and `isInBabhRegister` (the ДНЕВНИК page: spraying, fertilising).
 
 **Treated area per parcel** (#363, agri-saas #2086, live 2026-10-20): step
 two lists each chosen parcel's area under «Третирана площ, дка». An empty
