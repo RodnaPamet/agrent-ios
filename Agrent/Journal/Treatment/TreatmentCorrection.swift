@@ -19,7 +19,7 @@ enum TreatmentCorrection {
     /// Only an explicit `false` hides it. An absent flag is a page cached
     /// before the field existed, and the route checks again either way.
     nonisolated static func offered(_ entry: LogEntry, to me: CurrentUser?) -> Bool {
-        guard let treatment = entry.treatment, treatment.isTreatment,
+        guard let treatment = entry.treatment, treatment.isTreatment, treatment.isChemicalTreatment,
               treatment.treatmentGroupId != nil,
               let me, me.mayWrite else { return false }
         return treatment.mayCorrect ?? true
