@@ -176,8 +176,13 @@ final class OutboxStore {
                                                           tenant: item.tenant),
                          seenVersion: mark.seenVersion)
         case .treatment(let treatment):
-            return .treatment(path: TreatmentAPI.recordPath(tenant: item.tenant), handle: item.id,
-                              parcels: treatment.parcelCount)
+            // Other work to its own route (#439), by the kind it was kept
+            // under; a treatment, and a row kept before #439, to the
+            // treatments route.
+            let path = ActivityKind(rawValue: treatment.kind) != nil
+                ? ActivityAPI.recordPath(tenant: item.tenant)
+                : TreatmentAPI.recordPath(tenant: item.tenant)
+            return .treatment(path: path, handle: item.id, parcels: treatment.parcelCount)
         case nil:
             return nil
         }

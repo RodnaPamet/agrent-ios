@@ -109,6 +109,11 @@ struct TreatmentMapView: View {
 extension TreatmentMapView {
     /// «Третирани парцели» or «Наторени парцели», the ДНЕВНИК's own words for
     /// what was done to them.
+    /// Other work treats nothing, so its parcels are just «Парцели» (#439).
+    nonisolated static func title(for record: TreatmentRecord) -> String {
+        record.activity == nil ? title(for: record.kind) : "Парцели"
+    }
+
     nonisolated static func title(for kind: TreatmentDraft.Kind?) -> String {
         kind == .fertilize ? "Наторени парцели" : "Третирани парцели"
     }

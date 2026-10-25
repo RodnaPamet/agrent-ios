@@ -39,13 +39,34 @@ struct TreatmentRecord: Hashable, Sendable {
     /// re-measured later (owner, 2026-10-25). A parcel with no recorded area
     /// isn't here and goes out as the whole parcel.
     let parcelAreas: [String: Double]
+    /// Other work instead of a treatment (#439). The product and dose above
+    /// then carry nothing: `productName` is the work's label, for the rows
+    /// that show a record by its product, and nothing sends them
+    /// (`ActivityAPI.Body`).
+    let activity: ActivityKind?
+    /// A harvest's quantity in kg, one total.
+    let harvestKg: Decimal?
 
     /// nil while the draft has a problem or no parcel is chosen.
     static func make(_ draft: TreatmentDraft, catalogue: [InputItem]?,
                      fields: [TreatmentPlace.Field], now: Date = Date()) -> TreatmentRecord? {
         guard draft.problems(catalogue: catalogue, now: now).isEmpty, !fields.isEmpty,
-              TreatmentDraft.treatedProblem(draft.treatedText, for: fields) == nil,
-              let dose = draft.dose, let unit = draft.doseUnit else { return nil }
+              TreatmentDraft.treatedProblem(draft.treatedText, for: fields) == nil else { return nil }
+        let treated = TreatmentDraft.treatedAreas(draft.treatedText, for: fields).mapValues(\.wireHectares)
+        // Over zero only: the server's bound is `positive()`, so a parcel
+        // recorded with area 0 goes out as the whole parcel, as one with no
+        // area does, rather than as a 0 it refuses.
+        let own = Dictionary(fields.compactMap { field in
+            field.parcel.areaHa.flatMap { $0 > 0 ? (field.id, $0) : nil }
+        }, uniquingKeysWith: { first, _ in first })
+        if let activity = draft.activity {
+            return TreatmentRecord(
+                kind: draft.kind, date: draft.date, productName: activity.label, newProduct: nil,
+                quarantineDays: nil, pest: nil, dose: 0, doseUnitID: "", technique: nil, phenophase: nil,
+                parcelIDs: fields.map(\.id), treatedAreas: treated, parcelAreas: own,
+                activity: activity, harvestKg: activity == .harvest ? draft.harvestKg : nil)
+        }
+        guard let dose = draft.dose, let unit = draft.doseUnit else { return nil }
         let typed = draft.typed(in: catalogue)
         let name: String
         switch typed {
@@ -69,9 +90,10 @@ struct TreatmentRecord: Hashable, Sendable {
             technique: spraying ? draft.technique : nil,
             phenophase: spraying ? draft.phenophase : nil,
             parcelIDs: fields.map(\.id),
-            treatedAreas: TreatmentDraft.treatedAreas(draft.treatedText, for: fields).mapValues(\.wireHectares),
-            parcelAreas: Dictionary(fields.compactMap { field in field.parcel.areaHa.map { (field.id, $0) } },
-                                    uniquingKeysWith: { first, _ in first })
+            treatedAreas: treated,
+            parcelAreas: own,
+            activity: nil,
+            harvestKg: nil
         )
     }
 }

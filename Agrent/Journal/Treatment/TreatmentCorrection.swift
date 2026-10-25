@@ -408,7 +408,8 @@ enum TreatmentCorrection {
                  // «Ново мероприятие» (owner, 2026-10-25); null only where
                  // the parcel's area isn't known.
                  parcels: chosenParcels.map { Body.ParcelArea(parcelId: $0.id,
-                                                              treatedAreaHa: sentArea($0.id)?.wireHectares ?? $0.areaHa) })
+                                                              treatedAreaHa: sentArea($0.id)?.wireHectares
+                                                                  ?? $0.areaHa.flatMap { $0 > 0 ? $0 : nil }) })
         }
 
         enum Problem: Equatable, Sendable {

@@ -106,7 +106,8 @@ struct JournalDetailView: View {
                     // Which parcels, and where (#399, owner 2026-10-22): the
                     // row above says only how many.
                     Button {
-                        pushRoute(.treatmentMap(handle: handle, title: TreatmentMapView.title(for: treatment.treatmentKind)))
+                        pushRoute(.treatmentMap(handle: handle, title: treatment.isChemicalTreatment
+                            ? TreatmentMapView.title(for: treatment.treatmentKind) : "Парцели"))
                     } label: {
                         Label(TreatmentMapView.buttonTitle, systemImage: "map").frame(maxWidth: .infinity)
                     }

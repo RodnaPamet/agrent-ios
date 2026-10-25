@@ -849,7 +849,13 @@ treatment, as the owner ruled (agri-saas #1740 Q2):
 
 The form's note says that.
 
-**Other work on the journal row** (agri-saas #2339, owner 2026-10-25): pruning, cultivation, sowing and harvest are lines on parcels like a treatment, and share the journal row. The phone keeps a treatment's own controls off them: «Коригирай», «Изтегли PDF» and the unfinished section. Only a row whose `kind` is a spraying or a fertilising gets those, or one with no kind, which is from before the field. The correction route refuses a bare activity (`NOT_A_TREATMENT`). «Изтрий» is offered on them, on the same `mayDelete`: the treatment withdrawal removes a bare activity too (backend 1's test, 2026-10-25). Recording such work on the phone is #439.
+**Other work on the journal row** (agri-saas #2339, owner 2026-10-25): pruning, cultivation, sowing and harvest are lines on parcels like a treatment, and share the journal row. The phone keeps a treatment's own controls off them: «Коригирай», «Изтегли PDF» and the unfinished section. Only a row whose `kind` is a spraying or a fertilising gets those, or one with no kind, which is from before the field. The correction route refuses a bare activity (`NOT_A_TREATMENT`). «Изтрий» is offered on them, on the same `mayDelete`: the treatment withdrawal removes a bare activity too (backend 1's test, 2026-10-25). **Recording it on the phone (#439, owner 2026-10-25):**
+- «Нов запис»'s «Вид» is a menu of «Пръскане», «Торене», «Резитба», «Обработка на почвата» and «Прибиране на реколтата», with the server's labels (`ACTIVITY_LABELS_BG`) word for word.
+- Other work asks only for its one day (no range, owner), then the same parcel step and «Проверка», with the area as «Площ».
+- A harvest also asks for one total in kg, never split by parcel (owner).
+- It is posted to `POST …/journal/activities` under the same key, landing and replay rules as a treatment, and waits in the outbox the same way without signal.
+- The saved screen offers no ДНЕВНИК PDF: other work prints in the farm's diary (#436).
+- Not sowing. A sowing applies a seed product at a rate, so it isn't bare work (owner with backend 1, 2026-10-25), and the activities route takes only the three. It comes to «Нов запис» once the treatments route takes a seed product (asked).
 
 **Treated area per parcel** (#363, agri-saas #2086, live 2026-10-20): step
 two lists each chosen parcel's area under «Третирана площ, дка». An empty

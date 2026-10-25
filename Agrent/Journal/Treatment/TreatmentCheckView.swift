@@ -38,7 +38,18 @@ struct TreatmentCheckView: View {
         return fields.map(\.blockName).filter { seen.insert($0).inserted }
     }
 
-    private var areaWord: String { record.kind == .spray ? "Третирана площ" : "Наторена площ" }
+    private var areaWord: String { Self.areaWord(record) }
+
+    /// «Площ» on other work, which treats nothing (#439).
+    nonisolated static func areaWord(_ record: TreatmentRecord) -> String {
+        if record.activity != nil { return "Площ" }
+        return record.kind == .spray ? "Третирана площ" : "Наторена площ"
+    }
+
+    /// «1 250 кг», the harvest as typed.
+    nonisolated static func kgText(_ kg: Decimal) -> String {
+        "\(kg.formatted(.number.precision(.fractionLength(0...2)).grouping(.automatic).locale(BgDate.locale))) кг"
+    }
 
     private var dose: String {
         let number = Num.text(NSDecimalNumber(decimal: record.dose).doubleValue)
@@ -54,13 +65,18 @@ struct TreatmentCheckView: View {
     var body: some View {
         PageForm {
             Section {
-                ValueRow("Вид") { Text(record.kind.label) }
+                ValueRow("Вид") { Text(record.activity?.label ?? record.kind.label) }
                 ValueRow("Дата") { Text(BgDate.full(record.date)) }
-                ValueRow(record.kind.inputLabel) { Text(record.productName) }
-                if let pest = record.pest { ValueRow("Вредител") { Text(pest) } }
-                ValueRow("Доза") { Text(dose).accessibilityLabel(doseSpoken) }
-                if let stage = record.phenophase { ValueRow("Фенофаза/BBCH") { Text(stage) } }
-                if let technique = record.technique { ValueRow("Техника") { Text(technique.label) } }
+                if record.activity == nil {
+                    ValueRow(record.kind.inputLabel) { Text(record.productName) }
+                    if let pest = record.pest { ValueRow("Вредител") { Text(pest) } }
+                    ValueRow("Доза") { Text(dose).accessibilityLabel(doseSpoken) }
+                    if let stage = record.phenophase { ValueRow("Фенофаза/BBCH") { Text(stage) } }
+                    if let technique = record.technique { ValueRow("Техника") { Text(technique.label) } }
+                }
+                if let kg = record.harvestKg {
+                    ValueRow("Прибрано") { Text(Self.kgText(kg)) }
+                }
             }
             Section {
                 if let cropLabel { ValueRow("Култура") { Text(cropLabel) } }
@@ -69,7 +85,12 @@ struct TreatmentCheckView: View {
                 ValueRow(areaWord) { Text(total.area.text).accessibilityLabel(total.area.spoken) }
             } header: {
                 SectionHeader("Къде")
+            } footer: {
+                // Other work has no «Изчислено» to carry the note (#439).
+                SectionFooter(record.activity == nil ? "" : Self.withoutAreaNote(total.withoutArea))
             }
+            // The amount of product and the end of the period: a treatment's.
+            if record.activity == nil {
             Section {
                 if let amount {
                     ValueRow(record.kind == .spray ? "Нужен препарат" : "Нужен тор") {
@@ -90,6 +111,7 @@ struct TreatmentCheckView: View {
                 SectionHeader("Изчислено")
             } footer: {
                 SectionFooter(Self.withoutAreaNote(total.withoutArea))
+            }
             }
             if let failure {
                 Section {
