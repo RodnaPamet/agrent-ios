@@ -239,8 +239,11 @@ final class PendingOperationTests: XCTestCase {
         let builder = try? NSRegularExpression(pattern: #"\b[A-Z]\w*API\.\w+Path\b"#)
         let named = Set((builder?.matches(in: code, range: NSRange(code.startIndex..., in: code)) ?? [])
             .compactMap { Range($0.range, in: code).map { String(code[$0]) } })
+        // `ActivityAPI.recordPath`: other work recorded from «Нов запис»
+        // (#439) waits for signal as a treatment does, the owner's rule for
+        // field work (#324).
         XCTAssertEqual(named, ["LocationsAPI.operationsPath", "FieldOperationAPI.linePath",
-                               "TreatmentAPI.recordPath"],
+                               "TreatmentAPI.recordPath", "ActivityAPI.recordPath"],
                        "the outbox can replay a write nobody argued for here")
 
         for forbidden in ["listingsPath", "inquiriesPath", "createListing"] {

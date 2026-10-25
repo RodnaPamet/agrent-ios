@@ -17,7 +17,12 @@ struct QueuedTreatmentRow: View {
     let item: PendingOperation
     let treatment: PendingOperation.QueuedTreatment
 
-    private var kind: String { treatment.treatmentKind?.label ?? treatment.kind }
+    /// The treatment's kind under its product. Nil for other work (#439),
+    /// whose headline is its kind already.
+    private var kind: String? {
+        if ActivityKind(rawValue: treatment.kind) != nil { return nil }
+        return treatment.treatmentKind?.label ?? treatment.kind
+    }
     private var parcels: String { Plural.bg(treatment.parcelCount, "парцел", "парцела") }
     private var blocks: String? {
         treatment.blockNames.isEmpty ? nil : treatment.blockNames.joined(separator: ", ")
@@ -49,8 +54,10 @@ struct QueuedTreatmentRow: View {
                 .foregroundStyle(.primary)
             VStack(alignment: .leading, spacing: 2) {
                 MetaRow {
-                    Text(kind)
-                    MetaSeparator()
+                    if let kind {
+                        Text(kind)
+                        MetaSeparator()
+                    }
                     Text(parcels)
                     if let area = treatment.area {
                         MetaSeparator()

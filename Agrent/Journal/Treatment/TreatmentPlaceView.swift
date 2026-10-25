@@ -18,6 +18,8 @@ import SwiftUI
 struct TreatmentPlaceView: View {
     let store: TreatmentPlaceStore
     let kind: TreatmentDraft.Kind
+    /// Other work (#439): its area is plain «Площ», as it treats nothing.
+    var activity: ActivityKind? = nil
     @Binding var cropKey: String?
     @Binding var chosen: Set<String>
     /// The treated area typed per chosen parcel, in decares (#363).
@@ -42,7 +44,10 @@ struct TreatmentPlaceView: View {
         TreatmentPlace.total(chosenFields,
                              treated: TreatmentDraft.treatedAreas(treatedText, for: chosenFields).mapValues(\.wireHectares))
     }
-    private var areaWord: String { kind == .spray ? "Третирана площ" : "Наторена площ" }
+    private var areaWord: String {
+        if activity != nil { return "Площ" }
+        return kind == .spray ? "Третирана площ" : "Наторена площ"
+    }
 
     /// Above the list, never at the cost of it: the map grows with the text
     /// only to a cap, and at the accessibility sizes it is small — the list,

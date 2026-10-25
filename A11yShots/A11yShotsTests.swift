@@ -121,7 +121,7 @@ final class A11yShotsTests: XCTestCase {
             case "01e-journal-treatment", "01g-treatment-correction", "01i-treatment-trail",
                  "01j-treatment-correction-areas":
                 captureJournalTreatment(app)
-            case "17-new-entry": captureNewEntryForm(app)
+            case "17-new-entry", "17b-new-activity": captureNewEntryForm(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "19c-public-profile": capturePublicProfile(app)
             case "18-operation-typed-product":
@@ -1188,9 +1188,46 @@ final class A11yShotsTests: XCTestCase {
         // are below the fold and a lazy form has not built its rows yet.
         Thread.sleep(forTimeInterval: 2)
         capture("17-new-entry", app: app)
+        captureNewActivity(app)
         cancel.tap()
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 10),
                       "«Отказ» did not close «Нов запис»")
+    }
+
+    /// The same form with «Резитба» chosen (#439): no product, dose or period,
+    /// then the one crop's parcels and «Проверка». Left from «Проверка» by
+    /// «Отказ»: «Добави» writes a farm's register, and the seam refuses it.
+    /// Ends on the form's «Отказ», which the caller taps.
+    private func captureNewActivity(_ app: XCUIApplication) {
+        let kind = app.buttons["Вид"]
+        XCTAssertTrue(kind.waitForExistence(timeout: 5), "no «Вид» on «Нов запис»")
+        kind.tap()
+        let prune = app.buttons["Резитба"]
+        XCTAssertTrue(prune.waitForExistence(timeout: 5), "no «Резитба» in «Вид»")
+        prune.tap()
+        XCTAssertFalse(app.textFields["Търговско наименование"].exists, "a product field on other work")
+        Thread.sleep(forTimeInterval: 1)
+        capture("17b-new-activity", app: app)
+
+        let next = app.buttons["Напред"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5), "no «Напред»")
+        XCTAssertTrue(next.isEnabled, "«Напред» dimmed on a pruning with its day")
+        next.tap()
+        let all = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Избери всички'")).firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 15), "no parcels on «Къде»")
+        all.tap()
+        let proceed = app.buttons["Продължи"]
+        XCTAssertTrue(proceed.waitForExistence(timeout: 5), "no «Продължи»")
+        proceed.tap()
+        let add = app.buttons["Добави"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10), "no «Проверка» for the pruning")
+        Thread.sleep(forTimeInterval: 1)
+        capture("17c-new-activity-check", app: app)
+        // Back to the form by the way back, not «Отказ», which would close
+        // the sheet under the caller.
+        app.buttons["BackButton"].firstMatch.tap()
+        app.buttons["BackButton"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Вид"].waitForExistence(timeout: 5), "not back on the form")
     }
 
     /// The listing detail with «Съобщение до продавача» on it — photographed,
@@ -1827,8 +1864,13 @@ final class A11yShotsTests: XCTestCase {
         print("A11Y-TIMING \(name): «Нов запис» after \(Int(Date().timeIntervalSince(launched)))s")
         open.tap()
 
+        // «Вид» is a menu since #439 (five kinds), named by its title as the
+        // unit's is.
+        let kind = app.buttons["Вид"]
+        XCTAssertTrue(kind.waitForExistence(timeout: 10), "no «Вид» on step one\n\(app.debugDescription)")
+        kind.tap()
         let fertilise = app.buttons["Торене"]
-        XCTAssertTrue(fertilise.waitForExistence(timeout: 10), "no «Торене» on step one")
+        XCTAssertTrue(fertilise.waitForExistence(timeout: 5), "no «Торене» in «Вид»")
         fertilise.tap()
 
         let product = app.textFields["Търговско наименование"]

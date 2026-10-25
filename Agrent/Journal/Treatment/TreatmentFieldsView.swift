@@ -28,74 +28,93 @@ struct TreatmentFieldsView: View {
     var body: some View {
         PageForm {
             Section {
-                Picker("Вид", selection: $draft.kind) {
-                    ForEach(TreatmentDraft.Kind.allCases) { Text($0.label).tag($0) }
+                // A menu, not segments: five kinds don't fit one row in
+                // Bulgarian. Spraying and fertilising first, then other work
+                // (#439), which records no product or dose.
+                MenuPicker("Вид", selection: $draft.entryKind, value: draft.entryKind.label) {
+                    ForEach(EntryKind.all) { Text($0.label).tag($0) }
                 }
-                .pickerStyle(.segmented)
                 DatePicker("Дата", selection: $draft.date, in: ...Date(), displayedComponents: .date)
                     .tint(Palette.DatePill.tint)
             }
 
-            productSection
+            // A treatment's own fields; other work has none of them (#439).
+            if draft.activity == nil {
+                productSection
 
-            if draft.kind == .spray {
-                Section(titled: "Вредител") {
-                    TextField("Вредител", text: $draft.pestText,
-                              prompt: .fieldPrompt(Self.pestExample), axis: .vertical)
-                        .promptRoom(Self.pestExample)
+                if draft.kind == .spray {
+                    Section(titled: "Вредител") {
+                        TextField("Вредител", text: $draft.pestText,
+                                  prompt: .fieldPrompt(Self.pestExample), axis: .vertical)
+                            .promptRoom(Self.pestExample)
+                    }
                 }
-            }
 
-            Section(titled: "Доза") {
-                FieldRow("Количество") {
-                    TextField("0", text: $draft.doseText, prompt: .fieldPrompt("0"))
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                }
-                MenuPicker("Мерна единица", selection: $draft.doseUnit, value: draft.doseUnit?.symbol ?? "—") {
-                    Text("—").tag(Unit?.none)
-                    ForEach(units) { Text($0.symbol).tag(Unit?.some($0)) }
-                }
-            }
-
-            // PRZ's place for it: after the dose, before the period (#363).
-            if draft.kind == .spray {
-                Section {
-                    TextField("Фенофаза/BBCH", text: $draft.phenophaseText,
-                              prompt: .fieldPrompt(Self.phenophaseExample))
-                        .accessibilityInputLabels(A11y.spokenNames("Фенофаза", "BBCH", "Growth stage"))
-                } header: {
-                    SectionHeader("Фенофаза/BBCH")
-                } footer: {
-                    SectionFooter(Self.phenophaseNote)
-                }
-            }
-
-            if draft.kind == .spray {
-                Section {
-                    // The unit in the prompt, not the title, as on the parcel
-                    // sheet: «Карантинен срок, дни» was cut at the default size.
-                    FieldRow("Карантинен срок", spoken: "Карантинен срок в дни") {
-                        TextField("дни", text: $draft.quarantineText, prompt: .fieldPrompt("дни"))
-                            .keyboardType(.numberPad)
+                Section(titled: "Доза") {
+                    FieldRow("Количество") {
+                        TextField("0", text: $draft.doseText, prompt: .fieldPrompt("0"))
+                            .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
-                    ValueRow("Най-ранна дата за прибиране") {
-                        Text(draft.earliestHarvest.map(BgDate.full) ?? "—")
-                            .accessibilityLabel(draft.earliestHarvest.map(BgDate.full) ?? "не е изчислена")
+                    MenuPicker("Мерна единица", selection: $draft.doseUnit, value: draft.doseUnit?.symbol ?? "—") {
+                        Text("—").tag(Unit?.none)
+                        ForEach(units) { Text($0.symbol).tag(Unit?.some($0)) }
                     }
-                } header: {
-                    SectionHeader("Карантинен срок")
-                } footer: {
-                    SectionFooter(Self.harvestNote)
                 }
 
-                Section {
-                    MenuPicker("Техника", selection: $draft.technique, value: draft.technique.label) {
-                        ForEach(ApplicationTechnique.allCases) { Text($0.label).tag($0) }
+                // PRZ's place for it: after the dose, before the period (#363).
+                if draft.kind == .spray {
+                    Section {
+                        TextField("Фенофаза/BBCH", text: $draft.phenophaseText,
+                                  prompt: .fieldPrompt(Self.phenophaseExample))
+                            .accessibilityInputLabels(A11y.spokenNames("Фенофаза", "BBCH", "Growth stage"))
+                    } header: {
+                        SectionHeader("Фенофаза/BBCH")
+                    } footer: {
+                        SectionFooter(Self.phenophaseNote)
                     }
+                }
+
+                if draft.kind == .spray {
+                    Section {
+                        // The unit in the prompt, not the title, as on the parcel
+                        // sheet: «Карантинен срок, дни» was cut at the default size.
+                        FieldRow("Карантинен срок", spoken: "Карантинен срок в дни") {
+                            TextField("дни", text: $draft.quarantineText, prompt: .fieldPrompt("дни"))
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        ValueRow("Най-ранна дата за прибиране") {
+                            Text(draft.earliestHarvest.map(BgDate.full) ?? "—")
+                                .accessibilityLabel(draft.earliestHarvest.map(BgDate.full) ?? "не е изчислена")
+                        }
+                    } header: {
+                        SectionHeader("Карантинен срок")
+                    } footer: {
+                        SectionFooter(Self.harvestNote)
+                    }
+
+                    Section {
+                        MenuPicker("Техника", selection: $draft.technique, value: draft.technique.label) {
+                            ForEach(ApplicationTechnique.allCases) { Text($0.label).tag($0) }
+                        }
+                    } footer: {
+                        SectionFooter("Техниката се записва в ДНЕВНИКА така, както е избрана.")
+                    }
+                }
+            }
+
+            if draft.activity == .harvest {
+                Section {
+                    FieldRow("Количество", spoken: "Прибрано количество в килограми") {
+                        TextField("кг", text: $draft.harvestText, prompt: .fieldPrompt("кг"))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                } header: {
+                    SectionHeader("Прибрано, кг")
                 } footer: {
-                    SectionFooter("Техниката се записва в ДНЕВНИКА така, както е избрана.")
+                    SectionFooter(Self.harvestKgNote)
                 }
             }
 
@@ -189,6 +208,8 @@ struct TreatmentFieldsView: View {
         + "на ред, отбелязан като изведен от мероприятието."
     static let harvestNote =
         "Най-ранната дата за прибиране е датата на третирането плюс карантинния срок."
+    /// One total for the harvest, never split by parcel (owner, 2026-10-25).
+    static let harvestKgNote = "Общото прибрано количество от всички избрани парцели."
     private static let areaNote =
         "На следващата стъпка изберете културата и парцелите. Площта се изчислява от тях."
 }

@@ -69,6 +69,7 @@
 /api/t/{tenantSlug}/insurance/products
 /api/t/{tenantSlug}/items
 /api/t/{tenantSlug}/journal
+/api/t/{tenantSlug}/journal/activities
 /api/t/{tenantSlug}/journal/treatments
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/corrections

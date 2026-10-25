@@ -348,7 +348,7 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
         reason: String?,
         at now: Date = Date()
     ) -> PendingOperation {
-        let kind = treatment.treatmentKind?.label ?? treatment.kind
+        let kind = treatment.treatmentKind?.label ?? ActivityKind(rawValue: treatment.kind)?.label ?? treatment.kind
         return PendingOperation(
             id: handle, locationID: nil, ownerUserID: ownerUserID, tenantSlug: farm,
             parcelSummary: "\(treatment.productName) · \(kind) · "

@@ -183,12 +183,15 @@ enum TreatmentAPI {
     /// is the key it went out under (`FieldOperationAPI.landed`). A plain
     /// decoder for the reason given there.
     static func receipt(from data: Data, key: String) -> TreatmentReceipt {
+        // `parcelCount` on the treatments route, `lines` on the activities
+        // route (#439): the parcels recorded, by either name.
         struct Wire: Decodable {
             let treatmentGroupId: String?
             let parcelCount: Int?
+            let lines: Int?
         }
         let wire = try? JSONDecoder().decode(Wire.self, from: data)
-        return TreatmentReceipt(handle: wire?.treatmentGroupId ?? key, parcelCount: wire?.parcelCount)
+        return TreatmentReceipt(handle: wire?.treatmentGroupId ?? key, parcelCount: wire?.parcelCount ?? wire?.lines)
     }
 
     /// What the server holds under a handle.
@@ -298,8 +301,13 @@ struct TreatmentProgress: Decodable, Equatable, Sendable {
 
 /// The recorder «Нов запис» opens with: the server, through `TreatmentAPI`.
 struct LiveTreatmentRecorder: TreatmentRecorder {
+    /// Other work goes to its own route (#439); everything else about the
+    /// save is a treatment's: the key, the landing check, the outbox.
     func record(_ record: TreatmentRecord, idempotencyKey: String) async throws -> TreatmentReceipt {
-        try await TreatmentAPI.record(record, idempotencyKey: idempotencyKey)
+        if record.activity != nil {
+            return try await ActivityAPI.record(record, idempotencyKey: idempotencyKey)
+        }
+        return try await TreatmentAPI.record(record, idempotencyKey: idempotencyKey)
     }
 
     func landing(of handle: String) async throws -> TreatmentLanding {
@@ -347,7 +355,7 @@ struct LiveTreatmentRecorder: TreatmentRecorder {
     @MainActor
     func keep(_ entry: TreatmentAttempt.Sent, after error: Error) async -> Bool {
         guard let farm = FarmPath.openSlug, let owner = SessionIdentity.shared.userID,
-              let body = try? await APIClient.shared.encodeBody(TreatmentAPI.Body(entry.record))
+              let body = try? await Self.encoded(entry.record)
         else { return false }
         let outbox = OutboxStore.shared
         outbox.pause.absorb(error)
@@ -358,12 +366,22 @@ struct LiveTreatmentRecorder: TreatmentRecorder {
         }
         let row = PendingOperation.treatment(
             handle: entry.key,
-            .init(kind: entry.record.kind.rawValue, productName: entry.record.productName,
+            // The work's own kind for other work: the outbox sends it to its
+            // route by that (`OutboxStore.replay`).
+            .init(kind: entry.record.activity?.rawValue ?? entry.record.kind.rawValue,
+                  productName: entry.record.productName,
                   occurredOn: BgDate.isoDay(entry.record.date), parcelCount: entry.record.parcelIDs.count,
                   areaHa: total.withoutArea < total.parcels ? total.area.wireHectares : nil,
                   blockNames: blocks),
             ownerUserID: owner, farm: farm, payload: body, reason: UserMessage.text(for: error))
         await outbox.enqueue(row)
         return await PendingOperations.shared.row(entry.key) != nil
+    }
+
+    /// The bytes a live send would have produced: the activities route's
+    /// body for other work, the treatments route's for a treatment.
+    private static func encoded(_ record: TreatmentRecord) async throws -> Data {
+        if let activity = ActivityAPI.Body(record) { return try await APIClient.shared.encodeBody(activity) }
+        return try await APIClient.shared.encodeBody(TreatmentAPI.Body(record))
     }
 }

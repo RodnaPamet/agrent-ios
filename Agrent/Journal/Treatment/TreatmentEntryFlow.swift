@@ -47,7 +47,7 @@ struct TreatmentEntryFlow: View {
     /// path itself it can't be missing.
     /// `.map` is the saved screen's «Виж на картата» (#399): the parcels it
     /// already holds, on a map.
-    enum Step: Hashable { case place, check(Checking), map([TreatmentPlace.Field], TreatmentDraft.Kind) }
+    enum Step: Hashable { case place, check(Checking), map([TreatmentPlace.Field], String) }
 
     struct Checking: Hashable {
         let record: TreatmentRecord
@@ -59,7 +59,7 @@ struct TreatmentEntryFlow: View {
             Group {
                 if let saved {
                     TreatmentSavedView(saved: saved, recorder: recorder,
-                                       onShowMap: { path.append(.map(saved.fields, saved.record.kind)) }) { dismiss() }
+                                       onShowMap: { path.append(.map(saved.fields, TreatmentMapView.title(for: saved.record))) }) { dismiss() }
                 } else {
                     TreatmentFieldsView(draft: $draft, reference: reference) {
                         path.append(.place)
@@ -76,13 +76,14 @@ struct TreatmentEntryFlow: View {
             .navigationDestination(for: Step.self) { step in
                 switch step {
                 case .place:
-                    TreatmentPlaceView(store: place, kind: draft.kind, cropKey: $cropKey, chosen: $chosen,
+                    TreatmentPlaceView(store: place, kind: draft.kind, activity: draft.activity,
+                                       cropKey: $cropKey, chosen: $chosen,
                                        treatedText: $draft.treatedText,
                                        failure: failure, retryCrops: { await loadPlace() }) { fields in
                         proceed(fields)
                     }
-                case .map(let fields, let kind):
-                    TreatmentMapView(fields: fields, title: TreatmentMapView.title(for: kind))
+                case .map(let fields, let title):
+                    TreatmentMapView(fields: fields, title: title)
                 case .check(let checking):
                     TreatmentCheckView(
                         record: checking.record, fields: checking.fields, cropLabel: cropLabel,

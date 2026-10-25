@@ -777,6 +777,15 @@ enum UserMessage {
         // are the route checking again.
         "TREATMENT_EDIT_NOT_PERMITTED":
             "Само човекът, който е записал това третиране, или администратор на стопанството може да го коригира.",
+        // Other work (#439, agri-saas `/journal/activities`), in the server's
+        // words. The phone sends no product with it, so the first is the
+        // route checking again; the second can meet a harvest.
+        "ACTIVITY_APPLIES_NO_INPUT":
+            "Това мероприятие не използва продукт или торов продукт. Запишете го като пръскане или торене, "
+            + "ако е приложен такъв.",
+        "HARVEST_NOT_RECORDED":
+            "Мероприятието не създаде запис в дневника, затова количеството не можа да се запише. "
+            + "Проверете дали е отбелязано като извършено.",
         // The parcel set (agri-saas #2304). The phone offers neither, so these
         // are the route checking again, or another client's refusal.
         "TREATMENT_CORRECTION_WOULD_EMPTY":

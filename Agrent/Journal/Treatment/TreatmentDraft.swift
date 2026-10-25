@@ -29,6 +29,12 @@ struct TreatmentDraft: Equatable, Sendable {
     }
 
     var kind: Kind = .spray
+    /// Other work instead of a treatment (#439): pruning, cultivation or a
+    /// harvest, with no product or dose. Nil for a treatment, which `kind`
+    /// then names.
+    var activity: ActivityKind?
+    /// A harvest's quantity in kg, one total (owner, 2026-10-25).
+    var harvestText = ""
     var date: Date
     /// The trade name, typed and matched against the farm's catalogue — see
     /// `TypedProduct`.
@@ -74,6 +80,7 @@ struct TreatmentDraft: Equatable, Sendable {
         case unitMissing
         case quarantineMissing
         case phenophaseTooLong
+        case harvestMissing
 
         var text: String {
             switch self {
@@ -87,6 +94,7 @@ struct TreatmentDraft: Equatable, Sendable {
             case .unitMissing: "Изберете мерна единица за дозата."
             case .quarantineMissing: "Въведете карантинния срок в дни."
             case .phenophaseTooLong: "Фенофазата е твърде дълга — до \(TreatmentDraft.phenophaseMaxLength) знака."
+            case .harvestMissing: "Въведете прибраното количество в килограми."
             }
         }
     }
@@ -102,6 +110,20 @@ struct TreatmentDraft: Equatable, Sendable {
     }
 
     var dose: Decimal? { Self.decimal(doseText) }
+
+    /// The harvest typed, over zero.
+    var harvestKg: Decimal? { Self.decimal(harvestText).flatMap { $0 > 0 ? $0 : nil } }
+
+    /// What «Вид» shows: the treatment's kind, or the work.
+    var entryKind: EntryKind {
+        get { activity.map(EntryKind.activity) ?? .treatment(kind) }
+        set {
+            switch newValue {
+            case .treatment(let kind): self.kind = kind; activity = nil
+            case .activity(let work): activity = work
+            }
+        }
+    }
 
     /// The treated area of each chosen parcel that ISN'T the whole parcel.
     ///
@@ -164,6 +186,12 @@ struct TreatmentDraft: Equatable, Sendable {
         if Calendar(identifier: .gregorian).startOfDay(for: date)
             > Calendar(identifier: .gregorian).startOfDay(for: now) {
             found.append(.futureDate)
+        }
+        // Other work asks only for its day, and a harvest for its quantity:
+        // no product, dose, pest or period to give (#439).
+        if let activity {
+            if activity == .harvest, harvestKg == nil { found.append(.harvestMissing) }
+            return found
         }
         let typed = typed(in: catalogue)
         switch typed {

@@ -94,11 +94,16 @@ struct TreatmentSavedView: View {
                 }
             }
             Section {
-                ValueRow("Вид") { Text(saved.record.kind.label) }
+                ValueRow("Вид") { Text(saved.record.activity?.label ?? saved.record.kind.label) }
                 ValueRow("Дата") { Text(BgDate.full(saved.record.date)) }
-                ValueRow(saved.record.kind.inputLabel) { Text(saved.record.productName) }
+                if saved.record.activity == nil {
+                    ValueRow(saved.record.kind.inputLabel) { Text(saved.record.productName) }
+                }
+                if let kg = saved.record.harvestKg {
+                    ValueRow("Прибрано") { Text(TreatmentCheckView.kgText(kg)) }
+                }
                 if let culture = saved.cropLabel { ValueRow("Култура") { Text(culture) } }
-                ValueRow(saved.record.kind == .spray ? "Третирана площ" : "Наторена площ") {
+                ValueRow(TreatmentCheckView.areaWord(saved.record)) {
                     Text(total.area.text).accessibilityLabel(total.area.spoken)
                 }
                 ValueRow("Парцели") { Text(String(total.parcels)) }
@@ -111,7 +116,11 @@ struct TreatmentSavedView: View {
             } footer: {
                 SectionFooter(withoutAreaNote)
             }
-            if saved.waiting != nil {
+            // The per-entry ДНЕВНИК is a treatment's: other work has no page
+            // of its own (#439), and prints in the farm's diary instead.
+            if saved.record.activity != nil {
+                EmptyView()
+            } else if saved.waiting != nil {
                 Section {
                     Text(Self.documentLaterNote)
                         .foregroundStyle(Palette.secondaryText)
@@ -155,10 +164,12 @@ struct TreatmentSavedView: View {
     @ViewBuilder
     private var headline: some View {
         if saved.waiting == nil {
-            Label("Мероприятието е записано.", systemImage: "checkmark.circle.fill")
+            Label(saved.record.activity == nil ? "Мероприятието е записано." : "Дейността е записана.",
+                  systemImage: "checkmark.circle.fill")
                 .foregroundStyle(Palette.success)
         } else {
-            Label("Мероприятието чака изпращане.", systemImage: "tray.and.arrow.up")
+            Label(saved.record.activity == nil ? "Мероприятието чака изпращане." : "Дейността чака изпращане.",
+                  systemImage: "tray.and.arrow.up")
         }
     }
 
