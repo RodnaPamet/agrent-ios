@@ -134,7 +134,8 @@ struct JournalDetailView: View {
                 }
                 if let handle = treatment?.treatmentGroupId?.recorded {
                     if let progress, !progress.complete {
-                        UnfinishedTreatmentSection(handle: handle, progress: $progress)
+                        UnfinishedTreatmentSection(handle: handle, progress: $progress,
+                                                   mayFinish: TreatmentCorrection.offered(entry, to: people.user))
                     }
                     TreatmentDocumentAction(handle: handle)
                 }

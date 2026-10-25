@@ -62,6 +62,13 @@ enum TreatmentAPI {
         let parcelIds: [String]
         let productName: String?
         let fertilizerName: String?
+        /// The farm's product or fertiliser BY ID, sent only to finish a
+        /// treatment already on the register (`init(resuming:)`), where the
+        /// definition names it by id. A new entry goes by name (#237).
+        let productItemId: String?
+        let fertilizerItemId: String?
+        /// The treatment's own title, kept when finishing one.
+        let title: String?
         /// Read by the server only when the name has to CREATE a plant
         /// protection product, and ignored on a match: an operation never
         /// rewrites a stored registration.
@@ -109,6 +116,9 @@ enum TreatmentAPI {
             parcelIds = record.parcelIDs
             productName = spraying ? record.productName : nil
             fertilizerName = spraying ? nil : record.productName
+            productItemId = nil
+            fertilizerItemId = nil
+            title = nil
             pppRegistrationNo = record.newProduct?.pppRegistrationNo
             quarantinePeriodDays = record.quarantineDays
             // An empty note is no note: the schema caps its length and
@@ -122,6 +132,40 @@ enum TreatmentAPI {
             // doesn't list there, or one listed twice.
             let areas = record.parcelIDs.compactMap { id in
                 (record.treatedAreas[id] ?? record.parcelAreas[id]).map { ParcelArea(parcelId: id, treatedAreaHa: $0) }
+            }
+            parcels = areas.isEmpty ? nil : areas
+        }
+
+        /// The treatment as the server holds it, sent again under its own
+        /// handle to finish it: «Довърши мероприятието» (owner, 2026-10-25).
+        ///
+        /// The record path finishes a treatment that isn't complete rather
+        /// than replaying it (agri-saas #2318): each block already written is
+        /// recognised by its derived key and left alone, and only the lines
+        /// still PENDING are marked. So the body must be the same treatment,
+        /// which `GET …/definition` gives, lines pending included. The product
+        /// goes by id, as the definition names it. Nil without a farm day,
+        /// which a definition has only once a line is marked.
+        init?(resuming definition: TreatmentDefinition) {
+            guard let day = definition.occurredOn else { return nil }
+            let spraying = definition.kind == TreatmentDraft.Kind.spray.rawValue
+            kind = definition.kind
+            occurredOn = day
+            parcelIds = definition.lines.map(\.parcelId)
+            productName = nil
+            fertilizerName = nil
+            productItemId = spraying ? definition.productItemId : nil
+            fertilizerItemId = spraying ? nil : definition.productItemId
+            title = definition.title?.recorded
+            pppRegistrationNo = nil
+            quarantinePeriodDays = definition.quarantinePeriodDays
+            targetNote = definition.targetNote?.recorded
+            doseValue = definition.doseValue
+            doseUnitId = definition.doseUnitId
+            applicationTechnique = definition.applicationTechnique?.recorded
+            phenophase = definition.phenophase?.recorded
+            let areas = definition.lines.compactMap { line in
+                line.treatedAreaHa.map { ParcelArea(parcelId: line.parcelId, treatedAreaHa: $0) }
             }
             parcels = areas.isEmpty ? nil : areas
         }

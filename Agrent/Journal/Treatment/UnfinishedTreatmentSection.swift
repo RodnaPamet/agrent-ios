@@ -31,10 +31,15 @@ struct UnfinishedTreatmentSection: View {
     let handle: String
     /// The entry's reading, and this section's after a refused abandon.
     @Binding var progress: TreatmentProgress?
+    /// Whether this person may finish it: the correction's rule
+    /// (`TreatmentCorrection.offered`), since finishing reads the same
+    /// write-gated definition (owner, 2026-10-25).
+    var mayFinish = false
     var recorder: TreatmentRecorder = LiveTreatmentRecorder()
 
     @State private var confirming = false
     @State private var abandoning = false
+    @State private var finishing = false
     @State private var failure: String?
     @State private var people = CurrentUserStore.shared
     @State private var outbox = OutboxStore.shared
@@ -58,6 +63,12 @@ struct UnfinishedTreatmentSection: View {
                 .font(.body)
                 .foregroundStyle(Palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
+
+            // Not while the phone itself is sending the rest: it is finishing
+            // it already, under the same handle.
+            if mayFinish, !resending {
+                finishButton
+            }
 
             if people.user?.mayAdmin ?? true {
                 abandonButton(progress)
@@ -124,7 +135,48 @@ struct UnfinishedTreatmentSection: View {
         return "\(counts) \(rest)"
     }
 
-    static let restNotSent = "Останалите не са записани."
+    static let restNotSent = PendingOperation.QueuedTreatment.restNotSent
+
+    /// The phone's own copy of it is in the outbox and not stuck.
+    private var resending: Bool {
+        guard let kept = outbox.pending.first(where: { $0.id == handle })?.treatment else { return false }
+        return kept.stalled != true
+    }
+
+    private var finishButton: some View {
+        Button {
+            Task { await finish() }
+        } label: {
+            if finishing {
+                ProgressView().frame(maxWidth: .infinity)
+                    .accessibilityLabel("Довършване")
+            } else {
+                Label(TreatmentFinish.title, systemImage: "checkmark.circle")
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(finishing || abandoning)
+        .accessibilityInputLabels(A11y.Spoken.finishTreatment)
+    }
+
+    /// Sends the treatment again under its handle, then reads how far the
+    /// server got: a finished one stops showing this section.
+    private func finish() async {
+        finishing = true
+        failure = nil
+        let outcome = await TreatmentFinish.run(handle)
+        progress = await Self.read(handle, with: recorder)
+        finishing = false
+        switch outcome {
+        case .finished:
+            JournalChanges.shared.changed()
+            AccessibilityNotification.Announcement(TreatmentFinish.finished).post()
+        case .failed(let text):
+            failure = text
+        }
+    }
 
     private func abandon() async {
         abandoning = true

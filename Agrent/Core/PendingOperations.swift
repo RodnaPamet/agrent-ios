@@ -279,6 +279,9 @@ struct PendingOperation: Codable, Identifiable, Equatable, Sendable {
 
         static let restResent = "Останалите се изпращат отново."
         static let restStuck = "Останалите не могат да бъдат записани."
+        /// Unfinished on the server and on its way from nowhere (#326,
+        /// agri-saas #2318): someone finishes it or ends it, on its screen.
+        static let restNotSent = "Останалите не са записани."
 
         /// The answer came back short: note what the server held, and
         /// whether that is more than last time.

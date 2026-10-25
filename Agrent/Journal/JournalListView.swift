@@ -389,6 +389,13 @@ struct JournalRow: View {
                     .font(.footnote)
                     .foregroundStyle(partial?.stalled == true ? Palette.warning : Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+            } else if let text = entry.treatment?.unfinishedText {
+                // Unfinished on the server and not on its way from this
+                // phone: someone has to finish it or end it, on its screen.
+                Label(text, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             AdaptiveRow { chip; dateAndStatus }
@@ -409,7 +416,7 @@ struct JournalRow: View {
             entry.type.label,
             entry.occurredAt.map(BgDate.full) ?? LogEntry.noDate,
             entry.status == .planned ? entry.status.label : nil,
-        ] + Self.spokenTreatment(entry.treatment) + [partial?.partialText]))
+        ] + Self.spokenTreatment(entry.treatment) + [partial?.partialText ?? entry.treatment?.unfinishedText]))
     }
 
     /// The treatment's facts in words — «декара», never the «дка» a screen
