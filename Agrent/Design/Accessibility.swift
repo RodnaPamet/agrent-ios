@@ -198,6 +198,8 @@ enum A11y {
         static let deleteTreatment = spokenNames("Изтрий", "Delete")
         /// The bar that follows it, for five seconds before it is sent.
         static let undo = spokenNames("Отмени", "Undo")
+        /// An unfinished treatment's «Довърши мероприятието» (owner, 2026-10-25).
+        static let finishTreatment = spokenNames("Довърши мероприятието", "Довърши", "Finish")
         /// A recorded treatment's «Коригирай» (#392).
         static let correctTreatment = spokenNames("Коригирай", "Корекция", "Correct")
         /// A correction met one someone else made first: load what is there.

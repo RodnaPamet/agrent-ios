@@ -211,6 +211,13 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// see `TreatmentCorrection.offered`. Nil from a server, or a cached
     /// page, older than it.
     var mayCorrect: Bool?
+    /// Lines still PENDING, and every line (agri-saas #2318). `parcelCount`
+    /// counts only the finished ones: a pending line has no journal entry
+    /// yet. A treatment is unfinished when `pendingCount > 0`, never when two
+    /// counts differ, since a manual entry has 0 of all three. 0 from a
+    /// server before them.
+    var pendingCount: Int = 0
+    var lineCount: Int = 0
 
     init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
          totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil,
@@ -252,10 +259,21 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         phenophase = (try? c?.decodeIfPresent(String.self, forKey: .phenophase)) ?? nil
         mayDelete = (try? c?.decodeIfPresent(Bool.self, forKey: .mayDelete)) ?? nil
         mayCorrect = (try? c?.decodeIfPresent(Bool.self, forKey: .mayCorrect)) ?? nil
+        pendingCount = (try? c?.decodeIfPresent(Int.self, forKey: .pendingCount)) ?? 0
+        lineCount = (try? c?.decodeIfPresent(Int.self, forKey: .lineCount)) ?? 0
     }
 
     /// A row that stands for parcels, rather than an entry folded to itself.
     var isTreatment: Bool { parcelCount > 0 }
+
+    /// «Записани 2 от 3 парцела. Останалите не са записани.» for a treatment
+    /// the server holds in part (agri-saas #2318), whoever recorded it and
+    /// from wherever. Nil when it is finished.
+    var unfinishedText: String? {
+        guard pendingCount > 0 else { return nil }
+        return "\(PendingOperation.QueuedTreatment.recordedText(parcelCount, of: lineCount)) "
+            + PendingOperation.QueuedTreatment.restNotSent
+    }
 
     /// The product, when this row is a treatment and names one.
     var foldedProduct: String? {

@@ -755,6 +755,8 @@ waits for the updated app, as a queued spray does. The owner chose this on
     ДНЕВНИК entries that go with it.
   - Everyone else is told only an administrator can.
   - The abandon also drops the phone's own copy, so nothing resends it.
+  - **«Довърши мероприятието»** (owner, 2026-10-25, asked interactively). It sits beside «Прекрати», for whoever may correct the treatment (`mayCorrect`), and isn't shown while this phone is still resending its own copy. It reads `GET …/definition` and sends it again to `POST …/journal/treatments` under the treatment's own handle. The server then finishes a treatment that isn't complete (agri-saas #2318): blocks already written are recognised and left alone, and only the lines still pending are marked.
+  - **The journal row** says «Записани 2 от 3 парцела. Останалите не са записани.» for any treatment the server holds in part (`pendingCount > 0`, agri-saas #2318), whoever recorded it. Before that, only this phone's own short saves said so. `parcelCount` counts only finished lines.
   - **Until #428 (2026-10-24) the entry's screen never asked.** The section read
     from a `.task` on a `Group` that held no view before the answer, so the
     read never ran and no build showed the warning or the button. That was

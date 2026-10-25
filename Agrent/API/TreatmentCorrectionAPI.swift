@@ -109,6 +109,8 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
     let kind: String
     /// `YYYY-MM-DD`, the farm day. Null only while no line is marked.
     let occurredOn: String?
+    /// The treatment's title, kept when it is finished (`Body(resuming:)`).
+    var title: String? = nil
     let applicationTechnique: String?
     let targetNote: String?
     /// The farm's product, by id: a correction changes it by id too
@@ -149,7 +151,7 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
 
 extension TreatmentDefinition {
     private enum CodingKeys: String, CodingKey {
-        case treatmentGroupId, version, kind, occurredOn, applicationTechnique, targetNote
+        case treatmentGroupId, version, kind, occurredOn, title, applicationTechnique, targetNote
         case productItemId, productName, pppRegistrationNo, doseValue, doseUnitId, doseUnitSymbol
         case waterRateValue, waterRateUnitSymbol
         case quarantinePeriodDays, phenophase, lines
@@ -162,6 +164,7 @@ extension TreatmentDefinition {
         version = try c.decode(Int.self, forKey: .version)
         kind = try c.decode(String.self, forKey: .kind)
         occurredOn = try c.decodeIfPresent(String.self, forKey: .occurredOn)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
         applicationTechnique = try c.decodeIfPresent(String.self, forKey: .applicationTechnique)
         targetNote = try c.decodeIfPresent(String.self, forKey: .targetNote)
         productItemId = try c.decode(String.self, forKey: .productItemId)
