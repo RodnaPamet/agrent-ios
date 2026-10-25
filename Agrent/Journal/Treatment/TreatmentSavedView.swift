@@ -118,7 +118,9 @@ struct TreatmentSavedView: View {
             }
             // The per-entry ДНЕВНИК is a treatment's: other work has no page
             // of its own (#439), and prints in the farm's diary instead.
-            if saved.record.activity != nil {
+            // A sowing has none either: it is in neither БАБХ table (owner,
+            // 2026-10-25), and the route refuses it (`NOT_IN_BABH_REGISTER`).
+            if saved.record.activity != nil || !saved.record.kind.isInBabhRegister {
                 EmptyView()
             } else if saved.waiting != nil {
                 Section {

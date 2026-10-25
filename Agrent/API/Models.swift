@@ -288,17 +288,21 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// Spraying or fertilising, when the row says which.
     var treatmentKind: TreatmentDraft.Kind? { kind.flatMap(TreatmentDraft.Kind.init(rawValue:)) }
 
-    /// A chemical treatment, a spraying or a fertilising, rather than other
-    /// work on parcels: pruning, cultivation, sowing or harvest, which share
-    /// the row (agri-saas #2339, owner 2026-10-25). The row's `kind` is the
-    /// task's own operation type. A row with no kind is from before the
-    /// field, when only treatments had parcels.
+    /// Something applied at a rate (a spraying, a fertilising or a sowing)
+    /// rather than bare work on parcels: pruning, cultivation or harvest,
+    /// which share the row (agri-saas #2339, owner 2026-10-25). The row's
+    /// `kind` is the task's own operation type. A row with no kind is from
+    /// before the field, when only treatments had parcels.
     ///
-    /// Only a treatment has a dose to correct or a ДНЕВНИК page of its own: a
-    /// bare activity is refused by the correction route (`NOT_A_TREATMENT`),
-    /// so those controls are kept off it. «Изтрий» isn't: the withdrawal
-    /// removes a bare activity the same way (agri-saas, 2026-10-25).
-    var isChemicalTreatment: Bool { kind == nil || treatmentKind != nil }
+    /// The treatment correction route takes these and refuses bare work
+    /// (`NOT_A_TREATMENT`), so «Коригирай» and «Довърши» follow this.
+    /// «Изтрий» doesn't: the withdrawal removes bare work the same way.
+    var isApplication: Bool { kind == nil || treatmentKind != nil }
+
+    /// In the БАБХ register, so with a ДНЕВНИК page of its own: a spraying
+    /// or a fertilising. Never a sowing (owner, 2026-10-25): the route
+    /// answers `NOT_IN_BABH_REGISTER`, and it prints only in the farm's diary.
+    var isInBabhRegister: Bool { kind == nil || treatmentKind?.isInBabhRegister == true }
 
     /// «1,5 л/дка». Nil without a dose, so the fact is left out rather than
     /// shown as a «0» nobody set a boom to. Up to the column's four places,

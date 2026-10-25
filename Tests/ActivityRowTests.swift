@@ -19,7 +19,7 @@ final class ActivityRowTests: XCTestCase {
     func testATreatmentKeepsItsControls() {
         for kind in ["SPRAY", "FERTILIZE", nil] {
             let row = entry(kind: kind)
-            XCTAssertTrue(row.treatment?.isChemicalTreatment == true, kind ?? "nil")
+            XCTAssertTrue(row.treatment?.isApplication == true, kind ?? "nil")
             XCTAssertTrue(TreatmentCorrection.offered(row, to: writer), kind ?? "nil")
             XCTAssertTrue(TreatmentRemoval.offered(row, to: writer), kind ?? "nil")
         }
@@ -29,12 +29,25 @@ final class ActivityRowTests: XCTestCase {
     /// offered, whatever the flags say. The withdrawal removes it like a
     /// treatment, so «Изтрий» is, on the same `mayDelete`.
     func testOtherWorkIsDeletedButNotCorrected() {
-        for kind in ["PRUNE", "CULTIVATE", "SEED", "HARVEST", "SOMETHING_NEW"] {
+        for kind in ["PRUNE", "CULTIVATE", "HARVEST", "SOMETHING_NEW"] {
             let row = entry(kind: kind, mayCorrect: true)
-            XCTAssertFalse(row.treatment?.isChemicalTreatment == true, kind)
+            XCTAssertFalse(row.treatment?.isApplication == true, kind)
             XCTAssertFalse(TreatmentCorrection.offered(row, to: writer), kind)
             XCTAssertTrue(TreatmentRemoval.offered(row, to: writer), kind)
         }
+    }
+
+    /// A sowing is an application with a seed (agri-saas #2368): correctable
+    /// like a treatment, but never in a БАБХ table, so no ДНЕВНИК page.
+    func testASowingIsCorrectedButHasNoBabhPage() throws {
+        let row = try XCTUnwrap(entry(kind: "SEED", mayCorrect: true).treatment)
+        XCTAssertTrue(row.isApplication)
+        XCTAssertFalse(row.isInBabhRegister)
+        XCTAssertTrue(TreatmentCorrection.offered(entry(kind: "SEED", mayCorrect: true), to: writer))
+        for kind in ["SPRAY", "FERTILIZE", nil] {
+            XCTAssertTrue(try XCTUnwrap(entry(kind: kind).treatment).isInBabhRegister, kind ?? "nil")
+        }
+        XCTAssertFalse(try XCTUnwrap(entry(kind: "PRUNE").treatment).isInBabhRegister)
     }
 
     func testTheAreaIsNamedForTheWork() throws {
@@ -45,5 +58,6 @@ final class ActivityRowTests: XCTestCase {
         XCTAssertEqual(try label("FERTILIZE"), "Наторена площ")
         XCTAssertEqual(try label(nil), "Третирана площ")
         XCTAssertEqual(try label("PRUNE"), "Площ")
+        XCTAssertEqual(try label("SEED"), "Засята площ")
     }
 }

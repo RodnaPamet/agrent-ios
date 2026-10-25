@@ -46,7 +46,7 @@ struct TreatmentPlaceView: View {
     }
     private var areaWord: String {
         if activity != nil { return "Площ" }
-        return kind == .spray ? "Третирана площ" : "Наторена площ"
+        return kind.areaWord
     }
 
     /// Above the list, never at the cost of it: the map grows with the text

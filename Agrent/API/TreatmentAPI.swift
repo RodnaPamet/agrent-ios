@@ -110,12 +110,15 @@ enum TreatmentAPI {
         }
 
         init(_ record: TreatmentRecord) {
-            let spraying = record.kind == .spray
             kind = record.kind.rawValue
             occurredOn = BgDate.isoDay(record.date)
             parcelIds = record.parcelIDs
-            productName = spraying ? record.productName : nil
-            fertilizerName = spraying ? nil : record.productName
+            // A fertiliser by its own field; a plant-protection product and a
+            // seed (agri-saas #2368) by `productName`, the kind telling them
+            // apart on the server.
+            let fertilising = record.kind == .fertilize
+            productName = fertilising ? nil : record.productName
+            fertilizerName = fertilising ? record.productName : nil
             productItemId = nil
             fertilizerItemId = nil
             title = nil
@@ -148,14 +151,14 @@ enum TreatmentAPI {
         /// which a definition has only once a line is marked.
         init?(resuming definition: TreatmentDefinition) {
             guard let day = definition.occurredOn else { return nil }
-            let spraying = definition.kind == TreatmentDraft.Kind.spray.rawValue
             kind = definition.kind
             occurredOn = day
             parcelIds = definition.lines.map(\.parcelId)
             productName = nil
             fertilizerName = nil
-            productItemId = spraying ? definition.productItemId : nil
-            fertilizerItemId = spraying ? nil : definition.productItemId
+            let fertilising = definition.kind == TreatmentDraft.Kind.fertilize.rawValue
+            productItemId = fertilising ? nil : definition.productItemId
+            fertilizerItemId = fertilising ? definition.productItemId : nil
             title = definition.title?.recorded
             pppRegistrationNo = nil
             quarantinePeriodDays = definition.quarantinePeriodDays

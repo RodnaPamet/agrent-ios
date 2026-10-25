@@ -20,7 +20,7 @@ struct TreatmentCorrectionForm: View {
     private var units: [Unit] { reference.units.value ?? [] }
 
     private var suggestions: [InputItem] {
-        TypedProduct.suggestions(for: draft.productText, spraying: draft.spraying,
+        TypedProduct.suggestions(for: draft.productText, use: draft.kind.use,
                                  in: reference.items.value ?? [])
     }
 
@@ -33,8 +33,8 @@ struct TreatmentCorrectionForm: View {
             }
 
             Section {
-                TextField("Търговско наименование", text: $draft.productText,
-                          prompt: .fieldPrompt("Търговско наименование"))
+                TextField(draft.kind.productField, text: $draft.productText,
+                          prompt: .fieldPrompt(draft.kind.productField))
                     .autocorrectionDisabled()
                 // The farm's own products the typed text is part of — a tap
                 // takes the stored name, as on «Ново мероприятие».
@@ -56,7 +56,7 @@ struct TreatmentCorrectionForm: View {
                 }
             }
 
-            Section(titled: "Доза") {
+            Section(titled: draft.kind.doseWord) {
                 FieldRow("Количество") {
                     TextField("0", text: $draft.doseText, prompt: .fieldPrompt("0"))
                         .keyboardType(.decimalPad)

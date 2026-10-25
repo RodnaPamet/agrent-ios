@@ -115,7 +115,11 @@ extension TreatmentMapView {
     }
 
     nonisolated static func title(for kind: TreatmentDraft.Kind?) -> String {
-        kind == .fertilize ? "Наторени парцели" : "Третирани парцели"
+        switch kind {
+        case .fertilize: "Наторени парцели"
+        case .seed: "Засети парцели"
+        case .spray, nil: "Третирани парцели"
+        }
     }
 
     /// The button that opens it, the same on the journal's entry and the

@@ -64,7 +64,31 @@ enum TypedProduct: Equatable, Sendable {
     /// The server's lookup skips archetypes (`isArchetype: false`), so a
     /// sample's exact name would not be FOUND — it would collide with the
     /// sample on create and come back 409. Caught here as `.sample` first.
+    /// Which of the farm's products a path takes.
+    ///
+    /// - `product`: any category but a seed. The server's rule is one-sided
+    ///   for fertilisers (above), and since agri-saas #2368 it refuses a seed
+    ///   on a spraying (`assertCategoryMatchesKind`).
+    /// - `fertilizer`: a fertiliser only.
+    /// - `seed`: a seed only, «Сеитба»'s, which the server refuses otherwise
+    ///   (`SEED_EXPECTED`). A new name there creates a seed, not a pesticide.
+    enum Use: Sendable {
+        case product, fertilizer, seed
+
+        func takes(_ item: InputItem) -> Bool {
+            switch self {
+            case .product: !item.isSeed
+            case .fertilizer: item.isFertilizer
+            case .seed: item.isSeed
+            }
+        }
+    }
+
     static func classify(_ typed: String, spraying: Bool, catalogue: [InputItem]) -> TypedProduct {
+        classify(typed, use: spraying ? .product : .fertilizer, catalogue: catalogue)
+    }
+
+    static func classify(_ typed: String, use: Use, catalogue: [InputItem]) -> TypedProduct {
         let name = cleaned(typed)
         guard !name.isEmpty else { return .empty }
         let key = name.lowercased()
@@ -73,7 +97,7 @@ enum TypedProduct: Equatable, Sendable {
         guard let match = named.first(where: { !$0.isArchetype }) else {
             return named.first.map(TypedProduct.sample) ?? .new
         }
-        return spraying || match.isFertilizer ? .existing(match) : .wrongKind(match)
+        return use.takes(match) ? .existing(match) : .wrongKind(match)
     }
 
     /// The farm's own products this path takes whose names contain what is
@@ -83,11 +107,16 @@ enum TypedProduct: Equatable, Sendable {
     /// text is short or already a product's name, and never a sample.
     static func suggestions(for typed: String, spraying: Bool, in catalogue: [InputItem],
                             limit: Int = 3) -> [InputItem] {
+        suggestions(for: typed, use: spraying ? .product : .fertilizer, in: catalogue, limit: limit)
+    }
+
+    static func suggestions(for typed: String, use: Use, in catalogue: [InputItem],
+                            limit: Int = 3) -> [InputItem] {
         let key = cleaned(typed).lowercased()
         guard key.count >= 2,
               !catalogue.contains(where: { $0.name.lowercased() == key }) else { return [] }
         let found = catalogue.filter {
-            !$0.isArchetype && (spraying || $0.isFertilizer) && $0.name.lowercased().contains(key)
+            !$0.isArchetype && use.takes($0) && $0.name.lowercased().contains(key)
         }
         return Array(found.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }.prefix(limit))
     }

@@ -30,7 +30,7 @@ final class ActivityEntryTests: XCTestCase {
     func testTheLabelsAreTheServers() {
         XCTAssertEqual(ActivityKind.allCases.map(\.label), ["Резитба", "Обработка на почвата", "Прибиране на реколтата"])
         XCTAssertEqual(EntryKind.all.map(\.label),
-                       ["Пръскане", "Торене", "Резитба", "Обработка на почвата", "Прибиране на реколтата"])
+                       ["Пръскане", "Торене", "Сеитба", "Резитба", "Обработка на почвата", "Прибиране на реколтата"])
     }
 
     /// Other work asks only for its day; a harvest for its quantity too.

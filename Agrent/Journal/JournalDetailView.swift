@@ -106,7 +106,7 @@ struct JournalDetailView: View {
                     // Which parcels, and where (#399, owner 2026-10-22): the
                     // row above says only how many.
                     Button {
-                        pushRoute(.treatmentMap(handle: handle, title: treatment.isChemicalTreatment
+                        pushRoute(.treatmentMap(handle: handle, title: treatment.isApplication
                             ? TreatmentMapView.title(for: treatment.treatmentKind) : "Парцели"))
                     } label: {
                         Label(TreatmentMapView.buttonTitle, systemImage: "map").frame(maxWidth: .infinity)
@@ -133,16 +133,19 @@ struct JournalDetailView: View {
                         }
                     }
                 }
-                // A treatment's own controls: finishing or ending it, and its
-                // ДНЕВНИК pages. Not on pruning, cultivation, sowing or harvest
-                // (`isChemicalTreatment`): they have no ДНЕВНИК page, and
-                // finishing one would post it through the treatments route.
-                if let treatment, treatment.isChemicalTreatment, let handle = treatment.treatmentGroupId?.recorded {
+                // An application's own controls: finishing or ending it
+                // (`isApplication`, which a sowing is too), and its ДНЕВНИК pages
+                // (`isInBabhRegister`, which a sowing isn't). Neither on pruning,
+                // cultivation or harvest, which have no ДНЕВНИК page and which
+                // the treatments route doesn't post.
+                if let treatment, treatment.isApplication, let handle = treatment.treatmentGroupId?.recorded {
                     if let progress, !progress.complete {
                         UnfinishedTreatmentSection(handle: handle, progress: $progress,
                                                    mayFinish: TreatmentCorrection.offered(entry, to: people.user))
                     }
-                    TreatmentDocumentAction(handle: handle)
+                    if treatment.isInBabhRegister {
+                        TreatmentDocumentAction(handle: handle)
+                    }
                 }
                 notes
             }
@@ -269,9 +272,8 @@ struct JournalDetailView: View {
     /// and plain «Площ» on other work, which treats nothing.
     nonisolated static func areaLabel(_ treatment: JournalTreatment) -> String {
         switch treatment.treatmentKind {
-        case .fertilize: "Наторена площ"
-        case .spray: "Третирана площ"
-        case nil: treatment.isChemicalTreatment ? "Третирана площ" : "Площ"
+        case let kind?: kind.areaWord
+        case nil: treatment.isApplication ? "Третирана площ" : "Площ"
         }
     }
 

@@ -21,7 +21,7 @@ struct TreatmentFieldsView: View {
     private var problems: [TreatmentDraft.Problem] { draft.problems(catalogue: catalogue) }
 
     private var suggestions: [InputItem] {
-        TypedProduct.suggestions(for: draft.productText, spraying: draft.kind == .spray,
+        TypedProduct.suggestions(for: draft.productText, use: draft.kind.use,
                                  in: catalogue ?? [])
     }
 
@@ -50,7 +50,7 @@ struct TreatmentFieldsView: View {
                     }
                 }
 
-                Section(titled: "Доза") {
+                Section(titled: draft.kind.doseWord) {
                     FieldRow("Количество") {
                         TextField("0", text: $draft.doseText, prompt: .fieldPrompt("0"))
                             .keyboardType(.decimalPad)
@@ -151,8 +151,8 @@ struct TreatmentFieldsView: View {
     @ViewBuilder
     private var productSection: some View {
         Section(titled: draft.kind.inputLabel) {
-            TextField("Търговско наименование", text: $draft.productText,
-                      prompt: .fieldPrompt("Търговско наименование"))
+            TextField(draft.kind.productField, text: $draft.productText,
+                      prompt: .fieldPrompt(draft.kind.productField))
                 .autocorrectionDisabled()
 
             // The farm's own products the typed text is part of — a tap takes
@@ -173,6 +173,8 @@ struct TreatmentFieldsView: View {
                         .autocorrectionDisabled()
                         .multilineTextAlignment(.trailing)
                 }
+            case .new where draft.kind == .seed:
+                note("Нов сорт — ще бъде добавен в каталога на стопанството.")
             case .new:
                 note("Нов тор — ще бъде добавен в каталога на стопанството.")
             case .empty, .wrongKind, .sample:
