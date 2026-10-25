@@ -224,7 +224,9 @@ final class RouteContractTests: XCTestCase {
                 ExchangeAPI.blockPath(threadID: "{threadId}"),
                 ExchangeAPI.messagePath(messageID: "{messageId}"),
             ]),
-            ("FarmRecordAPI.swift", [FarmRecordAPI.path(loc)]),
+            // The farm's diary for a campaign (#436), which replaced the
+            // per-block БАБХ period download.
+            ("FarmRecordAPI.swift", [FarmRecordAPI.campaignPath(.init(startYear: 2024))]),
             ("AdminPricesAPI.swift", [AdminPricesAPI.path, AdminPricesAPI.clearPath("{commodity}")]),
             ("AccountDeletionAPI.swift", [AccountDeletionAPI.path]),
             // «Ново мероприятие»'s crops and a crop's parcels (#293, agri-saas #1746).

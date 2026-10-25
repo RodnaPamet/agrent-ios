@@ -391,8 +391,10 @@ final class A11yShotsTests: XCTestCase {
         let open = app.navigationBars.buttons["Дневник (PDF)"]
         XCTAssertTrue(open.waitForExistence(timeout: 10), "Дневник has no «Дневник (PDF)»")
         open.tap()
-        XCTAssertTrue(app.staticTexts["Synthetic Land"].waitForExistence(timeout: 10),
-                      "the sheet named no location — locations-list.json did not load")
+        // The campaign picker (#436), the current campaign chosen: no block
+        // and no dates since the farm's diary replaced the per-block one.
+        let campaign = app.buttons["Кампания"]
+        XCTAssertTrue(campaign.waitForExistence(timeout: 10), "the sheet offers no «Кампания»")
         Thread.sleep(forTimeInterval: 1)
         capture("01b-farm-record", app: app)
         let cancel = app.navigationBars.buttons["Отказ"]

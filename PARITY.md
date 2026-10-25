@@ -640,20 +640,31 @@ server-side) and on a location's page. Both use «От» / «До» (1 January t
 today by default) and `POST /locations/{id}/farm-record` `{ from, to }`, which
 returns the PDF's bytes.
 
-**iOS** offers it on the Дневник page itself, as the owner asked:
-- **Where:** a toolbar button opens `FarmRecordSheet`, which asks for the
-  location (chosen for the person when the farm has only one) and the same
-  period. The list's `LogEntry` carries no field operation, so a per-entry
-  button would have had no location to name.
+**iOS** offers it on the Дневник page itself, as the owner asked, and since
+2026-10-25 (#436) it is «ДНЕВНИК НА СТОПАНСТВОТО», no longer the БАБХ
+register for a block:
+- **What:** the owner's own paper template (agri-saas #2316,
+  `POST /reports/campaign-diary?campaign=YYYY-YYYY`): the whole farm, every
+  recorded activity, one landscape table, one row per activity with its total
+  area in ха. The owner chose it to REPLACE the БАБХ period download, so the
+  phone no longer asks `POST /locations/{id}/farm-record`. The БАБХ register
+  stays per treatment (below).
+- **Which:** a campaign, 1 October to 30 September, picked from a menu: the
+  current one first, then the four before it. The phone works campaigns out
+  itself (`FarmRecordAPI.Campaign`, by Bulgaria's day). The server derives the
+  same window, so there is no Season row to keep in step. There is no block
+  and there are no dates.
 - **Waiting:** it travels on `APIClient`'s document session, which waits 90 s
-  rather than 15 s. The server builds the PDF before it sends a byte, on a
-  60 s budget.
+  rather than 15 s. A campaign's rows are uncapped by design, so a long one
+  takes a while.
 - **Checked:** a 200 that is not `%PDF` is refused.
-- **A block with nothing in the period** (owner, 2026-10-22, confirmed to backend 1 on 2026-10-23; agri-saas #2183, #402) gets no document. The server answers 404 `REGISTER_EMPTY_FOR_PERIOD`, and the sheet says «Няма записи за този период.» as a plain note, not an error, until the block or period changes. Its own code keeps it apart from a missing block or farm. **Not live yet:** today the route still renders a PDF for an idle block.
+- **A campaign with nothing in it** gets no document. The server answers 404 `REGISTER_EMPTY_FOR_PERIOD`, and the sheet says «Няма записи за тази кампания.» as a plain note, not an error, until the campaign changes.
 - **Opening:** the PDF opens in Quick Look, which shares it or saves it to
   Files.
 - **Storage:** it is written under complete file protection to a temporary
   folder of its own, which is removed when the sheet closes and on sign-out.
+
+**The web** still offers the per-location БАБХ download described above. The owner's replacement is for both products; the web's half is backend's.
 
 **And on a treatment's own entry (#320, owner 2026-10-14).** A folded
 treatment row (agri-saas #1799) carries its `treatmentGroupId`, which is the
@@ -662,7 +673,7 @@ was done, read from the row, and offers «Изтегли PDF» for that treatmen
 alone (`GET /journal/treatments/{id}/farm-record`, agri-saas #1822). This is
 the same document as the screen right after a save, and the same storage and
 Quick Look, removed when Quick Look closes. Entries that are not treatments
-still have only the page's per-location PDF.
+print only in the farm's diary.
 
 **Unverified:** no ДНЕВНИК has been downloaded from this app. Under the
 UI-test seam the POST is a 501, so the first real one is the owner's.

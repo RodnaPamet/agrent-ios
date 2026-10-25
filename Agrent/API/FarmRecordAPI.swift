@@ -1,42 +1,66 @@
 import Foundation
 
-/// The БАБХ ДНЕВНИК as a PDF (#246) — agri-saas's
-/// `POST /locations/{id}/farm-record`, the route the web's «Дневник (PDF)»
-/// calls from a location and from a journal entry.
+/// The farm's documents as PDFs, and what they share: the file, the folder
+/// it is kept in, the empty-period answer.
 ///
-/// ONE 200, TWO MEDIA TYPES, chosen by `save` in the body: absent, it is the
-/// PDF's bytes with `Content-Disposition: attachment`; `save: true` files it
-/// in the farm's register instead and answers JSON. This app only ever asks
-/// for the bytes, so `save` is never sent — filing is the web's. The server
-/// reads under `assertCanRead`, so this POST writes nothing: it is a job with
-/// a body, not a record, and none of the outward-write care applies.
+/// «Дневник (PDF)» on the Дневник page is «ДНЕВНИК НА СТОПАНСТВОТО» for one
+/// campaign (#436; agri-saas `POST /reports/campaign-diary`, owner
+/// 2026-10-25). It covers the whole farm and every recorded activity, in the
+/// owner's own template. It REPLACED the БАБХ ДНЕВНИК for a block and a
+/// period (`POST /locations/{id}/farm-record`), which the phone no longer
+/// asks for. The БАБХ register stays per treatment
+/// (`TreatmentAPI.documentPath`). The server reads under `assertCanRead`, so
+/// this POST writes nothing.
 enum FarmRecordAPI {
-    static func path(_ locationID: String) -> String {
-        "\(FarmPath.root)/locations/\(URLEscape.segment(locationID))/farm-record"
+    /// A campaign: 1 October to 30 September (owner, 2026-10-25),
+    /// «Кампания 2024–2025» starting in the autumn of 2024.
+    ///
+    /// A pure function of a year, not a stored row. Production's only
+    /// `Season` is the sample one, with other dates, so the phone offers
+    /// campaigns it works out itself, and the server derives the same window
+    /// from the parameter.
+    struct Campaign: Hashable, Sendable, Identifiable {
+        let startYear: Int
+        var id: Int { startYear }
+
+        /// `2024-2025`, the route's `campaign`.
+        var parameter: String { "\(startYear)-\(startYear + 1)" }
+        var label: String { "Кампания \(startYear)–\(startYear + 1)" }
+
+        /// The campaign a day is in, by the farm's calendar: from October
+        /// it is the one starting that autumn.
+        static func containing(_ day: Date, calendar: Calendar = FarmRecordAPI.farmCalendar) -> Campaign {
+            let parts = calendar.dateComponents([.year, .month], from: day)
+            let year = parts.year ?? 2026
+            return Campaign(startYear: (parts.month ?? 1) >= 10 ? year : year - 1)
+        }
+
+        /// The current campaign first, then the four before it: a farm's
+        /// paperwork reaches back a few years, and the server answers any.
+        static func recent(now: Date = Date(), calendar: Calendar = FarmRecordAPI.farmCalendar,
+                           count: Int = 5) -> [Campaign] {
+            let current = containing(now, calendar: calendar).startYear
+            return (0..<count).map { Campaign(startYear: current - $0) }
+        }
     }
 
-    struct Request: Encodable, Equatable, Sendable {
-        /// yyyy-mm-dd, the day in the device's zone — `BgDate.isoDay`, the
-        /// write side every date-only field in this app goes through.
-        let from: String
-        let to: String
+    /// The farm's day is Bulgaria's, whatever zone the phone is set to:
+    /// the server bounds a campaign in the farm's own timezone.
+    static let farmCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Sofia") ?? .current
+        return calendar
+    }()
+
+    static func campaignPath(_ campaign: Campaign) -> String {
+        "\(FarmPath.root)/reports/campaign-diary?campaign=\(campaign.parameter)"
     }
 
-    /// The period the web offers first: 1 January of this year to today.
-    static func defaultPeriod(now: Date = Date(), calendar: Calendar = .current) -> (from: Date, to: Date) {
-        let january = calendar.date(from: calendar.dateComponents([.year], from: now)) ?? now
-        return (january, now)
-    }
+    /// The route reads only `campaign`; a POST still carries a body.
+    private struct NoBody: Encodable {}
 
-    /// The name the web falls back to when the server gives none.
-    static func fallbackName(_ request: Request) -> String {
-        "dnevnik-\(request.from)_\(request.to).pdf"
-    }
-
-    /// The name the file is written under: the server's, or the fallback —
-    /// and always ending `.pdf`, because Quick Look reads the type off it.
-    static func fileName(_ served: String?, for request: Request) -> String {
-        fileName(served, fallback: fallbackName(request))
+    static func fallbackName(_ campaign: Campaign) -> String {
+        "dnevnik-na-stopanstvoto-\(campaign.parameter).pdf"
     }
 
     static func fileName(_ served: String?, fallback: String) -> String {
@@ -59,6 +83,9 @@ enum FarmRecordAPI {
     /// is ordinary, so it is the one met most.
     static let emptyPeriodCode = "REGISTER_EMPTY_FOR_PERIOD"
     static let emptyPeriodText = "Няма записи за този период."
+    /// The campaign diary's own: nothing was recorded in the campaign, or
+    /// only work not yet finished. Not a fault (agri-saas's 404 says so).
+    static let emptyCampaignText = "Няма записи за тази кампания."
 
     static func isEmptyPeriod(_ error: Error) -> Bool {
         if case APIClient.APIError.http(404, emptyPeriodCode?, _, _, _) = error { return true }
@@ -75,19 +102,13 @@ enum FarmRecordAPI {
         }
     }
 
-    static func generate(locationID: String, from: Date, to: Date) async throws -> URL {
-        let request = Request(from: BgDate.isoDay(from), to: BgDate.isoDay(to))
-        let (data, served) = try await APIClient.shared.postForDocument(path(locationID), body: request)
-        return try keep(data, named: fileName(served, for: request))
+    /// Up to a minute or more to build: a campaign's rows are uncapped by
+    /// design, so the document session waits, and the sheet shows a spinner.
+    static func generate(_ campaign: Campaign) async throws -> URL {
+        let (data, served) = try await APIClient.shared.postForDocument(campaignPath(campaign), body: NoBody())
+        return try keep(data, named: fileName(served, fallback: fallbackName(campaign)))
     }
 
-    /// Checked to BE a PDF, and written where Quick Look can open it — the
-    /// per-block register and one treatment's pages (`TreatmentAPI`) alike.
-    /// The ДНЕВНИК names the farm's producer, so it is written under
-    /// complete protection, in a folder of its own that holds only the
-    /// latest one — emptied before each, and removed when the sheet closes
-    /// (`removeGenerated`). A copy the person shares or saves is theirs; this
-    /// one is never the app's to keep.
     static func keep(_ data: Data, named name: String) throws -> URL {
         guard isPDF(data) else { throw Failure.notAPDF }
         removeGenerated()
