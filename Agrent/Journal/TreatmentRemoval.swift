@@ -182,7 +182,10 @@ final class TreatmentRemoval {
     /// server's refusal is read out. Only a row that stands for a
     /// treatment: an entry folded to itself has no handle.
     nonisolated static func offered(_ entry: LogEntry, to me: CurrentUser?) -> Bool {
-        guard let treatment = entry.treatment, treatment.isTreatment, treatment.isChemicalTreatment,
+        // Any work on parcels, a bare activity included: the same route
+        // withdraws pruning or a harvest as it does a spraying (agri-saas,
+        // proven by its test 2026-10-25), under the same `mayDelete` rule.
+        guard let treatment = entry.treatment, treatment.isTreatment,
               treatment.treatmentGroupId != nil,
               let me, me.mayWrite else { return false }
         return treatment.mayDelete ?? true

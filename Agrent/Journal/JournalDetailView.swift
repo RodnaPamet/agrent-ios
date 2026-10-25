@@ -134,8 +134,8 @@ struct JournalDetailView: View {
                 }
                 // A treatment's own controls: finishing or ending it, and its
                 // ДНЕВНИК pages. Not on pruning, cultivation, sowing or harvest
-                // (`isChemicalTreatment`): they have no ДНЕВНИК page, and what
-                // the withdrawal does to one isn't settled (agri-saas #2339).
+                // (`isChemicalTreatment`): they have no ДНЕВНИК page, and
+                // finishing one would post it through the treatments route.
                 if let treatment, treatment.isChemicalTreatment, let handle = treatment.treatmentGroupId?.recorded {
                     if let progress, !progress.complete {
                         UnfinishedTreatmentSection(handle: handle, progress: $progress,

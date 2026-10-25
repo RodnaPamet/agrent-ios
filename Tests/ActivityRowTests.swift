@@ -25,14 +25,15 @@ final class ActivityRowTests: XCTestCase {
         }
     }
 
-    /// The correction route refuses it (`NOT_A_TREATMENT`) and the withdrawal
-    /// isn't settled for one, so neither is offered, whatever the flags say.
-    func testOtherWorkGetsNone() {
+    /// The correction route refuses it (`NOT_A_TREATMENT`), so it isn't
+    /// offered, whatever the flags say. The withdrawal removes it like a
+    /// treatment, so «Изтрий» is, on the same `mayDelete`.
+    func testOtherWorkIsDeletedButNotCorrected() {
         for kind in ["PRUNE", "CULTIVATE", "SEED", "HARVEST", "SOMETHING_NEW"] {
             let row = entry(kind: kind, mayCorrect: true)
             XCTAssertFalse(row.treatment?.isChemicalTreatment == true, kind)
             XCTAssertFalse(TreatmentCorrection.offered(row, to: writer), kind)
-            XCTAssertFalse(TreatmentRemoval.offered(row, to: writer), kind)
+            XCTAssertTrue(TreatmentRemoval.offered(row, to: writer), kind)
         }
     }
 
