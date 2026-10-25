@@ -838,9 +838,10 @@ The form's note says that.
 
 **Treated area per parcel** (#363, agri-saas #2086, live 2026-10-20): step
 two lists each chosen parcel's area under «Третирана площ, дка». An empty
-field means the whole parcel; a smaller figure is sent as
+field means the whole parcel. Each parcel goes out as
 `parcels: [{parcelId, treatedAreaHa}]` beside `parcelIds`.
-- **The bound:** a figure within the register's tolerance of the parcel's own area counts as the whole parcel, since the field shows that area rounded. A larger one is refused on the phone before the server's inclusive bound would refuse it.
+- **A whole parcel is its area, as a number** (owner, 2026-10-25, asked interactively; #435). An empty field, or the parcel's own size typed back, goes out as the parcel's own exact area, so the register keeps the number and an old ДНЕВНИК row doesn't change if the parcel is re-measured later. Only a parcel with no recorded area is left out, as the whole parcel. Until then the phone sent a whole parcel as "whole" (null) while the web kept numbers. «Коригирай» does the same (#433).
+- **The bound:** a figure within the register's tolerance of the parcel's own area counts as the whole parcel, since the field shows that area rounded, and goes out as the exact area, never the rounded figure. A larger one is refused on the phone before the server's inclusive bound would refuse it. Widening that bound for rounding, and what to do with the rows stored as null before, is agri-saas #2308.
 - **The total:** the check, the saved screen and the outbox row show what was treated.
 - **The save key:** the areas are part of the draft, so a changed area mints a new key, as the replay rule needs (agri-saas #1765).
 
