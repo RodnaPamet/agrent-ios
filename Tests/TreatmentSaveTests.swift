@@ -44,11 +44,13 @@ final class TreatmentSaveTests: XCTestCase {
     // MARK: - The body
 
     /// `RecordDiaryTreatment`'s properties and the five it requires, as
-    /// agri-saas #1758's spec lists them.
+    /// agri-saas #1758's spec lists them, with `phenophase` (#2083) and
+    /// `parcels` (#2086) since. `parcels` goes out on every treatment with a
+    /// parcel area to keep (owner, 2026-10-25).
     private let specKeys: Set<String> = [
         "kind", "occurredOn", "parcelIds", "productItemId", "productName", "fertilizerItemId",
         "fertilizerName", "pppRegistrationNo", "quarantinePeriodDays", "newProductCategory",
-        "targetNote", "doseValue", "doseUnitId", "applicationTechnique", "title",
+        "targetNote", "doseValue", "doseUnitId", "applicationTechnique", "title", "phenophase", "parcels",
     ]
     private let specRequired: Set<String> = ["kind", "occurredOn", "parcelIds", "doseValue", "doseUnitId"]
 
