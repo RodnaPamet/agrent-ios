@@ -294,10 +294,10 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// task's own operation type. A row with no kind is from before the
     /// field, when only treatments had parcels.
     ///
-    /// Only a treatment has a dose to correct, a ДНЕВНИК page of its own, or
-    /// a withdrawal the phone knows to be right. A bare activity is refused
-    /// by the correction route (`NOT_A_TREATMENT`), and what the withdrawal
-    /// does to one isn't settled yet. So those controls are kept off it.
+    /// Only a treatment has a dose to correct or a ДНЕВНИК page of its own: a
+    /// bare activity is refused by the correction route (`NOT_A_TREATMENT`),
+    /// so those controls are kept off it. «Изтрий» isn't: the withdrawal
+    /// removes a bare activity the same way (agri-saas, 2026-10-25).
     var isChemicalTreatment: Bool { kind == nil || treatmentKind != nil }
 
     /// «1,5 л/дка». Nil without a dose, so the fact is left out rather than

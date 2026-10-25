@@ -838,7 +838,7 @@ treatment, as the owner ruled (agri-saas #1740 Q2):
 
 The form's note says that.
 
-**Other work on the journal row** (agri-saas #2339, owner 2026-10-25): pruning, cultivation, sowing and harvest are lines on parcels like a treatment, and share the journal row. The phone keeps a treatment's own controls off them: «Коригирай», «Изтрий», «Изтегли PDF» and the unfinished section. Only a row whose `kind` is a spraying or a fertilising gets those, or one with no kind, which is from before the field. The correction route refuses a bare activity (`NOT_A_TREATMENT`), and what the withdrawal does to one isn't settled. Recording such work on the phone is #439.
+**Other work on the journal row** (agri-saas #2339, owner 2026-10-25): pruning, cultivation, sowing and harvest are lines on parcels like a treatment, and share the journal row. The phone keeps a treatment's own controls off them: «Коригирай», «Изтегли PDF» and the unfinished section. Only a row whose `kind` is a spraying or a fertilising gets those, or one with no kind, which is from before the field. The correction route refuses a bare activity (`NOT_A_TREATMENT`). «Изтрий» is offered on them, on the same `mayDelete`: the treatment withdrawal removes a bare activity too (backend 1's test, 2026-10-25). Recording such work on the phone is #439.
 
 **Treated area per parcel** (#363, agri-saas #2086, live 2026-10-20): step
 two lists each chosen parcel's area under «Третирана площ, дка». An empty
