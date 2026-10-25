@@ -75,7 +75,6 @@
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/definition
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/farm-record
 /api/t/{tenantSlug}/locations
-/api/t/{tenantSlug}/locations/{locationId}/farm-record
 /api/t/{tenantSlug}/locations/{locationId}/operations
 /api/t/{tenantSlug}/locations/{locationId}/parcels
 /api/t/{tenantSlug}/locations/{locationId}/parcels/{parcelId}
@@ -83,6 +82,7 @@
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import/{jobId}
 /api/t/{tenantSlug}/parcels/by-crop
 /api/t/{tenantSlug}/push-subscriptions
+/api/t/{tenantSlug}/reports/campaign-diary
 /api/t/{tenantSlug}/reports/field-briefing
 /api/t/{tenantSlug}/tasks
 /api/t/{tenantSlug}/tasks/{id}

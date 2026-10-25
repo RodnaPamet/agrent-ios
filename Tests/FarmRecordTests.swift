@@ -1,59 +1,68 @@
 import XCTest
 @testable import Agrent
 
-/// «Дневник (PDF)» (#246): the БАБХ ДНЕВНИК from
-/// `POST /locations/{id}/farm-record`. NOTHING HERE ASKS THE SERVER FOR ONE —
-/// the request, the file it becomes and the session it travels on are each
-/// decided above the wire.
+/// «Дневник (PDF)» (#246, #436): «ДНЕВНИК НА СТОПАНСТВОТО» from
+/// `POST /reports/campaign-diary?campaign=…`. NOTHING HERE ASKS THE SERVER
+/// FOR ONE: the request, the file it becomes and the session it travels on
+/// are each decided above the wire.
 final class FarmRecordTests: XCTestCase {
 
-    private let request = FarmRecordAPI.Request(from: "2026-01-01", to: "2026-10-09")
+    private var sofia: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Sofia")!
+        return calendar
+    }
 
-    /// A block with nothing in the period is its own 404 (#402, agri-saas
-    /// #2183): told apart from a missing block or farm, which are errors.
-    func testAnEmptyPeriodIsItsOwnAnswer() {
+    /// A campaign with nothing in it is its own 404 (agri-saas, as the
+    /// per-block register's since #2183): told apart from a missing farm,
+    /// which is an error.
+    func testAnEmptyCampaignIsItsOwnAnswer() {
         XCTAssertTrue(FarmRecordAPI.isEmptyPeriod(APIClient.APIError.http(
             status: 404, code: "REGISTER_EMPTY_FOR_PERIOD", message: nil)))
         XCTAssertFalse(FarmRecordAPI.isEmptyPeriod(APIClient.APIError.http(status: 404, code: nil, message: nil)),
-                       "a bare 404 is a missing block, not an empty one")
+                       "a bare 404 is something missing, not an empty campaign")
         XCTAssertFalse(FarmRecordAPI.isEmptyPeriod(APIClient.APIError.http(
             status: 404, code: "TENANT_NOT_FOUND", message: nil)))
         XCTAssertFalse(FarmRecordAPI.isEmptyPeriod(URLError(.notConnectedToInternet)))
-        XCTAssertEqual(UserMessage.text(for: APIClient.APIError.http(
-            status: 404, code: "REGISTER_EMPTY_FOR_PERIOD", message: "Nothing")), FarmRecordAPI.emptyPeriodText)
+        XCTAssertEqual(FarmRecordAPI.emptyCampaignText, "Няма записи за тази кампания.")
     }
 
-    func testThePathIsTheLocationsFarmRecord() {
-        XCTAssertTrue(FarmRecordAPI.path("loc 1").hasSuffix("/locations/loc%201/farm-record"),
-                      FarmRecordAPI.path("loc 1"))
+    /// The campaign is the query, `YYYY-YYYY` with consecutive years.
+    func testThePathCarriesTheCampaign() {
+        let path = FarmRecordAPI.campaignPath(.init(startYear: 2024))
+        XCTAssertTrue(path.hasSuffix("/reports/campaign-diary?campaign=2024-2025"), path)
     }
 
-    /// The period as days, and NEVER `save` — that files the PDF in the
-    /// register and answers JSON instead of the document.
-    func testTheBodyIsThePeriodAndNothingElse() throws {
-        let body = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
-        XCTAssertEqual(body["from"] as? String, "2026-01-01")
-        XCTAssertEqual(body["to"] as? String, "2026-10-09")
-        XCTAssertEqual(Set(body.keys), ["from", "to"])
+    /// 1 October to 30 September, by the farm's own day: 30 September is
+    /// still the campaign before, 1 October the next.
+    func testACampaignStartsOnTheFirstOfOctober() {
+        func campaign(_ instant: String) -> Int {
+            FarmRecordAPI.Campaign.containing(BgDate.parseInstant(instant)!, calendar: sofia).startYear
+        }
+        XCTAssertEqual(campaign("2025-09-30T12:00:00.000Z"), 2024)
+        XCTAssertEqual(campaign("2025-10-01T12:00:00.000Z"), 2025)
+        XCTAssertEqual(campaign("2026-02-14T12:00:00.000Z"), 2025)
+        // Midnight in Sofia, still 30 September in UTC: Bulgaria's day.
+        XCTAssertEqual(campaign("2025-09-30T21:30:00.000Z"), 2025)
     }
 
-    /// The web's first offer: 1 January of this year to today.
-    func testThePeriodStartsOnTheFirstOfJanuary() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Europe/Sofia")!
-        let now = BgDate.parseInstant("2026-10-09T12:00:00.000Z")!
-        let period = FarmRecordAPI.defaultPeriod(now: now, calendar: calendar)
-        XCTAssertEqual(calendar.dateComponents([.year, .month, .day], from: period.from),
-                       DateComponents(year: 2026, month: 1, day: 1))
-        XCTAssertEqual(period.to, now)
+    /// The current campaign first, then the four before it.
+    func testTheRecentCampaignsAreTheCurrentOneFirst() {
+        let now = BgDate.parseInstant("2026-10-25T12:00:00.000Z")!
+        let list = FarmRecordAPI.Campaign.recent(now: now, calendar: sofia)
+        XCTAssertEqual(list.map(\.parameter), ["2026-2027", "2025-2026", "2024-2025", "2023-2024", "2022-2023"])
+        XCTAssertEqual(list.first?.label, "Кампания 2026–2027")
+        XCTAssertEqual(FarmRecordSheet.years(list[2]), "2024–2025")
     }
 
-    func testTheFileIsNamedAsServedOrAsTheWebWouldName() {
-        XCTAssertEqual(FarmRecordAPI.fileName("dnevnik-x.pdf", for: request), "dnevnik-x.pdf")
-        XCTAssertEqual(FarmRecordAPI.fileName(nil, for: request), "dnevnik-2026-01-01_2026-10-09.pdf")
+    func testTheFileIsNamedAsServedOrByItsCampaign() {
+        let campaign = FarmRecordAPI.Campaign(startYear: 2024)
+        XCTAssertEqual(FarmRecordAPI.fileName("dnevnik-x.pdf", fallback: FarmRecordAPI.fallbackName(campaign)),
+                       "dnevnik-x.pdf")
+        XCTAssertEqual(FarmRecordAPI.fileName(nil, fallback: FarmRecordAPI.fallbackName(campaign)),
+                       "dnevnik-na-stopanstvoto-2024-2025.pdf")
         // Quick Look reads the type off the name.
-        XCTAssertEqual(FarmRecordAPI.fileName("register", for: request), "register.pdf")
+        XCTAssertEqual(FarmRecordAPI.fileName("register", fallback: "x.pdf"), "register.pdf")
     }
 
     /// One treatment's pages fall back to the name the server gives them.
