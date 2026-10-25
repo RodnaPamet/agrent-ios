@@ -159,7 +159,7 @@ enum TreatmentCorrection {
         struct ParcelChoice: Equatable, Sendable, Identifiable {
             let id: String
             let name: String
-            let blockID: String?
+            let blockID: String
             var areaHa: Double?
             /// On the treatment as recorded.
             let recorded: Bool
@@ -269,7 +269,7 @@ enum TreatmentCorrection {
         /// appear: the only blocks a correction may add a parcel in.
         var blockIDs: [String] {
             var seen = Set<String>()
-            return original.lines.compactMap(\.locationId).filter { seen.insert($0).inserted }
+            return original.lines.map(\.locationId).filter { seen.insert($0).inserted }
         }
 
         /// The blocks' parcels, read: each recorded parcel's own area filled
