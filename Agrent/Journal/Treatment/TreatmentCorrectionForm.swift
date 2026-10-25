@@ -175,11 +175,9 @@ struct TreatmentCorrectionForm: View {
     /// The parcels by block, in the order the treatment names its blocks,
     /// each headed by the block's name.
     private var blockSections: [(id: String, name: String, parcels: [TreatmentCorrection.Draft.ParcelChoice])] {
-        var order = draft.blockIDs
-        if draft.parcels.contains(where: { $0.blockID == nil }) { order.append("") }
-        return order.map { id in
+        draft.blockIDs.map { id in
             let name = blocks.blocks.first { $0.id == id }?.name?.recorded ?? "Блок"
-            return (id, name, draft.parcels.filter { ($0.blockID ?? "") == id })
+            return (id, name, draft.parcels.filter { $0.blockID == id })
         }
     }
 

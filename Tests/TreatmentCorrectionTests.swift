@@ -10,7 +10,7 @@ final class TreatmentCorrectionTests: XCTestCase {
                             technique: String? = "boom", pest: String? = "Плевели",
                             quarantine: Int? = 30, phenophase: String? = nil,
                             lines: [TreatmentDefinition.Line] = [
-                                .init(parcelId: "p1", parcelName: "Парцел 1", treatedAreaHa: nil),
+                                .init(parcelId: "p1", parcelName: "Парцел 1", locationId: "b1", treatedAreaHa: nil),
                             ]) -> TreatmentDefinition {
         TreatmentDefinition(
             treatmentGroupId: "tg_1", version: 4, kind: kind, occurredOn: occurredOn,
@@ -286,8 +286,8 @@ final class TreatmentCorrectionTests: XCTestCase {
     /// parcel as an explicit null.
     func testAnAreaChangeSendsTheWholeSet() throws {
         var form = draft(definition(lines: [
-            .init(parcelId: "p1", parcelName: "Парцел 1", treatedAreaHa: nil),
-            .init(parcelId: "p2", parcelName: "Парцел 2", treatedAreaHa: 1.2),
+            .init(parcelId: "p1", parcelName: "Парцел 1", locationId: "b1", treatedAreaHa: nil),
+            .init(parcelId: "p2", parcelName: "Парцел 2", locationId: "b1", treatedAreaHa: 1.2),
         ]))
         XCTAssertEqual(form.areaTexts["p2"], Area(hectares: 1.2).number, "shown in decares")
         XCTAssertEqual(form.changed, [])
@@ -450,7 +450,7 @@ final class TreatmentCorrectionTests: XCTestCase {
     func testAnAreaCorrectionSaysWhatTheAreasWere() async throws {
         let previous = previousJSON().replacingOccurrences(
             of: #""lines":[]"#,
-            with: #""lines":[{"parcelId":"p1","parcelName":"Парцел 1","locationId":null,"treatedAreaHa":null},{"parcelId":"p2","parcelName":"Парцел 2","locationId":null,"treatedAreaHa":1.2}]"#)
+            with: #""lines":[{"parcelId":"p1","parcelName":"Парцел 1","locationId":"b1","treatedAreaHa":null},{"parcelId":"p2","parcelName":"Парцел 2","locationId":"b1","treatedAreaHa":1.2}]"#)
         let read = try await trail(#"{"treatmentGroupId":"tg_1","version":2,"corrections":[{"correctedAt":"2026-10-24T18:40:00.000Z","correctedBy":null,"changedFields":["treatedAreaHa"],"previous":"# + previous + "}]}")
         let was = TreatmentCorrection.was(try XCTUnwrap(read.corrections.first))
         XCTAssertEqual(was.map(\.label), ["Третирана площ"])

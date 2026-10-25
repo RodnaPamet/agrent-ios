@@ -136,10 +136,10 @@ struct TreatmentDefinition: Decodable, Equatable, Sendable {
         let parcelId: String
         let parcelName: String
         /// The parcel's block: the treatment's blocks are the only ones a
-        /// correction may add a parcel in (agri-saas #2304). Never null on a
-        /// real treatment (`Parcel.locationId` is NOT NULL); optional until
-        /// the spec narrows it.
-        var locationId: String? = nil
+        /// correction may add a parcel in (agri-saas #2304). Required since
+        /// agri-saas #2305: `Parcel.locationId` is NOT NULL, so every parcel
+        /// is in a block, and the spec now says so.
+        let locationId: String
         /// Hectares. NIL MEANS THE WHOLE PARCEL, not an empty value.
         let treatedAreaHa: Double?
     }
