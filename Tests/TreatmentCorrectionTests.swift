@@ -255,6 +255,20 @@ final class TreatmentCorrectionTests: XCTestCase {
         XCTAssertEqual(form.changes.first?.after, "Парцел 3 — \(Area(hectares: 0.5).text)")
     }
 
+    /// A parcel treated whole goes out as its own exact area once its block
+    /// is read, as on «Ново мероприятие» (owner, 2026-10-25); its size typed
+    /// back too.
+    func testAWholeParcelGoesOutAsItsOwnArea() throws {
+        var form = setDraft()
+        form.offer([try block("b1", [("p1", "Парцел 1", 2), ("p2", "Парцел 2", 1.5), ("p3", "Парцел 3", 0.8)])])
+        form.chosen.insert("p3")
+        form.areaTexts["p1"] = "20"
+        let parcels = try XCTUnwrap(try json(form.body)["parcels"] as? [[String: Any]])
+        XCTAssertEqual(parcels.map { $0["treatedAreaHa"] as? Double }, [2, 1.2, nil, 0.8],
+                       "p1 whole and typed back: 2; p2 as typed; p4's block unread: whole; p3 added whole: 0,8")
+        XCTAssertTrue(parcels[2]["treatedAreaHa"] is NSNull)
+    }
+
     /// Larger than the parcel, said before the PUT; within the register's
     /// rounding isn't larger.
     func testAnAreaLargerThanTheParcelIsSaid() throws {

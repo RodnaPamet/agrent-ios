@@ -448,8 +448,10 @@ final class TreatmentEntryTests: XCTestCase {
         XCTAssertNil(TreatmentDraft.treatedProblem(["p9": "12"], for: fields), "only chosen parcels count")
     }
 
-    /// `parcels` refines `parcelIds`: hectares, in their order, each once,
-    /// and left out when every parcel was treated whole.
+    /// `parcels` refines `parcelIds`: hectares, in their order, each once.
+    /// A parcel treated whole goes out as its own exact area, so the register
+    /// keeps the number (owner, 2026-10-25); only one with no recorded area
+    /// is left out.
     func testThePartlyTreatedParcelsGoOutInHectares() throws {
         let fields = [field(parcel("p1", "1", crop: "Wheat", ha: 1)),
                       field(parcel("p2", "2", crop: "Wheat", ha: 2))]
@@ -460,16 +462,33 @@ final class TreatmentEntryTests: XCTestCase {
             let data = try JSONEncoder().encode(TreatmentAPI.Body(record))
             return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         }
-        XCTAssertNil(try body([:])["parcels"], "all whole: no refinement")
+        let whole = try XCTUnwrap(try body([:])["parcels"] as? [[String: Any]])
+        XCTAssertEqual(whole.map { $0["parcelId"] as? String }, ["p1", "p2"])
+        XCTAssertEqual(whole.map { $0["treatedAreaHa"] as? Double }, [1, 2], "each whole parcel's own area")
         let partly = try XCTUnwrap(try body(["p2": "5"])["parcels"] as? [[String: Any]])
-        XCTAssertEqual(partly.count, 1)
-        XCTAssertEqual(partly[0]["parcelId"] as? String, "p2")
-        XCTAssertEqual(partly[0]["treatedAreaHa"] as? Double ?? 0, 0.5, accuracy: 0.0000001)
+        XCTAssertEqual(partly.count, 2)
+        XCTAssertEqual(partly[1]["parcelId"] as? String, "p2")
+        XCTAssertEqual(partly[1]["treatedAreaHa"] as? Double ?? 0, 0.5, accuracy: 0.0000001)
+        // The size the form shows, typed back, is the exact own area, never
+        // the rounded figure, which could exceed it.
+        XCTAssertEqual((try body(["p1": "10"])["parcels"] as? [[String: Any]])?.first?["treatedAreaHa"] as? Double, 1)
         XCTAssertEqual(try body(["p2": "5"])["parcelIds"] as? [String], ["p1", "p2"], "every parcel still named")
 
         var tooBig = spraying(phenophase: "")
         tooBig.treatedText = ["p1": "50"]
         XCTAssertNil(TreatmentRecord.make(tooBig, catalogue: [], fields: fields, now: today), "never sent over the bound")
+    }
+
+    /// A parcel with no recorded area has no number to keep: it alone goes
+    /// out as the whole parcel, by being left out of `parcels`.
+    func testAParcelWithNoAreaIsTheWholeParcel() throws {
+        let fields = [field(parcel("p1", "1", crop: "Wheat", ha: 1)),
+                      field(parcel("p3", "3", crop: "Wheat", ha: nil))]
+        let record = try XCTUnwrap(TreatmentRecord.make(spraying(phenophase: ""), catalogue: [], fields: fields, now: today))
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(TreatmentAPI.Body(record)))
+            as? [String: Any])
+        XCTAssertEqual((sent["parcels"] as? [[String: Any]])?.map { $0["parcelId"] as? String }, ["p1"])
+        XCTAssertEqual(sent["parcelIds"] as? [String], ["p1", "p3"])
     }
 
     /// The total is what was treated: the ДНЕВНИК prints per-row areas, and

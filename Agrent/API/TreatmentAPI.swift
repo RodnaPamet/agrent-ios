@@ -84,9 +84,17 @@ enum TreatmentAPI {
         /// derived from the treatment (agri-saas #2089), not in the
         /// chemical table, which has no such column.
         let phenophase: String?
-        /// The parcels only partly treated, with their area in HECTARES
-        /// (agri-saas #2086): a refinement of `parcelIds`, which still names
-        /// every parcel. Left out when every parcel was treated whole.
+        /// Each parcel's treated area in HECTARES (agri-saas #2086): a
+        /// refinement of `parcelIds`, which still names every parcel.
+        ///
+        /// A parcel treated whole goes out as its own exact area, not left
+        /// out (owner, 2026-10-25): the register keeps the number, so the row
+        /// says what was treated on the day even if the parcel is re-measured
+        /// later. The exact area, not the rounded one the form shows, so it
+        /// never exceeds the parcel (`TREATMENT_AREA_EXCEEDS_PARCEL` compares
+        /// exactly). Only a parcel with no recorded area is left out, as the
+        /// whole parcel: there is no number to keep. Nil when that is every
+        /// parcel.
         let parcels: [ParcelArea]?
 
         struct ParcelArea: Encodable, Equatable, Sendable {
@@ -112,10 +120,10 @@ enum TreatmentAPI {
             phenophase = record.phenophase
             // In `parcelIds`' order, each once: the server refuses an id it
             // doesn't list there, or one listed twice.
-            let partly = record.parcelIDs.compactMap { id in
-                record.treatedAreas[id].map { ParcelArea(parcelId: id, treatedAreaHa: $0) }
+            let areas = record.parcelIDs.compactMap { id in
+                (record.treatedAreas[id] ?? record.parcelAreas[id]).map { ParcelArea(parcelId: id, treatedAreaHa: $0) }
             }
-            parcels = partly.isEmpty ? nil : partly
+            parcels = areas.isEmpty ? nil : areas
         }
     }
 

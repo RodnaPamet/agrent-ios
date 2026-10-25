@@ -302,10 +302,11 @@ enum TreatmentCorrection {
             return (true, area)
         }
 
-        /// The area that goes out: the typed one, or nil for the whole parcel,
-        /// which is also what a typed area within the register's rounding of
-        /// the parcel's own is, as on «Ново мероприятие» (`treatedAreas`).
-        /// Typing the shown size back is no change.
+        /// The area typed, or nil for the whole parcel, which is also what a
+        /// typed area within the register's rounding of the parcel's own is,
+        /// as on «Ново мероприятие» (`treatedAreas`). Typing the shown size
+        /// back is no change. The whole parcel goes out as the parcel's own
+        /// exact area (`body`).
         func sentArea(_ id: String) -> Area? {
             guard let typed = area(of: id).area else { return nil }
             if let own = parcels.first(where: { $0.id == id })?.areaHa.map(Area.init(hectares:)),
@@ -403,8 +404,11 @@ enum TreatmentCorrection {
                  productItemId: product?.id ?? original.productItemId,
                  targetNote: targetNote, doseValue: dose ?? original.doseValue, doseUnitId: doseUnit.id,
                  phenophase: phenophase, quarantinePeriodDays: quarantine.days, applicationTechnique: technique,
+                 // A parcel treated whole as its own exact area, as on
+                 // «Ново мероприятие» (owner, 2026-10-25); null only where
+                 // the parcel's area isn't known.
                  parcels: chosenParcels.map { Body.ParcelArea(parcelId: $0.id,
-                                                              treatedAreaHa: sentArea($0.id)?.wireHectares) })
+                                                              treatedAreaHa: sentArea($0.id)?.wireHectares ?? $0.areaHa) })
         }
 
         enum Problem: Equatable, Sendable {

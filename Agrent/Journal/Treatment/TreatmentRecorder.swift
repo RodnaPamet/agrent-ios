@@ -33,6 +33,12 @@ struct TreatmentRecord: Hashable, Sendable {
     /// HECTARES, for the parcels only partly treated (#363, agri-saas
     /// #2086). A parcel absent here is the whole parcel.
     let treatedAreas: [String: Double]
+    /// Each chosen parcel's own area, exact, in hectares, by id: what a
+    /// parcel treated whole goes out as. The register keeps the number, so
+    /// the row says what was treated on the day even if the parcel is
+    /// re-measured later (owner, 2026-10-25). A parcel with no recorded area
+    /// isn't here and goes out as the whole parcel.
+    let parcelAreas: [String: Double]
 
     /// nil while the draft has a problem or no parcel is chosen.
     static func make(_ draft: TreatmentDraft, catalogue: [InputItem]?,
@@ -63,7 +69,9 @@ struct TreatmentRecord: Hashable, Sendable {
             technique: spraying ? draft.technique : nil,
             phenophase: spraying ? draft.phenophase : nil,
             parcelIDs: fields.map(\.id),
-            treatedAreas: TreatmentDraft.treatedAreas(draft.treatedText, for: fields).mapValues(\.wireHectares)
+            treatedAreas: TreatmentDraft.treatedAreas(draft.treatedText, for: fields).mapValues(\.wireHectares),
+            parcelAreas: Dictionary(fields.compactMap { field in field.parcel.areaHa.map { (field.id, $0) } },
+                                    uniquingKeysWith: { first, _ in first })
         )
     }
 }
