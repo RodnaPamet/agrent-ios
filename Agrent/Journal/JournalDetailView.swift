@@ -132,7 +132,11 @@ struct JournalDetailView: View {
                         }
                     }
                 }
-                if let handle = treatment?.treatmentGroupId?.recorded {
+                // A treatment's own controls: finishing or ending it, and its
+                // ДНЕВНИК pages. Not on pruning, cultivation, sowing or harvest
+                // (`isChemicalTreatment`): they have no ДНЕВНИК page, and what
+                // the withdrawal does to one isn't settled (agri-saas #2339).
+                if let treatment, treatment.isChemicalTreatment, let handle = treatment.treatmentGroupId?.recorded {
                     if let progress, !progress.complete {
                         UnfinishedTreatmentSection(handle: handle, progress: $progress,
                                                    mayFinish: TreatmentCorrection.offered(entry, to: people.user))
@@ -225,7 +229,6 @@ struct JournalDetailView: View {
     /// said a second time.
     @ViewBuilder
     private func treatmentFacts(_ treatment: JournalTreatment) -> some View {
-        let kind = treatment.treatmentKind
         if let dose = treatment.doseText {
             LabelledFact(label: "Доза") {
                 factText(dose).accessibilityLabel(treatment.doseSpoken ?? dose)
@@ -250,7 +253,7 @@ struct JournalDetailView: View {
             factText(Plural.bg(treatment.parcelCount, "парцел", "парцела"))
         }
         if let area = treatment.area {
-            LabelledFact(label: kind == .fertilize ? "Наторена площ" : "Третирана площ") {
+            LabelledFact(label: Self.areaLabel(treatment)) {
                 factText(area.text).accessibilityLabel(area.spoken)
             }
         }
@@ -258,6 +261,16 @@ struct JournalDetailView: View {
             LabelledFact(label: treatment.blockNames.count == 1 ? "Блок" : "Блокове") {
                 factText(treatment.blockNames.joined(separator: ", "))
             }
+        }
+    }
+
+    /// «Третирана площ» on a spraying, «Наторена площ» on a fertilising,
+    /// and plain «Площ» on other work, which treats nothing.
+    nonisolated static func areaLabel(_ treatment: JournalTreatment) -> String {
+        switch treatment.treatmentKind {
+        case .fertilize: "Наторена площ"
+        case .spray: "Третирана площ"
+        case nil: treatment.isChemicalTreatment ? "Третирана площ" : "Площ"
         }
     }
 

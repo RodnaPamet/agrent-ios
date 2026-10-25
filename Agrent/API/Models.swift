@@ -288,6 +288,18 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// Spraying or fertilising, when the row says which.
     var treatmentKind: TreatmentDraft.Kind? { kind.flatMap(TreatmentDraft.Kind.init(rawValue:)) }
 
+    /// A chemical treatment, a spraying or a fertilising, rather than other
+    /// work on parcels: pruning, cultivation, sowing or harvest, which share
+    /// the row (agri-saas #2339, owner 2026-10-25). The row's `kind` is the
+    /// task's own operation type. A row with no kind is from before the
+    /// field, when only treatments had parcels.
+    ///
+    /// Only a treatment has a dose to correct, a ДНЕВНИК page of its own, or
+    /// a withdrawal the phone knows to be right. A bare activity is refused
+    /// by the correction route (`NOT_A_TREATMENT`), and what the withdrawal
+    /// does to one isn't settled yet. So those controls are kept off it.
+    var isChemicalTreatment: Bool { kind == nil || treatmentKind != nil }
+
     /// «1,5 л/дка». Nil without a dose, so the fact is left out rather than
     /// shown as a «0» nobody set a boom to. Up to the column's four places,
     /// trailing zeros dropped, as `OperationLine.doseText` reads it.
