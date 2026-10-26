@@ -404,12 +404,26 @@ enum TreatmentCorrection {
                  productItemId: product?.id ?? original.productItemId,
                  targetNote: targetNote, doseValue: dose ?? original.doseValue, doseUnitId: doseUnit.id,
                  phenophase: phenophase, quarantinePeriodDays: quarantine.days, applicationTechnique: technique,
-                 // A parcel treated whole as its own exact area, as on
-                 // «Ново мероприятие» (owner, 2026-10-25); null only where
-                 // the parcel's area isn't known.
-                 parcels: chosenParcels.map { Body.ParcelArea(parcelId: $0.id,
-                                                              treatedAreaHa: sentArea($0.id)?.wireHectares
-                                                                  ?? $0.areaHa.flatMap { $0 > 0 ? $0 : nil }) })
+                 parcels: chosenParcels.map { Body.ParcelArea(parcelId: $0.id, treatedAreaHa: wireArea($0)) })
+        }
+
+        /// What one chosen parcel's area goes out as, in hectares; nil is
+        /// the whole parcel, sent as `null`.
+        ///
+        /// A recorded area that wasn't touched goes back as it was stored,
+        /// to the digit (#449): the server compares exactly
+        /// (`changedTreatedAreas`), and the field shows decares rounded, so a
+        /// figure read back from it would be an area change nobody made, in
+        /// the trail and in the register. Anything else that is the whole
+        /// parcel goes as its own exact area, as on «Ново мероприятие»
+        /// (owner, 2026-10-25: a filed register keeps the number), and null
+        /// only where that isn't known.
+        private func wireArea(_ parcel: ParcelChoice) -> Double? {
+            if let line = original.lines.first(where: { $0.parcelId == parcel.id }), !areaChanged(line),
+               let stored = line.treatedAreaHa {
+                return stored
+            }
+            return sentArea(parcel.id)?.wireHectares ?? parcel.areaHa.flatMap { $0 > 0 ? $0 : nil }
         }
 
         enum Problem: Equatable, Sendable {
