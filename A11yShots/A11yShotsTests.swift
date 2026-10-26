@@ -122,7 +122,8 @@ final class A11yShotsTests: XCTestCase {
                  "01j-treatment-correction-areas":
                 captureJournalTreatment(app)
             case "17-new-entry", "17b-new-activity": captureNewEntryForm(app)
-            case "01k-activity-correction", "01l-activity-correction-check": captureActivityCorrection(app)
+            case "01k-activity-correction", "01l-activity-correction-check", "01m-activity-correction-parcels":
+                captureActivityCorrection(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "19c-public-profile": capturePublicProfile(app)
             case "18-operation-typed-product":
@@ -693,6 +694,36 @@ final class A11yShotsTests: XCTestCase {
         }
         Thread.sleep(forTimeInterval: 1)
         capture("01k-activity-correction", app: app)
+
+        // Its parcels (#447): the block's, the recorded two ticked and its
+        // third offered, then «Добави парцели от друг блок».
+        let other = app.buttons["Добави парцели от друг блок"]
+        var down = 0
+        while !other.exists, down < 6 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+            down += 1
+        }
+        if other.exists {
+            XCTAssertTrue(scrollWhollyIntoView(other, in: app), "the form would not scroll «Друг блок» into view")
+            Thread.sleep(forTimeInterval: 1)
+            capture("01m-activity-correction-parcels", app: app)
+        } else {
+            // One block on the fixture farm: nothing else to add, and the
+            // parcels are the form's foot.
+            let third = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label BEGINSWITH %@", "SYNTH-3")).firstMatch
+            XCTAssertTrue(third.exists, "the block's other parcel isn't offered")
+            Thread.sleep(forTimeInterval: 1)
+            capture("01m-activity-correction-parcels", app: app)
+        }
+        // Back up to the total, for the change «Проверка» reads back.
+        var up = 0
+        while !total.isHittable, up < 6 {
+            app.swipeDown()
+            Thread.sleep(forTimeInterval: 0.5)
+            up += 1
+        }
 
         // At the field's trailing edge, where the right-aligned «4200» ends,
         // so the cursor is after it: emptied, then the new total.

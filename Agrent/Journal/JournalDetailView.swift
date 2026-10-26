@@ -88,7 +88,7 @@ struct JournalDetailView: View {
 
     private var treatment: JournalTreatment? {
         guard let row = entry.treatment, row.isTreatment else { return nil }
-        return corrected.map(row.applying) ?? row
+        return corrected.map(row.applying) ?? activityCorrected.map(row.applying) ?? row
     }
 
     /// The day, as corrected when it was.

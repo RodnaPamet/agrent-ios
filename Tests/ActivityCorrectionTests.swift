@@ -145,6 +145,115 @@ final class ActivityCorrectionTests: XCTestCase {
         XCTAssertEqual(draft.changes[1].after, TreatmentCheckView.kgText(4300))
     }
 
+    // MARK: - The parcels (agri-saas #2386, #447)
+
+    private func setDraft() -> ActivityCorrection.Draft {
+        ActivityCorrection.Draft(ActivityDefinition(
+            treatmentGroupId: "tg_1", version: 3, kind: "PRUNE", occurredOn: "2026-09-08", harvestKg: nil,
+            lines: [.init(parcelId: "p1", parcelName: "Парцел 1", locationId: "b1", treatedAreaHa: 2.2345),
+                    .init(parcelId: "p2", parcelName: "Парцел 2", locationId: "b1", treatedAreaHa: nil)]))
+    }
+
+    /// A block's parcels as `/locations/{id}/parcels` lists them.
+    private func block(_ id: String, _ parcels: [(String, String, Double?)]) throws -> TreatmentBlocks.Block {
+        let rows = parcels.map { #"{"id":"\#($0.0)","name":"\#($0.1)","areaHa":\#($0.2.map { "\($0)" } ?? "null")}"# }
+        let decoded = try JSONDecoder().decode([Parcel].self, from: Data("[\(rows.joined(separator: ","))]".utf8))
+        return TreatmentBlocks.Block(id: id, name: "Блок \(id)", parcels: decoded)
+    }
+
+    private func offered() throws -> ActivityCorrection.Draft {
+        var form = setDraft()
+        form.offer([try block("b1", [("p1", "Парцел 1", 3), ("p2", "Парцел 2", 1.2), ("p3", "Парцел 3", 0.8)]),
+                    try block("b9", [("p9", "Парцел 9", 4)])])
+        return form
+    }
+
+    /// Any block may be offered, unlike a treatment's: a block the activity
+    /// never covered lists its parcels unticked (owner, 2026-10-26).
+    func testAnyBlocksParcelsAreOfferedUnticked() throws {
+        XCTAssertEqual(setDraft().blockIDs, ["b1"])
+        let form = try offered()
+        XCTAssertEqual(form.parcels.map(\.id), ["p1", "p2", "p3", "p9"])
+        XCTAssertEqual(form.parcels.last?.blockID, "b9")
+        XCTAssertEqual(form.chosen, ["p1", "p2"])
+        XCTAssertEqual(form.changed, [], "offering changes nothing")
+        XCTAssertEqual(form.problems(), [.nothingChanged])
+    }
+
+    /// The whole set goes out, and an untouched parcel keeps its STORED area
+    /// to the digit: the server compares exactly, and the field shows decares
+    /// rounded. A whole parcel goes as its own exact area (owner, #435).
+    func testTheWholeSetGoesOutWithUntouchedAreasAsStored() throws {
+        var form = try offered()
+        form.chosen.insert("p9")
+        XCTAssertEqual(form.changed, [.parcels])
+        XCTAssertEqual(try json(form.body), [
+            "parcelIds": ["p1", "p2", "p9"],
+            "parcels": [["parcelId": "p1", "treatedAreaHa": 2.2345], ["parcelId": "p2", "treatedAreaHa": 1.2],
+                        ["parcelId": "p9", "treatedAreaHa": 4]],
+        ])
+        XCTAssertEqual(form.changes.map(\.label), ["Добавен парцел"])
+        XCTAssertEqual(form.changes.first?.after, "Парцел 9 — \(Area(hectares: 4).text)")
+    }
+
+    func testADroppedParcelIsReadBack() throws {
+        var form = try offered()
+        form.chosen.remove("p2")
+        XCTAssertEqual(try json(form.body), [
+            "parcelIds": ["p1"], "parcels": [["parcelId": "p1", "treatedAreaHa": 2.2345]],
+        ])
+        XCTAssertEqual(form.changes.map(\.label), ["Премахнат парцел"])
+        XCTAssertEqual(form.changes.first?.before, "Парцел 2")
+    }
+
+    /// A mistyped area on a parcel that stays is correctable; emptying it is
+    /// the whole parcel, sent as its exact area (#435).
+    func testARetainedParcelsAreaIsCorrected() throws {
+        var form = try offered()
+        form.areaTexts["p1"] = "15"
+        XCTAssertEqual(try json(form.body), [
+            "parcelIds": ["p1", "p2"],
+            "parcels": [["parcelId": "p1", "treatedAreaHa": 1.5], ["parcelId": "p2", "treatedAreaHa": 1.2]],
+        ])
+        XCTAssertEqual(form.changes.map(\.label), ["Площ — Парцел 1"])
+
+        form.areaTexts["p1"] = ""
+        XCTAssertEqual(try json(form.body), [
+            "parcelIds": ["p1", "p2"],
+            "parcels": [["parcelId": "p1", "treatedAreaHa": 3], ["parcelId": "p2", "treatedAreaHa": 1.2]],
+        ])
+        XCTAssertEqual(form.changes.first?.after, Area(hectares: 3).text)
+    }
+
+    func testEveryParcelUntickedIsAWithdrawal() throws {
+        var form = try offered()
+        form.chosen = []
+        XCTAssertEqual(form.problems().first, .noParcels)
+        XCTAssertTrue(form.problems().first?.text.contains("«Изтрий»") == true)
+    }
+
+    func testAnAreaLargerThanTheParcelIsSaid() throws {
+        var form = try offered()
+        form.areaTexts["p1"] = "40"
+        XCTAssertEqual(form.problems().first, .areaTooLarge("Парцел 1", Area(hectares: 3).text))
+        form.areaTexts["p1"] = "0"
+        XCTAssertEqual(form.problems().first, .area("Парцел 1"))
+    }
+
+    /// The entry's row after a parcel change: its count follows, and its total
+    /// area waits for the journal rather than showing what it was.
+    func testAParcelChangeLeavesTheRowsAreaToTheJournal() {
+        let row = JournalTreatment(treatmentGroupId: "tg_1", parcelCount: 2, totalAreaHa: 3.4, kind: "PRUNE")
+        let saved = ActivityCorrection.Saved(definition: ActivityDefinition(
+            treatmentGroupId: "tg_1", version: 4, kind: "PRUNE", occurredOn: "2026-09-08", harvestKg: nil,
+            lines: [.init(parcelId: "p1", parcelName: nil)]), parcelsChanged: true)
+        let after = row.applying(saved)
+        XCTAssertEqual(after.parcelCount, 1)
+        XCTAssertNil(after.totalAreaHa)
+        XCTAssertEqual(row.applying(ActivityCorrection.Saved(definition: saved.definition)).totalAreaHa, 3.4,
+                       "positive control: a day's correction keeps the area")
+    }
+
     // MARK: - The trail
 
     /// An activity's own trail, with an activity's definition as `previous`:
@@ -161,6 +270,22 @@ final class ActivityCorrectionTests: XCTestCase {
         XCTAssertEqual(correction.previousActivity?.activity, .harvest)
         XCTAssertEqual(TreatmentCorrection.was(correction).map(TreatmentCorrection.wasText),
                        ["Беше: \(BgDate.full(try day("2026-09-08")))", "Беше: \(TreatmentCheckView.kgText(4200))"])
+    }
+
+    /// A parcel change says what the set was, each parcel with its area.
+    func testAnActivitysParcelCorrectionSaysWhatTheSetWas() async throws {
+        let read = try await APIClient.shared.decode(Data(#"""
+            {"treatmentGroupId":"tg_1","version":2,"corrections":[{"correctedAt":"2026-10-26T08:00:00.000Z",
+             "correctedBy":null,"changedFields":["parcels"],
+             "previous":{"treatmentGroupId":"tg_1","version":1,"kind":"PRUNE","occurredOn":"2026-09-08",
+                         "harvestKg":null,"parcelCount":2,"lines":[
+                           {"parcelId":"p1","parcelName":"Парцел 1","locationId":"b1","treatedAreaHa":1.2},
+                           {"parcelId":"p2","parcelName":"Парцел 2","locationId":"b1","treatedAreaHa":null}]}}]}
+            """#.utf8), as: TreatmentCorrectionTrail.self)
+        let was = TreatmentCorrection.was(try XCTUnwrap(read.corrections.first))
+        XCTAssertEqual(was.map(\.label), ["Парцели"])
+        XCTAssertEqual(TreatmentCorrection.wasText(was[0]),
+                       "Беше: Парцел 1 — \(Area(hectares: 1.2).text), Парцел 2 — \(TreatmentCorrection.wholeParcel)")
     }
 
     /// Positive control: a treatment's `previous` is still read as one, and

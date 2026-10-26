@@ -789,6 +789,11 @@ enum UserMessage {
         "NOT_AN_ACTIVITY": "Записът влага продукт, тоест е третиране, а не мероприятие. Коригирайте го от третирането.",
         "HARVEST_TOTAL_NOT_APPLICABLE":
             "Само прибирането на реколтата има количество. Запишете добива към прибирането, а не към това мероприятие.",
+        // Its parcels (agri-saas #2386). The phone sends no empty set and
+        // only the farm's own blocks, so these are the route checking again.
+        "ACTIVITY_CORRECTION_WOULD_EMPTY":
+            "Корекцията не може да премахне всички парцели. Изтрийте мероприятието вместо това.",
+        "ACTIVITY_CORRECTION_BLOCK_UNRESOLVED": "Този парцел не може да бъде отнесен към блок на мероприятието.",
         // Other work (#439, agri-saas `/journal/activities`), in the server's
         // words. The phone sends no product with it, so the first is the
         // route checking again; the second can meet a harvest.
