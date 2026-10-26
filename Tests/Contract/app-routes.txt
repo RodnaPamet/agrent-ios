@@ -70,6 +70,8 @@
 /api/t/{tenantSlug}/items
 /api/t/{tenantSlug}/journal
 /api/t/{tenantSlug}/journal/activities
+/api/t/{tenantSlug}/journal/activities/{treatmentGroupId}/corrections
+/api/t/{tenantSlug}/journal/activities/{treatmentGroupId}/definition
 /api/t/{tenantSlug}/journal/treatments
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/corrections

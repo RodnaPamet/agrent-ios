@@ -145,6 +145,11 @@ final class RouteContractTests: XCTestCase {
     /// open, came off with the refresh after its merge. «Нов запис» opened
     /// the treatment form only once `/api/health` carried #1822 (765fc4020,
     /// 2026-10-14).
+    ///
+    /// Empty again from agri-saas main 686bbfb: «Коригирай» on pruning,
+    /// cultivation and a harvest (#439), built against agri-saas #2375 while
+    /// that PR was open, came off with the refresh from its merge. The PR
+    /// (#445) merged only once `/api/health` carried #2375 (2026-10-26).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -207,6 +212,8 @@ final class RouteContractTests: XCTestCase {
             // «Коригирай»: the prefill and the correction, one path (#392).
             // Other work from «Нов запис» (#439, agri-saas `/journal/activities`).
             ("ActivityAPI.swift", [ActivityAPI.recordPath(tenant: FarmPath.openSlug)]),
+            ("ActivityCorrectionAPI.swift", [ActivityCorrectionAPI.definitionPath("{treatmentGroupId}"),
+                                             ActivityCorrectionAPI.correctionsPath("{treatmentGroupId}")]),
             ("TreatmentCorrectionAPI.swift", [TreatmentCorrectionAPI.definitionPath("{treatmentGroupId}"),
                                               TreatmentCorrectionAPI.correctionsPath("{treatmentGroupId}")]),
             ("ExchangeAPI.swift", [

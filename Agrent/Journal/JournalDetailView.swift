@@ -43,7 +43,9 @@ import SwiftUI
 /// And a second (owner, 2026-10-24): «Коригирай» on a recorded treatment,
 /// for its creator and the farm's administrators (#392). That is the
 /// treatment's own correction route (`TreatmentCorrectionAPI`), under the
-/// treatment's version, never the entry's PUT/PATCH.
+/// treatment's version, never the entry's PUT/PATCH. Pruning, cultivation and
+/// a harvest have theirs (`ActivityCorrectionAPI`, #439, owner 2026-10-25):
+/// the same button, the address picked by the row's kind.
 ///
 /// ── A treatment, and its ДНЕВНИК again (#320) ──
 ///
@@ -74,6 +76,8 @@ struct JournalDetailView: View {
     /// with: the route carries a value, so the list reading again does not
     /// reach it.
     @State private var corrected: TreatmentCorrection.Saved?
+    /// The same for pruning, cultivation or a harvest: only the day shows.
+    @State private var activityCorrected: ActivityCorrection.Saved?
     /// Bumped by each save, so «Корекции» reads the newest one in.
     @State private var trailRevision = 0
     /// The treatment's corrections (agri-saas #2292); nil until read.
@@ -89,7 +93,13 @@ struct JournalDetailView: View {
 
     /// The day, as corrected when it was.
     private var occurredAt: Date? {
-        corrected?.definition.occurredOn.flatMap(BgDate.parseISODay) ?? entry.occurredAt
+        (corrected?.definition.occurredOn ?? activityCorrected?.definition.occurredOn)
+            .flatMap(BgDate.parseISODay) ?? entry.occurredAt
+    }
+
+    /// «Коригирай»'s offer, for either route.
+    private var mayCorrect: Bool {
+        TreatmentCorrection.offered(entry, to: people.user) || ActivityCorrection.offered(entry, to: people.user)
     }
 
     var body: some View {
@@ -115,8 +125,7 @@ struct JournalDetailView: View {
                     .controlSize(.large)
                     .accessibilityInputLabels(A11y.Spoken.seeOnMap)
                 }
-                if let treatment, let handle = treatment.treatmentGroupId?.recorded,
-                   TreatmentCorrection.offered(entry, to: people.user) {
+                if let treatment, let handle = treatment.treatmentGroupId?.recorded, mayCorrect {
                     Button {
                         correcting = true
                     } label: {
@@ -126,10 +135,17 @@ struct JournalDetailView: View {
                     .controlSize(.large)
                     .accessibilityInputLabels(A11y.Spoken.correctTreatment)
                     .sheet(isPresented: $correcting) {
-                        TreatmentCorrectionFlow(handle: handle, row: treatment) { saved in
-                            corrected = saved
-                            trailRevision += 1
-                            AccessibilityNotification.Announcement("Корекцията е запазена.").post()
+                        // The kind picks the route: each refuses the other's.
+                        if treatment.activityKind != nil {
+                            ActivityCorrectionFlow(handle: handle) { saved in
+                                activityCorrected = saved
+                                didCorrect()
+                            }
+                        } else {
+                            TreatmentCorrectionFlow(handle: handle, row: treatment) { saved in
+                                corrected = saved
+                                didCorrect()
+                            }
                         }
                     }
                 }
@@ -163,17 +179,30 @@ struct JournalDetailView: View {
         }
     }
 
+    /// «Корекции» reads the newest one in, and it is said: the sheet closing
+    /// onto the corrected entry is the only other sign.
+    private func didCorrect() {
+        trailRevision += 1
+        AccessibilityNotification.Announcement("Корекцията е запазена.").post()
+    }
+
     private struct TrailKey: Hashable {
         let handle: String?
         let revision: Int
     }
 
-    /// «Корекции», for any treatment: the read is open to everyone who can
-    /// see it. A failure keeps what was there, which is nothing at first.
+    /// «Корекции», for any treatment or other work: the read is open to
+    /// everyone who can see it, on the route the kind names, as «Коригирай»'s
+    /// is. A failure keeps what was there, which is nothing at first.
     private func readTrail() async {
-        guard let handle = treatment?.treatmentGroupId?.recorded,
-              let read = try? await TreatmentCorrectionAPI.corrections(handle) else { return }
-        trail = read
+        guard let treatment, let handle = treatment.treatmentGroupId?.recorded else { return }
+        let read: TreatmentCorrectionTrail?
+        if treatment.activityKind != nil {
+            read = try? await ActivityCorrectionAPI.corrections(handle)
+        } else {
+            read = try? await TreatmentCorrectionAPI.corrections(handle)
+        }
+        if let read { trail = read }
     }
 
     // MARK: - Header

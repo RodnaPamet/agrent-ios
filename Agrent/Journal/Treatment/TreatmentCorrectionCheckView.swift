@@ -1,14 +1,15 @@
 import SwiftUI
 
 /// «Коригирай», step two: each change read back, what it was and what it
-/// becomes, before «Запази» (agrent-ios #392).
+/// becomes, before «Запази» (agrent-ios #392). An activity's correction
+/// reads its changes back here too (#439).
 ///
 /// Only the changes, unlike «Ново мероприятие»'s «Проверка», which reads the
 /// whole treatment back. Here the rest stays as recorded, and a list of
 /// everything would hide the one line that moves. A change to a filed
 /// record is checked here, as a new entry is there.
 struct TreatmentCorrectionCheckView: View {
-    let draft: TreatmentCorrection.Draft
+    let changes: [TreatmentCorrection.Draft.Change]
     let saving: Bool
     let failure: String?
     /// Someone else corrected it meanwhile: «Запази» can't go out, and the
@@ -21,7 +22,7 @@ struct TreatmentCorrectionCheckView: View {
     var body: some View {
         PageForm {
             Section {
-                ForEach(draft.changes) { change in
+                ForEach(changes) { change in
                     ChangeRow(change: change)
                 }
             } header: {

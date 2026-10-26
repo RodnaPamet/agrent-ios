@@ -1,0 +1,12 @@
+{
+  "treatmentGroupId": "tg_fixture_harvest",
+  "version": 1,
+  "kind": "HARVEST",
+  "occurredOn": "2026-09-08",
+  "harvestKg": 4200,
+  "parcelCount": 2,
+  "lines": [
+    { "parcelId": "par_holes", "parcelName": "SYNTH-1", "locationId": "loc_synthetic_1", "treatedAreaHa": 2.2 },
+    { "parcelId": "par_simple", "parcelName": "SYNTH-2", "locationId": "loc_synthetic_1", "treatedAreaHa": 1.2 }
+  ]
+}

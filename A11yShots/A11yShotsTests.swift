@@ -122,6 +122,7 @@ final class A11yShotsTests: XCTestCase {
                  "01j-treatment-correction-areas":
                 captureJournalTreatment(app)
             case "17-new-entry", "17b-new-activity": captureNewEntryForm(app)
+            case "01k-activity-correction", "01l-activity-correction-check": captureActivityCorrection(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "19c-public-profile": capturePublicProfile(app)
             case "18-operation-typed-product":
@@ -152,6 +153,7 @@ final class A11yShotsTests: XCTestCase {
         captureFarmRecordSheet(app)
         captureJournalFilter(app)
         captureJournalTreatment(app)
+        captureActivityCorrection(app)
         captureNewEntryForm(app)
 
         // ── The screens reached from the menu, done BEFORE Локации ──
@@ -654,6 +656,62 @@ final class A11yShotsTests: XCTestCase {
 
         app.buttons["Отказ"].firstMatch.tap()
         XCTAssertTrue(correct.waitForExistence(timeout: 5), "«Отказ» didn't close the correction")
+    }
+
+    /// «Коригирай» on a harvest (#439, agri-saas #2375): `journal-list.json`'s
+    /// last row, the form prefilled from `activity-definition.json` with its
+    /// day and total; then a new total and «Проверка» with that one change.
+    /// Left by «Отказ»: «Запази» is a write. Starts and ends on Дневник.
+    private func captureActivityCorrection(_ app: XCUIApplication) {
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Прибиране на реколтата"))
+            .firstMatch
+        // The list's last row: down until a lazy List has built it.
+        var swipes = 0
+        while !row.waitForExistence(timeout: swipes == 0 ? 5 : 2), swipes < 8 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(row.exists, "Дневник has no harvest row — journal-list.json's last row")
+        XCTAssertTrue(scrollWhollyIntoView(row, in: app), "the list would not scroll the harvest into view")
+        row.tap()
+
+        let correct = app.buttons["Коригирай"]
+        XCTAssertTrue(correct.waitForExistence(timeout: 10), "the harvest offers no «Коригирай»")
+        XCTAssertFalse(app.buttons["Изтегли PDF"].exists, "a harvest has no ДНЕВНИК page")
+        XCTAssertTrue(scrollWhollyIntoView(correct, in: app), "the page would not scroll «Коригирай» into view")
+        correct.tap()
+
+        // By its title or its prompt, as on a treatment's correction.
+        let total = app.textFields
+            .matching(NSPredicate(format: "label == %@ OR placeholderValue == %@ OR value == %@",
+                                  "Количество", "кг", "4200"))
+            .firstMatch
+        guard total.waitForExistence(timeout: 10) else {
+            XCTFail("«Коригирай» opened without the harvest's definition:\n\(app.debugDescription)")
+            return
+        }
+        Thread.sleep(forTimeInterval: 1)
+        capture("01k-activity-correction", app: app)
+
+        // At the field's trailing edge, where the right-aligned «4200» ends,
+        // so the cursor is after it: emptied, then the new total.
+        total.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+        total.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "4300")
+        let next = app.buttons["Напред"]
+        XCTAssertTrue(next.isEnabled, "one change, and «Напред» still dimmed")
+        next.tap()
+
+        let change = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Прибрано: беше 4"))
+            .firstMatch
+        XCTAssertTrue(change.waitForExistence(timeout: 5), "«Проверка» doesn't read the change back")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01l-activity-correction-check", app: app)
+
+        app.buttons["Отказ"].firstMatch.tap()
+        XCTAssertTrue(correct.waitForExistence(timeout: 5), "«Отказ» didn't close the correction")
+        goBack(app, to: "Земеделски дневник")
     }
 
     // MARK: - «Култура» (agrent-ios#245)

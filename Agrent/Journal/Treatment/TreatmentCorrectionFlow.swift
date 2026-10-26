@@ -64,7 +64,7 @@ struct TreatmentCorrectionFlow: View {
             .navigationDestination(for: Step.self) { _ in
                 if let draft {
                     TreatmentCorrectionCheckView(
-                        draft: draft, saving: saving, failure: failure, stale: stale,
+                        changes: draft.changes, saving: saving, failure: failure, stale: stale,
                         onSave: { Task { await save() } },
                         onReload: { Task { await reload() } },
                         onCancel: { dismiss() })
