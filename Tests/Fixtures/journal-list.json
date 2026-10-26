@@ -94,7 +94,8 @@
         "blockNames": [
           "Блок 2"
         ],
-        "recordedInDiary": true
+        "recordedInDiary": true,
+        "harvestKg": 4200
       }
     }
   ],

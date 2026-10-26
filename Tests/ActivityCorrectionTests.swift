@@ -254,6 +254,36 @@ final class ActivityCorrectionTests: XCTestCase {
                        "positive control: a day's correction keeps the area")
     }
 
+    // MARK: - The total on the row (agri-saas #2389, #446)
+
+    /// The row reads the harvest's one total, and an odd shape costs only
+    /// that field, never the row.
+    func testTheRowReadsTheHarvestTotal() throws {
+        func row(_ value: String) throws -> JournalTreatment {
+            try JSONDecoder().decode(JournalTreatment.self, from: Data(
+                #"{"treatmentGroupId":"tg_1","kind":"HARVEST","parcelCount":2,"harvestKg":\#(value)}"#.utf8))
+        }
+        XCTAssertEqual(try row("4200.5").harvestKg, Decimal(string: "4200.5"))
+        XCTAssertEqual(try row("0").harvestKg, 0, "a measured harvest of nothing is a figure")
+        XCTAssertNil(try row("null").harvestKg)
+        let odd = try row(#""много""#)
+        XCTAssertNil(odd.harvestKg)
+        XCTAssertEqual(odd.parcelCount, 2, "positive control: the rest of the row read")
+    }
+
+    /// A correction's total shows on the entry at once, with or without a
+    /// parcel change.
+    func testACorrectedTotalShowsOnTheRow() {
+        let row = JournalTreatment(treatmentGroupId: "tg_1", parcelCount: 2, totalAreaHa: 3.4, kind: "HARVEST",
+                                   harvestKg: 4200)
+        let saved = ActivityCorrection.Saved(definition: ActivityDefinition(
+            treatmentGroupId: "tg_1", version: 4, kind: "HARVEST", occurredOn: "2026-09-08", harvestKg: 4300,
+            lines: [.init(parcelId: "p1", parcelName: nil), .init(parcelId: "p2", parcelName: nil)]))
+        let after = row.applying(saved)
+        XCTAssertEqual(after.harvestKg, 4300)
+        XCTAssertEqual(after.totalAreaHa, 3.4, "no parcel change: the area holds")
+    }
+
     // MARK: - The trail
 
     /// An activity's own trail, with an activity's definition as `previous`:

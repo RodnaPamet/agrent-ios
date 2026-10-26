@@ -329,14 +329,17 @@ extension JournalTreatment {
     var activityKind: ActivityKind? { kind.flatMap(ActivityKind.init(rawValue:)) }
 
     /// The row as an activity's correction left it, until the journal is
-    /// read again. A parcel change moves the total area, which can't be
-    /// worked out here (a whole parcel's area isn't in the definition), so it
-    /// is left out rather than shown as it was.
+    /// read again: the harvest's total as corrected (#446). A parcel change
+    /// moves the total area, which can't be worked out here (a whole parcel's
+    /// area isn't in the definition), so it is left out rather than shown as
+    /// it was.
     func applying(_ saved: ActivityCorrection.Saved) -> JournalTreatment {
-        guard saved.parcelsChanged else { return self }
         var row = self
-        row.totalAreaHa = nil
-        row.parcelCount = saved.definition.lines.count
+        row.harvestKg = saved.definition.harvestKg
+        if saved.parcelsChanged {
+            row.totalAreaHa = nil
+            row.parcelCount = saved.definition.lines.count
+        }
         return row
     }
 }

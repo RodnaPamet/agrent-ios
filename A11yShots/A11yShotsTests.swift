@@ -122,7 +122,8 @@ final class A11yShotsTests: XCTestCase {
                  "01j-treatment-correction-areas":
                 captureJournalTreatment(app)
             case "17-new-entry", "17b-new-activity": captureNewEntryForm(app)
-            case "01k-activity-correction", "01l-activity-correction-check", "01m-activity-correction-parcels":
+            case "01k-activity-correction", "01l-activity-correction-check", "01m-activity-correction-parcels",
+                 "01n-journal-harvest":
                 captureActivityCorrection(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "19c-public-profile": capturePublicProfile(app)
@@ -680,6 +681,13 @@ final class A11yShotsTests: XCTestCase {
         let correct = app.buttons["Коригирай"]
         XCTAssertTrue(correct.waitForExistence(timeout: 10), "the harvest offers no «Коригирай»")
         XCTAssertFalse(app.buttons["Изтегли PDF"].exists, "a harvest has no ДНЕВНИК page")
+        // Its one total, from the row (#446, agri-saas #2389).
+        let shownTotal = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "килограма"))
+            .firstMatch
+        XCTAssertTrue(shownTotal.waitForExistence(timeout: 5), "the harvest's entry doesn't show its total")
+        Thread.sleep(forTimeInterval: 1)
+        capture("01n-journal-harvest", app: app)
         XCTAssertTrue(scrollWhollyIntoView(correct, in: app), "the page would not scroll «Коригирай» into view")
         correct.tap()
 

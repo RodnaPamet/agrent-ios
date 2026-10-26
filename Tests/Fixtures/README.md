@@ -401,8 +401,9 @@ shows each with what it was.
 
 `activity-definition.json`: `GET /journal/activities/tg_fixture_harvest/definition`
 (agri-saas #2375), the `FarmActivityDefinition` «Коригирай» starts from on
-`journal-list.json`'s last row, a harvest. SYNTHETIC: the same two parcels
-as above, an invented total of 4200 kg. Its correction (`PUT`) is a write
+`journal-list.json`'s last row, a harvest, whose row carries the same
+invented total of 4200 kg (`harvestKg`, agri-saas #2389). SYNTHETIC: the
+same two parcels as above. Its correction (`PUT`) is a write
 and stays `501 WRITE_REFUSED`.
 
 ## A recorded treatment's map (agrent-ios#399)

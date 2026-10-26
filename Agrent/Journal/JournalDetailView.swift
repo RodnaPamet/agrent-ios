@@ -262,6 +262,15 @@ struct JournalDetailView: View {
     /// said a second time.
     @ViewBuilder
     private func treatmentFacts(_ treatment: JournalTreatment) -> some View {
+        // A harvest's one total (#446): the only place a reader sees it once
+        // saved, as the correction's read is write-gated.
+        if let kg = treatment.harvestKg {
+            LabelledFact(label: ActivityCorrection.harvestLabel) {
+                factText(TreatmentCheckView.kgText(kg))
+                    .accessibilityLabel(TreatmentCheck.Amount(value: NSDecimalNumber(decimal: kg).doubleValue,
+                                                              unit: "кг").spoken)
+            }
+        }
         if let dose = treatment.doseText {
             LabelledFact(label: "Доза") {
                 factText(dose).accessibilityLabel(treatment.doseSpoken ?? dose)

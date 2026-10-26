@@ -218,13 +218,17 @@ struct JournalTreatment: Codable, Equatable, Sendable {
     /// server before them.
     var pendingCount: Int = 0
     var lineCount: Int = 0
+    /// A harvest's «Продукция» in kg, ONE total for the activity (agri-saas
+    /// #2389, #446). Nil on anything but a harvest, and on a harvest whose
+    /// total was never recorded: not a harvest of nothing, which is 0.
+    var harvestKg: Decimal?
 
     init(treatmentGroupId: String? = nil, productName: String? = nil, parcelCount: Int = 0,
          totalAreaHa: Double? = nil, blockNames: [String] = [], earliestHarvestOn: String? = nil,
          kind: String? = nil, doseValue: Decimal? = nil, doseUnit: String? = nil,
          targetNote: String? = nil, applicationTechnique: String? = nil,
          quarantinePeriodDays: Int? = nil, phenophase: String? = nil, mayDelete: Bool? = nil,
-         mayCorrect: Bool? = nil) {
+         mayCorrect: Bool? = nil, harvestKg: Decimal? = nil) {
         self.treatmentGroupId = treatmentGroupId
         self.productName = productName
         self.parcelCount = parcelCount
@@ -240,6 +244,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         self.phenophase = phenophase
         self.mayDelete = mayDelete
         self.mayCorrect = mayCorrect
+        self.harvestKg = harvestKg
     }
 
     init(from decoder: any Decoder) throws {
@@ -261,6 +266,7 @@ struct JournalTreatment: Codable, Equatable, Sendable {
         mayCorrect = (try? c?.decodeIfPresent(Bool.self, forKey: .mayCorrect)) ?? nil
         pendingCount = (try? c?.decodeIfPresent(Int.self, forKey: .pendingCount)) ?? 0
         lineCount = (try? c?.decodeIfPresent(Int.self, forKey: .lineCount)) ?? 0
+        harvestKg = ((try? c?.decodeIfPresent(WireDecimal.self, forKey: .harvestKg)) ?? nil)?.value
     }
 
     /// A row that stands for parcels, rather than an entry folded to itself.
