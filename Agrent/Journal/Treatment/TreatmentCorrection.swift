@@ -669,9 +669,13 @@ extension TreatmentCorrection {
         if !changed.isDisjoint(with: ["parcels", "treatedAreaHa"]) {
             // Every parcel and its area as it was, from the definition's own
             // lines: the trail says what the set was, not which line moved.
-            out.append(line(changed.contains("parcels") ? "Парцели" : "Третирана площ", before.map { previous in
-                previous.lines
-                    .map { "\($0.parcelName) — \(Draft.areaText($0.treatedAreaHa.map(Area.init(hectares:))))" }
+            // An activity's lines the same way (#447), its area «Площ».
+            let lines: [(name: String, areaHa: Double?)]? =
+                before.map { $0.lines.map { ($0.parcelName, $0.treatedAreaHa) } }
+                ?? activityBefore.map { $0.lines.map { ($0.parcelName?.recorded ?? "Парцел", $0.treatedAreaHa) } }
+            let areaWord = activityBefore != nil ? "Площ" : "Третирана площ"
+            out.append(line(changed.contains("parcels") ? "Парцели" : areaWord, lines.map { lines in
+                lines.map { "\($0.name) — \(Draft.areaText($0.areaHa.map(Area.init(hectares:))))" }
                     .joined(separator: ", ")
             }))
         }

@@ -12,12 +12,15 @@ import Foundation
 ///
 /// ── What can be corrected ──
 ///
-/// The day, and a harvest's total in kg: the two things a bare activity
-/// records that a person can get wrong. Not its kind (a pruning that was a
-/// harvest is another record), not its parcels yet (agri-saas #2373's second
-/// step), and not a title: the journal entry's title is composed by the
-/// server from the kind and the parcel, so a title field would change a
-/// string no farmer sees (backend 1, 2026-10-26).
+/// The day, a harvest's total in kg, and the parcels with each one's area
+/// (agri-saas #2386, #447). Not its kind (a pruning that was a harvest is
+/// another record), and not a title: the journal entry's title is composed
+/// by the server from the kind and the parcel, so a title field would change
+/// a string no farmer sees (backend 1, 2026-10-26).
+///
+/// Unlike a treatment's, the parcels may come from any of the farm's blocks
+/// (owner, 2026-10-26): activities aren't in the БАБХ register, which prints
+/// a table per block, and the farm's diary prints one row per activity.
 ///
 /// The address follows the row's kind, for the definition and the trail
 /// alike: a bare handle on the treatments' routes is `NOT_A_TREATMENT`, a
@@ -70,6 +73,11 @@ struct ActivityDefinition: Decodable, Equatable, Sendable {
     struct Line: Decodable, Equatable, Sendable {
         let parcelId: String
         let parcelName: String?
+        /// The parcel's block. Every parcel has one since agri-saas #2305;
+        /// nullable in the spec all the same.
+        var locationId: String? = nil
+        /// Hectares. NIL MEANS THE WHOLE PARCEL, not an empty value.
+        var treatedAreaHa: Double? = nil
     }
 
     var activity: ActivityKind? { ActivityKind(rawValue: kind) }

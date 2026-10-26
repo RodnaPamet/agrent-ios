@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// «Коригирай» on pruning, cultivation or a harvest (#439; agri-saas #2375):
-/// the activity as recorded, read from the server; its day, and a harvest's
-/// total; «Проверка» with each change before and after; «Запази».
+/// the activity as recorded, read from the server; its day, a harvest's
+/// total and its parcels (#447); «Проверка» with each change before and
+/// after; «Запази».
 ///
 /// A treatment's correction, made small (`TreatmentCorrectionFlow`): it
 /// starts from `GET …/definition` for the version, as a correction made
@@ -17,6 +18,9 @@ struct ActivityCorrectionFlow: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: ActivityCorrection.Draft?
+    /// The activity's blocks and their parcels, read once the definition
+    /// names them, and any other block the person adds.
+    @State private var blocks = TreatmentBlocks()
     @State private var loadFailure: String?
     @State private var path: [Step] = []
     @State private var saving = false
@@ -29,7 +33,7 @@ struct ActivityCorrectionFlow: View {
         NavigationStack(path: $path) {
             Group {
                 if let draft = Binding($draft) {
-                    ActivityCorrectionForm(draft: draft,
+                    ActivityCorrectionForm(draft: draft, blocks: blocks,
                                            onNext: { failure = nil; path = [.check] },
                                            onCancel: { dismiss() })
                 } else if let loadFailure {
@@ -69,6 +73,12 @@ struct ActivityCorrectionFlow: View {
         loadFailure = nil
         do {
             draft = ActivityCorrection.Draft(try await ActivityCorrectionAPI.definition(handle))
+            // The form is up by now; the blocks' other parcels join the list
+            // when they come, unticked.
+            if let ids = draft?.blockIDs {
+                await blocks.load(blockIDs: ids)
+                draft?.offer(blocks.blocks)
+            }
         } catch {
             loadFailure = UserMessage.text(for: error)
         }
@@ -92,7 +102,8 @@ struct ActivityCorrectionFlow: View {
             let corrected = try await ActivityCorrectionAPI.correct(
                 handle, draft.body, version: draft.original.version)
             JournalChanges.shared.changed()
-            onCorrected(ActivityCorrection.Saved(definition: corrected))
+            onCorrected(ActivityCorrection.Saved(definition: corrected,
+                                                 parcelsChanged: draft.changed.contains(.parcels)))
             dismiss()
         } catch APIClient.APIError.conflict {
             stale = true
