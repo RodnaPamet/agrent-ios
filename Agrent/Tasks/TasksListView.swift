@@ -11,7 +11,17 @@ import SwiftUI
 struct TasksListView: View {
     @State private var store = TasksStore()
     @State private var permission = PushPermission.shared
+    @State private var people = CurrentUserStore.shared
+    /// Rows swiped away, inside their five seconds or just sent (#454).
+    @State private var removal = TaskRemoval()
+    /// The row whose «Изтрий» is being asked about (owner, 2026-10-26).
+    @State private var confirmingRemoval: WorkItemSummary?
+    @State private var confirming = false
+    /// A delete the server refused is being said.
+    @State private var refused = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
 
     var body: some View {
         RoutedStack {
@@ -33,9 +43,39 @@ struct TasksListView: View {
                     .background(Palette.Surface.page)
                 NewTaskButton { await store.load() }
             }
+            // Under the list and the +, as on Дневник: what went, and
+            // «Отмени» for its five seconds.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let undoable = removal.undoable { undoBar(undoable) }
+            }
             .navigationTitle("Задачи")
             .appMenu()
+            .alert(TaskRemoval.confirmTitle, isPresented: $confirming, presenting: confirmingRemoval) { item in
+                Button(TreatmentRemoval.actionTitle, role: .destructive) { remove(item) }
+                    .accessibilityInputLabels(A11y.Spoken.deleteTreatment)
+                Button("Отказ", role: .cancel) {}
+                    .accessibilityInputLabels(A11y.Spoken.cancel)
+            } message: { item in
+                Text(item.title)
+            }
+            .alert("Задачата не е изтрита", isPresented: $refused, presenting: removal.failure) { _ in
+                Button("Затвори", role: .cancel) { removal.dismissFailure() }
+            } message: { failure in
+                Text(failure)
+            }
+            .onChange(of: removal.failure) { _, failure in
+                refused = failure != nil
+            }
+            // The server took a delete: the list as it now stands, and any
+            // sent row it no longer lists stops being hidden.
+            .onChange(of: removal.deletions) {
+                Task {
+                    await store.load()
+                    removal.listRead()
+                }
+            }
             .task { if store.state.value == nil { await store.load() } }
+            .task { _ = await people.load() }
             // Where iOS stands on notifications, for the card — again on a
             // return, as the person may have been to Settings (#272).
             .task { await permission.refresh() }
@@ -86,12 +126,27 @@ struct TasksListView: View {
                     )
                     .pageRow()
                 }
-                Section(titled: Plural.bg(page.items.count, "задача", "задачи")) {
-                ForEach(page.items) { item in
+                // What the list shows: a row swiped away isn't counted.
+                Section(titled: Plural.bg(visible(page.items).count, "задача", "задачи")) {
+                ForEach(visible(page.items)) { item in
                     NavigationLink(value: AppRoute.task(item)) {
                         TaskRow(item: item)
                     }
                     .pageRow()
+                    // Not a full swipe: «Изтрий», then the question, then
+                    // five seconds of «Отмени» (owner, 2026-10-26), as on
+                    // Дневник. Only where the server says it would succeed.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if TaskRemoval.offered(item, to: people.user) {
+                            Button(role: .destructive) {
+                                confirmingRemoval = item
+                                confirming = true
+                            } label: {
+                                Label(TreatmentRemoval.actionTitle, systemImage: "trash")
+                            }
+                            .accessibilityInputLabels(A11y.Spoken.deleteTreatment)
+                        }
+                    }
                 }
                 }
             }
@@ -101,6 +156,41 @@ struct TasksListView: View {
             .contentMargins(.bottom, 96, for: .scrollContent)
             .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
+    }
+
+    /// The rows the list shows: the server's, less what was swiped away.
+    private func visible(_ items: [WorkItemSummary]) -> [WorkItemSummary] {
+        removal.hidden.isEmpty ? items : items.filter { !removal.hidden.contains($0.id) }
+    }
+
+    /// The confirmed «Изтрий»: the row goes, the five seconds start, and it
+    /// is said, with the way back.
+    private func remove(_ item: WorkItemSummary) {
+        removal.remove(item, window: voiceOver || switchControl ? TreatmentRemoval.assistedWindow : nil)
+        if let going = removal.undoable {
+            var said = AttributedString(TaskRemoval.announcement(going))
+            said.accessibilitySpeechAnnouncementPriority = .high
+            AccessibilityNotification.Announcement(said).post()
+        }
+    }
+
+    /// What went, with «Отмени», for the five seconds before it is sent:
+    /// Дневник's bar, for a task.
+    private func undoBar(_ undoable: TaskRemoval.Undoable) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(TaskRemoval.removedText(undoable))
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(TreatmentRemoval.undoTitle) { removal.undo() }
+                .fontWeight(.semibold)
+                .accessibilityInputLabels(A11y.Spoken.undo)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .solidBar(hairline: .top)
     }
 }
 

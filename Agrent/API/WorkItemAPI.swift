@@ -33,6 +33,19 @@ enum WorkItemAPI {
     /// a person. The rule bites on `?assignee=` and filters, not here.
     static func detailPath(_ id: String) -> String { "\(base)/\(URLEscape.segment(id))" }
 
+    /// `DELETE /tasks/{taskId}`: a HARD delete, its comments and links with
+    /// it (agri-saas #2187). Sent only after «Изтрий» was confirmed and its
+    /// five seconds of «Отмени» have passed (`TaskRemoval`).
+    static func delete(_ id: String) async throws {
+        _ = try await APIClient.shared.deleteReturningData(detailPath(id))
+    }
+
+    /// Nothing left to delete: removed from the web or another phone.
+    static func isGone(_ error: Error) -> Bool {
+        if case APIClient.APIError.http(404, "TASK_NOT_FOUND"?, _, _, _) = error { return true }
+        return false
+    }
+
     static func decodeDetail(from data: Data) async throws -> WorkItem {
         try await APIClient.shared.decode(data, as: WorkItem.self)
     }

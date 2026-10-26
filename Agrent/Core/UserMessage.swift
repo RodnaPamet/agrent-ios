@@ -770,6 +770,13 @@ enum UserMessage {
         // A Дневник row's «Изтрий» (agri-saas #2184, agrent-ios #395), in the
         // server's own words, which the web shows. The phone offers it where
         // the row's `mayDelete` says yes; this is the route checking again.
+        // A task's «Изтрий» (#454, agri-saas #2187/#2396), in the server's
+        // words. The phone offers it where the row's `mayDelete` allows, so
+        // these are the route checking again.
+        "TASK_DELETE_NOT_PERMITTED":
+            "Само човекът, създал тази задача, или администратор на стопанството може да я изтрие.",
+        "TASK_BELONGS_TO_TREATMENT":
+            "Тази задача е частта за един блок от записано мероприятие. Изтрийте цялото мероприятие — иначе ще остане наполовина записано.",
         "TREATMENT_DELETE_NOT_PERMITTED":
             "Само човекът, записал това мероприятие, или администратор на стопанството може да го премахне.",
         // «Коригирай» (agri-saas #2283/#2287, agrent-ios #392), in the
