@@ -19,6 +19,9 @@ struct JournalListView: View {
     @State private var removal = TreatmentRemoval()
     /// A swipe the server refused is being said (#395).
     @State private var refused = false
+    /// The row whose «Изтрий» is being asked about (owner, 2026-10-26).
+    @State private var confirmingRemoval: LogEntry?
+    @State private var confirming = false
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
 
@@ -111,6 +114,14 @@ struct JournalListView: View {
             .sheet(isPresented: $exportingRecord, onDismiss: FarmRecordAPI.removeGenerated) {
                 FarmRecordSheet()
             }
+            .alert(TreatmentRemoval.confirmTitle, isPresented: $confirming, presenting: confirmingRemoval) { entry in
+                Button(TreatmentRemoval.actionTitle, role: .destructive) { remove(entry) }
+                    .accessibilityInputLabels(A11y.Spoken.deleteTreatment)
+                Button("Отказ", role: .cancel) {}
+                    .accessibilityInputLabels(A11y.Spoken.cancel)
+            } message: { entry in
+                Text(TreatmentRemoval.confirmMessage(entry))
+            }
             .alert("Мероприятието не е изтрито", isPresented: $refused, presenting: removal.failure) { _ in
                 Button("Затвори", role: .cancel) { removal.dismissFailure() }
             } message: { failure in
@@ -165,6 +176,17 @@ struct JournalListView: View {
             .padding(.top, 8)
             .padding(.bottom, 12)
             .solidBar(hairline: .top)
+        }
+    }
+
+    /// The confirmed «Изтрий»: the row goes, the five seconds start, and it
+    /// is said, with the way back.
+    private func remove(_ entry: LogEntry) {
+        removal.remove(entry, window: voiceOver || switchControl ? TreatmentRemoval.assistedWindow : nil)
+        if let going = removal.undoable {
+            var said = AttributedString(TreatmentRemoval.announcement(going))
+            said.accessibilitySpeechAnnouncementPriority = .high
+            AccessibilityNotification.Announcement(said).post()
         }
     }
 
@@ -262,19 +284,15 @@ struct JournalListView: View {
                     .pageRow()
                     // The WHOLE treatment, every parcel and block (#395).
                     // Not a full swipe: on a register, removing a record
-                    // takes the tap on «Изтрий», and the bar below still
-                    // offers «Отмени» for five seconds. VoiceOver lists it
-                    // among the row's actions.
+                    // takes the tap on «Изтрий», then the question
+                    // «Сигурни ли сте…?» (owner, 2026-10-26), and the bar
+                    // below still offers «Отмени» for five seconds.
+                    // VoiceOver lists it among the row's actions.
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         if TreatmentRemoval.offered(entry, to: people.user) {
                             Button(role: .destructive) {
-                                removal.remove(entry, window: voiceOver || switchControl
-                                               ? TreatmentRemoval.assistedWindow : nil)
-                                if let going = removal.undoable {
-                                    var said = AttributedString(TreatmentRemoval.announcement(going))
-                                    said.accessibilitySpeechAnnouncementPriority = .high
-                                    AccessibilityNotification.Announcement(said).post()
-                                }
+                                confirmingRemoval = entry
+                                confirming = true
                             } label: {
                                 Label(TreatmentRemoval.actionTitle, systemImage: "trash")
                             }

@@ -2217,8 +2217,9 @@ final class A11yShotsTests: XCTestCase {
         capture("01g-treatment-map-target", app: app)
     }
 
-    /// #395: a treatment's «Изтрий» and the bar's «Отмени» (no «Кошче» since
-    /// #411: what's deleted is deleted). The
+    /// #395: a treatment's «Изтрий», the question before it (owner,
+    /// 2026-10-26), and the bar's «Отмени» (no «Кошче» since #411: what's
+    /// deleted is deleted). The
     /// undo comes inside the window, so no delete is ever built; one that
     /// were would meet the seam's refusal of every write, never a server.
     func testSwipeDeleteAndUndo() {
@@ -2233,6 +2234,20 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(delete.waitForExistence(timeout: 5), "the swipe offered no «Изтрий»\n\(app.debugDescription)")
         capture("01h-journal-swipe", app: app)
         delete.tap()
+        // Asked first (owner, 2026-10-26): nothing goes until the question's
+        // own «Изтрий».
+        let question = app.alerts["Сигурни ли сте, че искате да изтриете записа?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "«Изтрий» asked nothing\n\(app.debugDescription)")
+        XCTAssertTrue(row.exists, "the row went before the question was answered")
+        capture("01h2-journal-swipe-confirm", app: app)
+        question.buttons["Отказ"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 3), "«Отказ» removed the row")
+        XCTAssertFalse(app.buttons["Отмени"].exists, "«Отказ» started the five seconds")
+        row.swipeLeft()
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the second swipe offered no «Изтрий»")
+        delete.tap()
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "the second «Изтрий» asked nothing")
+        question.buttons["Изтрий"].tap()
         let undo = app.buttons["Отмени"]
         XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»\n\(app.debugDescription)")
         XCTAssertFalse(row.exists, "the row stayed in the list")

@@ -38,6 +38,19 @@ final class TreatmentRemovalTests: XCTestCase {
             changed: { calls.log.append("changed") })
     }
 
+    // MARK: - The question (owner, 2026-10-26)
+
+    /// «Изтрий» asks first, naming the record and how much it stands for,
+    /// as the bar will.
+    func testTheQuestionNamesTheRecord() {
+        XCTAssertEqual(TreatmentRemoval.confirmTitle, "Сигурни ли сте, че искате да изтриете записа?")
+        let row = entry(parcels: 1)
+        XCTAssertEqual(TreatmentRemoval.confirmMessage(row),
+                       "\(row.displayTitle), \(TreatmentRemoval.extent(of: row.treatment) ?? "")")
+        XCTAssertTrue(TreatmentRemoval.confirmMessage(row).contains("Препарат А"), "the record isn't named")
+        XCTAssertTrue(TreatmentRemoval.confirmMessage(row).hasSuffix("1\u{00A0}парцел"), "its extent isn't said")
+    }
+
     // MARK: - Who is offered «Изтрий»
 
     /// The server's own answer for this person (agri-saas #2184): it alone

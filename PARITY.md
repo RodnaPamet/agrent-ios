@@ -849,6 +849,8 @@ treatment, as the owner ruled (agri-saas #1740 Q2):
 
 The form's note says that.
 
+**«Изтрий» asks first** (owner, 2026-10-26): the swipe's «Изтрий» opens «Сигурни ли сте, че искате да изтриете записа?», with the record and its extent under it. Only that alert's «Изтрий» removes the row, and the five seconds of «Отмени» still follow (the owner chose to keep both). Задачи gets the same once the task list row carries `mayDelete` (asked of backend 1, 2026-10-26).
+
 **The entry's actions are in its bar** (owner, 2026-10-26): «Коригирай» (a pencil) and «Изтегли PDF» (the document icon) sit at the top right of «Запис», as a task's «Редактирай» and the journal's «Дневник (PDF)» do. They used to be full-width buttons under the facts. «Виж на картата» stays a button on the page. A PDF that couldn't be made is said on the page, where the button was. The line about which pages it holds is the button's VoiceOver hint now.
 
 **Other work on the journal row** (agri-saas #2339, owner 2026-10-25): pruning, cultivation, sowing and harvest are lines on parcels like a treatment, and share the journal row. The phone keeps a treatment's own controls off them: the treatment's «Коригирай», «Изтегли PDF» and the unfinished section. Only a row whose `kind` is a spraying, a fertilising or a sowing gets those, or one with no kind, which is from before the field. The treatment correction route refuses a bare activity (`NOT_A_TREATMENT`). «Изтрий» is offered on them, on the same `mayDelete`: the treatment withdrawal removes a bare activity too (backend 1's test, 2026-10-25). **Recording it on the phone (#439, owner 2026-10-25):**
