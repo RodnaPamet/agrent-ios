@@ -109,6 +109,11 @@ the figures, as before, in a sentence that names the margin too. So its
 margin line adds the web's sentence only for the four other codes, and never
 says the same thing twice.
 
+### «Нов разход» is EUR only (owner 2026-10-26)
+
+- **No «Валута» field.** Every cost is saved in EUR, and the form says «Валута: EUR» as Борса's «Нова обява» does. The free-text field it replaces stored whatever was typed. On the owner's farm, 3 costs typed as «EURO» and one test cost in BGN made the calculator refuse its totals as "in more than one currency" (read-only, owner's OK, 2026-10-26).
+- **Old records are the server's** (owner, 2026-10-26: count them as EUR in the sums, leva at the fixed 1,95583, an unrecorded currency as EUR, with no stored record rewritten). The owner tells agri-saas directly. Until then the calculator's sentences stay, because the stored rows still say «EURO» and «BGN».
+
 ### «Нов разход»: «Култура» or «Общи» first (#245, owner 2026-10-09)
 
 «Общи», the farm's overheads, was «Режийни» until the owner renamed it the
