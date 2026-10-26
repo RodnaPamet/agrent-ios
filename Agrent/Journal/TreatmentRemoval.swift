@@ -193,6 +193,19 @@ final class TreatmentRemoval {
 
     static let actionTitle = "Изтрий"
 
+    /// Asked before anything goes (owner, 2026-10-26): «Изтрий» on the swipe
+    /// opens this, and only its own «Изтрий» hides the row and starts the
+    /// five seconds, so a mistaken swipe costs nothing and «Отмени» still
+    /// follows a mistaken confirmation.
+    static let confirmTitle = "Сигурни ли сте, че искате да изтриете записа?"
+
+    /// Under the question: which record, and how much of the register it
+    /// stands for, as the bar will say.
+    nonisolated static func confirmMessage(_ entry: LogEntry) -> String {
+        guard let extent = extent(of: entry.treatment) else { return entry.displayTitle }
+        return "\(entry.displayTitle), \(extent)"
+    }
+
     /// The bar's sentence: what went, by the name the row carried, and how
     /// much of the register that was.
     nonisolated static func removedText(_ undoable: Undoable) -> String {
