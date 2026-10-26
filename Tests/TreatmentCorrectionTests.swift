@@ -269,6 +269,23 @@ final class TreatmentCorrectionTests: XCTestCase {
         XCTAssertTrue(parcels[2]["treatedAreaHa"] is NSNull)
     }
 
+    /// An untouched recorded area goes back as stored, to the digit, though
+    /// the field shows it rounded (#449): the server compares exactly, and a
+    /// figure read back from the field would be a change nobody made.
+    func testAnUntouchedAreaGoesBackAsStored() throws {
+        var form = draft(definition(lines: [
+            .init(parcelId: "p1", parcelName: "Парцел 1", locationId: "b1", treatedAreaHa: 1.23456),
+            .init(parcelId: "p2", parcelName: "Парцел 2", locationId: "b1", treatedAreaHa: 0.5),
+        ]))
+        form.offer([try block("b1", [("p1", "Парцел 1", 2), ("p2", "Парцел 2", 1.5), ("p3", "Парцел 3", 0.8)])])
+        XCTAssertNotEqual(Area.parse(decares: try XCTUnwrap(form.areaTexts["p1"]))?.wireHectares, 1.23456,
+                          "positive control: the field's figure isn't the stored one")
+        form.chosen.insert("p3")
+        let parcels = try XCTUnwrap(try json(form.body)["parcels"] as? [[String: Any]])
+        XCTAssertEqual(parcels.map { $0["treatedAreaHa"] as? Double }, [1.23456, 0.5, 0.8])
+        XCTAssertEqual(form.changes.map(\.label), ["Добавен парцел"], "no area change on the parcels that stayed")
+    }
+
     /// Larger than the parcel, said before the PUT; within the register's
     /// rounding isn't larger.
     func testAnAreaLargerThanTheParcelIsSaid() throws {
