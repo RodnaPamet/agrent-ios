@@ -60,4 +60,18 @@ final class CostSaveOutcomeTests: XCTestCase {
         XCTAssertFalse(source.contains("catch let error as URLError"),
                        "a save sorts URLErrors itself again, past WriteOutcome")
     }
+
+    /// EUR only (owner, 2026-10-26): no field to type a currency into. One
+    /// typed as «EURO» was stored as a currency of its own, and the
+    /// calculator refused to add it to the farm's EUR costs.
+    func testACostIsAlwaysInEuro() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Agrent/Calculator/NewCostView.swift"),
+            encoding: .utf8)
+        XCTAssertTrue(source.contains(#"private let currency = "EUR""#), "the sheet's currency isn't fixed to EUR")
+        XCTAssertFalse(source.contains(#"TextField("Валута""#), "a currency can be typed again")
+        XCTAssertTrue(source.contains(#"ValueRow("Валута")"#), "positive control: the currency is still said")
+    }
 }

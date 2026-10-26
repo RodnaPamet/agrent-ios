@@ -76,7 +76,6 @@ struct NewCostView: View {
     @State private var overhead = OverheadSheet()
     @State private var machinery: MachineryDepreciation?
     @State private var overheadPrefilled = false
-    @State private var currencyEdited = false
 
     /// The «Култура» sheet: the crop chosen and its rows. A sheet typed for
     /// one crop is kept while another is looked at, so choosing a different
@@ -89,9 +88,13 @@ struct NewCostView: View {
     /// crop, since its save would be refused for the same reason.
     @State private var unrecognisedCrops: Set<String> = []
 
-    /// EUR: Bulgaria's currency since 1 January 2026 (owner, 2026-10-10).
-    /// Typed over for a cost in another currency.
-    @State private var currency = "EUR"
+    /// EUR, and only EUR (owner, 2026-10-26): Bulgaria's currency since
+    /// 1 January 2026. The field it replaces took any text, and a cost typed
+    /// in as «EURO» was stored as a currency of its own, which the
+    /// calculator then refused to add to the farm's EUR costs (measured on
+    /// the owner's farm, read-only, the same day). A farm's leva history is
+    /// still converted into it when prefilled (`EuroChangeover`).
+    private let currency = "EUR"
     @State private var incurredOn = Date()
 
     @State private var saving = false
@@ -217,7 +220,6 @@ struct NewCostView: View {
                 cropSheet = new.flatMap { otherCropSheets[$0] } ?? CropSheet()
                 failure = nil
             }
-            .onChange(of: currency) { currencyEdited = true }
             // A refusal belongs to the side that was sent; a lost answer
             // cannot get here, because it fixes the side.
             .onChange(of: scope) { failure = nil }
@@ -271,12 +273,14 @@ struct NewCostView: View {
         }
     }
 
-    /// The sheet's currency and date: one each, for every line.
+    /// The sheet's currency and date: one each, for every line. The currency
+    /// is said, not chosen, as on Борса's «Нова обява».
     @ViewBuilder
     private var commonFields: some View {
         Section {
-            TextField("Валута", text: $currency, prompt: .fieldPrompt("Валута"))
-                .textInputAutocapitalization(.characters)
+            ValueRow("Валута") {
+                Text(currency).foregroundStyle(Palette.secondaryText)
+            }
             DatePicker("Дата", selection: $incurredOn, displayedComponents: .date)
                 .tint(Palette.DatePill.tint)
         }
@@ -377,9 +381,9 @@ struct NewCostView: View {
         guard !overheadPrefilled else { return }
         overheadPrefilled = true
         if let defaults = try? await CostsAPI.loadDefaults() {
-            // Into the sheet's currency: a leva figure converted at the fixed
-            // rate, and said so; one in any other currency left out. The
-            // owner chose EUR over following the farm's last currency.
+            // Into EUR: a leva figure converted at the fixed rate, and said
+            // so; one in any other currency left out (owner, 2026-10-10 and
+            // 2026-10-26: EUR only).
             overhead.prefill(from: defaults, currency: currency)
         }
         machinery = try? await CostsAPI.loadMachinery()
@@ -404,7 +408,6 @@ struct NewCostView: View {
     /// between midnight and 03:00 was booked to the 24th.
     private func saveSheet() async {
         guard canSave else { return }
-        let currency = currency.trimmingCharacters(in: .whitespaces).uppercased()
         let day = BgDate.isoDay(incurredOn)
         let lines: [CreateCostEntry]
         switch scope {

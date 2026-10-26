@@ -6,7 +6,7 @@ import SwiftUI
 struct CropFields: View {
     @Binding var sheet: CropSheet
     let crop: CropChoice
-    /// The sheet's currency, as typed: the rate's unit.
+    /// The sheet's currency, EUR (owner, 2026-10-26): the rate's unit.
     let currency: String
     /// Sent, and in flight or its answer lost: nothing on it is edited.
     let locked: Bool
