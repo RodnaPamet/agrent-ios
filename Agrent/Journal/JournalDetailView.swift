@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 
 /// One diary entry, in full.
@@ -85,6 +86,8 @@ struct JournalDetailView: View {
     /// How far the server got with it (#326); nil until read. Read here,
     /// not by its section, for the reason `UnfinishedTreatmentSection` gives.
     @State private var progress: TreatmentProgress?
+    /// «Изтегли PDF»'s read, its button in the bar (owner, 2026-10-26).
+    @State private var pdf = TreatmentDocument()
 
     private var treatment: JournalTreatment? {
         guard let row = entry.treatment, row.isTreatment else { return nil }
@@ -125,43 +128,21 @@ struct JournalDetailView: View {
                     .controlSize(.large)
                     .accessibilityInputLabels(A11y.Spoken.seeOnMap)
                 }
-                if let treatment, let handle = treatment.treatmentGroupId?.recorded, mayCorrect {
-                    Button {
-                        correcting = true
-                    } label: {
-                        Label(TreatmentCorrection.actionTitle, systemImage: "pencil").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .accessibilityInputLabels(A11y.Spoken.correctTreatment)
-                    .sheet(isPresented: $correcting) {
-                        // The kind picks the route: each refuses the other's.
-                        if treatment.activityKind != nil {
-                            ActivityCorrectionFlow(handle: handle) { saved in
-                                activityCorrected = saved
-                                didCorrect()
-                            }
-                        } else {
-                            TreatmentCorrectionFlow(handle: handle, row: treatment) { saved in
-                                corrected = saved
-                                didCorrect()
-                            }
-                        }
-                    }
+                // An application's own section: finishing or ending it
+                // (`isApplication`, which a sowing is too). Not on pruning,
+                // cultivation or harvest, which the treatments route doesn't
+                // post.
+                if let treatment, treatment.isApplication, let handle = treatment.treatmentGroupId?.recorded,
+                   let progress, !progress.complete {
+                    UnfinishedTreatmentSection(handle: handle, progress: $progress,
+                                               mayFinish: TreatmentCorrection.offered(entry, to: people.user))
                 }
-                // An application's own controls: finishing or ending it
-                // (`isApplication`, which a sowing is too), and its ДНЕВНИК pages
-                // (`isInBabhRegister`, which a sowing isn't). Neither on pruning,
-                // cultivation or harvest, which have no ДНЕВНИК page and which
-                // the treatments route doesn't post.
-                if let treatment, treatment.isApplication, let handle = treatment.treatmentGroupId?.recorded {
-                    if let progress, !progress.complete {
-                        UnfinishedTreatmentSection(handle: handle, progress: $progress,
-                                                   mayFinish: TreatmentCorrection.offered(entry, to: people.user))
-                    }
-                    if treatment.isInBabhRegister {
-                        TreatmentDocumentAction(handle: handle)
-                    }
+                // «Изтегли PDF» is in the bar, which has no room for why it
+                // failed: said here, where the button used to be.
+                if let failure = pdf.failure {
+                    Text(failure)
+                        .foregroundStyle(Palette.error)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 notes
             }
@@ -170,6 +151,56 @@ struct JournalDetailView: View {
             .padding(.vertical, 16)
         }
         .inlineTitle("Запис")
+        // «Коригирай» and «Изтегли PDF» at the top right (owner, 2026-10-26),
+        // as a task's «Редактирай» and the journal's «Дневник (PDF)» are,
+        // rather than as two more full-width buttons under the facts.
+        .toolbar {
+            if let treatment, treatment.treatmentGroupId?.recorded != nil, mayCorrect {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        correcting = true
+                    } label: {
+                        Label(TreatmentCorrection.actionTitle, systemImage: "pencil")
+                    }
+                    .accessibilityInputLabels(A11y.Spoken.correctTreatment)
+                }
+            }
+            // Its ДНЕВНИК pages (`isInBabhRegister`): a spraying's or a
+            // fertilising's, never a sowing's or other work's.
+            if let treatment, treatment.isApplication, treatment.isInBabhRegister,
+               let handle = treatment.treatmentGroupId?.recorded {
+                ToolbarItem(placement: .primaryAction) {
+                    TreatmentDocumentButton(document: pdf, handle: handle)
+                }
+            }
+        }
+        .sheet(isPresented: $correcting) {
+            if let treatment, let handle = treatment.treatmentGroupId?.recorded {
+                // The kind picks the route: each refuses the other's.
+                if treatment.activityKind != nil {
+                    ActivityCorrectionFlow(handle: handle) { saved in
+                        activityCorrected = saved
+                        didCorrect()
+                    }
+                } else {
+                    TreatmentCorrectionFlow(handle: handle, row: treatment) { saved in
+                        corrected = saved
+                        didCorrect()
+                    }
+                }
+            }
+        }
+        .quickLookPreview($pdf.document)
+        // Removed when Quick Look closes, not on `onDisappear`, which fires
+        // under the full-screen preview (`FarmRecordAPI.removeGenerated`).
+        .onChange(of: pdf.document) { _, now in
+            if now == nil { FarmRecordAPI.removeGenerated() }
+        }
+        // Said, not only drawn: the bar's button came back with nothing.
+        .onChange(of: pdf.failure) { _, now in
+            guard let now else { return }
+            AccessibilityNotification.Announcement(now).post()
+        }
         .task(id: TrailKey(handle: treatment?.treatmentGroupId?.recorded, revision: trailRevision)) {
             await readTrail()
         }
