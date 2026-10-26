@@ -88,6 +88,16 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
     /// later change to a closed task moves it.
     let completedAt: Date?
 
+    /// Whether THIS person may delete THIS task (agri-saas #2396): the
+    /// server's own answer, as a journal row's `mayDelete` is. It folds the
+    /// route's three refusals (a reader; not the creator nor an admin; one
+    /// block's share of a recorded treatment) into one flag, and the row
+    /// carries none of the facts behind two of them. Nil from a server, or a
+    /// cached page, from before the field; a value of another shape reads as
+    /// nil too, never as the reason the list fails.
+    var mayDelete: Bool? { mayDeleteRaw?.value }
+    private let mayDeleteRaw: LenientFlag?
+
     /// Spelled out because `severityRaw` is renamed, and a synthesised
     /// `CodingKeys` would have looked for a `severityRaw` key that no server
     /// sends. Every other name is its own.
@@ -95,6 +105,15 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
         case id, key, title, type, status, dueAt
         case assignee, assigneeUserId, createdAt, updatedAt, completedAt
         case severityRaw = "severity"
+        case mayDeleteRaw = "mayDelete"
+    }
+
+    /// A boolean, or nothing: a wrong shape costs the field, not the row.
+    struct LenientFlag: Decodable, Hashable, Sendable {
+        let value: Bool?
+        init(from decoder: any Decoder) throws {
+            value = try? decoder.singleValueContainer().decode(Bool.self)
+        }
     }
 
     /// A person, which makes this the first PERSONAL DATA the app models.
@@ -198,6 +217,8 @@ extension WorkItemSummary {
         createdAt = item.createdAt
         updatedAt = item.updatedAt
         completedAt = item.completedAt
+        // The detail read doesn't say; the list's own row will.
+        mayDeleteRaw = nil
     }
 }
 

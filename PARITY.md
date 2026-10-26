@@ -849,7 +849,7 @@ treatment, as the owner ruled (agri-saas #1740 Q2):
 
 The form's note says that.
 
-**«Изтрий» asks first** (owner, 2026-10-26): the swipe's «Изтрий» opens «Сигурни ли сте, че искате да изтриете записа?», with the record and its extent under it. Only that alert's «Изтрий» removes the row, and the five seconds of «Отмени» still follow (the owner chose to keep both). Задачи gets the same once the task list row carries `mayDelete` (asked of backend 1, 2026-10-26).
+**«Изтрий» asks first** (owner, 2026-10-26): the swipe's «Изтрий» opens «Сигурни ли сте, че искате да изтриете записа?», with the record and its extent under it. Only that alert's «Изтрий» removes the row, and the five seconds of «Отмени» still follow (the owner chose to keep both). Задачи has the same (#454): «Изтрий» → «Сигурни ли сте, че искате да изтриете задачата?» → five seconds of «Отмени», offered where the row's `mayDelete` (agri-saas #2396) isn't `false`. It folds the route's three refusals: a reader, not the creator nor an admin, a treatment's block task. A task's delete is a hard one, its comments with it.
 
 **The entry's actions are in its bar** (owner, 2026-10-26): «Коригирай» (a pencil) and «Изтегли PDF» (the document icon) sit at the top right of «Запис», as a task's «Редактирай» and the journal's «Дневник (PDF)» do. They used to be full-width buttons under the facts. «Виж на картата» stays a button on the page. A PDF that couldn't be made is said on the page, where the button was. The line about which pages it holds is the button's VoiceOver hint now.
 

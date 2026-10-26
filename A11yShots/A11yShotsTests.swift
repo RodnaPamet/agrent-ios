@@ -2258,6 +2258,37 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertFalse(app.buttons["Кошче"].exists, "«Кошче» was removed (#411)")
     }
 
+    /// #454: a task's «Изтрий», the question, and the bar's «Отмени»
+    /// (owner, 2026-10-26). The undo comes inside the window, so no delete is
+    /// ever built; one that were would meet the seam's refusal of every write.
+    func testTaskSwipeDeleteAndUndo() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let tab = labelled("Задачи", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Задачи» tab")
+        tab.tap()
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Смяна на масло'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "no fixture task on Задачи\n\(app.debugDescription)")
+        row.swipeLeft()
+        let delete = app.buttons["Изтрий"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the swipe offered no «Изтрий»\n\(app.debugDescription)")
+        capture("08e-task-swipe", app: app)
+        delete.tap()
+        let question = app.alerts["Сигурни ли сте, че искате да изтриете задачата?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "«Изтрий» asked nothing\n\(app.debugDescription)")
+        XCTAssertTrue(row.exists, "the task went before the question was answered")
+        capture("08f-task-swipe-confirm", app: app)
+        question.buttons["Изтрий"].tap()
+        let undo = app.buttons["Отмени"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»\n\(app.debugDescription)")
+        XCTAssertFalse(row.exists, "the task stayed in the list")
+        capture("08g-task-undo", app: app)
+        undo.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the task back")
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")
