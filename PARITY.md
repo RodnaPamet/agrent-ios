@@ -1517,6 +1517,12 @@ caller of `.sensoryFeedback`.
 - **The floating button moved** from bottom-left to bottom-right, where Задачи's + is. The risk page is its only user.
 - **«История» on a row opens the parcel's history.** It did nothing before, because the button read `pushRoute` from outside the stack it pushes onto.
 
+### The enquiry form's words (owner 2026-10-26, the web too)
+
+- **«Застрахователна сума»** is the sum's visible title. It showed only «0 €».
+- **«Вноски»** is written above the 1–4 segmented picker, which shows no title of its own.
+- **No «Запитването не може да бъде оттеглено.»** The owner dropped the sentence, on the web as well; they confirm that to agri-saas themselves. A repeat ask on the same parcel still says «За този парцел вече има запитване. Това ще изпрати ново.»
+
 ## Blocks (Блокове)
 
 ### Divergence — a parcel on the map opens its history (#387, owner 2026-10-21)
