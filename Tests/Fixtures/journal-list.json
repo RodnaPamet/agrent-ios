@@ -74,6 +74,28 @@
       "notes": null,
       "occurredAt": "2026-09-10T09:00:00.000Z",
       "version": 2
+    },
+    {
+      "id": "log_fixture_harvest",
+      "type": "HARVEST",
+      "status": "DONE",
+      "title": "Прибиране на реколтата — SYNTH-1",
+      "notes": null,
+      "occurredAt": "2026-09-08T00:00:00.000Z",
+      "version": 1,
+      "treatment": {
+        "treatmentGroupId": "tg_fixture_harvest",
+        "occurredOn": "2026-09-08",
+        "kind": "HARVEST",
+        "parcelCount": 2,
+        "mayDelete": true,
+        "mayCorrect": true,
+        "totalAreaHa": 3.4,
+        "blockNames": [
+          "Блок 2"
+        ],
+        "recordedInDiary": true
+      }
     }
   ],
   "nextCursor": null

@@ -98,6 +98,9 @@ enum FixtureCatalogue {
     /// The journal fixture's one treatment (`journal-list.json`), read by its
     /// handle for «Виж на картата» (#399).
     static let fixtureTreatmentHandle = "tg_fixture_1"
+    /// Its one harvest (`journal-list.json`'s last row), for «Коригирай» on
+    /// other work (#439).
+    static let fixtureHarvestHandle = "tg_fixture_harvest"
 
     /// `tasks-list.json`'s row 1, a plain `TASK` with linked parcels — for
     /// the parcels map every other kind of task has (agrent-ios#177).
@@ -169,6 +172,8 @@ enum FixtureCatalogue {
         (TreatmentCorrectionAPI.definitionPath(fixtureTreatmentHandle), "treatment-definition"),
         // agri-saas #2292: its corrections, one, so «Корекции» shows.
         (TreatmentCorrectionAPI.correctionsPath(fixtureTreatmentHandle), "treatment-corrections"),
+        // #439, agri-saas #2375: the harvest's prefill. Its PUT is a write.
+        (ActivityCorrectionAPI.definitionPath(fixtureHarvestHandle), "activity-definition"),
         (WorkItemAPI.listPath, "tasks-list"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),

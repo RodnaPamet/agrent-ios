@@ -399,6 +399,12 @@ the quarantine period to 30 days from 21 and the pest from «Плевели». I
 `previous` is the definition above with those two values, so «Корекции»
 shows each with what it was.
 
+`activity-definition.json`: `GET /journal/activities/tg_fixture_harvest/definition`
+(agri-saas #2375), the `FarmActivityDefinition` «Коригирай» starts from on
+`journal-list.json`'s last row, a harvest. SYNTHETIC: the same two parcels
+as above, an invented total of 4200 kg. Its correction (`PUT`) is a write
+and stays `501 WRITE_REFUSED`.
+
 ## A recorded treatment's map (agrent-ios#399)
 
 `treatment-summary.json`: `GET /journal/treatments/tg_fixture_1`, the

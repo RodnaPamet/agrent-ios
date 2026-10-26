@@ -76,14 +76,21 @@ struct TreatmentCorrectionTrail: Decodable, Equatable, Sendable {
         /// one this build can't read costs only its "was" values, not the
         /// fact that a correction happened, nor the rest of the trail.
         let previous: TreatmentDefinition?
+        /// The same for pruning, cultivation or a harvest, read from their own
+        /// trail (`ActivityCorrectionAPI.corrections`, agri-saas #2375) in this
+        /// one shape: an activity's definition, which has no product to read
+        /// as a treatment's.
+        let previousActivity: ActivityDefinition?
 
         private enum CodingKeys: String, CodingKey { case correctedAt, correctedBy, changedFields, previous }
 
-        init(correctedAt: Date, correctedBy: String?, changedFields: [String], previous: TreatmentDefinition?) {
+        init(correctedAt: Date, correctedBy: String?, changedFields: [String], previous: TreatmentDefinition?,
+             previousActivity: ActivityDefinition? = nil) {
             self.correctedAt = correctedAt
             self.correctedBy = correctedBy
             self.changedFields = changedFields
             self.previous = previous
+            self.previousActivity = previousActivity
         }
 
         init(from decoder: any Decoder) throws {
@@ -92,6 +99,11 @@ struct TreatmentCorrectionTrail: Decodable, Equatable, Sendable {
             correctedBy = try c.decodeIfPresent(String.self, forKey: .correctedBy)
             changedFields = (try? c.decode([String].self, forKey: .changedFields)) ?? []
             previous = (try? c.decodeIfPresent(TreatmentDefinition.self, forKey: .previous)) ?? nil
+            // Only where it isn't a treatment's, and only of the three kinds:
+            // an activity's few fields would read out of any definition.
+            let activity = previous == nil
+                ? (try? c.decodeIfPresent(ActivityDefinition.self, forKey: .previous)) ?? nil : nil
+            previousActivity = activity?.activity == nil ? nil : activity
         }
     }
 }

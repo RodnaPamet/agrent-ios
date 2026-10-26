@@ -775,8 +775,20 @@ enum UserMessage {
         // «Коригирай» (agri-saas #2283/#2287, agrent-ios #392), in the
         // server's own words. The phone offers it where the row allows; these
         // are the route checking again.
+        // Kind-neutral since agri-saas #2375, which reuses it for pruning,
+        // cultivation and a harvest.
         "TREATMENT_EDIT_NOT_PERMITTED":
-            "Само човекът, който е записал това третиране, или администратор на стопанството може да го коригира.",
+            "Само човекът, който е направил записа, или администратор на стопанството може да го коригира.",
+        // «Коригирай» on other work (agri-saas #2375), in the server's words.
+        // The phone picks the route by the row's kind and sends a total only
+        // on a harvest, so these are the route checking again.
+        "ACTIVITY_NOT_FOUND": "Няма записано мероприятие с този идентификатор.",
+        "ACTIVITY_MIXED_AUTHORSHIP":
+            "Мероприятието е записано от повече от един човек и не може да се коригира наведнъж. "
+            + "Ограничението важи и за администраторите.",
+        "NOT_AN_ACTIVITY": "Записът влага продукт, тоест е третиране, а не мероприятие. Коригирайте го от третирането.",
+        "HARVEST_TOTAL_NOT_APPLICABLE":
+            "Само прибирането на реколтата има количество. Запишете добива към прибирането, а не към това мероприятие.",
         // Other work (#439, agri-saas `/journal/activities`), in the server's
         // words. The phone sends no product with it, so the first is the
         // route checking again; the second can meet a harvest.

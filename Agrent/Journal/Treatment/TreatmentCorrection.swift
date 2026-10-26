@@ -621,13 +621,19 @@ extension TreatmentCorrection {
     static func was(_ entry: TreatmentCorrectionTrail.Entry) -> [Was] {
         let changed = Set(entry.changedFields)
         let before = entry.previous
+        let activityBefore = entry.previousActivity
         func line(_ label: String, _ value: String?) -> Was {
-            Was(label: label, value: value, shown: before != nil)
+            Was(label: label, value: value, shown: before != nil || activityBefore != nil)
         }
         func named(_ label: String) -> Was { Was(label: label, value: nil, shown: false) }
         var out: [Was] = []
         if changed.contains("occurredOn") {
-            out.append(line("Дата", before?.occurredOn.flatMap(BgDate.parseISODay).map(BgDate.full)))
+            out.append(line("Дата", (before?.occurredOn ?? activityBefore?.occurredOn)
+                .flatMap(BgDate.parseISODay).map(BgDate.full)))
+        }
+        // A harvest's total (agri-saas #2375): only an activity has one.
+        if changed.contains("harvestKg") {
+            out.append(line(ActivityCorrection.harvestLabel, activityBefore?.harvestKg.map(TreatmentCheckView.kgText)))
         }
         if changed.contains("title") { out.append(named("Наименование")) }
         if changed.contains("productItemId") {

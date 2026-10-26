@@ -25,10 +25,11 @@ final class ActivityRowTests: XCTestCase {
         }
     }
 
-    /// The correction route refuses it (`NOT_A_TREATMENT`), so it isn't
-    /// offered, whatever the flags say. The withdrawal removes it like a
+    /// The treatment correction route refuses it (`NOT_A_TREATMENT`), so
+    /// that one isn't offered, whatever the flags say: the activities' own is
+    /// (`ActivityCorrectionTests`). The withdrawal removes it like a
     /// treatment, so «Изтрий» is, on the same `mayDelete`.
-    func testOtherWorkIsDeletedButNotCorrected() {
+    func testOtherWorkIsDeletedButNotCorrectedAsATreatment() {
         for kind in ["PRUNE", "CULTIVATE", "HARVEST", "SOMETHING_NEW"] {
             let row = entry(kind: kind, mayCorrect: true)
             XCTAssertFalse(row.treatment?.isApplication == true, kind)
