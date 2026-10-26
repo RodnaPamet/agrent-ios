@@ -328,11 +328,22 @@ final class InsuranceAskTests: XCTestCase {
                       "the form does not name the parcel")
     }
 
-    /// It says the ask cannot be withdrawn. After this there is nowhere
-    /// left to say it — there is still no DELETE and no PATCH.
-    func testTheFormSaysItCannotBeTakenBack() {
-        XCTAssertTrue(formSource.contains("не може да бъде оттеглено"),
-                      "the form does not state that the ask is irreversible")
+    /// The owner dropped «Запитването не може да бъде оттеглено.» from the
+    /// form (2026-10-26, the web too). What stays is the one fact a person
+    /// can act on: the parcel was asked about already, and this is another.
+    func testTheFormNoLongerSaysItCannotBeTakenBack() {
+        XCTAssertFalse(formSource.contains("не може да бъде оттеглено"),
+                       "the form still says the ask cannot be withdrawn")
+        XCTAssertTrue(formSource.contains("За този парцел вече има запитване."),
+                      "positive control: the repeat-ask note is still there")
+    }
+
+    /// Both calculation fields are titled on screen (owner, 2026-10-26): the
+    /// sum on its row, and «Вноски» above the segmented four, which show no
+    /// title of their own.
+    func testTheCalculationFieldsAreTitled() {
+        XCTAssertTrue(formSource.contains(#"FieldRow("Застрахователна сума""#), "the sum has no title")
+        XCTAssertTrue(formSource.contains(#"Text("Вноски")"#), "the instalments have no title")
     }
 
     /// AND IT NO LONGER CLAIMS ONE ASK PER PARCEL. The server dropped that

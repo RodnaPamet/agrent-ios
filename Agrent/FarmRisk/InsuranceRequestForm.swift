@@ -307,22 +307,35 @@ struct InsuranceRequestForm: View {
                                                                choices: coverage(catalogue.products.filter { !$0.isCrop })),
                                        ])
 
-                            HStack {
-                                TextField("0", text: $sumInsuredText, prompt: .fieldPrompt("0"))
-                                    .keyboardType(.decimalPad)
-                                    .multilineTextAlignment(.trailing)
-                                // The tenant's own symbol, so the app does not
-                                // guess at a currency it was never told.
-                                Text(catalogue.currencySymbol)
-                                    .foregroundStyle(Palette.secondaryText)
+                            // Titled on the row, as every other field is: a
+                            // lone «0 €» said what to type but not what it is
+                            // (owner, 2026-10-26).
+                            FieldRow("Застрахователна сума", spoken: "Застрахователна сума в евро") {
+                                HStack {
+                                    TextField("0", text: $sumInsuredText, prompt: .fieldPrompt("0"))
+                                        .keyboardType(.decimalPad)
+                                        .multilineTextAlignment(.trailing)
+                                    // The tenant's own symbol, so the app does not
+                                    // guess at a currency it was never told.
+                                    Text(catalogue.currencySymbol)
+                                        .foregroundStyle(Palette.secondaryText)
+                                }
                             }
-                            .accessibilityLabel("Застрахователна сума в евро")
 
-                            Picker("Вноски", selection: $instalments) {
-                                ForEach(1...4, id: \.self) { Text("\($0)").tag($0) }
+                            // A segmented picker shows no title of its own, so
+                            // «Вноски» is written above the four (owner,
+                            // 2026-10-26). VoiceOver hears it from the picker,
+                            // which is named «Брой вноски», so the line itself
+                            // is not read twice.
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Вноски")
+                                    .accessibilityHidden(true)
+                                Picker("Вноски", selection: $instalments) {
+                                    ForEach(1...4, id: \.self) { Text("\($0)").tag($0) }
+                                }
+                                .pickerStyle(.segmented)
+                                .accessibilityLabel("Брой вноски")
                             }
-                            .pickerStyle(.segmented)
-                            .accessibilityLabel("Брой вноски")
                         } header: {
                             SectionHeader("Изчисление")
                         } footer: {
@@ -382,21 +395,20 @@ struct InsuranceRequestForm: View {
                         }
                     }
 
-                    Section {
-                        // The warning is now narrower and truer. A lead
-                        // still cannot be withdrawn — there is no DELETE
-                        // and no PATCH — but it is no longer one per
-                        // parcel, and saying so would misdescribe the
-                        // server and discourage the correction this form
-                        // exists to allow.
-                        Label(
-                            selected.map { alreadyAsked.contains($0.id) } == true
-                                ? "За този парцел вече има запитване. Това ще изпрати "
-                                + "ново, което не може да бъде оттеглено."
-                                : "Запитването не може да бъде оттеглено.",
-                            systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
-                            .foregroundStyle(Palette.warning)
+                    // No line saying the ask can't be taken back (owner,
+                    // 2026-10-26, the web too): the owner dropped it from
+                    // the form. A lead still has no DELETE or PATCH. What
+                    // stays is the one fact the person can act on: this
+                    // parcel was asked about already, and this is a second
+                    // ask, not a change to the first.
+                    if selected.map({ alreadyAsked.contains($0.id) }) == true {
+                        Section {
+                            Label("За този парцел вече има запитване. Това ще изпрати ново.",
+                                  systemImage: "exclamationmark.triangle")
+                                .font(.footnote)
+                                .foregroundStyle(Palette.warning)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
