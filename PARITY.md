@@ -849,6 +849,8 @@ treatment, as the owner ruled (agri-saas #1740 Q2):
 
 The form's note says that.
 
+**The entry's actions are in its bar** (owner, 2026-10-26): «Коригирай» (a pencil) and «Изтегли PDF» (the document icon) sit at the top right of «Запис», as a task's «Редактирай» and the journal's «Дневник (PDF)» do. They used to be full-width buttons under the facts. «Виж на картата» stays a button on the page. A PDF that couldn't be made is said on the page, where the button was. The line about which pages it holds is the button's VoiceOver hint now.
+
 **Other work on the journal row** (agri-saas #2339, owner 2026-10-25): pruning, cultivation, sowing and harvest are lines on parcels like a treatment, and share the journal row. The phone keeps a treatment's own controls off them: the treatment's «Коригирай», «Изтегли PDF» and the unfinished section. Only a row whose `kind` is a spraying, a fertilising or a sowing gets those, or one with no kind, which is from before the field. The treatment correction route refuses a bare activity (`NOT_A_TREATMENT`). «Изтрий» is offered on them, on the same `mayDelete`: the treatment withdrawal removes a bare activity too (backend 1's test, 2026-10-25). **Recording it on the phone (#439, owner 2026-10-25):**
 - «Нов запис»'s «Вид» is a menu of «Пръскане», «Торене», «Резитба», «Обработка на почвата» and «Прибиране на реколтата», with the server's labels (`ACTIVITY_LABELS_BG`) word for word.
 - Other work asks only for its one day (no range, owner), then the same parcel step and «Проверка», with the area as «Площ».
