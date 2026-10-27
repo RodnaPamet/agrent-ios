@@ -83,6 +83,9 @@
 /api/t/{tenantSlug}/locations/{locationId}/parcels/{parcelId}
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import/{jobId}
+/api/t/{tenantSlug}/ortho/blocks
+/api/t/{tenantSlug}/ortho/coverage
+/api/t/{tenantSlug}/ortho/tiles/{z}/{x}/{y}
 /api/t/{tenantSlug}/parcels/by-crop
 /api/t/{tenantSlug}/push-subscriptions
 /api/t/{tenantSlug}/reports/campaign-diary

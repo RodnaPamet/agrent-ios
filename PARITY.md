@@ -1532,6 +1532,17 @@ caller of `.sensoryFeedback`.
 - **«Вноски»** is written above the 1–4 segmented picker, which shows no title of its own.
 - **No «Запитването не може да бъде оттеглено.»** The owner dropped the sentence, on the web as well; they confirm that to agri-saas themselves. A repeat ask on the same parcel still says «За този парцел вече има запитване. Това ще изпрати ново.»
 
+### «Ортофотокарта» replaces «Схема» (#458, owner 2026-10-27)
+
+- **Why:** «Схема» drew each parcel as a square at its centroid, five times life, so neighbours overlapped. The owner asked for an ортофотокарта instead, as farmers know it from ДФЗ.
+- **What it is:** the third map mode draws the МЗХ orthophoto (25 cm, the newest of 2023–2025 for the area) in place of Apple's imagery. Over it are the parcels' true outlines and names, and the Ministry's physical blocks (ФБ) as thin light outlines with their numbers. The footer reads «Ортофото: МЗХ, заснемане <date>». True size can't overlap. MapKit hides a colliding label, a block's number before a parcel's name.
+- **Blocks:** in view when zoomed in (≤ 0.12°). Zoomed out, the farm's own blocks, up to a 0.3° holding. Further out, none, and the footer says to zoom in.
+- **Offline:** tiles fail to the schematic's plain ground (#6E6A52), and the outlines stay.
+- **Through agri-saas only.** The source is HTTP-only, so the server proxies it over HTTPS (`/api/t/{slug}/ortho/{tiles,coverage,blocks}`, proposed 2026-10-27, not yet built), with no ATS exception on the phone.
+- **Licence:** МЗХ publishes none. The owner asks МЗХ in writing. TestFlight now, the App Store only once they agree.
+- **Behind the server's switch `agro.orthophoto`** (owner, 2026-10-27). It's on for the owner's farm and testers and off for everyone else. Off, the button cycles «Точни очертания» and «Опростена» only, and a saved «Ортофотокарта» opens on the default. Other features can reach the App Store meanwhile, and when МЗХ agrees the switch goes on with no app update. Offline the switches read off (#145), and the map then has its first two modes.
+- **A saved «Схема» preference** opens on the default, «Точни очертания».
+
 ## Blocks (Блокове)
 
 ### Divergence — a parcel on the map opens its history (#387, owner 2026-10-21)

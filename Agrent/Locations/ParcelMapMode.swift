@@ -7,11 +7,9 @@ import Foundation
 /// name the mode the button will take you TO, so the control says where it
 /// goes rather than where you are.
 ///
-/// The order is not arbitrary. It runs from most detail to least: true
-/// outlines with imagery and vegetation data, then rectangles over imagery,
-/// then no imagery at all. Pressing repeatedly strips the screen down, which
-/// is the direction a farmer moves when the sun is bright or the signal is
-/// poor.
+/// The order: true outlines over Apple's imagery with the vegetation data,
+/// then rectangles coloured sown or fallow, then the Ministry's orthophoto
+/// with the outlines and the physical blocks (ФБ), as on a ДФЗ map.
 enum ParcelMapMode: String, CaseIterable, Sendable {
     /// True GeoJSON outlines with their holes, over Apple's imagery, with the
     /// vegetation indices. The default, and the owner's choice for it.
@@ -22,15 +20,26 @@ enum ParcelMapMode: String, CaseIterable, Sendable {
     /// shape, so under a box the colour would stop short of the corners.
     case simplified
 
-    /// No imagery at all. Drawn from the coordinates onto a flat ground in
-    /// colours that are ours, so it needs no tiles and holds up in direct
-    /// sun. This is the one that still renders with no signal.
-    case schematic
+    /// «Ортофотокарта» (#458, owner 2026-10-27): the МЗХ orthophoto, each
+    /// parcel's true outline and name, and the physical blocks (ФБ) with
+    /// their numbers. It replaced «Схема», whose squares were drawn five
+    /// times life and overlapped. True size can't overlap. With no signal
+    /// the outlines stay on a plain ground (`OrthophotoTileOverlay`).
+    case orthophoto
 
-    var next: ParcelMapMode {
-        let all = Self.allCases
-        let index = all.firstIndex(of: self) ?? 0
-        return all[(index + 1) % all.count]
+    var next: ParcelMapMode { next(in: Self.allCases) }
+
+    /// The next of the modes this person has: «Ортофотокарта» is behind the
+    /// server's switch (`OrthophotoAPI.flag`). A mode outside the list, a
+    /// saved one the switch has since taken away, goes to the first.
+    func next(in modes: [ParcelMapMode]) -> ParcelMapMode {
+        guard let index = modes.firstIndex(of: self) else { return modes.first ?? .precise }
+        return modes[(index + 1) % modes.count]
+    }
+
+    /// The modes on offer: all three with the switch on, the first two off.
+    static func available(orthophoto: Bool) -> [ParcelMapMode] {
+        orthophoto ? allCases : allCases.filter { $0 != .orthophoto }
     }
 
     /// Names the mode itself, in Bulgarian, as a button's title naming a
@@ -39,7 +48,7 @@ enum ParcelMapMode: String, CaseIterable, Sendable {
         switch self {
         case .precise: return "Точни очертания"
         case .simplified: return "Опростена"
-        case .schematic: return "Схема"
+        case .orthophoto: return "Ортофотокарта"
         }
     }
 
@@ -47,7 +56,7 @@ enum ParcelMapMode: String, CaseIterable, Sendable {
         switch self {
         case .precise: return "pentagon"
         case .simplified: return "square.dashed"
-        case .schematic: return "square.on.square.dashed"
+        case .orthophoto: return "photo"
         }
     }
 
@@ -56,15 +65,15 @@ enum ParcelMapMode: String, CaseIterable, Sendable {
         switch self {
         case .precise: return "Превключва към точните очертания на парцелите"
         case .simplified: return "Превключва към опростена карта с правоъгълни парцели"
-        case .schematic: return "Превключва към схематична карта без сателитни снимки"
+        case .orthophoto: return "Превключва към ортофотокартата на МЗХ с физическите блокове"
         }
     }
 
     /// Whether this mode draws parcels by crop state rather than uniformly —
     /// which is exactly when the sown/fallow key belongs on screen.
-    var showsSownFallow: Bool { self != .precise }
+    var showsSownFallow: Bool { self == .simplified }
 
-    /// Whether this mode is drawn by MapKit. The schematic is a Canvas and
-    /// has no camera to command and nothing to point a target button at.
-    var isSatellite: Bool { self != .schematic }
+    /// Every mode is MapKit since «Ортофотокарта» replaced the Canvas
+    /// schematic: each has a camera and a target button.
+    var isSatellite: Bool { true }
 }

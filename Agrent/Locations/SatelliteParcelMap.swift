@@ -9,11 +9,11 @@ import SwiftUI
 /// overlay of any kind. There is no `MapTileOverlay`, and `MKTileOverlay`
 /// cannot be reached through `MapContentBuilder`. Raster imagery from
 /// somewhere other than Apple means an `MKMapView`, so the map moved down a
-/// layer. It serves the TWO SATELLITE modes of the three the button cycles —
-/// true outlines with index tiles, and simplified rectangles coloured sown or
-/// fallow — from one view, because a second representable in an if/else would
-/// tear this down on every switch. See `ParcelShape`. The third mode, the
-/// schematic, is pure Canvas and touches no MapKit at all, deliberately.
+/// layer. It serves all three modes the button cycles — true outlines with
+/// index tiles, simplified rectangles coloured sown or fallow, and the
+/// Ministry's orthophoto with its physical blocks (`Base.orthophoto`, #458) —
+/// from one view, because a second representable in an if/else would tear
+/// this down on every switch. See `ParcelShape` and `Base`.
 ///
 /// ── Overlay order is the whole design ──
 ///
@@ -39,8 +39,27 @@ struct SatelliteParcelMap: UIViewRepresentable {
         case boundingBoxes
     }
 
+    /// What the map is drawn ON.
+    enum Base: Equatable {
+        /// Apple's hybrid imagery.
+        case apple
+        /// «Ортофотокарта»: the МЗХ orthophoto replaces Apple's imagery
+        /// (`OrthophotoTileOverlay`), the parcels are named, and the
+        /// physical blocks (ФБ) are drawn under them with their numbers.
+        case orthophoto
+    }
+
     let parcels: [Parcel]
     let region: MKCoordinateRegion
+
+    var base: Base = .apple
+
+    /// The physical blocks in view, on the orthophoto only.
+    var blocks: [OrthoBlock] = []
+
+    /// The visible area once a pan or a zoom settles: what the blocks are
+    /// read for.
+    var onRegionChange: ((MKCoordinateRegion) -> Void)?
 
     /// The XYZ template, or nil for imagery alone.
     let tileTemplate: String?
@@ -114,6 +133,9 @@ struct SatelliteParcelMap: UIViewRepresentable {
         context.coordinator.shape = shape
         context.coordinator.contrast = contrast
         context.coordinator.syncParcels(parcels, shape: shape, in: view)
+        context.coordinator.syncBase(base, in: view)
+        context.coordinator.syncBlocks(base == .orthophoto ? blocks : [], in: view)
+        context.coordinator.syncLabels(base == .orthophoto ? parcels : [], in: view)
 
         let tap = UITapGestureRecognizer(
             target: context.coordinator,
@@ -144,6 +166,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         // `camera` is the deliberate exception, and is why it carries a tick:
         // it moves the map when, and only when, something asked it to.
         context.coordinator.onTap = onTap
+        context.coordinator.onRegionChange = onRegionChange
         // The gesture is removed rather than made a no-op, so the map does
         // not consume a touch it will do nothing with.
         context.coordinator.tap?.isEnabled = onTap != nil
@@ -156,13 +179,16 @@ struct SatelliteParcelMap: UIViewRepresentable {
 
         context.coordinator.syncParcels(parcels, shape: shape, in: view)
         context.coordinator.syncTiles(to: tileTemplate, in: view)
+        context.coordinator.syncBase(base, in: view)
+        context.coordinator.syncBlocks(base == .orthophoto ? blocks : [], in: view)
+        context.coordinator.syncLabels(base == .orthophoto ? parcels : [], in: view)
         context.coordinator.apply(camera, in: view)
 
         // Repaint what MapKit has already drawn. `renderer(for:)` returns nil
         // for anything not yet on screen, which is fine — those get their
         // style from `rendererFor` when they are first drawn. Both routes go
         // through the same `style` call so they cannot drift apart.
-        for overlay in view.overlays where overlay is MKPolygon {
+        for overlay in view.overlays where overlay is MKPolygon && !(overlay is OrthoBlockPolygon) {
             if let polygon = overlay as? MKPolygon,
                let renderer = view.renderer(for: overlay) as? MKPolygonRenderer {
                 context.coordinator.style(renderer, for: polygon)
@@ -191,7 +217,11 @@ struct SatelliteParcelMap: UIViewRepresentable {
         var shape: ParcelShape = .outlines
         var contrast: ColorSchemeContrast = .standard
         var onTap: (([Parcel]) -> Void)?
+        var onRegionChange: ((MKCoordinateRegion) -> Void)?
         weak var tap: UITapGestureRecognizer?
+        private var mountedBase: Base?
+        private var mountedBlocks: [OrthoBlock] = []
+        private var mountedLabels: [Parcel] = []
 
         /// Whether the overlays on screen still describe the data.
         ///
@@ -251,7 +281,9 @@ struct SatelliteParcelMap: UIViewRepresentable {
             mountedParcels = parcels
             mountedShape = shape
 
-            for overlay in view.overlays where overlay is MKPolygon {
+            // A parcel's polygons only: the blocks are their own class and
+            // their own remount (`syncBlocks`).
+            for overlay in view.overlays where overlay is MKPolygon && !(overlay is OrthoBlockPolygon) {
                 view.removeOverlay(overlay)
             }
             owners.removeAll()
@@ -370,11 +402,85 @@ struct SatelliteParcelMap: UIViewRepresentable {
             onTap(hits.sorted { $0.area < $1.area }.map(\.parcel))
         }
 
+        /// Apple's imagery, or the orthophoto in its place. One map view for
+        /// both, so a toggle remounts a layer rather than the view.
+        func syncBase(_ base: Base, in view: MKMapView) {
+            guard base != mountedBase else { return }
+            mountedBase = base
+            for overlay in view.overlays where overlay is OrthophotoTileOverlay {
+                view.removeOverlay(overlay)
+            }
+            switch base {
+            case .apple:
+                view.mapType = .hybrid
+            case .orthophoto:
+                // Under the photo, which replaces it: the cheapest base
+                // MapKit has, as nothing of it shows.
+                view.mapType = .mutedStandard
+                // ABOVE THE LABELS, at the bottom of that level: at
+                // `.aboveRoads` Apple's road numbers drew over the photo.
+                // The blocks and the parcels go above it in the same level
+                // (`syncBlocks` inserts over it; parcels are added on top).
+                view.insertOverlay(OrthophotoTileOverlay(), at: 0, level: .aboveLabels)
+            }
+        }
+
+        /// The physical blocks (ФБ): thin outlines over the photo and under
+        /// the parcels, each with its number.
+        func syncBlocks(_ blocks: [OrthoBlock], in view: MKMapView) {
+            guard blocks != mountedBlocks else { return }
+            mountedBlocks = blocks
+            view.removeOverlays(view.overlays.filter { $0 is OrthoBlockPolygon })
+            view.removeAnnotations(view.annotations.filter { $0 is OrthoMapLabel && ($0 as? OrthoMapLabel)?.kind == .block })
+            // Over the photo and under the parcels, in the photo's level.
+            let photo = view.overlays(in: .aboveLabels).first { $0 is OrthophotoTileOverlay }
+            for block in blocks {
+                for polygon in block.mapPolygons {
+                    if let photo {
+                        view.insertOverlay(polygon, above: photo)
+                    } else {
+                        view.insertOverlay(polygon, at: 0, level: .aboveLabels)
+                    }
+                }
+                if let point = block.labelPoint {
+                    view.addAnnotation(OrthoMapLabel(kind: .block, text: block.id, coordinate: point))
+                }
+            }
+        }
+
+        /// The parcels' names, on the orthophoto only, as a ДФЗ map prints
+        /// them. MapKit hides a label that would collide with another, the
+        /// blocks' first (`OrthoMapLabelView`).
+        func syncLabels(_ parcels: [Parcel], in view: MKMapView) {
+            guard parcels != mountedLabels else { return }
+            mountedLabels = parcels
+            view.removeAnnotations(view.annotations.filter { ($0 as? OrthoMapLabel)?.kind == .parcel })
+            for parcel in parcels {
+                guard let point = parcel.geometry?.boundingMapPolygon?.coordinate else { continue }
+                view.addAnnotation(OrthoMapLabel(kind: .parcel, text: parcel.name, coordinate: point))
+            }
+        }
+
+        func mapView(_ view: MKMapView, regionDidChangeAnimated animated: Bool) {
+            onRegionChange?(view.region)
+        }
+
+        func mapView(_ view: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            guard let label = annotation as? OrthoMapLabel else { return nil }
+            let reuse = label.kind == .parcel ? "orthoParcel" : "orthoBlock"
+            let shown = view.dequeueReusableAnnotationView(withIdentifier: reuse) as? OrthoMapLabelView
+                ?? OrthoMapLabelView(annotation: label, reuseIdentifier: reuse)
+            shown.annotation = label
+            shown.show(label)
+            return shown
+        }
+
         func syncTiles(to template: String?, in view: MKMapView) {
             guard template != mountedTemplate else { return }
             mountedTemplate = template
 
-            for overlay in view.overlays where overlay is MKTileOverlay {
+            // The index tiles only: the orthophoto is `syncBase`'s.
+            for overlay in view.overlays where overlay is MKTileOverlay && !(overlay is OrthophotoTileOverlay) {
                 view.removeOverlay(overlay)
             }
             guard let template else { return }
@@ -396,6 +502,19 @@ struct SatelliteParcelMap: UIViewRepresentable {
         }
 
         func mapView(_ view: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            // The photo opaque: it is the map, not data laid over one.
+            if let photo = overlay as? OrthophotoTileOverlay {
+                return MKTileOverlayRenderer(tileOverlay: photo)
+            }
+            // A block: a thin light line and no fill, so the photo and the
+            // parcel over it both stay readable.
+            if let block = overlay as? OrthoBlockPolygon {
+                let renderer = MKPolygonRenderer(polygon: block)
+                renderer.fillColor = .clear
+                renderer.strokeColor = UIColor(Palette.Map.blockStroke)
+                renderer.lineWidth = 1
+                return renderer
+            }
             if let tiles = overlay as? MKTileOverlay {
                 let renderer = MKTileOverlayRenderer(tileOverlay: tiles)
                 // 0.7, because that is what the web draws.

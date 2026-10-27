@@ -292,7 +292,7 @@ directly and never remembered, so this only names it.
 `featureFlags` turns `social.farm-registration` on, so A11yShots can
 photograph «Добави стопанство» and the wizard's first steps
 (`ONLY=17-farm-wizard`). It never taps «Готово»: that would create a real
-farm. Under the seam it would get a 501, but the suite doesn't rely on that.
+farm. Under the seam it would get a 501, but the suite doesn't rely on that. `agro.orthophoto` is on too, so the map's third mode, «Ортофотокарта» (#458), is reachable.
 
 It also turns `social.public-profile` on (agrent-ios#323), so Борса's bar
 has «Ферми» and Админ has «Публичен профил». A11yShots photographs «Ферми»
@@ -414,3 +414,14 @@ and stays `501 WRITE_REFUSED`.
 `tsk_fixture_fieldop`, is the field-operation fixture's, so «Виж на картата»
 draws that task's three lines over «Synthetic Land». The ids follow no real
 format.
+
+## «Ортофотокарта» (agrent-ios#458)
+
+`ortho-coverage.json`: `GET …/ortho/coverage`, the newest photo of an area.
+SYNTHETIC: an invented flight date, «МЗХ» as the source.
+
+`ortho-blocks.json`: `GET …/ortho/blocks`, the Ministry's physical blocks
+(ФБ) crossing an area. SYNTHETIC: three rectangles inside the fixture farm's
+bounds (`locations-parcels.json`), numbered `00000-11…13`, which follow no
+real ЕКАТТЕ. Served by path whatever the box. The tiles have no fixture, so
+the map shows the plain ground it draws with no photo.

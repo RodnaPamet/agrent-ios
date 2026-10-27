@@ -127,6 +127,11 @@ final class A11yShotsTests: XCTestCase {
                 captureActivityCorrection(app)
             case "19-admin-prices": captureAdminPrices(app)
             case "19c-public-profile": capturePublicProfile(app)
+            case "04-parcel-map-orthophoto":
+                openTheLocation(app)
+                XCTAssertTrue(app.navigationBars.buttons.firstMatch.waitForExistence(timeout: 20),
+                              "the location did not push a screen")
+                captureOrthophotoMap(app)
             case "18-operation-typed-product":
                 openTheLocation(app)
                 captureOperationSheet(app)
@@ -217,7 +222,7 @@ final class A11yShotsTests: XCTestCase {
         app.cells.firstMatch.tap()
 
         // There is no element to wait on inside either map — the satellite
-        // modes are a MapKit view and the schematic is a `Canvas`, and both
+        // modes are one MapKit view (the orthophoto replaced the Canvas), and both
         // are one opaque rectangle. The navigation bar's back button is the
         // closest thing to a signal that the push completed. The parcels come
         // from a fixture, but the SATELLITE tiles are still Apple's, fetched by
@@ -230,7 +235,7 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 6)
         capture("03-parcel-map-precise", app: app)
 
-        captureSchematicMap(app)
+        captureOrthophotoMap(app)
         captureOperationSheet(app)
     }
 
@@ -310,46 +315,33 @@ final class A11yShotsTests: XCTestCase {
         if history.waitForExistence(timeout: 5) { history.buttons.element(boundBy: 0).tap() }
     }
 
-    /// The schematic map, which is up to two taps away and is the one #97
-    /// cares about.
+    /// «Ортофотокарта» (#458), which replaced the schematic and is up to two
+    /// taps away.
     ///
-    /// `ParcelMapView` defaults to `.precise` — true outlines over Apple's
-    /// imagery — and the toolbar button CYCLES precise → simplified →
-    /// schematic → precise (`ParcelMapMode.next`). The white parcel labels
-    /// whose contrast PR #93 measured at 3.93:1, and 3.20:1 once Increase
-    /// Contrast switches the near-solid fill on, are drawn by the schematic
-    /// `Canvas` and by nothing else. Stopping at the satellite map would
-    /// photograph the wrong screen.
-    ///
+    /// `ParcelMapView` defaults to `.precise` and the toolbar button CYCLES
+    /// precise → simplified → orthophoto → precise (`ParcelMapMode.next`).
     /// The button's accessibility label is the mode it takes you TO, so the
     /// mode the screen is IN is read off the label rather than counted in
-    /// taps: the button offers «Точни очертания» exactly when the schematic
-    /// is on screen.
+    /// taps: the button offers «Точни очертания» exactly when the orthophoto
+    /// is on screen. `mode` is `@AppStorage`, so it survives the run, and a
+    /// count from an assumed start once failed the fourth variant of
+    /// `scripts/a11y-shots.sh` on state the third left behind.
     ///
-    /// WHICH IS NOT A REFINEMENT — IT IS A BUG THIS HAD. `mode` is
-    /// `@AppStorage`, so it survives the run, and the first version tapped
-    /// twice from an assumed `.precise` start. The fourth variant in
-    /// `scripts/a11y-shots.sh` then failed with "no «Опростена» button in the
-    /// toolbar", because the third variant's restoring tap had not landed and
-    /// the app opened in the schematic it had been left in. A suite whose
-    /// first three runs pass and whose fourth fails on state left by the
-    /// third is worse than one that never worked.
+    /// The seam has no tiles, so this photographs what the map draws with no
+    /// photo: the plain ground, the parcels' outlines and names, the
+    /// fixture's physical blocks and numbers, and the footer.
     ///
-    /// THE LAST TAP IS STILL THE CLEANUP, for the same `@AppStorage` reason:
-    /// the owner's simulator should open locations the way it did before.
-    private func captureSchematicMap(_ app: XCUIApplication) {
-        // Three modes, so at most two taps reach the schematic from any of
-        // them; the third iteration exists only so the loop cannot end one
-        // short of a mode it has not seen.
+    /// THE LAST TAP IS THE CLEANUP, for the same `@AppStorage` reason.
+    private func captureOrthophotoMap(_ app: XCUIApplication) {
         for _ in 0..<mapModeDestinations.count {
-            if app.navigationBars.buttons[schematicIsOn].exists { break }
+            if app.navigationBars.buttons[orthophotoIsOn].exists { break }
             guard let next = mapModeDestinations
                 .map({ app.navigationBars.buttons[$0] })
                 .first(where: { $0.exists })
             else {
                 XCTFail("""
                 No map-mode button in the toolbar. Expected one labelled with the mode \
-                it switches TO — «Опростена», «Схема» or «Точни очертания», from \
+                it switches TO — «Опростена», «Ортофотокарта» or «Точни очертания», from \
                 ParcelMapMode.label.
                 """)
                 return
@@ -361,28 +353,29 @@ final class A11yShotsTests: XCTestCase {
             Thread.sleep(forTimeInterval: 1)
         }
 
-        guard app.navigationBars.buttons[schematicIsOn].exists else {
-            XCTFail("cycled through every map mode without reaching the schematic")
+        guard app.navigationBars.buttons[orthophotoIsOn].exists else {
+            XCTFail("cycled through every map mode without reaching the orthophoto")
             return
         }
-
-        // Shorter than the 6s above: the parcels are already decoded by now,
-        // and the schematic draws from the same values with no tiles to fetch.
+        let footer = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Ортофото: МЗХ"))
+            .firstMatch
+        XCTAssertTrue(footer.waitForExistence(timeout: 10), "the orthophoto has no footer\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 3)
-        capture("04-parcel-map-schematic", app: app)
+        capture("04-parcel-map-orthophoto", app: app)
 
-        app.navigationBars.buttons[schematicIsOn].tap()
+        app.navigationBars.buttons[orthophotoIsOn].tap()
     }
 
     /// The three labels `ParcelMapMode.label` can put on the toolbar button.
     /// Spelled out here rather than imported: a UI test target runs in its own
     /// process and cannot link the app, so these strings are a copy and will
     /// go stale if the labels change. The `XCTFail` above says so by name.
-    private let mapModeDestinations = ["Опростена", "Схема", "Точни очертания"]
+    private let mapModeDestinations = ["Опростена", "Ортофотокарта", "Точни очертания"]
 
-    /// The button offers «Точни очертания» exactly when the schematic is what
-    /// is on screen.
-    private var schematicIsOn: String { "Точни очертания" }
+    /// The button offers «Точни очертания» exactly when the orthophoto is
+    /// what is on screen.
+    private var orthophotoIsOn: String { "Точни очертания" }
 
 
     // MARK: - «Дневник (PDF)» (agrent-ios#246)

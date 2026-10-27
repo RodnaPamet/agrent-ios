@@ -435,6 +435,9 @@ final class FixtureSeamTests: XCTestCase {
         ("treatment-corrections", { _ = try await APIClient.shared.decode($0, as: TreatmentCorrectionTrail.self) }),
         // #439: «Коригирай»'s prefill on a harvest.
         ("activity-definition", { _ = try await APIClient.shared.decode($0, as: ActivityDefinition.self) }),
+        // #458: «Ортофотокарта».
+        ("ortho-coverage", { _ = try await APIClient.shared.decode($0, as: OrthoCoverage.self) }),
+        ("ortho-blocks", { _ = try await APIClient.shared.decode($0, as: OrthoBlocks.self) }),
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),
         ("costs-defaults", { _ = try await APIClient.shared.decode($0, as: OverheadDefaults.self) }),

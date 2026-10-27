@@ -11,15 +11,24 @@ struct ParcelMapView: View {
 
     /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
     ///
-    /// Three modes, one cycling button — see `ParcelMapMode`. The schematic
-    /// is among them, which is the only one of the three that draws a farm
-    /// with no signal at all.
+    /// Three modes, one cycling button — see `ParcelMapMode`. The third is
+    /// «Ортофотокарта» since it replaced «Схема» (#458), and it still draws
+    /// the outlines with no signal, on a plain ground.
     ///
     /// A NEW KEY, with `locations.useSchematicMap` left unread. That one
     /// recorded an answer to a two-way question, and a boolean cannot say
     /// which of three a person wanted. Everyone starts from the owner's
     /// default and picks again once.
-    @AppStorage("locations.parcelMapMode") private var mode: ParcelMapMode = .precise
+    @AppStorage("locations.parcelMapMode") private var storedMode: ParcelMapMode = .precise
+
+    /// The server's switches: «Ортофотокарта» is behind one (#458).
+    @State private var flags = FeatureFlags.shared
+
+    /// The modes this person has, and the one shown: the saved choice, or
+    /// the default where the switch has taken it away. The saved choice is
+    /// kept, so switching the mode back on brings it back.
+    private var modes: [ParcelMapMode] { ParcelMapMode.available(orthophoto: flags.isOn(OrthophotoAPI.flag)) }
+    private var mode: ParcelMapMode { modes.contains(storedMode) ? storedMode : .precise }
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -33,6 +42,9 @@ struct ParcelMapView: View {
     @State private var choosing: ParcelChoice?
 
     @State private var indices: SatelliteIndexStore
+
+    /// «Ортофотокарта»'s flight date and physical blocks (#458).
+    @State private var ortho = OrthophotoStore()
 
     /// The index whose explainer is open.
     @State private var explaining: VegetationIndex?
@@ -60,13 +72,11 @@ struct ParcelMapView: View {
         .inlineTitle(location.name)
         // OPAQUE EVEN AT THE SCROLL EDGE, here and only here. `SolidChrome`
         // leaves the bar clear at the scroll edge because elsewhere the page
-        // is all that is beneath it — but the schematic ground runs up under
-        // this bar by design, so the location name sat on #6E6A52 olive —
-        // black on it is 3.85:1, in light and «Слънце». The page behind the title
-        // instead; the map keeps its clearance (`SchematicParcelMap`
-        // measures the safe area, which the bar still occupies). iOS 16 API,
-        // and an inline title, which the iOS 26 large-title defect does not
-        // touch.
+        // is all that is beneath it — but a map runs up under this bar, and
+        // the orthophoto's plain ground (#6E6A52 olive, with no signal) put
+        // black on 3.85:1, in light and «Слънце». The page behind the title
+        // instead. iOS 16 API, and an inline title, which the iOS 26
+        // large-title defect does not touch.
         .toolbarBackground(Palette.Surface.page, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         // IN THE MENU — and the menu button IS the second trailing glyph this
@@ -117,9 +127,9 @@ struct ParcelMapView: View {
                 Button {
                     cycleMode()
                 } label: {
-                    Label(mode.next.label, systemImage: mode.next.icon)
+                    Label(mode.next(in: modes).label, systemImage: mode.next(in: modes).icon)
                 }
-                .accessibilityHint(mode.next.hint)
+                .accessibilityHint(mode.next(in: modes).hint)
             }
         }
         .sheet(item: $choosing) { choice in
@@ -151,7 +161,9 @@ struct ParcelMapView: View {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
                 if mode.showsSownFallow && !drawable.isEmpty { legend }
-                if !mode.showsSownFallow && !drawable.isEmpty { indexControls }
+                // The vegetation indices are the precise map's: the photo
+                // has no index tiles over it.
+                if mode == .precise && !drawable.isEmpty { indexControls }
                 parcelList(response, drawable: drawable)
             }
         }
@@ -159,9 +171,8 @@ struct ParcelMapView: View {
 
     // MARK: - Map
 
-    /// For the two modes that colour a parcel by crop state — simplified and
-    /// schematic — where the fill is the only thing on screen saying which
-    /// fields are sown. The precise view has the vegetation indices and their
+    /// For the mode that colours a parcel by crop state — simplified — where
+    /// the fill is the only thing on screen saying which fields are sown. The precise view has the vegetation indices and their
     /// own legend, and paints every parcel alike, so a sown/fallow key there
     /// would explain a distinction it does not draw.
     private var legend: some View {
@@ -222,20 +233,11 @@ struct ParcelMapView: View {
                 icon: "map",
                 message: "Парцелите съществуват, но нямат географски очертания."
             )
-        } else if mode == .schematic, let box = response.bounds ?? location.boundsJson {
-            // A Canvas, not MapKit. It needs a box to normalise into and has
-            // nothing to fall back on without one, so a location with neither
-            // bound falls through to the satellite branch below — which can
-            // still frame itself from the parcels.
-            SchematicParcelMap(
-                parcels: drawable, bounds: box,
-                onTap: { tapped($0) }
-            )
         } else {
-            // ONE map view for both SATELLITE modes, differing by `shape`.
-            // Two views in an if/else would give SwiftUI different structural
-            // identity, tearing down the MKMapView and re-firing the index
-            // refresh on every switch.
+            // ONE map view for all three modes, differing by `shape` and
+            // `base`. Two views in an if/else would give SwiftUI different
+            // structural identity, tearing down the MKMapView and re-firing
+            // the index refresh on every switch.
             //
             // No index tiles under the rectangles. Earth Engine clips each
             // tile to the TRUE parcel shape, so beneath a box the colour
@@ -245,15 +247,59 @@ struct ParcelMapView: View {
             SatelliteParcelMap(
                 parcels: drawable,
                 region: mapRegion(for: mode),
-                tileTemplate: mode == .simplified ? nil : indices.tiles?.tileUrl,
+                base: mode == .orthophoto ? .orthophoto : .apple,
+                blocks: mode == .orthophoto ? ortho.blocks : [],
+                onRegionChange: { region in
+                    if mode == .orthophoto { ortho.showBlocks(in: region) }
+                },
+                tileTemplate: mode == .precise ? indices.tiles?.tileUrl : nil,
                 shape: mode == .simplified ? .boundingBoxes : .outlines,
                 contrast: contrast,
                 camera: camera,
                 onTap: { tapped($0) }
             )
             .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
+            // At the TOP: the bottom corners are the target button's and
+            // Apple's legal link's, which must stay visible.
+            .overlay(alignment: .topLeading) {
+                if mode == .orthophoto { orthophotoFooter }
+            }
             .task { await indices.refreshIfNeeded() }
+            // The farm's flight date, and the blocks for where the map
+            // opens: a pan reads them again (`onRegionChange`).
+            .task(id: mode) {
+                guard mode == .orthophoto else { return }
+                if let box = response.bounds ?? location.boundsJson {
+                    // The farm first, so the blocks have it to fall back on.
+                    let farm = OrthophotoAPI.Box(box)
+                    ortho.showBlocks(in: mapRegion(for: .orthophoto), farm: farm)
+                    await ortho.loadCoverage(farm)
+                } else {
+                    ortho.showBlocks(in: mapRegion(for: .orthophoto))
+                }
+            }
         }
+    }
+
+    /// Whose photo it is and when it was taken, as a ДФЗ map prints it, and
+    /// why no blocks show when the map is out too far for them.
+    private var orthophotoFooter: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(ortho.coverage?.footer ?? OrthoCoverage(year: nil, flightDate: nil, attribution: nil).footer)
+            if ortho.tooFarOut {
+                Text("Приближете, за да видите физическите блокове.")
+            } else if ortho.truncated {
+                Text("Показани са част от блоковете — приближете картата.")
+            }
+        }
+        .font(.caption2)
+        .foregroundStyle(.primary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Palette.Surface.page.opacity(0.9), in: RoundedRectangle(cornerRadius: 6))
+        .padding(10)
+        .accessibilityElement(children: .combine)
     }
 
     /// Cycle to the next mode, and move the camera to match.
@@ -269,7 +315,7 @@ struct ParcelMapView: View {
     /// be invoked from somewhere other than the button — which is the only
     /// way this path gets exercised outside a human thumb.
     private func cycleMode() {
-        mode = mode.next
+        storedMode = mode.next(in: modes)
         cameraTick += 1
         camera = .init(tick: cameraTick, region: mapRegion(for: mode))
     }
@@ -300,9 +346,6 @@ struct ParcelMapView: View {
 
     // MARK: - Tap
 
-    /// The schematic hands over one parcel; it draws true outlines on a
-    /// flat ground and an overlap there means the fields really do overlap.
-    private func tapped(_ parcel: Parcel) { openHistory(parcel) }
 
     /// The parcel's history, with «Ново мероприятие» on it for this block.
     /// Every role: the history is a read, and the button there keeps the

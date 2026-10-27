@@ -1,0 +1,12 @@
+{
+  "type": "FeatureCollection",
+  "truncated": false,
+  "features": [
+    { "type": "Feature", "properties": { "id": "00000-11", "usage": "Обработваеми земи", "year": 2025 },
+      "geometry": { "type": "MultiPolygon", "coordinates": [[[[25.115, 42.515], [25.186, 42.515], [25.186, 42.586], [25.115, 42.586], [25.115, 42.515]]]] } },
+    { "type": "Feature", "properties": { "id": "00000-12", "usage": "Обработваеми земи", "year": 2025 },
+      "geometry": { "type": "Polygon", "coordinates": [[[25.179, 42.579], [25.2, 42.579], [25.2, 42.6], [25.179, 42.6], [25.179, 42.579]]] } },
+    { "type": "Feature", "properties": { "id": "00000-13", "usage": "Постоянно затревени площи", "year": 2025 },
+      "geometry": { "type": "Polygon", "coordinates": [[[25.12, 42.588], [25.17, 42.588], [25.17, 42.598], [25.12, 42.598], [25.12, 42.588]]] } }
+  ]
+}
