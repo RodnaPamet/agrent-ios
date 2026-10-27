@@ -150,6 +150,11 @@ final class RouteContractTests: XCTestCase {
     /// cultivation and a harvest (#439), built against agri-saas #2375 while
     /// that PR was open, came off with the refresh from its merge. The PR
     /// (#445) merged only once `/api/health` carried #2375 (2026-10-26).
+    ///
+    /// Empty again from agri-saas main b7b8e7f: «Ортофотокарта» (#458), built
+    /// against the shape proposed to backend 1, came off with the refresh
+    /// from agri-saas #2425's merge. The PR (#459) merged only once
+    /// `/api/health` carried it (2026-10-27).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -240,6 +245,11 @@ final class RouteContractTests: XCTestCase {
             ("AccountDeletionAPI.swift", [AccountDeletionAPI.path]),
             // «Ново мероприятие»'s crops and a crop's parcels (#293, agri-saas #1746).
             ("ParcelsByCropAPI.swift", [ParcelsByCropAPI.path, ParcelsByCropAPI.path(crop: "Wheat")]),
+            ("OrthophotoAPI.swift", [
+                OrthophotoAPI.tilePath("{z}", "{x}", "{y}"),
+                OrthophotoAPI.coveragePath(.init(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)),
+                OrthophotoAPI.blocksPath(.init(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)),
+            ]),
             ("LocationsAPI.swift", [
                 LocationsAPI.listPath,
                 LocationsAPI.parcelsPath(loc),

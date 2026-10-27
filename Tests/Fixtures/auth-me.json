@@ -15,6 +15,7 @@
   },
   "featureFlags": {
     "social.farm-registration": true,
-    "social.public-profile": true
+    "social.public-profile": true,
+    "agro.orthophoto": true
   }
 }

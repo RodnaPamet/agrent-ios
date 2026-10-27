@@ -157,6 +157,12 @@ enum FixtureCatalogue {
     /// Routes matched on the path alone.
     static let byPath: [String: String] = table([
         (MeAPI.path, "auth-me"),
+        // #458: «Ортофотокарта»'s flight date and the physical blocks, by
+        // path whatever the box asked for. Synthetic: the fixture farm's
+        // bounds, invented numbers. Its tiles stay `NO_FIXTURE`, so the
+        // screenshot shows the plain ground the map draws with no photo.
+        (OrthophotoAPI.coveragePath(.init(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)), "ortho-coverage"),
+        (OrthophotoAPI.blocksPath(.init(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)), "ortho-blocks"),
         (JournalAPI.listPath, "journal-list"),
         (LocationsAPI.listPath, "locations-list"),
         (LocationsAPI.parcelsPath(fixtureLocationID), "locations-parcels"),

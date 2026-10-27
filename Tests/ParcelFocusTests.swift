@@ -78,8 +78,8 @@ final class ParcelMapModeTests: XCTestCase {
 
     func testCyclesThroughAllThreeAndReturns() {
         XCTAssertEqual(ParcelMapMode.precise.next, .simplified)
-        XCTAssertEqual(ParcelMapMode.simplified.next, .schematic)
-        XCTAssertEqual(ParcelMapMode.schematic.next, .precise)
+        XCTAssertEqual(ParcelMapMode.simplified.next, .orthophoto)
+        XCTAssertEqual(ParcelMapMode.orthophoto.next, .precise)
     }
 
     /// Three presses from anywhere come home. If `allCases` ever grows a
@@ -97,14 +97,28 @@ final class ParcelMapModeTests: XCTestCase {
     func testOnlyTheCropColouredModesShowTheLegend() {
         XCTAssertFalse(ParcelMapMode.precise.showsSownFallow)
         XCTAssertTrue(ParcelMapMode.simplified.showsSownFallow)
-        XCTAssertTrue(ParcelMapMode.schematic.showsSownFallow)
+        XCTAssertFalse(ParcelMapMode.orthophoto.showsSownFallow, "the photo shows what is sown")
     }
 
-    /// The schematic is a Canvas: no camera to command, no target to press.
-    func testOnlyTheSchematicIsNotSatellite() {
-        XCTAssertTrue(ParcelMapMode.precise.isSatellite)
-        XCTAssertTrue(ParcelMapMode.simplified.isSatellite)
-        XCTAssertFalse(ParcelMapMode.schematic.isSatellite)
+    /// Every mode is MapKit since «Ортофотокарта» replaced the Canvas
+    /// schematic (#458): each has a camera and a target button.
+    func testEveryModeIsAMap() {
+        for mode in ParcelMapMode.allCases { XCTAssertTrue(mode.isSatellite, mode.rawValue) }
+    }
+
+    func testTheThirdIsTheOrthophoto() {
+        XCTAssertEqual(ParcelMapMode.orthophoto.label, "Ортофотокарта")
+    }
+
+    /// Behind the server's switch (owner, 2026-10-27): off, the button
+    /// cycles the first two, and a saved «Ортофотокарта» goes to the first.
+    func testTheOrthophotoIsBehindTheSwitch() {
+        let off = ParcelMapMode.available(orthophoto: false)
+        XCTAssertEqual(off, [.precise, .simplified])
+        XCTAssertEqual(ParcelMapMode.simplified.next(in: off), .precise)
+        XCTAssertEqual(ParcelMapMode.orthophoto.next(in: off), .precise)
+        XCTAssertEqual(ParcelMapMode.available(orthophoto: true), ParcelMapMode.allCases)
+        XCTAssertEqual(OrthophotoAPI.flag, "agro.orthophoto")
     }
 
     /// Stored by raw value, so renaming a case silently changes what a
@@ -112,7 +126,9 @@ final class ParcelMapModeTests: XCTestCase {
     func testRawValuesArePinned() {
         XCTAssertEqual(ParcelMapMode.precise.rawValue, "precise")
         XCTAssertEqual(ParcelMapMode.simplified.rawValue, "simplified")
-        XCTAssertEqual(ParcelMapMode.schematic.rawValue, "schematic")
+        // A phone left on «Схема» opens on the default, «Точни очертания».
+        XCTAssertEqual(ParcelMapMode.orthophoto.rawValue, "orthophoto")
+        XCTAssertNil(ParcelMapMode(rawValue: "schematic"))
     }
 
     /// Every mode must have a distinct label and glyph, or the button lies

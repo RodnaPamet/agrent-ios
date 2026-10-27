@@ -507,6 +507,10 @@ enum Palette {
         /// path strokes will want their own value the day there is path data.
         static let graticule = Color(hex: 0x7E7A63)
         static let graticuleLabel = Color(hex: 0xC9C4A8)
+        /// A physical block's (ФБ) outline on the orthophoto (#458): light
+        /// and thin, the colour a ДФЗ map draws them in, so it reads over a
+        /// photo of fields and stays below the parcels' green outline.
+        static let blockStroke = Color(hex: 0xF2E8A0)
         static let fillOpacity: Double = 0.55
         static let strokeWidth: CGFloat = 2.5
         static let dash: [CGFloat] = [7, 5]
