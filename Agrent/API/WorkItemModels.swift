@@ -98,6 +98,15 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
     var mayDelete: Bool? { mayDeleteRaw?.value }
     private let mayDeleteRaw: LenientFlag?
 
+    /// The parcels the task touches, on a row of the person's own queue
+    /// (`GET /farm-tasks`, agri-saas #2476): PARCEL links and a field
+    /// operation's lines, the `/tasks/{id}/parcels` union. For the numbers
+    /// on a mechanisator's map (#465). Nil on `/tasks` rows, which don't
+    /// carry it, and on a queue cached before the field; an odd shape
+    /// reads as nil too, never as the reason the list fails.
+    var parcelIds: [String]? { parcelIdsRaw?.value }
+    private let parcelIdsRaw: LenientIDs?
+
     /// Spelled out because `severityRaw` is renamed, and a synthesised
     /// `CodingKeys` would have looked for a `severityRaw` key that no server
     /// sends. Every other name is its own.
@@ -106,6 +115,15 @@ struct WorkItemSummary: Decodable, Identifiable, Equatable, Hashable, Sendable {
         case assignee, assigneeUserId, createdAt, updatedAt, completedAt
         case severityRaw = "severity"
         case mayDeleteRaw = "mayDelete"
+        case parcelIdsRaw = "parcelIds"
+    }
+
+    /// A list of ids, or nothing: a wrong shape costs the field, not the row.
+    struct LenientIDs: Decodable, Hashable, Sendable {
+        let value: [String]?
+        init(from decoder: any Decoder) throws {
+            value = try? decoder.singleValueContainer().decode([String].self)
+        }
     }
 
     /// A boolean, or nothing: a wrong shape costs the field, not the row.
@@ -219,6 +237,7 @@ extension WorkItemSummary {
         completedAt = item.completedAt
         // The detail read doesn't say; the list's own row will.
         mayDeleteRaw = nil
+        parcelIdsRaw = nil
     }
 }
 

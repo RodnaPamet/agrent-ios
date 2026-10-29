@@ -33,6 +33,10 @@ import SwiftUI
 /// opening the parcel's tasks, «Текущи» and «Архив» (`ParcelTasksView`).
 /// From Блокове too, as it was asked for there.
 ///
+/// And «Коментари» (#465, same day): the comments on the parcel's tasks and
+/// their closing notes, from wherever the screen is opened, as they are its
+/// history (`ParcelCommentsView`).
+///
 /// ── Read-only, this pass ──
 ///
 /// `createCropSeason`, `createWeedObservation`, `deleteCropSeason` and
@@ -69,6 +73,9 @@ struct ParcelHistoryView: View {
     /// The parcel's tasks, from Блокове (#462). One store for the card and
     /// the list it opens.
     @State private var tasks: ParcelTasksStore?
+    /// The comments on the parcel's tasks and their closing notes (#465),
+    /// part of its history, so from wherever the screen is opened.
+    @State private var comments: ParcelCommentsStore
 
     init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil) {
         self.parcelName = parcelName
@@ -76,6 +83,7 @@ struct ParcelHistoryView: View {
         _store = State(initialValue: ParcelHistoryStore(parcelID: parcelID))
         _risk = State(initialValue: recordIn == nil ? nil : ParcelRiskStore(parcelID: parcelID))
         _tasks = State(initialValue: recordIn == nil ? nil : ParcelTasksStore(parcelID: parcelID))
+        _comments = State(initialValue: ParcelCommentsStore(parcelID: parcelID))
     }
 
     var body: some View {
@@ -96,6 +104,7 @@ struct ParcelHistoryView: View {
             .task { _ = await people.load() }
             .task { await risk?.load() }
             .task { await tasks?.load() }
+            .task { if comments.state.value == nil { await comments.load() } }
             .safeAreaInset(edge: .bottom, spacing: 0) { recordButton }
             .sheet(isPresented: $recording) {
                 if let recordIn {
@@ -155,6 +164,9 @@ struct ParcelHistoryView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
                 }
+                commentsCard(inList: false)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
                 ErrorState(message: message) { await store.load() }
             }
 
@@ -168,6 +180,7 @@ struct ParcelHistoryView: View {
                     header(archive)
                     if let risk { riskSection(risk) }
                     if let tasks { tasksCard(tasks, inList: true) }
+                    commentsCard(inList: true)
                     if archive.isEmpty {
                         emptyArchive
                     } else {
@@ -189,6 +202,7 @@ struct ParcelHistoryView: View {
                 await PullToRefresh.bounded {
                     await store.refresh()
                     await tasks?.load()
+                    await comments.load()
                 }
             }
         }
@@ -270,7 +284,7 @@ struct ParcelHistoryView: View {
     /// `RoutedStack`. Its own type and destination, declared on this screen
     /// rather than as an `AppRoute`: the lists share this screen's store,
     /// which nothing outside the screen should hold.
-    private enum DrillIn: Hashable { case seasons, operations, weeds, tasks }
+    private enum DrillIn: Hashable { case seasons, operations, weeds, tasks, comments }
 
     @ViewBuilder
     private func cards(_ archive: ParcelHistoryStore.Archive) -> some View {
@@ -337,6 +351,8 @@ struct ParcelHistoryView: View {
             if let tasks {
                 ParcelTasksView(parcelName: parcelName, store: tasks)
             }
+        case .comments:
+            ParcelCommentsView(parcelName: parcelName, store: comments)
         }
     }
 
@@ -365,23 +381,52 @@ struct ParcelHistoryView: View {
             }
             .padding(.vertical, 4)
         case .loaded(let list, _):
-            let card = ParcelTasksCard(list)
-            if !card.isTappable {
-                tasksCardBody(card, chevron: false)
-            } else if inList {
-                NavigationLink(value: DrillIn.tasks) { tasksCardBody(card, chevron: false) }
-            } else {
-                NavigationLink(value: DrillIn.tasks) { tasksCardBody(card, chevron: true) }
-                    .buttonStyle(.plain)
-            }
+            summaryCard(ParcelTasksCard(list), opens: .tasks, inList: inList)
         }
     }
 
-    /// The history cards' look (`cardBody`), for the tasks card's values.
-    private func tasksCardBody(_ card: ParcelTasksCard, chevron: Bool) -> some View {
+    // MARK: - Comments
+
+    /// «Коментари»: the newest comment or closing note, and how many, opening
+    /// them all. Quiet while it loads and on a failure, as «Задачи» is.
+    @ViewBuilder
+    private func commentsCard(inList: Bool) -> some View {
+        switch comments.state {
+        case .loading:
+            EmptyView()
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(ParcelCommentsCard.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 4)
+        case .loaded(let list, _):
+            summaryCard(ParcelCommentsCard(list), opens: .comments, inList: inList)
+        }
+    }
+
+    /// A summing card and its push, when there is something to push to.
+    @ViewBuilder
+    private func summaryCard(_ card: some ParcelSummaryCard, opens drillIn: DrillIn, inList: Bool) -> some View {
+        if !card.isTappable {
+            summaryCardBody(card, chevron: false)
+        } else if inList {
+            NavigationLink(value: drillIn) { summaryCardBody(card, chevron: false) }
+        } else {
+            NavigationLink(value: drillIn) { summaryCardBody(card, chevron: true) }
+                .buttonStyle(.plain)
+        }
+    }
+
+    /// The history cards' look (`cardBody`), for a summing card's values.
+    private func summaryCardBody(_ card: some ParcelSummaryCard, chevron: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(ParcelTasksCard.title)
+                Text(card.title)
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 8)
                 if let count = card.count {
@@ -398,6 +443,7 @@ struct ParcelHistoryView: View {
             if !card.line.text.isEmpty {
                 Text(card.line.text)
                     .font(.headline)
+                    .lineLimit(card.headlineLimit)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !card.line.detailText.isEmpty {

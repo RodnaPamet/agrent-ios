@@ -442,6 +442,13 @@ field operation and `tsk_fixture_2`, whose detail has a fixture, so a tap
 opens it) and two invented archived ones, one RESOLVED and one CANCELED.
 Every status, `truncated: false`, `mayDelete` on each row.
 
+## A parcel's comments
+
+`parcel-comments.json`: `GET /agro/parcels/par_holes/comments` (#465, agri-saas
+#2476), SYNTH-1's comments newest first: an invented comment on the field
+operation by the fixture operator, and the closing note of the invented
+RESOLVED task from `parcel-tasks.json`, which names no author.
+
 ## A mechanisator's one screen
 
 `auth-me-operator.json` and `me-farms-operator.json`: the fixture person and
@@ -449,5 +456,7 @@ farm, with the role MECHANISATOR, served instead of `auth-me.json` and
 `me-farms.json` when the seam is launched with `AGRENT_UITEST_OPERATOR`
 (#465). `farm-tasks-mine.json`: `GET /farm-tasks`, the person's queue, two
 current rows reused from `tasks-list.json` and one invented CLOSED one that
-the screen leaves out. `task-parcels-fieldop.json`: the field operation's
-parcels, SYNTH-1 alone, so SYNTH-1 counts two tasks on the map.
+the screen leaves out. Each row carries `parcelIds` (agri-saas #2476), so
+SYNTH-1 counts two tasks on the map and SYNTH-2 one.
+`task-parcels-fieldop.json`: the field operation's parcels, SYNTH-1 alone,
+for the per-task read a queue cached before `parcelIds` still makes.

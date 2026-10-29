@@ -4,14 +4,13 @@ import Observation
 /// How many of the mechanisator's current tasks touch each parcel: the
 /// numbers on the whole-farm map (#465).
 ///
-/// ── One read per task, for now ──
+/// ── From the queue's rows, else one read per task ──
 ///
-/// The queue's rows carry no parcel ids, so each current task's parcels are
-/// read from `GET /tasks/{id}/parcels`, cache first, in parallel. A person's
-/// own queue is a handful of tasks, and each read is the one a task's map
-/// already makes. Asked of backend 1 (2026-10-29): the ids on the queue's
-/// rows, which would make this one read; `parcelsByTask` is the seam either
-/// source fills.
+/// Since agri-saas #2476 each row of the person's queue carries its
+/// `parcelIds`, so the numbers cost no request of their own. A row without
+/// them (a queue cached before the field) has its parcels read from
+/// `GET /tasks/{id}/parcels`, cache first, in parallel, as before: the read
+/// a task's map already makes. `parcelsByTask` is the seam both fill.
 @MainActor
 @Observable
 final class TaskParcelCounts {
@@ -29,13 +28,22 @@ final class TaskParcelCounts {
         loadParcels = load
     }
 
-    /// Reads the parcels of these tasks, and forgets any task no longer
-    /// among them: a task closed since is no longer counted.
-    func load(_ taskIDs: [String]) async {
+    /// The parcels of these tasks: a row's own `parcelIds` where it has
+    /// them, a read where it doesn't.
+    func load(_ tasks: [WorkItemSummary]) async {
+        let known = Dictionary(tasks.compactMap { task in task.parcelIds.map { (task.id, $0) } },
+                               uniquingKeysWith: { first, _ in first })
+        await load(tasks.map(\.id), known: known)
+    }
+
+    /// Reads the parcels of these tasks, takes `known` as given, and forgets
+    /// any task no longer among them: a task closed since stops counting.
+    func load(_ taskIDs: [String], known: [String: [String]] = [:]) async {
         let wanted = Set(taskIDs)
         parcelsByTask = parcelsByTask.filter { wanted.contains($0.key) }
+        parcelsByTask.merge(known.filter { wanted.contains($0.key) }) { _, given in given }
         await withDiscardingTaskGroup { group in
-            for id in wanted {
+            for id in wanted where known[id] == nil {
                 group.addTask { await self.loadOne(id) }
             }
         }
