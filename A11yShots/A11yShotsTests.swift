@@ -2279,10 +2279,11 @@ final class A11yShotsTests: XCTestCase {
     }
 
     /// «Тема» in Админ, light then dark then back (owner, 2026-10-29), and the
-    /// calculator's cost titles in gold. Ends on «Автоматично», as the
+    /// section titles in gold, «Разходи» on Калкулатор with the cost names
+    /// under it in the row's own colour. Ends on «Автоматично», as the
     /// choice is remembered across launches and the next run should start
     /// where this one did.
-    func testThemeAndGoldCostTitles() {
+    func testThemeAndGoldSectionTitles() {
         let app = XCUIApplication()
         app.launchArguments.append(Self.seamArgument)
         app.launch()
@@ -2313,7 +2314,7 @@ final class A11yShotsTests: XCTestCase {
         while !fertiliser.exists, swipes < 8 { app.swipeUp(); Thread.sleep(forTimeInterval: 0.5); swipes += 1 }
         XCTAssertTrue(fertiliser.exists, "the calculator lists no costs\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
-        capture("09f-calculator-costs-gold", app: app)
+        capture("09f-calculator-section-titles-gold", app: app)
     }
 
     /// #454: a task's «Изтрий», the question, and the bar's «Отмени»

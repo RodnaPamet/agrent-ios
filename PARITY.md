@@ -113,9 +113,11 @@ the figures, as before, in a sentence that names the margin too. So its
 margin line adds the web's sentence only for the four other codes, and never
 says the same thing twice.
 
-### The cost list's titles are gold (owner 2026-10-29)
+### Section titles are gold, on every screen (owner 2026-10-29)
 
-- Each cost's category («Торове», «Препарати» …) in «Разходи» is drawn in the accent gold, as the crop names are, no longer white.
+- Every section title («Разходи», «Култури» and the rest, through `SectionHeader` and `Section(titled:)`) is the gold, no longer off-white. The owner chose every screen over Калкулатор alone. Footers stay muted.
+- «Слънце» uses the deeper brand gold for them. The accent on a form's ground there measures 4.48, under AA, so they use `--brand-emphasis`, as the avatar's fill does.
+- The cost names under «Разходи» are rows, not titles, and stay white. The first pass (#460) put the gold on them by mistake.
 
 ### «Нов разход» is EUR only (owner 2026-10-26)
 

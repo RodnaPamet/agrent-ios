@@ -111,8 +111,10 @@ final class PaletteTokenTests: XCTestCase {
         // `Palette.ListChrome` (`FormChrome.swift`). Headers and footers sit
         // on a form's ground or a list's page; values on a form's card or a
         // list's page row; prompts and menu values on the card.
-        ("section header on formPage", Palette.ListChrome.header, Palette.Surface.formPage, [9.17, 6.98, 9.28]),
-        ("section header on page", Palette.ListChrome.header, Palette.Surface.page, [9.17, 6.98, 11.37]),
+        ("section header on formPage", Palette.ListChrome.header, Palette.Surface.formPage, [7.91, 4.90, 5.32]),
+        ("section header on page", Palette.ListChrome.header, Palette.Surface.page, [7.91, 4.90, 6.51]),
+        ("section footer on formPage", Palette.ListChrome.footer, Palette.Surface.formPage, [9.17, 6.98, 9.28]),
+        ("section footer on page", Palette.ListChrome.footer, Palette.Surface.page, [9.17, 6.98, 11.37]),
         ("row value on card", Palette.ListChrome.value, Palette.Surface.card, [7.64, 7.24, 11.37]),
         ("row value on page", Palette.ListChrome.value, Palette.Surface.page, [9.17, 6.98, 11.37]),
         ("field prompt on card", Palette.ListChrome.placeholder, Palette.Surface.card, [5.81, 5.32, 7.46]),
@@ -248,6 +250,17 @@ final class PaletteTokenTests: XCTestCase {
                 XCTAssertEqual(Self.rgba(colour, traits)[3], 1, "\(name) must be opaque")
             }
         }
+    }
+
+    /// Section titles are gold (owner, 2026-10-29): the accent in dark and
+    /// light, the deeper brand gold in «Слънце», where the accent misses AA
+    /// on a form's ground. Footers are not: the light arm is the control.
+    func testSectionTitlesAreGold() {
+        XCTAssertEqual(Self.rgba(Palette.ListChrome.header, Self.dark), Self.rgba(Palette.accent, Self.dark))
+        XCTAssertEqual(Self.rgba(Palette.ListChrome.header, Self.light), Self.rgba(Palette.accent, Self.light))
+        XCTAssertEqual(Self.rgba(Palette.ListChrome.header, Self.sunlight), Self.rgba(Palette.accentDeep, Self.sunlight))
+        XCTAssertNotEqual(Self.rgba(Palette.ListChrome.footer, Self.light), Self.rgba(Palette.accent, Self.light))
+        XCTAssertEqual(Self.rgba(Palette.ListChrome.footer, Self.light), Self.rgba(Palette.secondaryText, Self.light))
     }
 
     func testEveryDocumentedPairMeasuresWhatItSaysAndPassesAA() {

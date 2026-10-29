@@ -11,8 +11,11 @@ struct ThemeRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Written above, as a segmented picker shows no title of its
-            // own; VoiceOver hears it from the picker's own name.
+            // own; VoiceOver hears it from the picker's own name. In the
+            // section titles' gold, as it titles this block (owner,
+            // 2026-10-29).
             Text("Тема")
+                .foregroundStyle(Palette.ListChrome.header)
                 .accessibilityHidden(true)
             Picker("Тема", selection: $theme) {
                 ForEach(AppTheme.allCases) { Text($0.label).tag($0) }
