@@ -99,6 +99,16 @@ enum UITestSeam {
     static let isOffline: Bool =
         isActive && ProcessInfo.processInfo.arguments.contains(offlineArgument)
 
+    /// Beside `launchArgument`: the fixture person is a MECHANISATOR on the
+    /// fixture farm (#465), so a run photographs the operator's one screen.
+    /// `/me` and the farm list answer from their `-operator` fixtures
+    /// (`FixtureCatalogue.operatorOverrides`); everything else is the same
+    /// world. `A11yShotsTests.operatorArgument` points back.
+    static let operatorArgument = "AGRENT_UITEST_OPERATOR"
+
+    static let isOperator: Bool =
+        isActive && ProcessInfo.processInfo.arguments.contains(operatorArgument)
+
     /// Tokens that never leave the device.
     ///
     /// `FixtureURLProtocol` answers every request before URLSession opens a

@@ -181,6 +181,10 @@ enum FixtureCatalogue {
         // #439, agri-saas #2375: the harvest's prefill. Its PUT is a write.
         (ActivityCorrectionAPI.definitionPath(fixtureHarvestHandle), "activity-definition"),
         (WorkItemAPI.listPath, "tasks-list"),
+        // #465: the person's own queue, for a mechanisator's one screen, and
+        // the field operation's parcels, for the numbers on its map.
+        (FarmTasksAPI.queuePath, "farm-tasks-mine"),
+        (WorkItemAPI.parcelsPath(fixtureFieldOperationTaskID), "task-parcels-fieldop"),
         // #462: SYNTH-1's tasks, for its «Задачи» card from Блокове: two
         // current, two in the archive. Synthetic.
         (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
@@ -247,10 +251,19 @@ enum FixtureCatalogue {
         path.removingPercentEncoding ?? path
     }
 
+    /// The person and the farm list as a MECHANISATOR (#465), answered
+    /// instead of the owner's when the seam runs with
+    /// `UITestSeam.operatorArgument`. By the fixture they replace, so the
+    /// routes stay in the tables above, once.
+    static let operatorOverrides: [String: String] = [
+        "auth-me": "auth-me-operator",
+        "me-farms": "me-farms-operator",
+    ]
+
     /// Every fixture the table can name, for the test that proves each one
     /// exists in the bundle and decodes.
     static var allFixtureNames: [String] {
-        (Array(byPathAndQuery.values) + Array(byPath.values)).sorted()
+        (Array(byPathAndQuery.values) + Array(byPath.values) + Array(operatorOverrides.values)).sorted()
     }
 
     /// The fixture that answers this request, or nil for "nothing recorded
@@ -258,7 +271,9 @@ enum FixtureCatalogue {
     static func fixtureName(path: String, query: String?) -> String? {
         let path = inFixtureFarm(path)
         let full = query.map { "\(path)?\($0)" } ?? path
-        return byPathAndQuery[full] ?? byPath[path]
+        let name = byPathAndQuery[full] ?? byPath[path]
+        if UITestSeam.isOperator, let name, let swapped = operatorOverrides[name] { return swapped }
+        return name
     }
 
     /// A farm path with NO farm in it, read as the fixture world's one farm.

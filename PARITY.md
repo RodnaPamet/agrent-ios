@@ -1553,6 +1553,16 @@ caller of `.sensoryFeedback`.
 - **Behind the server's switch `agro.orthophoto`** (owner, 2026-10-27). It's on for the owner's farm and testers and off for everyone else. Off, the button cycles «Точни очертания» and «Опростена» only, and a saved «Ортофотокарта» opens on the default. Other features can reach the App Store meanwhile, and when МЗХ agrees the switch goes on with no app update. Offline the switches read off (#145), and the map then has its first two modes.
 - **A saved «Схема» preference** opens on the default, «Точни очертания».
 
+## A mechanisator's one screen (#465)
+
+### Divergence: one screen instead of tabs (owner 2026-10-29)
+
+- **No bar for a MECHANISATOR.** The app opens on «Моите задачи». The farm's map is on top, every block's parcels fitted to the farm, with a gold number on each parcel that has the person's current tasks. Their current tasks are listed under it, then every parcel with its count. Every other role keeps its tabs. The menu keeps Риск and Админ.
+- **Assigned to me.** The list is `GET /farm-tasks` with no query, the caller's FARM_TASK and FIELD_OPERATION queue. Finished and cancelled tasks are left out. A parcel's screen still shows all its tasks.
+- **The numbers** are one `/tasks/{id}/parcels` read per current task, cache first, until the queue's rows carry their parcel ids (asked of backend 1, 2026-10-29).
+- **A parcel** opens its screen as from Блокове: risk, «Задачи» and history. Its comments (task threads and closing notes, owner: both) wait on a parcel-scoped route from backend 1.
+- **The parcels list** is the way into a parcel without the map, for VoiceOver, Voice Control and Switch Control, and for a field too small to hit at the farm's zoom.
+
 ## Blocks (Блокове)
 
 ### A parcel's risk on its own screen (owner 2026-10-29)

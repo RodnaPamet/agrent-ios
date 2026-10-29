@@ -196,6 +196,9 @@ struct TasksListView: View {
 
 struct TaskRow: View {
     let item: WorkItemSummary
+    /// Off on a list of the person's own tasks (#465), where every row
+    /// would carry their own name.
+    var showsAssignee = true
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -226,7 +229,7 @@ struct TaskRow: View {
             item.title,
             item.status.label,
             severityText,
-            item.assignee?.displayName.map { "възложена на \($0)" },
+            assigneeName.map { "възложена на \($0)" },
             dueText,
             item.isOverdue ? "просрочена" : nil,
             item.rowDate(),
@@ -252,6 +255,10 @@ struct TaskRow: View {
         }
     }
 
+    private var assigneeName: String? {
+        showsAssignee ? item.assignee?.displayName : nil
+    }
+
     /// Named, now the row carries a second date (#236): a bare «1 октомври»
     /// beside «Отворена на 20 септември» would leave a reader to guess which
     /// is the deadline.
@@ -275,7 +282,7 @@ struct TaskRow: View {
                 Text(dueText)
                     .foregroundStyle(item.isOverdue ? Palette.error : Palette.secondaryText)
             }
-            if let who = item.assignee?.displayName {
+            if let who = assigneeName {
                 if severityText != nil || dueText != nil {
                     MetaSeparator()
                 }

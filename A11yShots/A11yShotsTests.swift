@@ -71,6 +71,9 @@ final class A11yShotsTests: XCTestCase {
     private static let seamArgument = "AGRENT_UITEST_FIXTURES"
     /// `UITestSeam.offlineArgument`, copied for the same reason.
     private static let offlineArgument = "AGRENT_UITEST_OFFLINE"
+    /// `UITestSeam.operatorArgument`, copied for the same reason: the
+    /// fixture person is a MECHANISATOR (#465).
+    private static let operatorArgument = "AGRENT_UITEST_OPERATOR"
 
     /// A failed step leaves the app on an unknown screen, and the screenshots
     /// taken after it would be of that screen under the previous one's name.
@@ -2276,6 +2279,62 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the row back")
 
         XCTAssertFalse(app.buttons["Кошче"].exists, "«Кошче» was removed (#411)")
+    }
+
+    /// A MECHANISATOR's one screen (#465, owner 2026-10-29): no tab bar, the
+    /// farm's map with the person's task count on SYNTH-1, their current
+    /// tasks under it (the queue fixture's closed row left out), the
+    /// parcels list, and a parcel opened from it onto its risk and tasks.
+    /// Then the menu: Риск and Админ, no Блокове or Задачи.
+    func testMechanisatorHome() {
+        let app = XCUIApplication()
+        app.launchArguments += [Self.seamArgument, Self.operatorArgument]
+        app.launch()
+        XCTAssertFalse(app.buttons["Вход с Google"].waitForExistence(timeout: 3), "the seam is off")
+        XCTAssertTrue(app.navigationBars["Моите задачи"].waitForExistence(timeout: 20),
+                      "a mechanisator did not open on «Моите задачи»\n\(app.debugDescription)")
+        XCTAssertFalse(app.tabBars.firstMatch.exists, "a mechanisator has no tab bar")
+
+        let task = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Пръскане срещу плевели")).firstMatch
+        XCTAssertTrue(task.waitForExistence(timeout: 15), "the queue's current task is not listed")
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Почистване на синтетичен канал")).firstMatch.exists,
+                       "a closed task is listed as current")
+        // On the MAP, not the parcels row with the same words: the row is a
+        // button and the number on the map is not.
+        let badge = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@ AND elementType != %d",
+                                  "SYNTH-1, 2 задачи", XCUIElement.ElementType.button.rawValue)).firstMatch
+        XCTAssertTrue(badge.waitForExistence(timeout: 15),
+                      "SYNTH-1 carries no «2 задачи» on the map\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 2)
+        capture("20-mechanisator-home", app: app)
+
+        // The parcels list, under the tasks: dragged on the list, as a swipe
+        // from the middle could land on the map and pan it.
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "SYNTH-1, 2 задачи")).firstMatch
+        for _ in 0..<4 where !(row.exists && row.isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)))
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "no «Парцели» row for SYNTH-1")
+        capture("20b-mechanisator-parcels", app: app)
+        row.tap()
+        XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "the parcel row opened no screen")
+        let tasksCard = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Задачи, 2 текущи")).firstMatch
+        XCTAssertTrue(tasksCard.waitForExistence(timeout: 10), "the parcel's screen has no «Задачи»")
+        Thread.sleep(forTimeInterval: 1)
+        capture("20c-mechanisator-parcel", app: app)
+        app.navigationBars["История"].buttons.firstMatch.tap()
+
+        XCTAssertTrue(openMenu(app), "no «Меню» on the mechanisator's screen")
+        XCTAssertTrue(labelled("Риск", in: app.buttons).waitForExistence(timeout: 5), "«Риск» is not in the menu")
+        XCTAssertTrue(labelled("Админ", in: app.buttons).exists, "«Админ» is not in the menu")
+        XCTAssertFalse(labelled("Блокове", in: app.buttons).exists, "«Блокове» is in the menu")
+        Thread.sleep(forTimeInterval: 1)
+        capture("20d-mechanisator-menu", app: app)
     }
 
     /// «Тема» in Админ, light then dark then back (owner, 2026-10-29), and the

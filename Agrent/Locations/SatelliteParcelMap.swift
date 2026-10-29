@@ -101,6 +101,10 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// screen that writes real work records.
     var onTap: (([Parcel]) -> Void)?
 
+    /// A number on each parcel that has one, by parcel id: the
+    /// mechanisator's own current tasks on it (#465). Empty everywhere else.
+    var badges: [String: Int] = [:]
+
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> MKMapView {
@@ -136,6 +140,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         context.coordinator.syncBase(base, in: view)
         context.coordinator.syncBlocks(base == .orthophoto ? blocks : [], in: view)
         context.coordinator.syncLabels(base == .orthophoto ? parcels : [], in: view)
+        context.coordinator.syncBadges(badges, on: parcels, in: view)
 
         let tap = UITapGestureRecognizer(
             target: context.coordinator,
@@ -182,6 +187,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         context.coordinator.syncBase(base, in: view)
         context.coordinator.syncBlocks(base == .orthophoto ? blocks : [], in: view)
         context.coordinator.syncLabels(base == .orthophoto ? parcels : [], in: view)
+        context.coordinator.syncBadges(badges, on: parcels, in: view)
         context.coordinator.apply(camera, in: view)
 
         // Repaint what MapKit has already drawn. `renderer(for:)` returns nil
@@ -222,6 +228,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         private var mountedBase: Base?
         private var mountedBlocks: [OrthoBlock] = []
         private var mountedLabels: [Parcel] = []
+        private var mountedBadges: [String: Int] = [:]
 
         /// Whether the overlays on screen still describe the data.
         ///
@@ -461,11 +468,30 @@ struct SatelliteParcelMap: UIViewRepresentable {
             }
         }
 
+        /// A task count on each parcel that has one, where its name would be.
+        func syncBadges(_ badges: [String: Int], on parcels: [Parcel], in view: MKMapView) {
+            guard badges != mountedBadges else { return }
+            mountedBadges = badges
+            view.removeAnnotations(view.annotations.filter { $0 is ParcelTaskBadge })
+            for parcel in parcels {
+                guard let count = badges[parcel.id], count > 0,
+                      let point = parcel.geometry?.boundingMapPolygon?.coordinate else { continue }
+                view.addAnnotation(ParcelTaskBadge(parcelName: parcel.name, count: count, coordinate: point))
+            }
+        }
+
         func mapView(_ view: MKMapView, regionDidChangeAnimated animated: Bool) {
             onRegionChange?(view.region)
         }
 
         func mapView(_ view: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            if let badge = annotation as? ParcelTaskBadge {
+                let shown = view.dequeueReusableAnnotationView(withIdentifier: ParcelTaskBadgeView.reuse) as? ParcelTaskBadgeView
+                    ?? ParcelTaskBadgeView(annotation: badge, reuseIdentifier: ParcelTaskBadgeView.reuse)
+                shown.annotation = badge
+                shown.show(badge)
+                return shown
+            }
             guard let label = annotation as? OrthoMapLabel else { return nil }
             let reuse = label.kind == .parcel ? "orthoParcel" : "orthoBlock"
             let shown = view.dequeueReusableAnnotationView(withIdentifier: reuse) as? OrthoMapLabelView

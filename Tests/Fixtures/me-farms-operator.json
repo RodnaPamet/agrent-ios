@@ -1,0 +1,18 @@
+{
+  "farms": [
+    {
+      "id": "ten_synthetic",
+      "slug": "agrent",
+      "name": "Синтетично стопанство",
+      "role": "MECHANISATOR",
+      "isPlatform": false,
+      "permissions": {
+        "canRead": true,
+        "canWrite": false,
+        "canAdmin": false,
+        "canAudit": false,
+        "canExport": false
+      }
+    }
+  ]
+}

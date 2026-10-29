@@ -1,0 +1,59 @@
+[
+  {
+    "id": "tsk_fixture_fieldop",
+    "key": "FT-102",
+    "title": "Пръскане срещу плевели",
+    "type": "FIELD_OPERATION",
+    "status": "IN_PROGRESS",
+    "severity": "MEDIUM",
+    "dueAt": "2026-10-08T07:00:00.000Z",
+    "assignee": {
+      "id": "usr_fixture_owner",
+      "name": "Иван Фикстуров",
+      "email": "owner@example.invalid"
+    },
+    "assigneeUserId": "usr_fixture_owner",
+    "createdAt": "2026-10-03T06:30:00.000Z",
+    "updatedAt": "2026-10-05T07:55:00.000Z",
+    "completedAt": null,
+    "mayDelete": false
+  },
+  {
+    "id": "tsk_fixture_2",
+    "key": null,
+    "title": "Заявка за анализ на почвата",
+    "type": "FARM_TASK",
+    "status": "IN_PROGRESS",
+    "severity": null,
+    "dueAt": null,
+    "assignee": {
+      "id": "usr_fixture_owner",
+      "name": "Иван Фикстуров",
+      "email": "owner@example.invalid"
+    },
+    "assigneeUserId": "usr_fixture_owner",
+    "createdAt": "2026-09-22T06:10:00.000Z",
+    "updatedAt": "2026-09-22T06:10:00.000Z",
+    "completedAt": null,
+    "mayDelete": false
+  },
+  {
+    "id": "tsk_fixture_queue_done",
+    "key": "FT-095",
+    "title": "Почистване на синтетичен канал",
+    "type": "FARM_TASK",
+    "status": "CLOSED",
+    "severity": null,
+    "dueAt": null,
+    "createdAt": "2026-09-01T06:00:00.000Z",
+    "updatedAt": "2026-09-03T12:00:00.000Z",
+    "completedAt": "2026-09-03T12:00:00.000Z",
+    "assigneeUserId": "usr_fixture_owner",
+    "assignee": {
+      "id": "usr_fixture_owner",
+      "name": "Иван Фикстуров",
+      "email": "owner@example.invalid"
+    },
+    "mayDelete": false
+  }
+]

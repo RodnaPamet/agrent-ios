@@ -208,6 +208,8 @@ final class RouteContractTests: XCTestCase {
             ("PushAPI.swift", [PushAPI.subscriptionsPath(in: "{tenantSlug}")]),
             // Who a farm's work can be given to (#371, #372).
             ("AssignableUsersAPI.swift", [AssignableUsersAPI.path]),
+            // A mechanisator's own queue, for their one screen (#465).
+            ("FarmTasksAPI.swift", [FarmTasksAPI.queuePath]),
             // «Нова задача» posts to the task list (#372).
             ("NewTaskAPI.swift", [NewTaskAPI.path]),
             // «Нова задача»'s parcels, one link each after the create (#388).
