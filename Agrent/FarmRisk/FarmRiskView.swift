@@ -258,7 +258,7 @@ struct FarmRiskView: View {
             }
 
             if let risk = row.risk {
-                readings(risk, row.freshness)
+                ParcelRiskReadings(risk: risk, freshness: row.freshness)
             } else if let failure = row.failure {
                 Text(failure)
                     .font(.footnote)
@@ -284,11 +284,7 @@ struct FarmRiskView: View {
         ]
 
         if let risk = row.risk {
-            parts.append(spokenReading("зеленина", risk.vegetation, risk.ndvi, "NDVI"))
-            parts.append(spokenReading("влага", risk.moisture, risk.ndmi, "NDMI"))
-            parts.append(risk.absenceReason)
-            parts.append(Self.acquisition(risk, row.freshness)?.spoken
-                ?? "датата на заснемане е неизвестна")
+            parts += ParcelRiskReadings.spoken(risk, row.freshness)
         } else if let failure = row.failure {
             parts.append(failure)
         } else {
@@ -298,17 +294,6 @@ struct FarmRiskView: View {
         }
 
         return A11y.sentence(parts)
-    }
-
-    /// «зеленина добро, NDVI 0,62 средно» — the chip's MEANING rather than
-    /// its rendered fragment, and «ср.» spelled out, which is an
-    /// abbreviation on screen and a word in the ear.
-    private func spokenReading(
-        _ title: String, _ level: RiskLevel, _ value: Double?, _ index: String
-    ) -> String {
-        var text = "\(title) \(level.label.lowercased())"
-        if let value { text += ", \(index) \(Num.text(value)) средно" }
-        return text
     }
 
     /// Where an ask about this parcel stands: being sent, or asked already.
@@ -329,76 +314,6 @@ struct FarmRiskView: View {
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
             }
-        }
-    }
-
-    @ViewBuilder
-    private func readings(_ risk: ParcelRisk, _ freshness: Freshness?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Two chips, stacked rather than side by side: at accessibility
-            // sizes two labelled chips on one line reflow independently and
-            // fight, which is the failure JournalDetailView documents.
-            reading("Зеленина", risk.vegetation, value: risk.ndvi, index: "NDVI")
-            reading("Влага", risk.moisture, value: risk.ndmi, index: "NDMI")
-
-            if let reason = risk.absenceReason {
-                Text(reason)
-                    .font(.caption)
-                    .foregroundStyle(Palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            acquisition(risk, freshness)
-        }
-    }
-
-    private func reading(
-        _ title: String, _ level: RiskLevel, value: Double?, index: String
-    ) -> some View {
-        // A COLUMN WHILE IT FITS, STACKED WHEN IT CANNOT.
-        //
-        // `Text(title).frame(width: 72)` boxed «Зеленина» at a hard 72pt. At
-        // `.footnote` that is comfortable by default and ruinous at the five
-        // accessibility sizes, where the word wants roughly 290pt: with no
-        // `fixedSize` the column breaks it into two- and three-letter
-        // fragments and the tail is simply cut. On the one screen whose job is
-        // telling a farmer WHICH reading is bad — and the chip beside it says
-        // only the level, while the trailing text is an index code.
-        //
-        // The 72 is worth keeping below that threshold: it aligns «Зеленина»
-        // and «Влага» so the two chips form a column you can compare down.
-        // Above it the alignment is the thing that has to go, because there
-        // are only two readings and losing the column costs less than losing
-        // the words. `NewsView` already switches axis on the same threshold.
-        let layout = typeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-            : AnyLayout(HStackLayout(spacing: 8))
-
-        return layout {
-            Text(title)
-                .font(.footnote)
-                .foregroundStyle(Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(width: typeSize.isAccessibilitySize ? nil : 72,
-                       alignment: .leading)
-
-            CategoryChip(
-                text: level.label,
-                foreground: level.colors.foreground,
-                background: level.colors.background
-            )
-
-            if let value {
-                // Labelled as an average, deliberately. The map overlay is
-                // per-pixel over the whole location; this is one number
-                // over this parcel's boundary. A farmer comparing a bright
-                // patch there against this will find them different, and
-                // both are correct.
-                Text("\(index) \(Num.text(value)) ср.")
-                    .font(.caption)
-                    .foregroundStyle(Palette.secondaryText)
-            }
-            Spacer(minLength: 0)
         }
     }
 
@@ -455,32 +370,6 @@ struct FarmRiskView: View {
         )
     }
 
-    @ViewBuilder
-    private func acquisition(_ risk: ParcelRisk, _ freshness: Freshness?) -> some View {
-        if let line = Self.acquisition(risk, freshness) {
-            Label(line.shown, systemImage: "camera.badge.clock")
-                .font(.caption)
-                // NEVER `.secondary`, which is what this was. The parcel map
-                // says it in its own comment: this line is the caveat on
-                // every number above it, and it must not read as a footnote.
-                .foregroundStyle(line.isStale ? Palette.warning : Color.primary)
-                .fixedSize(horizontal: false, vertical: true)
-        } else {
-            // THE `else` THE PARCEL MAP ALREADY HAD.
-            //
-            // Without it the whole line vanished and the row showed two
-            // coloured chips and two index numbers with no date and no
-            // caveat — an undated reading wearing the clothes of a current
-            // one. `acquiredDate` is optional on the wire, and the parcel
-            // map records for the SAME satellite data that the server may
-            // omit it; `BgDate.parseISODay` also returns nil for a full
-            // instant, which is the other shape this codebase has met.
-            Label("Датата на заснемане е неизвестна.", systemImage: "camera.badge.clock")
-                .font(.caption)
-                .foregroundStyle(Palette.warning)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
 }
 
 /// THE ARCHIVE, as its own control on a risk row, never the whole row.

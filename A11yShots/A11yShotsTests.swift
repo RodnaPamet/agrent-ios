@@ -279,6 +279,11 @@ final class A11yShotsTests: XCTestCase {
         // and «Ново мероприятие» is there.
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10),
                       "the parcel row opened no history")
+        // Its risk, at the top (owner, 2026-10-29): the reading Риск shows.
+        let risk = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Риск, зеленина")).firstMatch
+        XCTAssertTrue(risk.waitForExistence(timeout: 10), "the parcel from Блокове shows no «Риск»\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
         capture("18a-parcel-history-from-map", app: app)
         let record = app.buttons["Ново мероприятие"]
         XCTAssertTrue(record.waitForExistence(timeout: 10), "the history has no «Ново мероприятие»")

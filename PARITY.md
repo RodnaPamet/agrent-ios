@@ -1553,6 +1553,11 @@ caller of `.sensoryFeedback`.
 
 ## Blocks (Блокове)
 
+### A parcel's risk on its own screen (owner 2026-10-29)
+
+- **«Риск» first:** Блокове → tap a parcel → its screen starts with «Риск». That's the parcel's reading exactly as Риск shows it (vegetation and moisture with their NDVI/NDMI averages, and when the satellite looked), drawn by the one shared `ParcelRiskReadings`. It stays above the archive's failure, as it's its own read. Not when opened from Риск, which has just shown it.
+- **Tasks waiting:** the parcel's current and archived tasks need agri-saas `GET /agro/parcels/{parcelId}/tasks`, the inverse of `taskParcelIds`. A link filter would miss field operations. Proposed to backend 1, waiting on the owner's go-ahead.
+
 ### Divergence — a parcel on the map opens its history (#387, owner 2026-10-21)
 
 - **A tap on a parcel** (either map, or a row of the list under it) opens the parcel's history for every role, where it used to open «Ново мероприятие» for those who may record. Overlapping shapes still ask which parcel first.
