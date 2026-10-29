@@ -23,6 +23,12 @@ import SwiftUI
 /// AUDITOR. Putting the archive there would have buried it in a create form
 /// and hidden it from the operator who sprayed the field.
 ///
+/// ── And the parcel's risk, from Блокове (owner, 2026-10-29) ──
+///
+/// Opened from Блокове, the screen starts with «Риск»: the parcel's reading
+/// as Риск shows it (`ParcelRiskReadings`). Not when opened from Риск, which
+/// has just shown it.
+///
 /// ── Read-only, this pass ──
 ///
 /// `createCropSeason`, `createWeedObservation`, `deleteCropSeason` and
@@ -53,10 +59,15 @@ struct ParcelHistoryView: View {
     /// closes on success (`WriteFeedback`).
     @State private var feedback = WriteFeedback()
 
+    /// The parcel's risk reading, when opened from Блокове (owner,
+    /// 2026-10-29). Nil from Риск, which has just shown the same reading.
+    @State private var risk: ParcelRiskStore?
+
     init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil) {
         self.parcelName = parcelName
         self.recordIn = recordIn
         _store = State(initialValue: ParcelHistoryStore(parcelID: parcelID))
+        _risk = State(initialValue: recordIn == nil ? nil : ParcelRiskStore(parcelID: parcelID))
     }
 
     var body: some View {
@@ -75,6 +86,7 @@ struct ParcelHistoryView: View {
                 if store.state.value == nil { await store.load() }
             }
             .task { _ = await people.load() }
+            .task { await risk?.load() }
             .safeAreaInset(edge: .bottom, spacing: 0) { recordButton }
             .sheet(isPresented: $recording) {
                 if let recordIn {
@@ -121,8 +133,16 @@ struct ParcelHistoryView: View {
         case .failed(let message):
             // `.failed` means there was nothing cached to fall back on, so
             // this is the genuinely empty-handed case — the only one that
-            // gets the error treatment and a way out.
-            ErrorState(message: message) { await store.load() }
+            // gets the error treatment and a way out. The risk is its own
+            // read, so it stays above the failure rather than going with it.
+            VStack(alignment: .leading, spacing: 0) {
+                if let risk {
+                    riskSection(risk)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                }
+                ErrorState(message: message) { await store.load() }
+            }
 
         case .loaded(let archive, _):
             List {
@@ -132,6 +152,7 @@ struct ParcelHistoryView: View {
                 // check in `FormSurfaceTests` can see it from the list (#164).
                 Group {
                     header(archive)
+                    if let risk { riskSection(risk) }
                     if archive.isEmpty {
                         emptyArchive
                     } else {
@@ -189,6 +210,37 @@ struct ParcelHistoryView: View {
             .padding(.vertical, 8)
             .listRowSeparator(.hidden)
             .pageRow()
+    }
+
+    // MARK: - Risk
+
+    /// «Риск», the parcel's reading as Риск shows it (`ParcelRiskReadings`),
+    /// above the archive: what the field looks like now, then what was done
+    /// to it. Nothing while it loads; a failure is one quiet line, as on Риск.
+    @ViewBuilder
+    private func riskSection(_ risk: ParcelRiskStore) -> some View {
+        switch risk.state {
+        case .loading:
+            EmptyView()
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Риск").font(.headline)
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 6)
+        case .loaded(let reading, let freshness):
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Риск").font(.headline)
+                ParcelRiskReadings(risk: reading, freshness: freshness)
+            }
+            .padding(.vertical, 6)
+            // One stop, said from the values, as a Риск row is.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)))
+        }
     }
 
     // MARK: - The three cards
