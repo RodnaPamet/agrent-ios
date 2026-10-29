@@ -1,0 +1,21 @@
+{
+  "rows": [
+    { "id": "cost_fixture_1", "category": "FERTILIZER", "amount": 1779.12, "currency": "EUR",
+      "incurredOn": "2026-10-20T00:00:00.000Z", "supplier": null, "description": null,
+      "allocationBasis": "TARGET", "seasonId": null, "plantingId": null, "locationId": null, "parcelId": null,
+      "leaseId": null, "itemId": null, "invoiceFileId": null,
+      "createdAt": "2026-10-20T08:00:00.000Z", "updatedAt": "2026-10-20T08:00:00.000Z" },
+    { "id": "cost_fixture_2", "category": "PESTICIDE", "amount": 640.5, "currency": "EUR",
+      "incurredOn": "2026-10-18T00:00:00.000Z", "supplier": null, "description": null,
+      "allocationBasis": "TARGET", "seasonId": null, "plantingId": null, "locationId": null, "parcelId": null,
+      "leaseId": null, "itemId": null, "invoiceFileId": null,
+      "createdAt": "2026-10-18T08:00:00.000Z", "updatedAt": "2026-10-18T08:00:00.000Z" },
+    { "id": "cost_fixture_3", "category": "SEED", "amount": 980, "currency": "EUR",
+      "incurredOn": "2026-10-02T00:00:00.000Z", "supplier": null, "description": null,
+      "allocationBasis": "TARGET", "seasonId": null, "plantingId": null, "locationId": null, "parcelId": null,
+      "leaseId": null, "itemId": null, "invoiceFileId": null,
+      "createdAt": "2026-10-02T08:00:00.000Z", "updatedAt": "2026-10-02T08:00:00.000Z" }
+  ],
+  "totalCount": 3,
+  "truncated": false
+}

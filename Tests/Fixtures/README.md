@@ -425,3 +425,11 @@ SYNTHETIC: an invented flight date, «МЗХ» as the source.
 bounds (`locations-parcels.json`), numbered `00000-11…13`, which follow no
 real ЕКАТТЕ. Served by path whatever the box. The tiles have no fixture, so
 the map shows the plain ground it draws with no photo.
+
+## The calculator's «Разходи»
+
+`costs-list.json`: `GET /grain/costs`, three synthetic costs (fertiliser,
+plant protection, seed) in EUR, invented amounts, so the screenshots show the
+cost list's titles in the accent gold (owner, 2026-10-29). Its POST, a write,
+stays `501 WRITE_REFUSED`.
+

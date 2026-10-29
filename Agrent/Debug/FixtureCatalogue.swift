@@ -184,6 +184,9 @@ enum FixtureCatalogue {
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),
         (CostsAPI.machineryPath, "costs-machinery"),
+        // The calculator's «Разходи» (owner, 2026-10-29, gold titles): three
+        // synthetic costs. Its POST is a write and stays `WRITE_REFUSED`.
+        (CostsAPI.listPath, "costs-list"),
         (ExchangeAPI.listingsPath, "exchange-listings"),
         (ExchangeAPI.myListingsPath, "exchange-my-listings"),
         (ExchangeAPI.threadsPath, "exchange-threads"),

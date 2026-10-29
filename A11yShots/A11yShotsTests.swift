@@ -2251,6 +2251,44 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertFalse(app.buttons["Кошче"].exists, "«Кошче» was removed (#411)")
     }
 
+    /// «Тема» in Админ, light then dark then back (owner, 2026-10-29), and the
+    /// calculator's cost titles in gold. Ends on «Автоматично», as the
+    /// choice is remembered across launches and the next run should start
+    /// where this one did.
+    func testThemeAndGoldCostTitles() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Админ")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        let dark = app.buttons["Тъмна"]
+        XCTAssertTrue(dark.waitForExistence(timeout: 15), "Админ has no «Тема»\n\(app.debugDescription)")
+        XCTAssertTrue(app.buttons["Светла"].exists && app.buttons["Автоматично"].exists)
+        app.buttons["Светла"].tap()
+        Thread.sleep(forTimeInterval: 1)
+        capture("10c-admin-theme-light", app: app)
+        dark.tap()
+        Thread.sleep(forTimeInterval: 1)
+        capture("10d-admin-theme-dark", app: app)
+        app.buttons["Автоматично"].tap()
+        Thread.sleep(forTimeInterval: 1)
+        // Out of Админ by its own «Затвори»: a swipe-down dismissal is still
+        // animating when the tab is tapped, and that tap is dropped.
+        app.navigationBars.buttons["Затвори"].firstMatch.tap()
+        let tab = labelled("Калкулатор", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        Thread.sleep(forTimeInterval: 1)
+        tab.tap()
+        let fertiliser = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Торове")).firstMatch
+        var swipes = 0
+        while !fertiliser.exists, swipes < 8 { app.swipeUp(); Thread.sleep(forTimeInterval: 0.5); swipes += 1 }
+        XCTAssertTrue(fertiliser.exists, "the calculator lists no costs\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09f-calculator-costs-gold", app: app)
+    }
+
     /// #454: a task's «Изтрий», the question, and the bar's «Отмени»
     /// (owner, 2026-10-26). The undo comes inside the window, so no delete is
     /// ever built; one that were would meet the seam's refusal of every write.

@@ -65,6 +65,9 @@ struct AdminView: View {
         List {
             // FIRST, and outside the switch: every state draws it.
             Section { accountRow }.pageRow()
+            // Light or dark (owner, 2026-10-29): the device's, for every
+            // role, so above what a reader is refused.
+            Section { ThemeRow() }.pageRow()
 
             switch store.access {
             case .forbidden:
