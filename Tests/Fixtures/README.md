@@ -441,3 +441,13 @@ tasks newest first: two current rows reused from `tasks-list.json` (the
 field operation and `tsk_fixture_2`, whose detail has a fixture, so a tap
 opens it) and two invented archived ones, one RESOLVED and one CANCELED.
 Every status, `truncated: false`, `mayDelete` on each row.
+
+## A mechanisator's one screen
+
+`auth-me-operator.json` and `me-farms-operator.json`: the fixture person and
+farm, with the role MECHANISATOR, served instead of `auth-me.json` and
+`me-farms.json` when the seam is launched with `AGRENT_UITEST_OPERATOR`
+(#465). `farm-tasks-mine.json`: `GET /farm-tasks`, the person's queue, two
+current rows reused from `tasks-list.json` and one invented CLOSED one that
+the screen leaves out. `task-parcels-fieldop.json`: the field operation's
+parcels, SYNTH-1 alone, so SYNTH-1 counts two tasks on the map.

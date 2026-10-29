@@ -151,6 +151,36 @@ struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AuthClient.self) private var auth
 
+    /// Every other role's app: the bar and its screens.
+    private var tabView: some View {
+        // Selection through the router (#194): a re-tap of the selected
+        // tab arrives as a write of the same value, which pops it.
+        TabView(selection: $router.tab) {
+            ForEach(tabs.bottomTabs) { surface in
+                surface.screen
+                    // The root's `RoutedStack` keeps its path in the
+                    // router under this surface.
+                    .environment(\.routedSurface, surface)
+                    .tabItem { Label(surface.label, systemImage: surface.icon) }
+                    // How many conversations have something unread
+                    // (PARITY GAP 7) — THREADS, not messages; 0 draws no
+                    // badge. The web has none; the owner asked for one.
+                    // When Борса is not on the bar the app menu's row
+                    // carries the count instead.
+                    .badge(surface == .exchange ? unread.count : 0)
+                    .tag(surface)
+            }
+        }
+        .onChange(of: tabs.bottomTabs) { _, bar in router.adoptBar(bar) }
+        // A press the bar takes and does not act on is finished by the
+        // app (#305) — see `TabBarPressObserver`.
+        .background {
+            TabBarPressCatcher(router: router)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
+        }
+    }
+
     var body: some View {
         // Built from the saved order rather than written out, so the bar
         // and the menu's overflow are two views of one list and cannot
@@ -162,34 +192,22 @@ struct MainTabView: View {
         // will eventually be two different numbers.
         VStack(spacing: 0) {
             OutboxBanner()
-            // Selection through the router (#194): a re-tap of the selected
-            // tab arrives as a write of the same value, which pops it.
-            TabView(selection: $router.tab) {
-                ForEach(tabs.bottomTabs) { surface in
-                    surface.screen
-                        // The root's `RoutedStack` keeps its path in the
-                        // router under this surface.
-                        .environment(\.routedSurface, surface)
-                        .tabItem { Label(surface.label, systemImage: surface.icon) }
-                        // How many conversations have something unread
-                        // (PARITY GAP 7) — THREADS, not messages; 0 draws no
-                        // badge. The web has none; the owner asked for one.
-                        // When Борса is not on the bar the app menu's row
-                        // carries the count instead.
-                        .badge(surface == .exchange ? unread.count : 0)
-                        .tag(surface)
-                }
-            }
-            .onChange(of: tabs.bottomTabs) { _, bar in router.adoptBar(bar) }
-            // A press the bar takes and does not act on is finished by the
-            // app (#305) — see `TabBarPressObserver`.
-            .background {
-                TabBarPressCatcher(router: router)
-                    .frame(width: 0, height: 0)
-                    .accessibilityHidden(true)
+            if tabs.isOperator {
+                // A MECHANISATOR's whole app is one screen (#465, owner
+                // 2026-10-29): the farm's map and their tasks, no bar. The
+                // menu keeps what the bar would have left over.
+                MechanisatorHomeView()
+                    .environment(\.routedSurface, MechanisatorHomeView.surface)
+            } else {
+                tabView
             }
         }
         .environment(router)
+        // The router keeps one stack for the operator's screen, so a link
+        // opens on it whatever the route's own tab would have been.
+        .onChange(of: tabs.isOperator, initial: true) { _, isOperator in
+            router.adoptBar(isOperator ? [MechanisatorHomeView.surface] : tabs.bottomTabs)
+        }
         // `FarmGate` has opened the link's farm, or it was open already.
         // Initial too: after a farm switch, these tabs are built for the
         // link and find it waiting.

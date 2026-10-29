@@ -152,6 +152,9 @@ final class FixtureSeamTests: XCTestCase {
             (WorkItemAPI.parcelsPath(FixtureCatalogue.fixtureTaskID), "task-parcels"),
             // agrent-ios#179 stage 3 — Профил's farm list.
             (FarmsAPI.farmsPath, "me-farms"),
+            // #465: a mechanisator's queue and the field operation's parcels.
+            (FarmTasksAPI.queuePath, "farm-tasks-mine"),
+            (WorkItemAPI.parcelsPath(FixtureCatalogue.fixtureFieldOperationTaskID), "task-parcels-fieldop"),
             // agrent-ios#258 — the superuser's prices form.
             (AdminPricesAPI.path, "admin-price-overrides"),
             // agrent-ios#323 — «Публичен профил».
@@ -422,6 +425,7 @@ final class FixtureSeamTests: XCTestCase {
     /// app calls on that route.
     private static let decoders: [(String, @Sendable (Data) async throws -> Void)] = [
         ("auth-me", { _ = try await MeAPI.decode(from: $0) }),
+        ("auth-me-operator", { _ = try await MeAPI.decode(from: $0) }),
         ("journal-list", { _ = try await JournalAPI.decodeList(from: $0) }),
         ("locations-list", { _ = try await LocationsAPI.decodeList(from: $0) }),
         ("locations-parcels", { _ = try await LocationsAPI.decodeParcels(from: $0) }),
@@ -477,6 +481,10 @@ final class FixtureSeamTests: XCTestCase {
         ("field-operation-detail", { _ = try await FieldOperationAPI.decodeDetail(from: $0) }),
         // agrent-ios#179 stage 3.
         ("me-farms", { _ = try await FarmsAPI.decodeFarms(from: $0) }),
+        ("me-farms-operator", { _ = try await FarmsAPI.decodeFarms(from: $0) }),
+        // #465: a mechanisator's queue and the field operation's parcels.
+        ("farm-tasks-mine", { _ = try await FarmTasksAPI.decodeQueue(from: $0) }),
+        ("task-parcels-fieldop", { _ = try await WorkItemAPI.decodeParcels(from: $0) }),
         // agrent-ios#258.
         ("admin-price-overrides", { _ = try await APIClient.shared.decode($0, as: AdminPricesAPI.Overrides.self) }),
         // agrent-ios#323.
