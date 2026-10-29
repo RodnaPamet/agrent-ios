@@ -433,3 +433,11 @@ plant protection, seed) in EUR, invented amounts, so the screenshots show the
 cost list's titles in the accent gold (owner, 2026-10-29). Its POST, a write,
 stays `501 WRITE_REFUSED`.
 
+
+## A parcel's tasks from Блокове
+
+`parcel-tasks.json`: `GET /agro/parcels/par_holes/tasks` (#462), SYNTH-1's
+tasks newest first: two current rows reused from `tasks-list.json` (the
+field operation and `tsk_fixture_2`, whose detail has a fixture, so a tap
+opens it) and two invented archived ones, one RESOLVED and one CANCELED.
+Every status, `truncated: false`, `mayDelete` on each row.

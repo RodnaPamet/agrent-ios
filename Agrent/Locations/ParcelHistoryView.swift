@@ -29,6 +29,10 @@ import SwiftUI
 /// as Риск shows it (`ParcelRiskReadings`). Not when opened from Риск, which
 /// has just shown it.
 ///
+/// Then «Задачи» (#462, same day): a card with the newest current task,
+/// opening the parcel's tasks, «Текущи» and «Архив» (`ParcelTasksView`).
+/// From Блокове too, as it was asked for there.
+///
 /// ── Read-only, this pass ──
 ///
 /// `createCropSeason`, `createWeedObservation`, `deleteCropSeason` and
@@ -62,12 +66,16 @@ struct ParcelHistoryView: View {
     /// The parcel's risk reading, when opened from Блокове (owner,
     /// 2026-10-29). Nil from Риск, which has just shown the same reading.
     @State private var risk: ParcelRiskStore?
+    /// The parcel's tasks, from Блокове (#462). One store for the card and
+    /// the list it opens.
+    @State private var tasks: ParcelTasksStore?
 
     init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil) {
         self.parcelName = parcelName
         self.recordIn = recordIn
         _store = State(initialValue: ParcelHistoryStore(parcelID: parcelID))
         _risk = State(initialValue: recordIn == nil ? nil : ParcelRiskStore(parcelID: parcelID))
+        _tasks = State(initialValue: recordIn == nil ? nil : ParcelTasksStore(parcelID: parcelID))
     }
 
     var body: some View {
@@ -87,6 +95,7 @@ struct ParcelHistoryView: View {
             }
             .task { _ = await people.load() }
             .task { await risk?.load() }
+            .task { await tasks?.load() }
             .safeAreaInset(edge: .bottom, spacing: 0) { recordButton }
             .sheet(isPresented: $recording) {
                 if let recordIn {
@@ -141,6 +150,11 @@ struct ParcelHistoryView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
                 }
+                if let tasks {
+                    tasksCard(tasks, inList: false)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                }
                 ErrorState(message: message) { await store.load() }
             }
 
@@ -153,6 +167,7 @@ struct ParcelHistoryView: View {
                 Group {
                     header(archive)
                     if let risk { riskSection(risk) }
+                    if let tasks { tasksCard(tasks, inList: true) }
                     if archive.isEmpty {
                         emptyArchive
                     } else {
@@ -170,7 +185,12 @@ struct ParcelHistoryView: View {
             // a gap in the middle that nothing on screen could explain. On a
             // drill-in the same gesture would silently discard pages the
             // reader had just asked for, so the drill-ins have none.
-            .refreshable { await PullToRefresh.bounded { await store.refresh() } }
+            .refreshable {
+                await PullToRefresh.bounded {
+                    await store.refresh()
+                    await tasks?.load()
+                }
+            }
         }
     }
 
@@ -250,7 +270,7 @@ struct ParcelHistoryView: View {
     /// `RoutedStack`. Its own type and destination, declared on this screen
     /// rather than as an `AppRoute`: the lists share this screen's store,
     /// which nothing outside the screen should hold.
-    private enum DrillIn: Hashable { case seasons, operations, weeds }
+    private enum DrillIn: Hashable { case seasons, operations, weeds, tasks }
 
     @ViewBuilder
     private func cards(_ archive: ParcelHistoryStore.Archive) -> some View {
@@ -313,7 +333,84 @@ struct ParcelHistoryView: View {
                 section: { $0.weeds },
                 line: { $0.historyLine }
             )
+        case .tasks:
+            if let tasks {
+                ParcelTasksView(parcelName: parcelName, store: tasks)
+            }
         }
+    }
+
+    // MARK: - Tasks
+
+    /// «Задачи»: the newest current task and how many there are, opening
+    /// both tabs. Nothing while it loads; a failure is one quiet line, as
+    /// «Риск» above it.
+    ///
+    /// `inList` is false above a failed archive, where the card is a link
+    /// outside a List: plain, or the link's tint turns its text gold, and
+    /// with a chevron of its own, as no row draws one there.
+    @ViewBuilder
+    private func tasksCard(_ tasks: ParcelTasksStore, inList: Bool) -> some View {
+        switch tasks.state {
+        case .loading:
+            EmptyView()
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 6) {
+                Text(ParcelTasksCard.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 4)
+        case .loaded(let list, _):
+            let card = ParcelTasksCard(list)
+            if !card.isTappable {
+                tasksCardBody(card, chevron: false)
+            } else if inList {
+                NavigationLink(value: DrillIn.tasks) { tasksCardBody(card, chevron: false) }
+            } else {
+                NavigationLink(value: DrillIn.tasks) { tasksCardBody(card, chevron: true) }
+                    .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// The history cards' look (`cardBody`), for the tasks card's values.
+    private func tasksCardBody(_ card: ParcelTasksCard, chevron: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(ParcelTasksCard.title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 8)
+                if let count = card.count {
+                    Text(count)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                }
+                if chevron {
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Palette.secondaryText)
+                }
+            }
+            if !card.line.text.isEmpty {
+                Text(card.line.text)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !card.line.detailText.isEmpty {
+                Text(card.line.detailText)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 4)
+        // One stop, spoken from the values, as the history cards are.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(card.spoken)
     }
 
     /// A card, and a push only when there is something to push to.

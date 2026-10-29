@@ -181,6 +181,9 @@ enum FixtureCatalogue {
         // #439, agri-saas #2375: the harvest's prefill. Its PUT is a write.
         (ActivityCorrectionAPI.definitionPath(fixtureHarvestHandle), "activity-definition"),
         (WorkItemAPI.listPath, "tasks-list"),
+        // #462: SYNTH-1's tasks, for its «Задачи» card from Блокове: two
+        // current, two in the archive. Synthetic.
+        (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),
         (CostsAPI.machineryPath, "costs-machinery"),

@@ -109,6 +109,8 @@ final class FixtureSeamTests: XCTestCase {
             (LocationsAPI.itemsPath, "items"),
             (LocationsAPI.rateUnitsPath, "units-rate"),
             (WorkItemAPI.listPath, "tasks-list"),
+            // #462: SYNTH-1's tasks from Блокове.
+            (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
             (CalculatorAPI.path, "calculator-sample"),
             (CostsAPI.defaultsPath, "costs-defaults"),
             // #245: the same route with the crop named is the crop's sheet.
@@ -439,6 +441,7 @@ final class FixtureSeamTests: XCTestCase {
         ("ortho-coverage", { _ = try await APIClient.shared.decode($0, as: OrthoCoverage.self) }),
         ("ortho-blocks", { _ = try await APIClient.shared.decode($0, as: OrthoBlocks.self) }),
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
+        ("parcel-tasks", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),
         ("costs-defaults", { _ = try await APIClient.shared.decode($0, as: OverheadDefaults.self) }),
         ("costs-defaults-crop", { _ = try await APIClient.shared.decode($0, as: CropCostDefaults.self) }),

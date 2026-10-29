@@ -285,6 +285,28 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(risk.waitForExistence(timeout: 10), "the parcel from Блокове shows no «Риск»\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
         capture("18a-parcel-history-from-map", app: app)
+
+        // Its tasks (#462, owner 2026-10-29): the card under «Риск», then
+        // «Текущи» and «Архив», then back for «Ново мероприятие».
+        let tasksCard = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Задачи, 2 текущи")).firstMatch
+        XCTAssertTrue(tasksCard.waitForExistence(timeout: 10),
+                      "the parcel from Блокове shows no «Задачи» card\n\(app.debugDescription)")
+        tasksCard.tap()
+        XCTAssertTrue(app.navigationBars["Задачи"].waitForExistence(timeout: 10), "the «Задачи» card opened no list")
+        let current = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Пръскане срещу плевели")).firstMatch
+        XCTAssertTrue(current.waitForExistence(timeout: 10), "«Текущи» shows no current task")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18c-parcel-tasks", app: app)
+        app.buttons["Архив"].tap()
+        let archived = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Дискуване след жътва")).firstMatch
+        XCTAssertTrue(archived.waitForExistence(timeout: 10), "«Архив» shows no finished task")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18d-parcel-tasks-archive", app: app)
+        app.navigationBars["Задачи"].buttons.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
         let record = app.buttons["Ново мероприятие"]
         XCTAssertTrue(record.waitForExistence(timeout: 10), "the history has no «Ново мероприятие»")
         record.tap()

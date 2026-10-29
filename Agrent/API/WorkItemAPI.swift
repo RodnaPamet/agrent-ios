@@ -33,6 +33,16 @@ enum WorkItemAPI {
     /// a person. The rule bites on `?assignee=` and filters, not here.
     static func detailPath(_ id: String) -> String { "\(base)/\(URLEscape.segment(id))" }
 
+    /// One parcel's tasks, for its screen from Блокове (#462, owner
+    /// 2026-10-29): every task that names the parcel, by a PARCEL link or a
+    /// field operation's line, once each, every status, newest first. The
+    /// list's `{rows, truncated}` and the list's row, so `decodeList` reads
+    /// it. The parcel's id in the PATH, as the archive's routes take it, and
+    /// no query, for `listPath`'s reason.
+    static func parcelTasksPath(_ parcelID: String) -> String {
+        "\(FarmPath.root)/agro/parcels/\(URLEscape.segment(parcelID))/tasks"
+    }
+
     /// `DELETE /tasks/{taskId}`: a HARD delete, its comments and links with
     /// it (agri-saas #2187). Sent only after «Изтрий» was confirmed and its
     /// five seconds of «Отмени» have passed (`TaskRemoval`).

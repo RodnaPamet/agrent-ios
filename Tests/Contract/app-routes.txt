@@ -37,6 +37,7 @@
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/crop-seasons
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/crop-seasons/{seasonId}
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/history
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/tasks
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations/{observationId}
 /api/t/{tenantSlug}/costs/machinery
