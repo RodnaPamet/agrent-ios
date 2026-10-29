@@ -9,6 +9,9 @@ struct AgrentApp: App {
     /// Watched for one thing here: a pending account deletion, which takes a
     /// signed-in session to the recovery screen (#281).
     @State private var me = CurrentUserStore.shared
+    /// «Тема», chosen in Админ (`AppTheme`): applied once here, for the
+    /// window and so every sheet it presents.
+    @AppStorage(AppTheme.storageKey) private var theme: AppTheme = .automatic
 
     /// BEFORE ANY SCENE EXISTS, because the defect it fixes is paid by the
     /// first Bulgarian string UIKit measures — and on this app that can be
@@ -96,6 +99,9 @@ struct AgrentApp: App {
             // the parcel map is DATA — it encodes whether a parcel is sown —
             // so an accent in that family would read as one more state.
             .tint(Palette.accent)
+            // Light, dark, or the phone's own (owner, 2026-10-29). At the
+            // root, which sets the window's style: a sheet follows it too.
+            .preferredColorScheme(theme.colorScheme)
             // Every literal in this app is hard-coded Bulgarian, but dates
             // were formatting against the DEVICE locale, which reports en-BG
             // here — so an all-Bulgarian journal printed "11 September".

@@ -53,6 +53,10 @@ not.
 
 ---
 
+## «Тема» (owner, 2026-10-29)
+
+- **Light or dark, in Админ:** «Тема», with «Автоматично» (the phone's own, the default), «Светла» and «Тъмна». It's applied at the app's root, so every screen and sheet follows it. It's stored on the device, kept across sign-out, and open to every role, so it sits above the part of Админ a reader is refused. «Слънце» stays what the phone's Increase Contrast switches on.
+
 ## Calculator
 
 Web `grain/calculator` (1705 lines) · iOS `Calculator/CalculatorView.swift`
@@ -108,6 +112,10 @@ margin line, for all six codes. The phone says the value side's reason above
 the figures, as before, in a sentence that names the margin too. So its
 margin line adds the web's sentence only for the four other codes, and never
 says the same thing twice.
+
+### The cost list's titles are gold (owner 2026-10-29)
+
+- Each cost's category («Торове», «Препарати» …) in «Разходи» is drawn in the accent gold, as the crop names are, no longer white.
 
 ### «Нов разход» is EUR only (owner 2026-10-26)
 
