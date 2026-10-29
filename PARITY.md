@@ -1556,7 +1556,8 @@ caller of `.sensoryFeedback`.
 ### A parcel's risk on its own screen (owner 2026-10-29)
 
 - **«Риск» first:** Блокове → tap a parcel → its screen starts with «Риск». That's the parcel's reading exactly as Риск shows it (vegetation and moisture with their NDVI/NDMI averages, and when the satellite looked), drawn by the one shared `ParcelRiskReadings`. It stays above the archive's failure, as it's its own read. Not when opened from Риск, which has just shown it.
-- **Tasks waiting:** the parcel's current and archived tasks need agri-saas `GET /agro/parcels/{parcelId}/tasks`, the inverse of `taskParcelIds`. A link filter would miss field operations. Proposed to backend 1, waiting on the owner's go-ahead.
+- **«Задачи» under it (#462):** a card with how many current tasks the parcel has and the newest one, opening its tasks in two tabs: «Текущи» and «Архив» (finished or cancelled; any other status, an unknown one included, is current). A row opens the task, as on Задачи. A capped list says so and isn't counted. Read-only: «Изтрий» stays on Задачи.
+- **The route:** agri-saas `GET /agro/parcels/{parcelId}/tasks` (owner approved 2026-10-29, built by backend 1): every task that names the parcel, by a PARCEL link or a field operation's line, once each, every status, newest first, the task list's `{rows, truncated}`. The split into the two tabs is the phone's, by status. A link filter on `/tasks` would have missed field operations.
 
 ### Divergence — a parcel on the map opens its history (#387, owner 2026-10-21)
 

@@ -155,6 +155,11 @@ final class RouteContractTests: XCTestCase {
     /// against the shape proposed to backend 1, came off with the refresh
     /// from agri-saas #2425's merge. The PR (#459) merged only once
     /// `/api/health` carried it (2026-10-27).
+    ///
+    /// Empty again from agri-saas main 4743a68: a parcel's tasks from
+    /// Блокове (#462), built against the shape agreed with backend 1, came
+    /// off with the refresh from agri-saas #2462's merge. The PR (#463)
+    /// merged only once `/api/health` carried it (2026-10-29).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -260,6 +265,8 @@ final class RouteContractTests: XCTestCase {
             ]),
             ("WorkItemAPI.swift", [
                 WorkItemAPI.listPath, WorkItemAPI.detailPath(id), WorkItemAPI.statusPath(id),
+                // agrent-ios#462: one parcel's tasks, from Блокове.
+                WorkItemAPI.parcelTasksPath(parcel),
                 // agrent-ios#177: any task's parcels (agri-saas #1410).
                 WorkItemAPI.parcelsPath(id),
                 // agrent-ios#225: a task's comment.

@@ -1,0 +1,65 @@
+{
+  "rows": [
+    {
+      "id": "tsk_fixture_fieldop",
+      "key": "FT-102",
+      "title": "Пръскане срещу плевели",
+      "type": "FIELD_OPERATION",
+      "status": "IN_PROGRESS",
+      "severity": "MEDIUM",
+      "dueAt": "2026-10-08T07:00:00.000Z",
+      "assignee": {
+        "id": "usr_fixture_operator",
+        "name": "Петър Механизаторов",
+        "email": "operator@example.invalid"
+      },
+      "assigneeUserId": "usr_fixture_operator",
+      "createdAt": "2026-10-03T06:30:00.000Z",
+      "updatedAt": "2026-10-05T07:55:00.000Z",
+      "mayDelete": false
+    },
+    {
+      "id": "tsk_fixture_2",
+      "key": null,
+      "title": "Заявка за анализ на почвата",
+      "type": "TASK",
+      "status": "IN_PROGRESS",
+      "severity": null,
+      "dueAt": null,
+      "assignee": null,
+      "assigneeUserId": null,
+      "createdAt": "2026-09-22T06:10:00.000Z",
+      "updatedAt": "2026-09-22T06:10:00.000Z",
+      "mayDelete": true
+    },
+    {
+      "id": "tsk_fixture_parcel_done",
+      "key": "FT-090",
+      "title": "Дискуване след жътва",
+      "type": "FARM_TASK",
+      "status": "RESOLVED",
+      "severity": "LOW",
+      "dueAt": "2026-08-20T07:00:00.000Z",
+      "assignee": null,
+      "assigneeUserId": null,
+      "createdAt": "2026-08-10T06:00:00.000Z",
+      "updatedAt": "2026-08-18T15:20:00.000Z",
+      "mayDelete": true
+    },
+    {
+      "id": "tsk_fixture_parcel_canceled",
+      "key": null,
+      "title": "Торене с азот",
+      "type": "TASK",
+      "status": "CANCELED",
+      "severity": null,
+      "dueAt": null,
+      "assignee": null,
+      "assigneeUserId": null,
+      "createdAt": "2026-07-02T05:45:00.000Z",
+      "updatedAt": "2026-07-05T09:00:00.000Z",
+      "mayDelete": true
+    }
+  ],
+  "truncated": false
+}
