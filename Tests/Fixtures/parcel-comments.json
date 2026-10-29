@@ -1,0 +1,31 @@
+{
+  "rows": [
+    {
+      "id": "cmt_fixture_1",
+      "taskId": "tsk_fixture_fieldop",
+      "taskKey": "FT-102",
+      "taskTitle": "Пръскане срещу плевели",
+      "kind": "COMMENT",
+      "body": "Спряхме заради вятъра, продължаваме утре сутрин.",
+      "createdAt": "2026-10-05T08:00:00.000Z",
+      "createdByUserId": "usr_fixture_operator",
+      "createdBy": {
+        "id": "usr_fixture_operator",
+        "name": "Петър Механизаторов",
+        "email": "operator@example.invalid"
+      }
+    },
+    {
+      "id": "resolution:tsk_fixture_parcel_done",
+      "taskId": "tsk_fixture_parcel_done",
+      "taskKey": "FT-090",
+      "taskTitle": "Дискуване след жътва",
+      "kind": "RESOLUTION",
+      "body": "Изпълнена успешно: да.\nПлевели: няма.",
+      "createdAt": "2026-08-18T15:20:00.000Z",
+      "createdByUserId": null,
+      "createdBy": null
+    }
+  ],
+  "truncated": false
+}

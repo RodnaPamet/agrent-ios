@@ -1559,8 +1559,9 @@ caller of `.sensoryFeedback`.
 
 - **No bar for a MECHANISATOR.** The app opens on «Моите задачи». The farm's map is on top, every block's parcels fitted to the farm, with a gold number on each parcel that has the person's current tasks. Their current tasks are listed under it, then every parcel with its count. Every other role keeps its tabs. The menu keeps Риск and Админ.
 - **Assigned to me.** The list is `GET /farm-tasks` with no query, the caller's FARM_TASK and FIELD_OPERATION queue. Finished and cancelled tasks are left out. A parcel's screen still shows all its tasks.
-- **The numbers** are one `/tasks/{id}/parcels` read per current task, cache first, until the queue's rows carry their parcel ids (asked of backend 1, 2026-10-29).
-- **A parcel** opens its screen as from Блокове: risk, «Задачи» and history. Its comments (task threads and closing notes, owner: both) wait on a parcel-scoped route from backend 1.
+- **The numbers** come from each queue row's `parcelIds` (agri-saas #2476). A queue cached before the field still reads `/tasks/{id}/parcels` per task.
+- **A parcel** opens its screen as from Блокове: risk, «Задачи», «Коментари» and history.
+- **«Коментари»** (owner: both kinds) is on every parcel's screen, as part of its history: comments on the parcel's tasks and each closed task's closing note, newest first, from `GET /agro/parcels/{parcelId}/comments`. A row opens its task. A closing note names no one, as the server doesn't record who wrote it (2026-10-29).
 - **The parcels list** is the way into a parcel without the map, for VoiceOver, Voice Control and Switch Control, and for a field too small to hit at the farm's zoom.
 
 ## Blocks (Блокове)

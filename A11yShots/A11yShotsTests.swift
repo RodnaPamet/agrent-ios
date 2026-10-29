@@ -310,6 +310,21 @@ final class A11yShotsTests: XCTestCase {
         capture("18d-parcel-tasks-archive", app: app)
         app.navigationBars["Задачи"].buttons.firstMatch.tap()
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
+
+        // Its comments (#465): a comment and a closing note, newest first.
+        let commentsCard = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Коментари, 2 коментара")).firstMatch
+        XCTAssertTrue(commentsCard.waitForExistence(timeout: 10),
+                      "the parcel shows no «Коментари» card\n\(app.debugDescription)")
+        commentsCard.tap()
+        XCTAssertTrue(app.navigationBars["Коментари"].waitForExistence(timeout: 10), "the card opened no list")
+        let note = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "При затваряне на задачата")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10), "the closing note is not listed")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18e-parcel-comments", app: app)
+        app.navigationBars["Коментари"].buttons.firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
         let record = app.buttons["Ново мероприятие"]
         XCTAssertTrue(record.waitForExistence(timeout: 10), "the history has no «Ново мероприятие»")
         record.tap()
@@ -2325,6 +2340,9 @@ final class A11yShotsTests: XCTestCase {
         let tasksCard = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Задачи, 2 текущи")).firstMatch
         XCTAssertTrue(tasksCard.waitForExistence(timeout: 10), "the parcel's screen has no «Задачи»")
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Коментари, 2 коментара")).firstMatch
+            .waitForExistence(timeout: 10), "the parcel's screen has no «Коментари»")
         Thread.sleep(forTimeInterval: 1)
         capture("20c-mechanisator-parcel", app: app)
         app.navigationBars["История"].buttons.firstMatch.tap()

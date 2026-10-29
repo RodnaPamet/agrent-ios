@@ -188,6 +188,8 @@ enum FixtureCatalogue {
         // #462: SYNTH-1's tasks, for its «Задачи» card from Блокове: two
         // current, two in the archive. Synthetic.
         (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
+        // #465: SYNTH-1's comments, a comment and a closing note. Synthetic.
+        (ParcelCommentsAPI.path("par_holes"), "parcel-comments"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),
         (CostsAPI.machineryPath, "costs-machinery"),

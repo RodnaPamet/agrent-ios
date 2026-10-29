@@ -34,6 +34,7 @@
 /api/t/{tenantSlug}/agro/locations/{locationId}/ndre-tiles
 /api/t/{tenantSlug}/agro/locations/{locationId}/ndvi-tiles
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/analysis
+/api/t/{tenantSlug}/agro/parcels/{parcelId}/comments
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/crop-seasons
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/crop-seasons/{seasonId}
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/history

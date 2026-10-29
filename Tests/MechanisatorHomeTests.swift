@@ -97,6 +97,35 @@ final class MechanisatorHomeTests: XCTestCase {
         XCTAssertEqual(counts.counts, ["p-t2": 1])
     }
 
+    /// A queue row's own `parcelIds` (agri-saas #2476) are taken as given,
+    /// with no read; only a row without them is read.
+    @MainActor
+    func testARowsOwnParcelsNeedNoRead() async throws {
+        let rows = try await FarmTasksAPI.decodeQueue(from: try fixture("farm-tasks-mine"))
+        XCTAssertEqual(rows.first { $0.id == "tsk_fixture_2" }?.parcelIds, ["par_holes", "par_simple", "par_nogeom"])
+        @MainActor final class Reads { var ids: [String] = [] }
+        let reads = Reads()
+        let counts = TaskParcelCounts(load: { id, publish in
+            reads.ids.append(id)
+            publish(.loaded([Self.parcel("par_read", "Нива")], .fresh))
+        })
+        await counts.load(rows.filter { !$0.status.isArchived })
+        XCTAssertEqual(reads.ids, [], "the rows carried their parcels")
+        XCTAssertEqual(counts.counts, ["par_holes": 2, "par_simple": 1, "par_nogeom": 1])
+
+        await counts.load(["t1", "t2"], known: ["t1": ["a"]])
+        XCTAssertEqual(reads.ids, ["t2"], "positive control: a row without parcels is read")
+        XCTAssertEqual(counts.counts, ["a": 1, "par_read": 1])
+    }
+
+    /// An odd `parcelIds` costs the field, not the row.
+    func testAnOddParcelIdsCostsOnlyTheField() async throws {
+        let body = #"[{"id":"t","key":null,"title":"Т","type":"FARM_TASK","status":"OPEN","parcelIds":"par_x"}]"#
+        let rows = try await FarmTasksAPI.decodeQueue(from: Data(body.utf8))
+        XCTAssertNil(rows.first?.parcelIds)
+        XCTAssertEqual(rows.first?.title, "Т", "positive control: the rest of the row read")
+    }
+
     /// A task whose parcels cannot be read counts nowhere, rather than
     /// somewhere wrong.
     @MainActor

@@ -65,12 +65,10 @@ private struct MechanisatorHome: View {
         }
         .task { if parcels.blocks.value == nil { await parcels.load() } }
         .task { if tasks.state.value == nil { await tasks.load() } }
-        // The counts follow the current tasks: a task closed or newly given
-        // changes the numbers on the next read.
-        .task(id: currentIDs) { await counts.load(currentIDs) }
+        // The counts follow the current tasks: a task closed or newly given,
+        // or a row now carrying its parcels, changes the numbers.
+        .task(id: tasks.current ?? []) { await counts.load(tasks.current ?? []) }
     }
-
-    private var currentIDs: [String] { tasks.current?.map(\.id) ?? [] }
 
     // MARK: - The map
 

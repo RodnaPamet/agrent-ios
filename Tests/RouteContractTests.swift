@@ -160,6 +160,11 @@ final class RouteContractTests: XCTestCase {
     /// Блокове (#462), built against the shape agreed with backend 1, came
     /// off with the refresh from agri-saas #2462's merge. The PR (#463)
     /// merged only once `/api/health` carried it (2026-10-29).
+    ///
+    /// Empty again from agri-saas main 38fc372: a parcel's comments (#465),
+    /// built against agri-saas #2476 while that PR was open, came off with
+    /// the refresh from its merge. The PR (#467) merged only once
+    /// `/api/health` carried it (2026-10-30).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -208,6 +213,8 @@ final class RouteContractTests: XCTestCase {
             ("PushAPI.swift", [PushAPI.subscriptionsPath(in: "{tenantSlug}")]),
             // Who a farm's work can be given to (#371, #372).
             ("AssignableUsersAPI.swift", [AssignableUsersAPI.path]),
+            // A parcel's comments and closing notes (#465).
+            ("ParcelCommentsAPI.swift", [ParcelCommentsAPI.path(parcel)]),
             // A mechanisator's own queue, for their one screen (#465).
             ("FarmTasksAPI.swift", [FarmTasksAPI.queuePath]),
             // «Нова задача» posts to the task list (#372).
