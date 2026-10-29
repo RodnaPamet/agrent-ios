@@ -2,7 +2,7 @@ import SwiftUI
 import XCTest
 @testable import Agrent
 
-/// «Тема» in Админ (owner, 2026-10-29), and the gold cost titles.
+/// «Тема» in Админ (owner, 2026-10-29), and the gold section titles.
 final class AppThemeTests: XCTestCase {
 
     /// Automatic is the phone's own: nothing asked of the window.
@@ -35,12 +35,21 @@ final class AppThemeTests: XCTestCase {
         XCTAssertLessThan(row.lowerBound, refusal.lowerBound, "a reader is refused before reaching «Тема»")
     }
 
-    /// The cost list's titles are gold, as the crop names are.
-    func testCostTitlesAreGold() throws {
+    /// The SECTION titles are gold (owner, 2026-10-29: «Разходи», not the
+    /// rows under it), through the house views' one token; the cost names
+    /// stay in the row's own colour.
+    func testSectionTitlesAreGoldNotTheCostNames() throws {
+        let chrome = try source("Agrent/Design/FormChrome.swift")
+        XCTAssertTrue(chrome.contains("struct SectionHeader"), "positive control: the house header is read")
+        let header = try XCTUnwrap(chrome.range(of: "struct SectionHeader"))
+        let footer = try XCTUnwrap(chrome.range(of: "struct SectionFooter"))
+        XCTAssertTrue(chrome[header.upperBound..<footer.lowerBound].contains("Palette.ListChrome.header"))
+        XCTAssertTrue(chrome[footer.upperBound...].contains("Palette.ListChrome.footer"), "footers stay muted")
+
         let calculator = try source("Agrent/Calculator/CalculatorView.swift")
         let row = try XCTUnwrap(calculator.range(of: "struct CostRow"))
         let title = try XCTUnwrap(calculator.range(of: "Text(cost.category.label)", range: row.upperBound..<calculator.endIndex))
-        let gold = try XCTUnwrap(calculator.range(of: ".foregroundStyle(Palette.accent)", range: title.upperBound..<calculator.endIndex))
-        XCTAssertLessThan(calculator.distance(from: title.upperBound, to: gold.lowerBound), 120)
+        let line = calculator[title.lowerBound...].prefix { $0 != "\n" }
+        XCTAssertFalse(line.contains("Palette.accent"), "a cost's name is a row, not a title: \(line)")
     }
 }

@@ -365,8 +365,10 @@ enum Palette {
     ///
     /// What they measure now (`PaletteTokenTests`, dark / light / «Слънце»):
     ///
-    ///     header on formPage          9.17   6.98   9.28
-    ///     header on page              9.17   6.98  11.37
+    ///     header on formPage          7.91   4.90   5.32   (gold, 2026-10-29)
+    ///     header on page              7.91   4.90   6.51
+    ///     footer on formPage          9.17   6.98   9.28
+    ///     footer on page              9.17   6.98  11.37
     ///     value on card               7.64   7.24  11.37
     ///     value on page               9.17   6.98  11.37
     ///     placeholder on card         5.81   5.32   7.46
@@ -386,9 +388,19 @@ enum Palette {
     /// `SearchField` now (#164, owner 2026-10-08): `placeholder` on
     /// `Field.fill`, the composer's pair, 5.81 / 5.32 / 7.46.
     enum ListChrome {
-        /// A section's header and footer — `SectionHeader`, `SectionFooter`,
-        /// `Section(titled:)`.
-        static let header = secondaryText
+        /// A section's title — `SectionHeader`, `Section(titled:)` — in the
+        /// gold, on every screen (owner, 2026-10-29): «Разходи» and its kind
+        /// were off-white. The accent, except in «Слънце», where a form's
+        /// ground is `--bg-muted` and the accent on it measures 4.48, under
+        /// AA for text this size; there it is `--brand-emphasis`, the deeper
+        /// gold, as the avatar's fill below does. 7.91 / 4.90 / 5.32 on a
+        /// form's ground, 7.91 / 4.90 / 6.51 on the page.
+        static let header = Color(token: { theme in
+            theme == .highContrast ? AgrentColor.brandEmphasis(theme) : AgrentColor.brandDefault(theme)
+        })
+        /// A section's footer — `SectionFooter`. Muted, as before: a footer
+        /// explains, and in gold it would read as a second title.
+        static let footer = secondaryText
         /// A row's value — `ValueRow`. What `LabeledContent` draws in
         /// `secondaryLabel` by default.
         static let value = secondaryText

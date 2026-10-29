@@ -41,14 +41,14 @@ extension SectionHeader where Content == Text {
     }
 }
 
-/// A section's footer in `Palette.ListChrome.header`. A footer that writes a
+/// A section's footer in `Palette.ListChrome.footer`. A footer that writes a
 /// caveat in `Palette.warning` keeps it: an explicit style inside wins over
 /// this one.
 struct SectionFooter<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        content.foregroundStyle(Palette.ListChrome.header)
+        content.foregroundStyle(Palette.ListChrome.footer)
     }
 }
 

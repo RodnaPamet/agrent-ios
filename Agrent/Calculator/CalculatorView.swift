@@ -564,11 +564,7 @@ struct CostRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                // Gold, as the crop names are (owner, 2026-10-29): the
-                // titles on this screen are the accent, not white.
-                Text(cost.category.label)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Palette.accent)
+                Text(cost.category.label).font(.subheadline.weight(.medium))
                 Text(BgDate.dayMonth(cost.incurredOn))
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
