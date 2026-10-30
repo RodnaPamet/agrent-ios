@@ -23,8 +23,9 @@ final class NotificationsTests: XCTestCase {
         let items = try await NotificationsAPI.decodeList(from: Self.fixture())
         XCTAssertEqual(items.map(\.id), ["ntf_fixture_task", "ntf_fixture_exchange", "ntf_fixture_lease"])
         XCTAssertEqual(items.filter { !$0.read }.count, 2)
-        XCTAssertEqual(items[0].link, .task(farm: "agrent", id: "tsk_fixture_2"))
-        XCTAssertNil(items[1].link, "no link: the row is only marked read")
+        XCTAssertEqual(items[0].link(inFarm: "agrent"), .task(farm: "agrent", id: "tsk_fixture_2"))
+        XCTAssertEqual(items[1].link(inFarm: "agrent"), .thread(farm: "agrent", id: "thr_synthetic_1"))
+        XCTAssertNil(items[2].link(inFarm: "agrent"), "no link: the row is only marked read")
 
         let odd = #"[{"title":"без id"},{"id":"x","read":"yes","title":"  "}]"#
         let rows = try await NotificationsAPI.decodeList(from: Data(odd.utf8))

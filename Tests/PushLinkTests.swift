@@ -18,6 +18,27 @@ final class PushLinkTests: XCTestCase {
                        "an encoded separator stays inside the id")
     }
 
+    /// A Борса conversation (#473), first on the approved push list.
+    func testAThreadLinkOpensTheConversation() {
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/threads/thr-7"), .thread(farm: "ferma-1", id: "thr-7"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/threads/thr-7")?.farm, "ferma-1")
+        let route = AppRoute(.thread(farm: "ferma-1", id: "thr-7"))
+        XCTAssertEqual(route, .conversation(threadID: "thr-7", commodity: nil))
+        XCTAssertEqual(route.home, .exchange)
+        XCTAssertNil(PushLink.parse("/t/ferma-1/exchange/my-listings#listing-3"), "a listing has no screen by id yet")
+    }
+
+    /// The one unprefixed task link resolves only where the caller vouches
+    /// for the farm (the notifications list), never for a push.
+    func testAnUnprefixedTaskLinkNeedsTheListsFarm() {
+        XCTAssertNil(PushLink.parse("/farm-tasks/task-9"), "a push names no farm: no guess")
+        XCTAssertEqual(PushLink.parse("/farm-tasks/task-9", inFarm: "ferma-1"), .task(farm: "ferma-1", id: "task-9"))
+        XCTAssertNil(PushLink.parse("/farm-tasks/", inFarm: "ferma-1"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-2/farm-tasks/task-9", inFarm: "ferma-1"), .task(farm: "ferma-2", id: "task-9"),
+                       "a link that names its farm keeps it")
+        XCTAssertNil(PushLink.parse("https://evil.example/farm-tasks/1", inFarm: "ferma-1"), "an absolute URL is never a link")
+    }
+
     /// Only paths the server sends, and only ones the app can show.
     func testAnythingElseIsNoLink() {
         for link in [nil, "", "t/ferma-1/farm-tasks/1", "//elsewhere/t/ferma-1/farm-tasks/1",

@@ -16,9 +16,9 @@
     "tenantId": "ten_synthetic",
     "userId": "usr_fixture_owner",
     "type": "GENERAL",
-    "title": "Ново запитване в Борса",
-    "message": "Купувач пита за синтетичната обява за пшеница.",
-    "linkUrl": null,
+    "title": "Ново съобщение в Борса",
+    "message": "Купувач ви писа за синтетичната обява за пшеница.",
+    "linkUrl": "/t/agrent/exchange/threads/thr_synthetic_1",
     "read": false,
     "dedupeKey": "fixture-2",
     "createdAt": "2026-10-29T16:05:00.000Z"
