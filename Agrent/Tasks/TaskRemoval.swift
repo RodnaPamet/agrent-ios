@@ -46,6 +46,9 @@ final class TaskRemoval {
     private(set) var undoable: Undoable?
     /// The server's sentence for a refused delete, while it is said.
     private(set) var failure: String?
+    /// Whether the refusal is on screen: the alert's own switch, so a list
+    /// needs no state of its own to say it (`taskRemoval`).
+    var showsFailure = false
     /// Bumped by each delete the server took, so the list reads again.
     private(set) var deletions = 0
 
@@ -70,6 +73,7 @@ final class TaskRemoval {
         guard stages[item.id] == nil else { return }
         if let earlier = undoable { sendNow(earlier.id) }
         failure = nil
+        showsFailure = false
         stages[item.id] = .waiting
         undoable = Undoable(id: item.id, title: item.title)
         let window = override ?? window
@@ -88,7 +92,10 @@ final class TaskRemoval {
         undoable = nil
     }
 
-    func dismissFailure() { failure = nil }
+    func dismissFailure() {
+        failure = nil
+        showsFailure = false
+    }
 
     /// A fresh read of the list answered: whatever was sent is gone from it,
     /// or the server still has it, so the list's own answer stands.
@@ -113,6 +120,7 @@ final class TaskRemoval {
         } catch {
             stages[id] = nil
             failure = UserMessage.text(for: error)
+            showsFailure = true
             return
         }
         deletions += 1

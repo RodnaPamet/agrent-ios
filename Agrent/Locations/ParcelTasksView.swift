@@ -4,13 +4,21 @@ import SwiftUI
 /// «Задачи» card opens, from the parcel's screen in Блокове. A row opens the
 /// task, as on Задачи.
 ///
-/// Read-only, this pass: «Изтрий» stays on Задачи, where a removed row and
-/// its «Отмени» have one list to come back to.
+/// And a row is deleted as on Задачи (owner, 2026-10-30): swipe «Изтрий»,
+/// the question, five seconds of «Отмени», through the same
+/// `taskRemoval`, offered only where the server says it would succeed.
+/// The parcel's card reads the same store, so it follows.
 struct ParcelTasksView: View {
     let parcelName: String
     let store: ParcelTasksStore
 
     @State private var tab: ParcelTasks.Tab = .current
+    /// Who is signed in: whether to offer «Изтрий».
+    @State private var people = CurrentUserStore.shared
+    /// Rows swiped away, inside their five seconds or just sent.
+    @State private var removal = TaskRemoval()
+    @State private var confirmingRemoval: WorkItemSummary?
+    @State private var confirming = false
     /// Set once the list has been on screen: a later appearance is a return
     /// from a task, which may have been closed there.
     @State private var shownBefore = false
@@ -19,6 +27,10 @@ struct ParcelTasksView: View {
     var body: some View {
         content
             .inlineTitle(ParcelTasksCard.title)
+            .taskRemoval(removal, asking: $confirmingRemoval, confirming: $confirming) {
+                await store.load()
+            }
+            .task { _ = await people.load() }
             // Back from a task: read again, so a task closed there is under
             // the tab its status now names. Cache-first, so the rows stay
             // while it reads.
@@ -55,7 +67,8 @@ struct ParcelTasksView: View {
                             icon: "exclamationmark.triangle"
                         )
                     }
-                    rows(tasks.rows(tab))
+                    // A row swiped away isn't listed or counted.
+                    rows(removal.visible(tasks.rows(tab)))
                 }
                 .pageRow()
             }
@@ -97,6 +110,10 @@ struct ParcelTasksView: View {
                         TaskRow(item: item)
                     }
                     .pageRow()
+                    .taskRemovalSwipe(item, me: people.user) {
+                        confirmingRemoval = item
+                        confirming = true
+                    }
                 }
             }
         }
