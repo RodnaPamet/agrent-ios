@@ -181,6 +181,9 @@ enum FixtureCatalogue {
         // #439, agri-saas #2375: the harvest's prefill. Its PUT is a write.
         (ActivityCorrectionAPI.definitionPath(fixtureHarvestHandle), "activity-definition"),
         (WorkItemAPI.listPath, "tasks-list"),
+        // #471: «Известия», three synthetic notifications, two unread, one
+        // linking to the fixture task. Marking read is a write: refused.
+        (NotificationsAPI.listPath, "notifications-list"),
         // #465: the person's own queue, for a mechanisator's one screen, and
         // the field operation's parcels, for the numbers on its map.
         (FarmTasksAPI.queuePath, "farm-tasks-mine"),

@@ -45,6 +45,8 @@ struct AppMenuButton<Extra: View>: View {
 
     @State private var tabs = BottomTabsStore.shared
     @State private var unread = ExchangeUnreadStore.shared
+    /// «Известия»'s unread count, on its row when it is not on the bar (#471).
+    @State private var notifications = NotificationsStore.shared
     @State private var showingAdmin = false
     @State private var farms = FarmStore.shared
 
@@ -53,6 +55,16 @@ struct AppMenuButton<Extra: View>: View {
     /// in the bottom row, so it changes at runtime and cannot have a
     /// fixed number of flags.
     @State private var presented: AppSurface?
+
+    /// A surface's row, with its count where it has one: Борса's unread
+    /// threads, «Известия»'s unread notifications (#471).
+    private func menuLabel(_ surface: AppSurface) -> String {
+        switch surface {
+        case .exchange: MessagingPolicy.counted(surface.label, unread: unread.count)
+        case .notifications: MessagingPolicy.counted(surface.label, unread: notifications.unreadCount)
+        default: surface.label
+        }
+    }
 
     var body: some View {
         Menu {
@@ -81,12 +93,7 @@ struct AppMenuButton<Extra: View>: View {
                     } label: {
                         // Борса off the bar takes its unread badge with it,
                         // so the count rides on the row that opens it.
-                        Label(
-                            surface == .exchange
-                                ? MessagingPolicy.counted(surface.label, unread: unread.count)
-                                : surface.label,
-                            systemImage: surface.icon
-                        )
+                        Label(menuLabel(surface), systemImage: surface.icon)
                     }
                 }
             }

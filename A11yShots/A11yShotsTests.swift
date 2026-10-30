@@ -2315,6 +2315,30 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertFalse(app.buttons["Кошче"].exists, "«Кошче» was removed (#411)")
     }
 
+    /// «Известия» (#471, owner 2026-10-30), from the menu, whose row carries
+    /// the unread count: the list, then a task's notification opening the
+    /// task. Marking it read is a write, which the seam refuses, so the list
+    /// reads again and keeps it unread: no write is ever made.
+    func testNotifications() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» on the root")
+        let row = app.buttons["Известия (2)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "the menu has no «Известия (2)»\n\(app.debugDescription)")
+        capture("22-notifications-menu", app: app)
+        row.tap()
+        XCTAssertTrue(app.navigationBars["Известия"].waitForExistence(timeout: 15), "the menu opened no «Известия»")
+        let task = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Ново, Възложена ви е задача'")).firstMatch
+        XCTAssertTrue(task.waitForExistence(timeout: 10), "no unread task notification\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("22b-notifications", app: app)
+        task.tap()
+        XCTAssertTrue(app.staticTexts["Заявка за анализ на почвата"].waitForExistence(timeout: 15),
+                      "the task notification opened no task\n\(app.debugDescription)")
+    }
+
     /// A MECHANISATOR's one screen (#465, owner 2026-10-29): no tab bar, the
     /// farm's map with the person's task count on SYNTH-1, their current
     /// tasks under it (the queue fixture's closed row left out), the
@@ -2370,6 +2394,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(labelled("Риск", in: app.buttons).waitForExistence(timeout: 5), "«Риск» is not in the menu")
         XCTAssertTrue(labelled("Админ", in: app.buttons).exists, "«Админ» is not in the menu")
         XCTAssertFalse(labelled("Блокове", in: app.buttons).exists, "«Блокове» is in the menu")
+        XCTAssertFalse(labelled("Известия", in: app.buttons).exists, "a mechanisator has «Известия» (#471: outside the operator allowlist)")
         Thread.sleep(forTimeInterval: 1)
         capture("20d-mechanisator-menu", app: app)
     }

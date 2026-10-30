@@ -86,6 +86,8 @@
 /api/t/{tenantSlug}/locations/{locationId}/parcels/{parcelId}
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import/{jobId}
+/api/t/{tenantSlug}/notifications
+/api/t/{tenantSlug}/notifications/{id}
 /api/t/{tenantSlug}/ortho/blocks
 /api/t/{tenantSlug}/ortho/coverage
 /api/t/{tenantSlug}/ortho/tiles/{z}/{x}/{y}

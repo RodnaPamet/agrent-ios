@@ -1553,6 +1553,17 @@ caller of `.sensoryFeedback`.
 - **Behind the server's switch `agro.orthophoto`** (owner, 2026-10-27). It's on for the owner's farm and testers and off for everyone else. Off, the button cycles «Точни очертания» and «Опростена» only, and a saved «Ортофотокарта» opens on the default. Other features can reach the App Store meanwhile, and when МЗХ agrees the switch goes on with no app update. Offline the switches read off (#145), and the map then has its first two modes.
 - **A saved «Схема» preference** opens on the default, «Точни очертания».
 
+## «Известия» (#471)
+
+### Matched: the web's bell, on the phone (owner 2026-10-30)
+
+- **Why:** 13 of the server's 16 notification producers write only to the bell and never push (agri-saas #2510): a buyer's inquiry on Борса, low stock, lease and contract dates, disease risk. With no list on the phone they reached an iPhone nowhere. The owner chose both remedies: this list, and pushes for a shortlist backend 1 drafts.
+- **«Известия» is in the menu with the unread count**, «Известия (2)» as Борса's row has, and choosable for the bar with a badge. The count refreshes on return to the app.
+- **The list** is the server's 50 newest, as the server rendered them in the person's language. The phone composes nothing from `type`. A read of exactly 50 says «Показани са последните 50 известия.», since the cap is silent.
+- **Tapping a row** marks it read (`PUT`, empty body) and opens what the app can show from its `linkUrl` (`PushLink`: tasks today). Other rows are only marked read.
+- **Not for a MECHANISATOR yet:** `notifications` is outside the operator allowlist, as raised on #2510. Their task pushes reach them.
+- **Never cached on disk:** rows name people.
+
 ## A mechanisator's one screen (#465)
 
 ### Divergence: one screen instead of tabs (owner 2026-10-29)
