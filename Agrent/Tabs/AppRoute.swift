@@ -99,6 +99,8 @@ extension AppRoute {
     init(_ link: PushLink) {
         switch link {
         case .task(_, let id): self = .taskID(id)
+        // The conversation reads its own commodity with the thread.
+        case .thread(_, let id): self = .conversation(threadID: id, commodity: nil)
         }
     }
 }

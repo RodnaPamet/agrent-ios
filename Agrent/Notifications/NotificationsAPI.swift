@@ -84,6 +84,7 @@ struct AppNotification: Decodable, Identifiable, Equatable, Sendable {
         AppNotification(id: id, type: type, title: title, message: message, linkUrl: linkUrl, read: true, createdAt: createdAt)
     }
 
-    /// Where it leads, when the app can show it.
-    var link: PushLink? { PushLink.parse(linkUrl) }
+    /// Where it leads, when the app can show it. `farm` is the farm the list
+    /// was read for, which resolves the one unprefixed task link (#473).
+    func link(inFarm farm: String?) -> PushLink? { PushLink.parse(linkUrl, inFarm: farm) }
 }

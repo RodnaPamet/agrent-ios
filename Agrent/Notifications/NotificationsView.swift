@@ -37,7 +37,9 @@ private struct NotificationsScreen: View {
             List {
                 Group {
                     ForEach(items) { item in
-                        Button { Task { await open(item) } } label: { NotificationRow(item: item) }
+                        Button { Task { await open(item) } } label: {
+                            NotificationRow(item: item, opens: item.link(inFarm: store.farm) != nil)
+                        }
                             .buttonStyle(.plain)
                     }
                     // The server sends the newest 50 and does not say when
@@ -60,7 +62,7 @@ private struct NotificationsScreen: View {
     /// Read, then where it leads, if the app can show it there.
     private func open(_ item: AppNotification) async {
         await store.markRead(item)
-        if let link = item.link {
+        if let link = item.link(inFarm: store.farm) {
             pushRoute(AppRoute(link))
         }
     }
@@ -70,6 +72,8 @@ private struct NotificationsScreen: View {
 /// title, its text, and when.
 private struct NotificationRow: View {
     let item: AppNotification
+    /// Whether a tap leads somewhere: the chevron says so.
+    let opens: Bool
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -95,7 +99,7 @@ private struct NotificationRow: View {
                 }
             }
             Spacer(minLength: 0)
-            if item.link != nil {
+            if opens {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Palette.secondaryText)

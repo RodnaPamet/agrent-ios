@@ -2337,6 +2337,16 @@ final class A11yShotsTests: XCTestCase {
         task.tap()
         XCTAssertTrue(app.staticTexts["Заявка за анализ на почвата"].waitForExistence(timeout: 15),
                       "the task notification opened no task\n\(app.debugDescription)")
+
+        // A Борса message opens its conversation (#473).
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let message = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Ново съобщение в Борса'")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 10), "no Борса notification\n\(app.debugDescription)")
+        message.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'пшеницата още ли е налична'")).firstMatch
+            .waitForExistence(timeout: 15), "the Борса notification opened no conversation\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("22c-notification-thread", app: app)
     }
 
     /// A MECHANISATOR's one screen (#465, owner 2026-10-29): no tab bar, the

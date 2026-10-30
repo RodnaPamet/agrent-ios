@@ -465,5 +465,6 @@ for the per-task read a queue cached before `parcelIds` still makes.
 
 `notifications-list.json`: `GET /notifications` (#471), a bare array of three
 invented notifications in Bulgarian, as the server now renders them: a task
-assigned (linking to `tsk_fixture_2`, whose detail has a fixture), an
-inquiry on Борса and a lease ending, the last one read.
+assigned (linking to `tsk_fixture_2`, whose detail has a fixture), a
+message on Борса (linking to `thr_synthetic_1`, #473) and a lease ending, the
+last one read.
