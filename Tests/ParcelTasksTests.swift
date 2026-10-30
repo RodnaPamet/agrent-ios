@@ -117,6 +117,35 @@ final class ParcelTasksTests: XCTestCase {
         XCTAssertEqual(archived.line.details, ["Няма текущи задачи", "Има задачи в архива"])
     }
 
+    // MARK: - «Изтрий»
+
+    /// Both lists delete through the one `taskRemoval`, and a parcel's
+    /// list offers the swipe as Задачи does (owner, 2026-10-30).
+    func testBothListsShareTheDelete() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let parcel = try String(contentsOf: root.appendingPathComponent("Agrent/Locations/ParcelTasksView.swift"), encoding: .utf8)
+        let tasks = try String(contentsOf: root.appendingPathComponent("Agrent/Tasks/TasksListView.swift"), encoding: .utf8)
+        for (name, source) in [("ParcelTasksView", parcel), ("TasksListView", tasks)] {
+            XCTAssertTrue(source.contains(".taskRemoval(removal, asking: $confirmingRemoval, confirming: $confirming)"), name)
+            XCTAssertTrue(source.contains(".taskRemovalSwipe(item, me: people.user)"), name)
+            XCTAssertTrue(source.contains("removal.visible("), name)
+            XCTAssertFalse(source.contains(".swipeActions("), "\(name) builds its own swipe")
+        }
+    }
+
+    /// A row swiped away leaves the list it was in, whichever tab.
+    @MainActor
+    func testASwipedRowLeavesTheList() async throws {
+        let body = #"{"rows":[{"id":"a","title":"А","type":"TASK","status":"OPEN"},{"id":"b","title":"Б","type":"TASK","status":"OPEN"},{"id":"c","title":"В","type":"TASK","status":"CLOSED"}],"truncated":false}"#
+        let split = ParcelTasks(try await WorkItemAPI.decodeList(from: Data(body.utf8)))
+        let removal = TaskRemoval(window: .seconds(600), send: { _ in })
+        removal.remove(try XCTUnwrap(split.current.first))
+        XCTAssertEqual(removal.visible(split.current).map(\.id), ["b"])
+        XCTAssertEqual(removal.visible(split.archived).map(\.id), ["c"], "positive control: the other tab is untouched")
+        removal.undo()
+        XCTAssertEqual(removal.visible(split.current).map(\.id), ["a", "b"])
+    }
+
     func testTheTabsAreNamedAsAsked() {
         XCTAssertEqual(ParcelTasks.Tab.allCases.map(\.label), ["Текущи", "Архив"])
     }

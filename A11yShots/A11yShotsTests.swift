@@ -302,6 +302,25 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(current.waitForExistence(timeout: 10), "«Текущи» shows no current task")
         Thread.sleep(forTimeInterval: 1)
         capture("18c-parcel-tasks", app: app)
+
+        // «Изтрий» here too (owner, 2026-10-30), as on Задачи: the question,
+        // then «Отмени» inside the window, so no delete is ever built.
+        let deletable = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Заявка за анализ на почвата'")).firstMatch
+        XCTAssertTrue(deletable.waitForExistence(timeout: 10), "no deletable task on «Текущи»")
+        deletable.swipeLeft()
+        let delete = app.buttons["Изтрий"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the parcel's task offered no «Изтрий»\n\(app.debugDescription)")
+        delete.tap()
+        let question = app.alerts["Сигурни ли сте, че искате да изтриете задачата?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "«Изтрий» asked nothing")
+        question.buttons["Изтрий"].tap()
+        let undo = app.buttons["Отмени"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»")
+        XCTAssertFalse(deletable.exists, "the task stayed in the parcel's list")
+        capture("18f-parcel-task-undo", app: app)
+        undo.tap()
+        XCTAssertTrue(deletable.waitForExistence(timeout: 5), "«Отмени» did not bring the task back")
+
         app.buttons["Архив"].tap()
         let archived = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Дискуване след жътва")).firstMatch
