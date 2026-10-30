@@ -35,6 +35,10 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     case news = "/news"
     case farmRisk = "/farm-risk"
     case dashboard = "/dashboard"
+    /// «Известия» (#471): the server's notifications, the web's bell. In
+    /// the menu with the unread count, choosable for the bar (owner,
+    /// 2026-10-30). The web's page is `/notifications` as well.
+    case notifications = "/notifications"
 
     var id: String { rawValue }
 
@@ -49,6 +53,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .news: "Новини"
         case .farmRisk: "Риск"
         case .dashboard: "Табло"
+        case .notifications: "Известия"
         }
     }
 
@@ -63,6 +68,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .news: "newspaper"
         case .farmRisk: "exclamationmark.shield"
         case .dashboard: "square.grid.2x2"
+        case .notifications: "bell"
         }
     }
 
@@ -112,6 +118,9 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         // at 1 and AUDITOR at 2.
         case .dashboard: false
         case .journal, .calculator, .exchange, .trends, .news: false
+        // `notifications` is outside the server's operator allowlist (raised
+        // on agri-saas #2510); an operator's task pushes still reach them.
+        case .notifications: false
         }
     }
 
@@ -122,7 +131,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     /// go in the default row: reordering somebody's bar on the day a screen
     /// ships would move things under a farmer who never asked for that. The
     /// default is what is already on their phone; the customiser is how it
-    /// changes, and «Табло» is one of the nine it offers.
+    /// changes, and «Табло» is one of the surfaces it offers.
     static let fallback: [AppSurface] = [.journal, .calculator, .exchange, .locations, .tasks]
 
     static func fallback(isOperator: Bool) -> [AppSurface] {
@@ -146,6 +155,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .news: NewsView()
         case .farmRisk: FarmRiskView()
         case .dashboard: DashboardView()
+        case .notifications: NotificationsView()
         }
     }
 }

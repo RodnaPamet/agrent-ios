@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ntf_fixture_task",
+    "tenantId": "ten_synthetic",
+    "userId": "usr_fixture_owner",
+    "type": "TASK_ASSIGNED",
+    "title": "Възложена ви е задача",
+    "message": "«Заявка за анализ на почвата» вече е ваша.",
+    "linkUrl": "/t/agrent/farm-tasks/tsk_fixture_2",
+    "read": false,
+    "dedupeKey": "fixture-1",
+    "createdAt": "2026-10-30T07:30:00.000Z"
+  },
+  {
+    "id": "ntf_fixture_exchange",
+    "tenantId": "ten_synthetic",
+    "userId": "usr_fixture_owner",
+    "type": "GENERAL",
+    "title": "Ново запитване в Борса",
+    "message": "Купувач пита за синтетичната обява за пшеница.",
+    "linkUrl": null,
+    "read": false,
+    "dedupeKey": "fixture-2",
+    "createdAt": "2026-10-29T16:05:00.000Z"
+  },
+  {
+    "id": "ntf_fixture_lease",
+    "tenantId": "ten_synthetic",
+    "userId": "usr_fixture_owner",
+    "type": "GENERAL",
+    "title": "Договорът за аренда изтича скоро",
+    "message": "Синтетичен договор за SYNTH-2 изтича след 30 дни.",
+    "linkUrl": null,
+    "read": true,
+    "dedupeKey": "fixture-3",
+    "createdAt": "2026-10-20T09:00:00.000Z"
+  }
+]

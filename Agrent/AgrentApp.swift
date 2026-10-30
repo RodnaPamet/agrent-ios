@@ -142,6 +142,8 @@ struct MainTabView: View {
     @State private var tabs = BottomTabsStore.shared
     @State private var outbox = OutboxStore.shared
     @State private var unread = ExchangeUnreadStore.shared
+    /// «Известия»'s unread count, for its badge when it is on the bar (#471).
+    @State private var notifications = NotificationsStore.shared
     @State private var foreground = ForegroundReturn()
     /// Here, not shared: `FarmGate` rebuilds this view per farm, so every
     /// farm's tabs start at their roots (see `AppRouter`).
@@ -150,6 +152,15 @@ struct MainTabView: View {
     @State private var inbox = PushInbox.shared
     @Environment(\.scenePhase) private var scenePhase
     @Environment(AuthClient.self) private var auth
+
+    /// Борса's unread threads; «Известия»'s unread notifications (#471).
+    private func badge(for surface: AppSurface) -> Int {
+        switch surface {
+        case .exchange: unread.count
+        case .notifications: notifications.unreadCount
+        default: 0
+        }
+    }
 
     /// Every other role's app: the bar and its screens.
     private var tabView: some View {
@@ -167,7 +178,7 @@ struct MainTabView: View {
                     // badge. The web has none; the owner asked for one.
                     // When Борса is not on the bar the app menu's row
                     // carries the count instead.
-                    .badge(surface == .exchange ? unread.count : 0)
+                    .badge(badge(for: surface))
                     .tag(surface)
             }
         }
@@ -230,6 +241,8 @@ struct MainTabView: View {
                 // phone was in a pocket is exactly what it is for. No push
                 // exists to say so sooner.
                 Task { await unread.refresh() }
+                // And the notifications' count, on the same return.
+                Task { await notifications.refresh() }
             }
             // Who, and with which flags, on every RETURN (owner decision
             // 2026-10-02): the only way a flag flip reaches an app that is
@@ -270,6 +283,7 @@ struct MainTabView: View {
                 // AFTER the user resolves, so a MECHANISATOR — who has no
                 // Борса — is not sent to collect a 403 for a badge.
                 await unread.refresh()
+                await notifications.refresh()
             }
             await outbox.flush()
             // DETACHED, not awaited.

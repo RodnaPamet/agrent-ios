@@ -668,6 +668,13 @@ actor APIClient {
     /// journal's PATCH, where the version increment sits INSIDE the
     /// If-Match guard and an unguarded write breaks every later lock.
     /// Asymmetry noted rather than assumed away.
+    /// A PUT whose answer the caller reads, or ignores: «Известия»'s mark
+    /// read (#471) sends an empty body and needs only the status.
+    func putReturningData<B: Encodable>(_ path: String, body: B) async throws -> Data {
+        let payload = try encoder.encode(body)
+        return try await send(path: path, method: "PUT", body: payload, idempotencyKey: nil)
+    }
+
     func patchReturningData<B: Encodable>(_ path: String, body: B) async throws -> Data {
         let payload = try encoder.encode(body)
         return try await send(

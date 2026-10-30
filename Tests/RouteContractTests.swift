@@ -215,6 +215,8 @@ final class RouteContractTests: XCTestCase {
             ("AssignableUsersAPI.swift", [AssignableUsersAPI.path]),
             // A parcel's comments and closing notes (#465).
             ("ParcelCommentsAPI.swift", [ParcelCommentsAPI.path(parcel)]),
+            // «Известия» (#471): the list and marking one read.
+            ("NotificationsAPI.swift", [NotificationsAPI.listPath, NotificationsAPI.readPath(id)]),
             // A mechanisator's own queue, for their one screen (#465).
             ("FarmTasksAPI.swift", [FarmTasksAPI.queuePath]),
             // «Нова задача» posts to the task list (#372).

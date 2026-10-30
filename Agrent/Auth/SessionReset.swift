@@ -30,6 +30,7 @@ import Foundation
 ///                                      Per USER (it is A's `/me`), not per
 ///                                      device, so it is user data.
 ///     · `ExchangeUnreadStore.shared`— which of A's farm's threads are unread.
+///     · `NotificationsStore.shared` — A's notifications on the open farm and the count (#471).
 ///     · `OutboxStore.shared`        — its in-memory list and its pause. The
 ///                                      QUEUE ON DISK IS NOT TOUCHED; see below.
 ///                                      Nor is `isClientTooOld` (#168): it is
@@ -163,6 +164,7 @@ enum SessionReset {
         CurrentUserStore.shared.clear()
         BottomTabsStore.shared.reset()
         ExchangeUnreadStore.shared.reset()
+        NotificationsStore.shared.reset()
         OutboxStore.shared.reset()
         RateLimitPause.messages.reset()
         DashboardPreferences.shared.reset()
