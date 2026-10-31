@@ -1,0 +1,86 @@
+import Foundation
+
+/// Every word the assistant's sheet says that the model does not (#483).
+/// Bulgarian only (owner, 2026-10-13): the stream carries CODES for its
+/// refusals and stops, never prose, so each has its sentence here.
+enum AssistantText {
+    static let title = "Асистент"
+    static let prompt = "Попитайте за стопанството…"
+    static let intro = "Питайте за задачите, Дневника, разходите, Калкулатора, Риска, Борсата и цените. "
+        + "Асистентът чете данните на стопанството и не променя нищо."
+
+    // MARK: - While a turn runs
+
+    static let thinking = "Мисля…"
+    static let reading = "Чета данните на стопанството…"
+
+    // MARK: - How a turn ended
+
+    // ── The server's own sentences ──
+    //
+    // agri-saas #2595's catalogue (`messages/bg/app.json`, `errors.*`), word
+    // for word. The server sends them itself, in the person's language; the
+    // phone shows THAT when it is Bulgarian, and these only when it is not
+    // — an `en` account, or an older server — because the phone shows no
+    // English (owner, 2026-10-13). A copy pinned by test, never a second
+    // wording.
+
+    /// `refusal.reason`: no answer, and not a fault.
+    static func refusal(_ code: String) -> String {
+        switch code {
+        case "ASSISTANT_NO_GROUNDING":
+            "Не намерих нищо в данните на стопанството, с което да отговоря, и няма да предполагам."
+        case "ASSISTANT_OUT_OF_SCOPE":
+            "Това е извън онова, на което мога да отговоря от данните на стопанството."
+        case "ASSISTANT_HIGH_STAKES_NEEDS_SOURCE":
+            "Тук е нужна точна стойност от етикета на регистриран продукт, а аз не разполагам с такава. "
+                + "Проверете етикета или се консултирайте с агроном."
+        case "ASSISTANT_EGRESS_BLOCKED":
+            "Спрях този отговор, защото изглеждаше, че съдържа идентификационни данни. Нищо не беше изпратено."
+        case "ASSISTANT_INPUT_REJECTED":
+            "Не можах да прочета въпроса безопасно. Опитайте да го формулирате иначе."
+        default:
+            "Асистентът не отговори на този въпрос."
+        }
+    }
+
+    /// `halt.outcome`: the answer above is real but incomplete — except a
+    /// provider failure, which can come before any answer, and says so.
+    static func halt(_ outcome: String, counts: [String: Int] = [:]) -> String {
+        switch outcome {
+        case "ASSISTANT_TOOL_BUDGET":
+            "Отговорът по-горе е верен, но непълен — достигнах ограничението колко мога да проверя за един въпрос."
+        case "ASSISTANT_SPEND_CEILING":
+            "Отговорът по-горе е непълен, защото стопанството достигна месечния си лимит за асистента."
+        case "ASSISTANT_TIME_BUDGET":
+            "Отговорът по-горе е непълен — отнемаше твърде дълго и спрях, вместо да Ви карам да чакате."
+        case "ASSISTANT_PROVIDER_UNAVAILABLE":
+            "Не успях да се свържа с модела. Данните на стопанството не бяха прочетени и нищо не беше създадено."
+        case "ASSISTANT_TRUNCATED_RESULT":
+            "Отговорът по-горе използва част от данните — един от списъците, които прочетох, беше твърде дълъг, "
+                + "за да го използвам цял."
+        default:
+            "Отговорът е непълен."
+        }
+    }
+
+    /// The sentence a refusal or a halt shows: the server's own, when it
+    /// sent one in Bulgarian; the copy above otherwise.
+    static func said(_ message: String?, else copy: String) -> String {
+        if let message, UserMessage.isBulgarianSentence(message) { return message }
+        return copy
+    }
+
+    /// `done` with no answer before it.
+    static let noAnswer = "Асистентът няма отговор на този въпрос."
+
+    /// The connection closed with no `refusal`, `halt` or `done`: the server
+    /// never says "error", so this is the transport and nothing else.
+    static let interrupted = "Връзката прекъсна, преди асистентът да довърши. Опитайте отново."
+
+    /// 204: the route is off for this person.
+    static let switchedOff = "Асистентът не е включен за това стопанство."
+
+    /// The turn, as VoiceOver hears the answer arrive.
+    static func answered(_ text: String) -> String { "Асистентът отговори: \(text)" }
+}

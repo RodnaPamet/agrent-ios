@@ -236,6 +236,25 @@ Two things found on the way that the original entry did not anticipate:
 - **After it lands,** the calculator reads again, because an expense is a term in every figure above it. A 404 counts as already gone.
 - **The web** gets the same from backend 1.
 
+### The assistant, lower right on every screen (owner, 2026-10-31, #483)
+
+Ported in shape from inflect-compliance's assistant: a launcher in the app shell and a sheet over the page. Server and web are agri-saas #2578 (backend 2).
+
+**Owner's rulings:**
+- It answers from the farm's data and knows the screen. Asked to do something, it prepares it, and the usual form opens filled for the person to tap «Запиши». Nothing is stored before that.
+- The button sits lower right, as on the web.
+- Everyone gets it, scoped to their role.
+
+**Phase 1 (answers only):**
+- `POST /assistant/stream` takes `{question, pageContext}`, single-turn. `pageContext.route` is the bar tab's web page TEMPLATE with its brackets (`/t/[tenantSlug]/journal`), checked against agri-saas #2591's generated set, so no farm slug and no id ride in it. «Документи» has no web page yet, so it sends no context. Nothing typed is ever sent as context.
+- **Events:** `thinking`, `tool_call`, `tool_result`, `answer`, `refusal`, `halt`, `done`. Unknown types are ignored. There is no `error` event, so a stream that just ends is said to be an interruption. `halt` keeps the answer and says it is incomplete.
+- **Every refusal is a code:** 404 off (agri-saas #2599; the first draft said 204, also read as off), `ASSISTANT_QUESTION_INVALID` / `ASSISTANT_CONTEXT_INVALID` before the stream, a spent budget as the shared `AI_BUDGET_EXCEEDED` (mid-stream it is the halt `ASSISTANT_SPEND_CEILING`, because the answer so far is real), and `refusal` / `halt` events carrying `code` and the server's localised `message` (agri-saas #2595's ten).
+  - The phone shows the server's own `message` when it is Bulgarian; otherwise its copy of the server catalogue's sentence for the code, word for word, since the phone shows no English (owner, 2026-10-13).
+  - The phone branches on the code, not the words. A halt keeps the answer above it; a refusal (an egress block included) removes it.
+- **The button** shows while `assistant.enabled` is on in `/auth/me`, which is re-read on each return to the foreground. Every bottom bar (`solidBar(hairline: .top)`) reports its height to its stack (`BottomChrome`), so the button sits above «Нов разход», «Ново мероприятие» and the «Отмени» bar. The sheet opens at half height.
+- **The answer is ONE `answer` event,** never a token stream: the server scans it for credentials before a byte leaves (`ASSISTANT_EGRESS_BLOCKED`). `tool_call` / `tool_result` are tolerated but not yet sent; the first server (#2599) reads no farm data until its tool loop lands.
+- **Links come in their own field,** `answer.links: [{route, label}]`, checked by the server against its page table. They are never Markdown in the text, and a stray Markdown link is shown as its words. A link to a bar tab closes the sheet and opens that tab. A link to a record (`/locations/{id}`, `/farm-tasks/{id}`, with the real id, which the server sends only for a record the turn read) opens the way a notification's link does. A menu-only page is not offered yet.
+
 ## Exchange
 
 Web `exchange` (683) + `exchange/my-listings` (367) + `exchange/my-interests`

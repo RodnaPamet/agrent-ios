@@ -109,6 +109,15 @@ enum UITestSeam {
     static let isOperator: Bool =
         isActive && ProcessInfo.processInfo.arguments.contains(operatorArgument)
 
+    /// Beside `launchArgument`: the fixture person has the assistant
+    /// (#483), so a run photographs its button and sheet. Off in every other
+    /// run, so the button never sits over what the other captures tap.
+    /// `A11yShotsTests` spells it once more.
+    static let assistantArgument = "AGRENT_UITEST_ASSISTANT"
+
+    static let isAssistant: Bool =
+        isActive && ProcessInfo.processInfo.arguments.contains(assistantArgument)
+
     /// Tokens that never leave the device.
     ///
     /// `FixtureURLProtocol` answers every request before URLSession opens a

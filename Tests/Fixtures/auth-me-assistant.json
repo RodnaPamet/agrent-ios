@@ -1,0 +1,22 @@
+{
+  "user": {
+    "id": "usr_fixture_owner",
+    "name": "Иван Фикстуров",
+    "email": "owner@example.invalid",
+    "role": "OWNER",
+    "bottomTabOrder": null,
+    "avatarUrl": null,
+    "deletion": null
+  },
+  "tenant": {
+    "id": "ten_synthetic",
+    "name": "Синтетично стопанство",
+    "slug": "agrent"
+  },
+  "featureFlags": {
+    "social.farm-registration": true,
+    "social.public-profile": true,
+    "agro.orthophoto": true,
+    "assistant.enabled": true
+  }
+}
