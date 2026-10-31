@@ -71,6 +71,12 @@ struct ExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     /// tests' listings, written before it, stay as they were.
     var farmHandle: String? = nil
 
+    /// Your own listing's values as stored, from «Моите обяви» (#478): what
+    /// the pencil's form starts from. nil on the board, whose read has none,
+    /// and nil before agri-saas #2543, which is what keeps the pencil off
+    /// until the server can take an edit.
+    var edit: ExchangeListingEdit? = nil
+
     /// Parsed with an EXPLICIT wire locale. `Decimal(string:)` without one
     /// is a hazard: the wire uses `.` regardless of the device, and a
     /// locale that groups with `.` reads "12.5" as 125 — a factor of ten,
@@ -107,9 +113,43 @@ extension ExchangeListing {
             pricePerTonne: own.pricePerTonne, priceCurrency: own.priceCurrency,
             regionCode: own.regionCode, regionName: own.regionName, lat: own.lat, lon: own.lon,
             description: own.description, sellerDisplayName: own.sellerDisplayName,
-            createdAt: own.createdAt, expiresAt: own.expiresAt, isOwn: own.isOwn
+            createdAt: own.createdAt, expiresAt: own.expiresAt, isOwn: own.isOwn,
+            edit: own.edit
         )
     }
+}
+
+/// A listing's editable values AS STORED, which is also exactly the body
+/// `PUT /exchange/listings/{id}` takes (agri-saas #2543): a FULL replacement,
+/// because five fields are nullable and a patch could not tell "leave the
+/// description" from "clear it".
+///
+/// ── Two fields that are not what their neighbours look like ──
+///
+/// `sellerDisplayName` is the seller's TYPED alias. The listing's own
+/// `sellerDisplayName` beside it is the resolved attribution — the farm's
+/// verified name while `publishAsFarm` is on — and sending that back would
+/// write the farm's name into the alias as typed text.
+///
+/// `updatedAt` is a precondition, not a value: it goes back VERBATIM, and
+/// the server refuses with `LISTING_MODIFIED` once someone else has saved
+/// since. Kept as the server's string so nothing here can reformat it.
+struct ExchangeListingEdit: Decodable, Equatable, Sendable {
+    let side: ExchangeSide
+    let kind: ExchangeKind
+    let commodity: String
+    let quantityTonnes: WireDecimal
+    let pricePerTonne: WireDecimal?
+    let regionCode: String
+    let description: String?
+    let sellerDisplayName: String?
+    let publishAsFarm: Bool?
+    /// Private: revealed only to a buyer whose inquiry the seller accepts.
+    let sellerContact: String?
+    /// The server's instant, kept as sent so an untouched expiry goes back
+    /// unchanged rather than moved to midnight.
+    let expiresAt: String?
+    let updatedAt: String
 }
 
 /// `GET /api/t/{slug}/exchange/listings` — envelope, paged.
@@ -139,6 +179,10 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     let createdAt: Date
     let expiresAt: Date?
     let isOwn: Bool
+    /// The pencil's starting values (#478); nil before agri-saas #2543, or
+    /// when the object does not decode, which then costs the pencil and
+    /// never the row.
+    let edit: ExchangeListingEdit?
 
     /// Decoded per element: one that does not match is dropped rather than
     /// failing the seller's whole listing page. The element shape is in the
@@ -163,7 +207,7 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, side, kind, status, commodity, quantityTonnes, pricePerTonne
         case priceCurrency, regionCode, regionName, lat, lon, description
-        case sellerDisplayName, createdAt, expiresAt, isOwn, inquiries
+        case sellerDisplayName, createdAt, expiresAt, isOwn, inquiries, edit
     }
 
     init(from decoder: Decoder) throws {
@@ -185,6 +229,7 @@ struct OwnExchangeListing: Decodable, Equatable, Sendable, Identifiable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         expiresAt = try c.decodeIfPresent(Date.self, forKey: .expiresAt)
         isOwn = try c.decode(Bool.self, forKey: .isOwn)
+        edit = try? c.decodeIfPresent(ExchangeListingEdit.self, forKey: .edit)
 
         if var list = try? c.nestedUnkeyedContainer(forKey: .inquiries) {
             var found: [ExchangeInquiry] = []

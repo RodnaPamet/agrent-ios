@@ -2385,6 +2385,20 @@ final class A11yShotsTests: XCTestCase {
         if outside.exists { outside.tap() } else { app.buttons["Отказ"].tap() }
         XCTAssertTrue(question.waitForNonExistence(timeout: 5), "the question did not go away")
         XCTAssertTrue(withdraw.exists, "leaving the question left the listing")
+
+        // The pencil (#478): the form with the listing's stored values,
+        // photographed and left with «Отказ» — «Запази» is a write.
+        let pencil = app.buttons["Редактирай"]
+        XCTAssertTrue(pencil.waitForExistence(timeout: 5), "no pencil on your own listing\n\(app.debugDescription)")
+        pencil.tap()
+        XCTAssertTrue(app.navigationBars["Редактиране"].waitForExistence(timeout: 10)
+                      || app.staticTexts["Редактиране"].waitForExistence(timeout: 2),
+                      "the pencil opened no form\n\(app.debugDescription)")
+        XCTAssertTrue(app.buttons["Запази"].exists, "the form has no «Запази»")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09f-my-listing-edit", app: app)
+        app.buttons["Отказ"].firstMatch.tap()
+        XCTAssertTrue(pencil.waitForExistence(timeout: 5), "«Отказ» did not close the form")
     }
 
     /// A MECHANISATOR's one screen (#465, owner 2026-10-29): no tab bar, the
