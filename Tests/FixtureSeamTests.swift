@@ -428,6 +428,7 @@ final class FixtureSeamTests: XCTestCase {
     private static let decoders: [(String, @Sendable (Data) async throws -> Void)] = [
         ("auth-me", { _ = try await MeAPI.decode(from: $0) }),
         ("auth-me-operator", { _ = try await MeAPI.decode(from: $0) }),
+        ("auth-me-assistant", { _ = try await MeAPI.decode(from: $0) }),
         ("journal-list", { _ = try await JournalAPI.decodeList(from: $0) }),
         ("locations-list", { _ = try await LocationsAPI.decodeList(from: $0) }),
         ("locations-parcels", { _ = try await LocationsAPI.decodeParcels(from: $0) }),

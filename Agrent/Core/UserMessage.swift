@@ -976,6 +976,11 @@ enum UserMessage {
         "THREAD_NOT_A_PARTY": "Вашето стопанство не е участник в разговора.",
         "BLOCK_SELLER_ONLY": "Само собственикът на обявата може да блокира или отблокира.",
         "LISTING_NOT_FOUND": "Обявата не беше намерена.",
+        // The assistant's refusals before its stream opens (#483, agri-saas
+        // #2578). Those after it opens are `AssistantText.refusal`.
+        "ASSISTANT_QUESTION_INVALID": "Въпросът е празен или твърде дълъг.",
+        "ASSISTANT_CONTEXT_INVALID": "Асистентът не разпозна екрана, от който питате. Опитайте от друг екран.",
+        "ASSISTANT_BUDGET_EXCEEDED": "Месечният лимит на асистента за стопанството е изчерпан.",
         // agri-saas #2541/#2543 (2026-10-31): the exchange's refusals, which
         // reached the phone as BAD_REQUEST with the code in `message` until
         // then. The server sends these sentences itself for a `bg` session

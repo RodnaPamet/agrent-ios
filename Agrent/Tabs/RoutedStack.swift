@@ -24,6 +24,8 @@ struct RoutedStack<Root: View>: View {
     @Environment(AppRouter.self) private var router: AppRouter?
     @Environment(\.routedSurface) private var surface
     @State private var ownPath = NavigationPath()
+    /// The stack's bottom bars, for the assistant's button (#483).
+    @State private var chrome = BottomChrome()
     @ViewBuilder var root: Root
 
     var body: some View {
@@ -31,9 +33,11 @@ struct RoutedStack<Root: View>: View {
             @Bindable var router = router
             NavigationStack(path: $router[path: surface]) { routed }
                 .environment(\.pushRoute, PushRouteAction { router[path: surface].append($0) })
+                .assistantLauncher(surface: surface, chrome: chrome)
         } else {
             NavigationStack(path: $ownPath) { routed }
                 .environment(\.pushRoute, PushRouteAction { ownPath.append($0) })
+                .assistantLauncher(surface: nil, chrome: chrome)
         }
     }
 

@@ -2531,6 +2531,45 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the task back")
     }
 
+    /// The assistant (#483): its button lower right, above Калкулатор's
+    /// «Нов разход» and above the bar on Задачи, and its sheet over the
+    /// screen. A question asked under the seam never leaves the device: the
+    /// fixture protocol has no stream to answer with, so the turn ends in its
+    /// Bulgarian refusal, which is photographed too.
+    func testAssistantButtonAndSheet() {
+        let app = XCUIApplication()
+        app.launchArguments += [Self.seamArgument, "AGRENT_UITEST_ASSISTANT"]
+        app.launch()
+        assertSeamActive(app)
+        let calculator = labelled("Калкулатор", in: app.tabBars.buttons)
+        XCTAssertTrue(calculator.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        calculator.tap()
+        let button = app.buttons["Асистент"]
+        XCTAssertTrue(button.waitForExistence(timeout: 15), "no assistant button\n\(app.debugDescription)")
+        let newCost = app.buttons["Нов разход"]
+        XCTAssertTrue(newCost.waitForExistence(timeout: 10), "no «Нов разход»")
+        XCTAssertLessThan(button.frame.maxY, newCost.frame.minY, "the button sits on «Нов разход»")
+        Thread.sleep(forTimeInterval: 1)
+        capture("23a-assistant-button", app: app)
+
+        let tasks = labelled("Задачи", in: app.tabBars.buttons)
+        tasks.tap()
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "no assistant button on Задачи")
+        Thread.sleep(forTimeInterval: 1)
+        capture("23b-assistant-button-tasks", app: app)
+
+        button.tap()
+        let field = app.textFields["Въпрос"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "the sheet has no question field\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("23c-assistant-sheet", app: app)
+        field.tap()
+        field.typeText("Колко задачи имам тази седмица?")
+        app.buttons["Попитай"].tap()
+        Thread.sleep(forTimeInterval: 2)
+        capture("23d-assistant-turn", app: app)
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")

@@ -229,6 +229,22 @@ Two things found on the way that the original entry did not anticipate:
 
 ---
 
+### The assistant, lower right on every screen (owner, 2026-10-31, #483)
+
+Ported in shape from inflect-compliance's assistant: a launcher in the app shell and a sheet over the page. Server and web are agri-saas #2578 (backend 2).
+
+**Owner's rulings:**
+- It answers from the farm's data and knows the screen. Asked to do something, it prepares it, and the usual form opens filled for the person to tap «Запиши». Nothing is stored before that.
+- The button sits lower right, as on the web.
+- Everyone gets it, scoped to their role.
+
+**Phase 1 (answers only):**
+- `POST /assistant/stream` takes `{question, pageContext}`, single-turn. `pageContext.route` is the bar tab's web page TEMPLATE with its brackets (`/t/[tenantSlug]/journal`), checked against agri-saas #2591's generated set, so no farm slug and no id ride in it. Nothing typed is ever sent as context.
+- **Events:** `thinking`, `tool_call`, `tool_result`, `answer`, `refusal`, `halt`, `done`. Unknown types are ignored. There is no `error` event, so a stream that just ends is said to be an interruption. `halt` keeps the answer and says it is incomplete.
+- **Every refusal is a code with a Bulgarian sentence:** 204 off, `ASSISTANT_*` before the stream, `refusal.reason` and `halt.outcome` in it.
+- **The button** shows while `assistant.enabled` is on in `/auth/me`, which is re-read on each return to the foreground. Every bottom bar (`solidBar(hairline: .top)`) reports its height to its stack (`BottomChrome`), so the button sits above «Нов разход», «Ново мероприятие» and the «Отмени» bar. The sheet opens at half height.
+- **Links come in their own field,** `answer.links: [{route, label}]`, checked by the server against its page table. They are never Markdown in the text, and a stray Markdown link is shown as its words. A link to a bar tab closes the sheet and opens that tab. A link to a record (`/locations/{id}`, `/farm-tasks/{id}`, with the real id, which the server sends only for a record the turn read) opens the way a notification's link does. A menu-only page is not offered yet.
+
 ## Exchange
 
 Web `exchange` (683) + `exchange/my-listings` (367) + `exchange/my-interests`

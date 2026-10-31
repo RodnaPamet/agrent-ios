@@ -265,10 +265,17 @@ enum FixtureCatalogue {
         "me-farms": "me-farms-operator",
     ]
 
+    /// The person with the assistant's flag on (#483), answered instead of
+    /// the owner's when the seam runs with `UITestSeam.assistantArgument`.
+    static let assistantOverrides: [String: String] = [
+        "auth-me": "auth-me-assistant",
+    ]
+
     /// Every fixture the table can name, for the test that proves each one
     /// exists in the bundle and decodes.
     static var allFixtureNames: [String] {
-        (Array(byPathAndQuery.values) + Array(byPath.values) + Array(operatorOverrides.values)).sorted()
+        (Array(byPathAndQuery.values) + Array(byPath.values) + Array(operatorOverrides.values)
+            + Array(assistantOverrides.values)).sorted()
     }
 
     /// The fixture that answers this request, or nil for "nothing recorded
@@ -278,6 +285,7 @@ enum FixtureCatalogue {
         let full = query.map { "\(path)?\($0)" } ?? path
         let name = byPathAndQuery[full] ?? byPath[path]
         if UITestSeam.isOperator, let name, let swapped = operatorOverrides[name] { return swapped }
+        if UITestSeam.isAssistant, let name, let swapped = assistantOverrides[name] { return swapped }
         return name
     }
 
