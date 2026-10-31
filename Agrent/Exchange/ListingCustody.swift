@@ -101,6 +101,12 @@ final class ListingCustody {
         self.send = send
     }
 
+    /// The status an edit left (#478): an expired listing given a later
+    /// date comes back ACTIVE, and its buttons with it.
+    func adopt(_ status: ExchangeListingStatus) {
+        self.status = status
+    }
+
     /// The confirmed move. One at a time: the second button is disabled
     /// while the first is out, and a terminal answer leaves nothing to press.
     func perform(_ action: ListingCustodyAction, listingID: String) async {

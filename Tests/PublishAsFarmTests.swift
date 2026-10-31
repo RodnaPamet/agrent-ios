@@ -70,7 +70,7 @@ final class PublishAsFarmTests: XCTestCase {
         let detail = try source("Agrent/Exchange/ListingDetailView.swift")
         XCTAssertTrue(detail.contains("struct ListingDetailView"), "positive control")
         XCTAssertTrue(detail.contains(
-            "if flags.isOn(FarmBrandAPI.flag), let page = InAppPage.farm(handle: listing.farmHandle) {"))
+            "if flags.isOn(FarmBrandAPI.flag), let page = InAppPage.farm(handle: shown.farmHandle) {"))
     }
 
     @MainActor

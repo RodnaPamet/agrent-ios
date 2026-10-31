@@ -362,8 +362,12 @@ The web has «Съобщения» as a fourth section beside «Обяви / М�
 The owner showed «Моите обяви» with rows that opened nothing, and asked for them to open, with an edit pencil.
 - **A row opens the listing's screen,** the same one a board row opens, built from the row (`ExchangeListing(own:)`). «Моите обяви» reads again when you come back.
 - **«Изпълнена» and «Оттегли»** are on your own listing, each behind a question. They use the existing `PATCH /exchange/listings/{id}` `{action}`. They are offered where the server allows: both on an active listing, only «Оттегли» on an expired one, nothing on a withdrawn or fulfilled one. The fulfil question says that waiting buyers are declined and told, because the server does that.
-- **The pencil waits on agri-saas.** Neither the server nor the web can edit a listing's fields yet. The owner chose every field editable, crop and sell/buy included, and an expired listing becomes active again with a later «Валидна до». The web gets the same edit. Asked of backend 1, 2026-10-31.
-- **Not fired:** the first real withdraw, fulfil or edit is the owner's. A11yShots photographs the question and answers «Отказ».
+- **The pencil** (agri-saas #2543) opens «Нова обява»'s form as «Редактиране», filled from the listing's stored values (`edit`). Every field is editable (owner's choice), and «Запази» replaces them all with `PUT`. Cleared fields are sent as `null`, and `updatedAt` is echoed, so a concurrent save is refused as `LISTING_MODIFIED` rather than overwritten.
+  - On an expired listing, a later «Валидна до» or none makes it active again, and the form says so.
+  - An untouched expiry goes back as the server's own instant, and only a changed one must be in the future (agri-saas #2543 at 33874116e). A price changed on the listing's last day is not refused over a date nobody moved.
+  - The pencil shows only when the server sends `edit`, on an active or expired listing, for a person who may write. The web gets the same edit from backend 1.
+- **The exchange's refusals have names** (agri-saas #2541): `LISTING_TERMINAL`, `LISTING_NOT_OWNED`, `LISTING_MODIFIED`, `LISTING_REGION_UNKNOWN`, `LISTING_NOT_ACTIVE`, `LISTING_EXPIRED`, `LISTING_IS_YOUR_OWN`, `INQUIRY_NOT_PENDING` and `LISTING_EXPIRES_AT_IN_PAST`, each a Bulgarian sentence in `UserMessage`, worded as the server's own catalogue words them. Also `LISTING_FULFIL_REQUIRES_ACTIVE` and `INQUIRY_ACCEPT_REQUIRES_ACTIVE_LISTING`, entered ahead of agri-saas #2564, which splits `LISTING_NOT_ACTIVE` into three.
+- **Not fired:** the first real withdraw, fulfil or edit is the owner's. A11yShots photographs the question and the form, and leaves both without sending.
 
 ### Gap 7 — no messaging — CLOSED 2026-09-30
 

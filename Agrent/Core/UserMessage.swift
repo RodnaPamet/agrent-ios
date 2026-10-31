@@ -976,6 +976,29 @@ enum UserMessage {
         "THREAD_NOT_A_PARTY": "Вашето стопанство не е участник в разговора.",
         "BLOCK_SELLER_ONLY": "Само собственикът на обявата може да блокира или отблокира.",
         "LISTING_NOT_FOUND": "Обявата не беше намерена.",
+        // agri-saas #2541/#2543 (2026-10-31): the exchange's refusals, which
+        // reached the phone as BAD_REQUEST with the code in `message` until
+        // then. The server sends these sentences itself for a `bg` session
+        // (#1677); they are copied here word for word from its catalogue
+        // (`messages/bg/app.json` `errors.*`, a75203659) so the phone and the
+        // web say one thing, and kept because an `en` account would get the
+        // English and this app shows none (owner, 2026-10-13).
+        "LISTING_TERMINAL": "Обявата вече е оттеглена или изпълнена и не може да се променя.",
+        "LISTING_NOT_OWNED": "Можете да променяте само своите обяви.",
+        "LISTING_MODIFIED": "Обявата е променена, откакто я отворихте. Презаредете я и направете промяната отново.",
+        "LISTING_REGION_UNKNOWN": "Непозната област.",
+        "LISTING_EXPIRES_AT_IN_PAST": "Изберете дата на изтичане в бъдещето или я премахнете.",
+        // One code for three refusals until agri-saas #2564 splits it: this
+        // one stays for the buyer's inquiry, neutral, and the two below take
+        // the seller's fulfil and the seller's accept, each with the sentence
+        // that is right only there. Entered before the server sends them, so
+        // the phone is ready when it does.
+        "LISTING_NOT_ACTIVE": "Обявата вече не е активна.",
+        "LISTING_FULFIL_REQUIRES_ACTIVE": "Обявата е изтекла — оттеглете я, вместо да я отбелязвате като изпълнена.",
+        "INQUIRY_ACCEPT_REQUIRES_ACTIVE_LISTING": "Обявата вече не е активна — можете да откажете, но не да приемете.",
+        "LISTING_EXPIRED": "Обявата е изтекла.",
+        "LISTING_IS_YOUR_OWN": "Това е Вашата обява — не можете да изпратите запитване към нея.",
+        "INQUIRY_NOT_PENDING": "Запитването вече е обработено.",
         "THREAD_OWN_LISTING": "Не можете да започнете разговор по обява на Вашето стопанство.",
         // Said to whoever the server refuses: the person blocked, opening a
         // conversation on any listing of that farm or writing in theirs. A

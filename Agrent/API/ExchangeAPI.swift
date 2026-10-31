@@ -88,6 +88,21 @@ enum ExchangeAPI {
         return try await APIClient.shared.decode(data, as: ListingStatusChanged.self)
     }
 
+    /// Your own listing, every field replaced (#478, agri-saas #2543):
+    /// `PUT` on the listing with its `edit` values as changed, `updatedAt`
+    /// echoed. Answers with the listing in the «Моите обяви» shape and its
+    /// new `edit`, so the screen shows the result without a second read.
+    ///
+    /// No idempotency key: a repeat of a save that took is refused as
+    /// `LISTING_MODIFIED`, because `updatedAt` moved, and changes nothing.
+    ///
+    /// NOT EXERCISED: it changes an offer every tenant can see. Built,
+    /// wired, and the first real save is the owner's.
+    static func updateListing(_ id: String, _ update: UpdateExchangeListing) async throws -> OwnExchangeListing {
+        let data = try await APIClient.shared.putReturningData(listingPath(id), body: update)
+        return try await APIClient.shared.decode(data, as: OwnExchangeListing.self)
+    }
+
     // MARK: - Messaging (agrent-ios#114)
     //
     // Nine operations: the inbox, one conversation page, open-a-thread, send,
@@ -414,6 +429,46 @@ struct CreateExchangeListing: Encodable, Sendable {
             found.append(.regionMissing)
         }
         return found
+    }
+}
+
+/// The `PUT` body (#478, agri-saas #2543): the create's fields, as a FULL
+/// replacement, plus the `updatedAt` precondition.
+///
+/// ── Every key, nulls included ──
+///
+/// The create leaves an unset field out and lets the server default it.
+/// An edit cannot: an absent description and a cleared one must be one
+/// thing, said explicitly, so each nullable field is written as `null`
+/// rather than left out, and `publishAsFarm` always as what it is — kept
+/// from the stored value when this person's form does not show the switch.
+struct UpdateExchangeListing: Encodable, Sendable {
+    let fields: CreateExchangeListing
+    let publishAsFarm: Bool
+    let updatedAt: String
+
+    var problems: [CreateExchangeListing.Invalid] { fields.problems }
+
+    private enum CodingKeys: String, CodingKey {
+        case side, kind, commodity, quantityTonnes, pricePerTonne, priceCurrency, regionCode
+        case description, sellerDisplayName, publishAsFarm, sellerContact, expiresAt, updatedAt
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(fields.side, forKey: .side)
+        try c.encode(fields.kind, forKey: .kind)
+        try c.encode(fields.commodity, forKey: .commodity)
+        try c.encode(fields.quantityTonnes, forKey: .quantityTonnes)
+        try c.encode(fields.pricePerTonne, forKey: .pricePerTonne)
+        try c.encode(fields.priceCurrency, forKey: .priceCurrency)
+        try c.encode(fields.regionCode, forKey: .regionCode)
+        try c.encode(fields.description, forKey: .description)
+        try c.encode(fields.sellerDisplayName, forKey: .sellerDisplayName)
+        try c.encode(publishAsFarm, forKey: .publishAsFarm)
+        try c.encode(fields.sellerContact, forKey: .sellerContact)
+        try c.encode(fields.expiresAt, forKey: .expiresAt)
+        try c.encode(updatedAt, forKey: .updatedAt)
     }
 }
 

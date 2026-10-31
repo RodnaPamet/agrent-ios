@@ -4,6 +4,10 @@ struct ListingDetailView: View {
     let listing: ExchangeListing
     /// Its status, and «Оттегли» / «Изпълнена» on your own (#478).
     @State private var custody: ListingCustody
+    /// The listing as the pencil last saved it, which the screen shows from
+    /// then on; nil until a save.
+    @State private var edited: ExchangeListing?
+    @State private var editing = false
     @State private var opener = ListingThreadOpener()
     /// The conversation goes onto Борса's stack as a value once the server
     /// answers with its id (#194) — a push no tap starts directly.
@@ -25,6 +29,18 @@ struct ListingDetailView: View {
         _custody = State(initialValue: ListingCustody(status: listing.status))
     }
 
+    /// What the screen shows: the saved edit once there is one.
+    private var shown: ExchangeListing { edited ?? listing }
+
+    /// The pencil (owner, 2026-10-31): your own listing, while it can still
+    /// change, for a person who may write, and once the server sends the
+    /// listing's stored values (`edit`, agri-saas #2543) — which is also
+    /// what keeps it off against a server that cannot take an edit.
+    private var mayEdit: Bool {
+        guard shown.isOwn, shown.edit != nil, user.user?.mayWrite ?? false else { return false }
+        return custody.status == .active || custody.status == .expired
+    }
+
     var body: some View {
         List {
             // ON THE PAGE, as every list is (#164) — until then this was the
@@ -33,40 +49,40 @@ struct ListingDetailView: View {
             // `if` included: one line, as in `PageForm`, rather than seven.
             Group {
                 Section {
-                    ValueRow("Култура") { Text(CommodityName.canonical(listing.commodity) ?? listing.commodity) }
-                    ValueRow("Тип") { Text(listing.kind.label) }
-                    ValueRow("Посока") { Text(listing.side.label) }
-                    if let quantity = listing.quantityTonnes {
+                    ValueRow("Култура") { Text(CommodityName.canonical(shown.commodity) ?? shown.commodity) }
+                    ValueRow("Тип") { Text(shown.kind.label) }
+                    ValueRow("Посока") { Text(shown.side.label) }
+                    if let quantity = shown.quantityTonnes {
                         ValueRow("Количество") { Text("\(Exchange.tonnes(quantity) ?? quantity) т") }
                     }
-                    if let price = listing.pricePerTonne {
+                    if let price = shown.pricePerTonne {
                         ValueRow("Цена / т") {
-                            Text("\(Exchange.money(price) ?? price) \(listing.priceCurrency ?? "")")
+                            Text("\(Exchange.money(price) ?? price) \(shown.priceCurrency ?? "")")
                         }
                     }
                     ValueRow("Състояние") { Text(custody.status.label) }
                 }
 
-                if let region = listing.region {
+                if let region = shown.region {
                     Section(titled: "Регион") {
-                        ValueRow(region) { Text(listing.regionCode ?? "") }
+                        ValueRow(region) { Text(shown.regionCode ?? "") }
                     }
                 }
 
                 // Public plaintext by design — sanitised server-side and
                 // deliberately not encrypted, because cross-tenant readability is
                 // what the marketplace is for. Absent when the seller wrote none.
-                if let description = listing.description, !description.isEmpty {
+                if let description = shown.description, !description.isEmpty {
                     Section(titled: "Описание") { Text(description) }
                 }
-                if let seller = listing.sellerDisplayName, !seller.isEmpty {
+                if let seller = shown.sellerDisplayName, !seller.isEmpty {
                     Section(titled: "Продавач") {
                         Text(seller)
                         // A listing published as the farm (P6.7): the name is
                         // the farm's verified one, and its page opens here as
                         // «Ферми» opens it. Behind the same flag, because
                         // `/f/` answers only while the flag is on.
-                        if flags.isOn(FarmBrandAPI.flag), let page = InAppPage.farm(handle: listing.farmHandle) {
+                        if flags.isOn(FarmBrandAPI.flag), let page = InAppPage.farm(handle: shown.farmHandle) {
                             Button {
                                 farmPage = page
                             } label: {
@@ -88,16 +104,16 @@ struct ListingDetailView: View {
 
                 Section {
                     ValueRow("Публикувана") {
-                        Text(BgDate.full(listing.createdAt))
+                        Text(BgDate.full(shown.createdAt))
                     }
-                    if let expires = listing.expiresAt {
+                    if let expires = shown.expiresAt {
                         ValueRow("Валидна до") {
                             Text(BgDate.full(expires))
                         }
                     }
                 }
 
-                if listing.isOwn {
+                if shown.isOwn {
                     Section {
                         Text("Това е обява на Вашето стопанство.")
                             .font(.footnote)
@@ -107,7 +123,7 @@ struct ListingDetailView: View {
                 }
 
                 if MessagingPolicy.offersMessageParty(
-                    isOwn: listing.isOwn, mayWrite: MessagingPolicy.mayWrite(user.user)
+                    isOwn: shown.isOwn, mayWrite: MessagingPolicy.mayWrite(user.user)
                 ) {
                     messagePartySection
                 }
@@ -115,7 +131,31 @@ struct ListingDetailView: View {
             .pageRow()
         }
         .pageBackground()
-        .inlineTitle(CommodityName.canonical(listing.commodity) ?? listing.commodity)
+        .inlineTitle(CommodityName.canonical(shown.commodity) ?? shown.commodity)
+        .toolbar {
+            if mayEdit {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        editing = true
+                    } label: {
+                        Label("Редактирай", systemImage: "pencil")
+                    }
+                    .accessibilityInputLabels(A11y.Spoken.edit)
+                }
+            }
+        }
+        .sheet(isPresented: $editing) {
+            if let edit = shown.edit {
+                NewListingView(editing: .init(
+                    listingID: shown.id, edit: edit, isExpired: custody.status == .expired,
+                    onSaved: { saved in
+                        edited = ExchangeListing(own: saved)
+                        custody.adopt(saved.status)
+                        AccessibilityNotification.Announcement("Обявата е записана.").post()
+                    }
+                ))
+            }
+        }
         .onAppear { isShown = true }
         .onDisappear { isShown = false }
         .sheet(item: $farmPage) { InAppBrowser(url: $0.url).ignoresSafeArea() }
@@ -126,12 +166,12 @@ struct ListingDetailView: View {
     /// server's answer to either leaves it.
     @ViewBuilder
     private var custodySection: some View {
-        let actions = ListingCustodyAction.offered(status: custody.status, isOwn: listing.isOwn,
+        let actions = ListingCustodyAction.offered(status: custody.status, isOwn: shown.isOwn,
                                                    mayWrite: user.user?.mayWrite ?? false)
         if !actions.isEmpty || custody.failure != nil {
             Section {
                 ForEach(actions, id: \.self) { action in
-                    ListingCustodyButton(action: action, custody: custody, listingID: listing.id)
+                    ListingCustodyButton(action: action, custody: custody, listingID: shown.id)
                 }
                 if let failure = custody.failure {
                     Text(failure)
@@ -160,12 +200,12 @@ struct ListingDetailView: View {
     /// the owner's inbox before a word is written. Built, wired, and never
     /// pressed against production.
     private var messagePartySection: some View {
-        let label = MessagingPolicy.messagePartyLabel(side: listing.side)
+        let label = MessagingPolicy.messagePartyLabel(side: shown.side)
         return Section {
             Button {
                 Task {
-                    if let id = await opener.open(listingID: listing.id), isShown {
-                        pushRoute(.conversation(threadID: id, commodity: listing.commodity))
+                    if let id = await opener.open(listingID: shown.id), isShown {
+                        pushRoute(.conversation(threadID: id, commodity: shown.commodity))
                     }
                 }
             } label: {

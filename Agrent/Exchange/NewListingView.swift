@@ -18,8 +18,27 @@ import SwiftUI
 ///
 /// Built, wired, and never sent. Publishing to other tenants is the
 /// owner's act, the same standing decision as `createListing`.
+///
+/// ── The same form edits your own listing (#478) ──
+///
+/// The pencil on your listing opens it with the listing's stored values
+/// (`ExchangeListingEdit`), every field editable (owner, 2026-10-31), and
+/// «Запази» replaces them all (`ExchangeAPI.updateListing`). A save is
+/// safer to repeat than a post: the server refuses a second one as
+/// `LISTING_MODIFIED`, so a lost answer says "may have saved" and nothing
+/// worse. An expired listing given a later date, or none, is active again.
 struct NewListingView: View {
     let onPosted: () -> Void
+    private let editing: Editing?
+
+    /// Your own listing, and what to do with the server's answer.
+    struct Editing {
+        let listingID: String
+        let edit: ExchangeListingEdit
+        /// The listing is EXPIRED: a later date, or none, reactivates it.
+        let isExpired: Bool
+        let onSaved: (OwnExchangeListing) -> Void
+    }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -39,6 +58,71 @@ struct NewListingView: View {
 
     @State private var sending = false
     @State private var failure: Failure?
+
+    init(onPosted: @escaping () -> Void) {
+        self.onPosted = onPosted
+        self.editing = nil
+    }
+
+    init(editing: Editing) {
+        self.onPosted = {}
+        self.editing = editing
+        let edit = editing.edit
+        _side = State(initialValue: edit.side)
+        _kind = State(initialValue: edit.kind)
+        _commodity = State(initialValue: edit.commodity)
+        _quantityText = State(initialValue: Self.fieldText(edit.quantityTonnes.value))
+        _priceText = State(initialValue: edit.pricePerTonne.map { Self.fieldText($0.value) } ?? "")
+        _regionCode = State(initialValue: edit.regionCode)
+        _descriptionText = State(initialValue: edit.description ?? "")
+        _sellerDisplayName = State(initialValue: edit.sellerDisplayName ?? "")
+        _sellerContact = State(initialValue: edit.sellerContact ?? "")
+        _publishAsFarm = State(initialValue: edit.publishAsFarm ?? false)
+        let stored = BgDate.parseInstantOrDay(edit.expiresAt)
+        _hasExpiry = State(initialValue: stored != nil)
+        if let stored { _expiresAt = State(initialValue: stored) }
+    }
+
+    /// A stored decimal as the field shows it: the comma a Bulgarian
+    /// keyboard types, no grouping, so `decimal(_:)` reads it straight back.
+    static func fieldText(_ value: Decimal) -> String {
+        NSDecimalNumber(decimal: value).description(withLocale: WireDecimal.wireLocale)
+            .replacingOccurrences(of: ".", with: ",")
+    }
+
+    /// The ten, and an edited listing's own crop when it is none of them:
+    /// a listing posted before the picker, or from the web, keeps its crop
+    /// rather than having the picker show the first of the ten.
+    private var commodityOptions: [String] {
+        guard let own = editing?.edit.commodity, !Self.canonicalCommodities.contains(own) else {
+            return Self.canonicalCommodities
+        }
+        return Self.canonicalCommodities + [own]
+    }
+
+    /// An edited listing's stored expiry, while the form still holds its
+    /// day: the server's own instant, to go back as it came. Re-deriving it
+    /// from the picked DAY would move it to midnight, which on the listing's
+    /// last day is already in the past.
+    private var keptExpiry: String? {
+        guard hasExpiry, let raw = editing?.edit.expiresAt, let stored = BgDate.parseInstantOrDay(raw),
+              BgDate.isoDay(stored) == BgDate.isoDay(expiresAt) else { return nil }
+        return raw
+    }
+
+    /// The expiry as it goes out.
+    private var expiresAtWire: String? {
+        guard hasExpiry else { return nil }
+        return keptExpiry ?? "\(BgDate.isoDay(expiresAt))T00:00:00.000Z"
+    }
+
+    /// A future expiry is a server rule, mirrored — for a CHANGED one only
+    /// (agri-saas #2543): an untouched expiry is accepted whatever the clock
+    /// says, so a price changed on a listing's last day is not refused over
+    /// a date nobody moved.
+    private var expiryInThePast: Bool {
+        hasExpiry && keptExpiry == nil && expiresAt <= Date()
+    }
 
     private enum Failure: Equatable {
         case refused(String)
@@ -88,7 +172,7 @@ struct NewListingView: View {
             //
             // So: the instant. `BgDate.isoDay` still decides WHICH DAY, in the
             // device's zone, because that is the part a seller picked.
-            expiresAt: hasExpiry ? "\(BgDate.isoDay(expiresAt))T00:00:00.000Z" : nil,
+            expiresAt: expiresAtWire,
             publishAsFarm: flags.isOn(FarmBrandAPI.flag) && publishAsFarm ? true : nil
         )
     }
@@ -98,7 +182,7 @@ struct NewListingView: View {
         // A future expiry is a server rule, mirrored: the schema refuses a
         // past one, and learning that after a request that cannot be
         // retried is the wrong order.
-        if hasExpiry && expiresAt <= Date() { return false }
+        if expiryInThePast { return false }
         return draft.problems.isEmpty
     }
 
@@ -127,7 +211,7 @@ struct NewListingView: View {
                     // posting a slug the board cannot filter on.
                     MenuPicker("Култура", selection: $commodity,
                                value: CommodityName.canonical(commodity) ?? commodity) {
-                        ForEach(Self.canonicalCommodities, id: \.self) { slug in
+                        ForEach(commodityOptions, id: \.self) { slug in
                             Text(CommodityName.canonical(slug) ?? slug).tag(slug)
                         }
                     }
@@ -203,12 +287,20 @@ struct NewListingView: View {
                             // `Palette.DatePill` (#164).
                             .tint(Palette.DatePill.tint)
                     }
+                } footer: {
+                    // Owner, 2026-10-31: a later date reactivates an expired
+                    // listing, and so does no date at all.
+                    SectionFooter {
+                        if editing?.isExpired == true {
+                            Text(Self.reactivationNote)
+                        }
+                    }
                 }
 
                 if let problem = problemText { Section { Text(problem).font(.footnote).foregroundStyle(Palette.secondaryText) } }
                 if let failure { Section { failureView(failure) } }
             }
-            .inlineTitle("Нова обява")
+            .inlineTitle(editing == nil ? "Нова обява" : "Редактиране")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
@@ -219,15 +311,29 @@ struct NewListingView: View {
                     if sending {
                         ProgressView()
                     } else {
-                        Button("Публикувай") { Task { await post() } }
-                            .disabled(!canSend)
-                            .accessibilityInputLabels(A11y.Spoken.publish)
+                        if editing == nil {
+                            Button("Публикувай") { Task { await post() } }
+                                .disabled(!canSend)
+                                .accessibilityInputLabels(A11y.Spoken.publish)
+                        } else {
+                            Button("Запази") { Task { await post() } }
+                                .disabled(!canSend)
+                                .accessibilityInputLabels(A11y.Spoken.save)
+                        }
                     }
                 }
             }
             .interactiveDismissDisabled(sending)
         }
     }
+
+    static let reactivationNote =
+        "Обявата е изтекла. С по-късна дата или без срок тя отново става активна."
+
+    /// What a lost answer means for a save: it may have taken, and a second
+    /// one changes nothing because the server refuses it.
+    static let editUnknownNote = "Връзката прекъсна, преди сървърът да отговори. Промените може да са "
+        + "записани. Отворете обявата отново, за да видите какво е в нея."
 
     /// The web's words (`exchange.publishAsFarmConsent`, agri-saas #1922).
     static let publishAsFarmNote = "Офертата се показва с публичното име на стопанството и с връзка към "
@@ -240,7 +346,8 @@ struct NewListingView: View {
         case .refused(let message):
             VStack(alignment: .leading, spacing: 6) {
                 Text(message).foregroundStyle(Palette.error)
-                Text("Обявата НЕ е публикувана.").font(.footnote).foregroundStyle(Palette.secondaryText)
+                Text(editing == nil ? "Обявата НЕ е публикувана." : "Промените НЕ са записани.")
+                    .font(.footnote).foregroundStyle(Palette.secondaryText)
             }
         case .unknown(let message):
             // No retry button, deliberately. A second attempt after a lost
@@ -250,13 +357,18 @@ struct NewListingView: View {
                 Label("Неясен резултат", systemImage: "questionmark.circle")
                     .foregroundStyle(Palette.error)
                 Text(message).font(.footnote).foregroundStyle(Palette.secondaryText)
-                Text("""
-                    Връзката прекъсна, преди сървърът да отговори. Обявата може \
-                    да е публикувана. Проверете „Моите обяви“, преди да я \
-                    въведете отново — повторното публикуване създава втора обява, \
-                    видима за всички стопанства.
-                    """)
-                    .font(.footnote).foregroundStyle(Palette.secondaryText)
+                if editing != nil {
+                    Text(Self.editUnknownNote)
+                        .font(.footnote).foregroundStyle(Palette.secondaryText)
+                } else {
+                    Text("""
+                        Връзката прекъсна, преди сървърът да отговори. Обявата може \
+                        да е публикувана. Проверете „Моите обяви“, преди да я \
+                        въведете отново — повторното публикуване създава втора обява, \
+                        видима за всички стопанства.
+                        """)
+                        .font(.footnote).foregroundStyle(Palette.secondaryText)
+                }
             }
         }
     }
@@ -264,7 +376,7 @@ struct NewListingView: View {
     private var problemText: String? {
         guard !quantityText.isEmpty else { return nil }
         guard let draft else { return "Количеството не е разчетено." }
-        if hasExpiry && expiresAt <= Date() { return "Срокът трябва да е в бъдещето." }
+        if expiryInThePast { return "Срокът трябва да е в бъдещето." }
         switch draft.problems.first {
         case .quantityOutOfRange: return "Количеството трябва да е между 0 и 1 000 000 т."
         case .priceOutOfRange: return "Цената е извън допустимия диапазон."
@@ -280,8 +392,19 @@ struct NewListingView: View {
         failure = nil
         defer { sending = false }
         do {
-            _ = try await ExchangeAPI.createListing(draft)
-            onPosted()
+            if let editing {
+                let saved = try await ExchangeAPI.updateListing(editing.listingID, UpdateExchangeListing(
+                    fields: draft,
+                    // Always said, and kept as stored for a person whose
+                    // form does not show the switch.
+                    publishAsFarm: publishAsFarm,
+                    updatedAt: editing.edit.updatedAt
+                ))
+                editing.onSaved(saved)
+            } else {
+                _ = try await ExchangeAPI.createListing(draft)
+                onPosted()
+            }
             dismiss()
         } catch let error as URLError {
             failure = .unknown(UserMessage.text(for: error))
