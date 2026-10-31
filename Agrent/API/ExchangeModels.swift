@@ -95,6 +95,23 @@ struct ExchangeListing: Decodable, Equatable, Sendable, Identifiable {
     var isActive: Bool { status == .active }
 }
 
+extension ExchangeListing {
+    /// A row of «Моите обяви» as the listing's own screen shows it (#478).
+    /// The same fields under the same names; the inquiries stay on the row,
+    /// and `farmHandle` is not in the seller's own read, so the farm's page
+    /// is not offered on your own listing — you are on it already.
+    init(own: OwnExchangeListing) {
+        self.init(
+            id: own.id, side: own.side, kind: own.kind, status: own.status,
+            commodity: own.commodity, quantityTonnes: own.quantityTonnes,
+            pricePerTonne: own.pricePerTonne, priceCurrency: own.priceCurrency,
+            regionCode: own.regionCode, regionName: own.regionName, lat: own.lat, lon: own.lon,
+            description: own.description, sellerDisplayName: own.sellerDisplayName,
+            createdAt: own.createdAt, expiresAt: own.expiresAt, isOwn: own.isOwn
+        )
+    }
+}
+
 /// `GET /api/t/{slug}/exchange/listings` — envelope, paged.
 struct ExchangeListingPage: Decodable, Equatable, Sendable {
     let rows: [ExchangeListing]

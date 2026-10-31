@@ -18,6 +18,10 @@ struct ExchangeView: View {
     @State private var tab: Tab = .browse
     @State private var listings = ExchangeListingsStore()
     @State private var mine = MyListingsStore()
+    /// Whether «Моите обяви» has been on screen, so its list reads again
+    /// when it comes BACK — from a listing that «Оттегли» may have changed
+    /// (#478) — and not twice on its first appearance.
+    @State private var mineShown = false
     @State private var inquiries = MyInquiriesStore()
     @State private var unread = ExchangeUnreadStore.shared
     /// The farms the board's search found (owner, 2026-10-24).
@@ -369,15 +373,23 @@ struct ExchangeView: View {
 
         case .loaded(let rows, _):
             List(rows) { row in
-                MyListingRow(listing: row)
-                    // The row's own background, which `pageBackground()` does
-                    // not reach: without it each listing sat on the system's
-                    // grouped card colour on the page — found by the per-list
-                    // check in `FormSurfaceTests` (#164).
-                    .pageRow()
+                // The listing's own screen, as a board row opens it (owner,
+                // 2026-10-31, #478): there are «Изпълнена» and «Оттегли».
+                NavigationLink(value: AppRoute.listing(ExchangeListing(own: row))) {
+                    MyListingRow(listing: row)
+                }
+                // The row's own background, which `pageBackground()` does
+                // not reach: without it each listing sat on the system's
+                // grouped card colour on the page — found by the per-list
+                // check in `FormSurfaceTests` (#164).
+                .pageRow()
             }
             .refreshable { await PullToRefresh.bounded { await mine.load() } }
             .pageBackground()
+            .onAppear {
+                if mineShown { Task { await mine.load() } }
+                mineShown = true
+            }
         }
     }
 

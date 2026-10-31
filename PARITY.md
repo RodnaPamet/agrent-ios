@@ -357,6 +357,14 @@ The web has «Съобщения» as a fourth section beside «Обяви / М�
 - **The inbox polls only while on screen,** as it did as a section, and an
   empty inbox's «Към обявите» goes back to the board.
 
+### Your own listing: opened from «Моите обяви», withdrawn or fulfilled, edited (owner, 2026-10-31, #478)
+
+The owner showed «Моите обяви» with rows that opened nothing, and asked for them to open, with an edit pencil.
+- **A row opens the listing's screen,** the same one a board row opens, built from the row (`ExchangeListing(own:)`). «Моите обяви» reads again when you come back.
+- **«Изпълнена» and «Оттегли»** are on your own listing, each behind a question. They use the existing `PATCH /exchange/listings/{id}` `{action}`. They are offered where the server allows: both on an active listing, only «Оттегли» on an expired one, nothing on a withdrawn or fulfilled one. The fulfil question says that waiting buyers are declined and told, because the server does that.
+- **The pencil waits on agri-saas.** Neither the server nor the web can edit a listing's fields yet. The owner chose every field editable, crop and sell/buy included, and an expired listing becomes active again with a later «Валидна до». The web gets the same edit. Asked of backend 1, 2026-10-31.
+- **Not fired:** the first real withdraw, fulfil or edit is the owner's. A11yShots photographs the question and answers «Отказ».
+
 ### Gap 7 — no messaging — CLOSED 2026-09-30
 
 Web `exchange/threads` (121) + `exchange/threads/[threadId]` (321) · iOS
