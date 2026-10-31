@@ -897,8 +897,10 @@ enum UserMessage {
         // The one that waiting does lift: a token cap per UTC month, so
         // «next month» is honest. Not «from the 1st»: in Bulgaria the UTC
         // month turns at 02:00 or 03:00 that day.
+        // The server's own catalogue wording (agri-saas messages/bg.json,
+        // 2026-10-31), so the phone and the web say one sentence.
         "AI_BUDGET_EXCEEDED":
-            "Месечният лимит за функциите с изкуствен интелект е изчерпан. "
+            "Месечният бюджет на стопанството за ИИ е изчерпан. "
             + "Той се подновява в началото на следващия месец.",
         // Refused on capability, not spend, so the month changes nothing.
         // The app picks no tier, so there is no other choice to point at.
@@ -1150,6 +1152,11 @@ enum UserMessage {
         "DOCUMENT_DRIVE_SYNC_OFF": "Копирането в Google Drive е изключено за това стопанство. Включете го в настройките на «Документи».",
         "DOCUMENT_DRIVE_COPY_IN_PROGRESS": "Копието вече е на път. Опитайте отново след няколко минути.",
         "DOCUMENT_DRIVE_ALREADY_COPIED": "Документът вече е в Google Drive.",
+        // An invoice read into expenses (#482, agri-saas): the read found no
+        // line, or the phone sent neither or both of the file and the id.
+        "INVOICE_NOT_RECOGNISED": "Фактурата не беше разчетена. Снимайте я отново на добра светлина, цялата в кадъра.",
+        "INVOICE_SCAN_INPUT_AMBIGUOUS": "Фактурата не беше изпратена правилно. Опитайте отново.",
+        "FILE_NOT_FOUND": "Файлът не беше намерен.",
         // agri-saas #2581: the deployment cannot return a native consent to
         // the app. The connection is the farm's, so the web can make it.
         "GOOGLE_NATIVE_RETURN_NOT_ALLOWED": "Свързването с Google от приложението не е налично. Свържете Google Drive от уеб приложението.",

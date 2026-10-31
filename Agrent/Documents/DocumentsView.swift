@@ -43,6 +43,8 @@ private struct DocumentsScreen: View {
     @State private var asking: FarmDocument?
     @State private var confirming = false
     @State private var showsMessage = false
+    /// A document read into expenses (#482): «От фактура» once it has lines.
+    @State private var invoice: InvoiceReview?
 
     private var mayUpload: Bool { people.user?.mayWrite == true }
 
@@ -89,6 +91,9 @@ private struct DocumentsScreen: View {
                     await store.load()
                     removal.listRead()
                 }
+            }
+            .sheet(item: $invoice) { review in
+                InvoiceReviewView(review: review, crops: []) {}
             }
             .sheet(item: $pending) { file in
                 DocumentUploadSheet(file: file, settings: store.settings.value, store: store)
@@ -275,6 +280,17 @@ private struct DocumentsScreen: View {
             }
         }
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
+            // An invoice already here, into expenses (owner, 2026-10-31):
+            // read by the server from the bytes it holds, then «От фактура».
+            if !document.isPurged, people.user?.mayWrite == true {
+                Button {
+                    Task { await readInvoice(document) }
+                } label: {
+                    Label("Към разходи", systemImage: "eurosign.circle")
+                }
+                .tint(Palette.accent)
+                .accessibilityInputLabels(A11y.spokenNames("Към разходи", "Разходи"))
+            }
             if text.driveFailed, store.settings.value?.mayEdit == true {
                 Button {
                     Task { await store.retryDriveCopy(document) }
@@ -284,6 +300,24 @@ private struct DocumentsScreen: View {
                 .tint(Palette.accent)
                 .accessibilityInputLabels(A11y.Spoken.retry)
             }
+        }
+    }
+
+    /// The document read as an invoice: «От фактура» with its lines, or
+    /// why not. The row shows it working, as it does while opening.
+    private func readInvoice(_ document: FarmDocument) async {
+        guard opening == nil else { return }
+        opening = document.id
+        defer { opening = nil }
+        do {
+            let scan = try await InvoiceScanAPI.scan(documentId: document.id)
+            if scan.lines.isEmpty {
+                store.message = UserMessage.bulgarian["INVOICE_NOT_RECOGNISED"]
+            } else {
+                invoice = InvoiceReview(scan, crops: [])
+            }
+        } catch {
+            store.message = UserMessage.text(for: error)
         }
     }
 
