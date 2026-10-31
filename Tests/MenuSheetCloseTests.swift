@@ -33,6 +33,7 @@ final class MenuSheetCloseTests: XCTestCase {
         case .farmRisk: "Agrent/FarmRisk/FarmRiskView.swift"
         case .dashboard: "Agrent/Dashboard/DashboardView.swift"
         case .notifications: "Agrent/Notifications/NotificationsView.swift"
+        case .documents: "Agrent/Documents/DocumentsView.swift"
         }
     }
 
@@ -80,7 +81,7 @@ final class MenuSheetCloseTests: XCTestCase {
     /// an unconditional «Затвори» of its own, which as a tab root is a button
     /// that does nothing.
     func testEverySurfaceHasAWayOutFromTheMenu() throws {
-        XCTAssertEqual(AppSurface.allCases.count, 10, "positive control: the ten surfaces")
+        XCTAssertEqual(AppSurface.allCases.count, 11, "positive control: the eleven surfaces")
         for surface in AppSurface.allCases {
             let path = file(for: surface)
             let text = try source(path)
@@ -107,6 +108,7 @@ final class MenuSheetCloseTests: XCTestCase {
         case .farmRisk: FarmRiskView.self
         case .dashboard: DashboardView.self
         case .notifications: NotificationsView.self
+        case .documents: DocumentsView.self
         }
     }
 }

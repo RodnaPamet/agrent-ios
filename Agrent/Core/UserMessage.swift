@@ -317,6 +317,16 @@ enum UserMessage {
             default:
                 return nil
             }
+        case "DOCUMENT_STORAGE_FULL":
+            // «Документи» (#468): the farm is at its ceiling. The numbers
+            // come as decimal strings (`usedBytes`, `limitBytes`, agri-saas
+            // #2534), so the sentence can say how full, and the remedy the
+            // feature names: deleting frees the space at once. Without the
+            // numbers, the table's plain sentence.
+            guard let used = params?["usedBytes"].flatMap({ Int64($0) }),
+                  let limit = params?["limitBytes"].flatMap({ Int64($0) }) else { return nil }
+            return "Мястото за документи е запълнено (\(DocumentSize.text(used)) от \(DocumentSize.text(limit))). "
+                + "Изтрийте стари документи, за да освободите място."
         case "FARM_NAME_TOO_LONG":
             // The bound is the server's (`params.max`, agri-saas #1388) — it
             // was a hardcoded 120 here, which would have gone on saying 120
@@ -1118,6 +1128,33 @@ enum UserMessage {
         // A machine operator (MECHANISATOR) is confined to its own work; a
         // person-scoped social route refuses that persona.
         "OPERATOR_SCOPE": "Това не е достъпно за механизатори.",
+        // «Документи» (#468, agri-saas #2495): the codes backend 1 gave the
+        // library's refusals so none is said in the server's English. The
+        // two scan codes are different things to a farmer: one is «wait»,
+        // the other «this file will never open».
+        "FILE_SCAN_PENDING": "Файлът още се проверява за вируси. Опитайте след малко.",
+        "FILE_SCAN_REJECTED": "Файлът е отказан при проверката за вируси.",
+        "DOCUMENT_NOT_FOUND": "Няма такъв документ.",
+        "DOCUMENT_PURGED": "Файлът вече не е в Agrent.",
+        // The upload never reached a stored state: not a deleted document,
+        // a failed upload, so the way out is to upload it again.
+        "DOCUMENT_NOT_DOWNLOADABLE": "Файлът не беше качен докрай. Качете го отново.",
+        "DOCUMENT_DELETE_NOT_ALLOWED": "Нямате право да изтриете този документ.",
+        "DOCUMENT_STORAGE_FULL": "Мястото за документи на стопанството е запълнено. Изтрийте стари документи, за да качите нов.",
+        // A settings PUT the server refused: the phone only sends the six
+        // periods and a boolean, so these mean a phone and server disagree.
+        // An admin's «Опитай пак» on a Drive copy (agri-saas #2573, #2495
+        // step 4), in the server catalogue's words. Each refusal means the row
+        // on screen was out of date, so the list reads again after it
+        // (`DocumentsStore.retryDriveCopy`).
+        "DOCUMENT_DRIVE_SYNC_OFF": "Копирането в Google Drive е изключено за това стопанство. Включете го в настройките на «Документи».",
+        "DOCUMENT_DRIVE_COPY_IN_PROGRESS": "Копието вече е на път. Опитайте отново след няколко минути.",
+        "DOCUMENT_DRIVE_ALREADY_COPIED": "Документът вече е в Google Drive.",
+        // agri-saas #2581: the deployment cannot return a native consent to
+        // the app. The connection is the farm's, so the web can make it.
+        "GOOGLE_NATIVE_RETURN_NOT_ALLOWED": "Свързването с Google от приложението не е налично. Свържете Google Drive от уеб приложението.",
+        "DOCUMENT_RETENTION_INVALID": "Срокът на съхранение не беше приет. Изберете го отново.",
+        "DOCUMENT_DRIVE_SYNC_INVALID": "Настройката за Google Drive не беше приета. Опитайте отново.",
         // An API key on a person's route. This app never sends one — it signs
         // in as a person — so this is for completeness, in the API-key words.
         "API_KEY_NOT_PERSON_SCOPED": "Сървърът отказа достъпа за тази заявка.",

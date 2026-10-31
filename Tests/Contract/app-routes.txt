@@ -22,6 +22,7 @@
 /api/public/eik-check
 /api/public/farms
 /api/t/{tenantSlug}/admin/farm-profile
+/api/t/{tenantSlug}/admin/integrations/google/connect
 /api/t/{tenantSlug}/admin/invites
 /api/t/{tenantSlug}/admin/market-prices/overrides
 /api/t/{tenantSlug}/admin/market-prices/overrides/{commodity}
@@ -44,6 +45,11 @@
 /api/t/{tenantSlug}/costs/machinery
 /api/t/{tenantSlug}/dashboard/ag
 /api/t/{tenantSlug}/dashboard/task-trend
+/api/t/{tenantSlug}/documents
+/api/t/{tenantSlug}/documents/settings
+/api/t/{tenantSlug}/documents/{id}
+/api/t/{tenantSlug}/documents/{id}/content
+/api/t/{tenantSlug}/documents/{id}/drive-copy
 /api/t/{tenantSlug}/exchange/inquiries
 /api/t/{tenantSlug}/exchange/listings
 /api/t/{tenantSlug}/exchange/listings/{listingId}

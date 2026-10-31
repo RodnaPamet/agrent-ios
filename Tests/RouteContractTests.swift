@@ -165,6 +165,10 @@ final class RouteContractTests: XCTestCase {
     /// built against agri-saas #2476 while that PR was open, came off with
     /// the refresh from its merge. The PR (#467) merged only once
     /// `/api/health` carried it (2026-10-30).
+    ///
+    /// Empty again from agri-saas main 8cc4408: «Документи» (#468), built
+    /// against agri-saas #2495's agreed shape step by step, came off as each
+    /// step went live; the Drive copy (step 4, #2573) last, live 2026-10-31.
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -213,6 +217,13 @@ final class RouteContractTests: XCTestCase {
             ("PushAPI.swift", [PushAPI.subscriptionsPath(in: "{tenantSlug}")]),
             // Who a farm's work can be given to (#371, #372).
             ("AssignableUsersAPI.swift", [AssignableUsersAPI.path]),
+            // «Документи» (#468): the list, settings, a document, its bytes,
+            // a Drive retry, and the farm's Google connect for the copy.
+            ("DocumentsAPI.swift", [
+                DocumentsAPI.listPath, DocumentsAPI.settingsPath, DocumentsAPI.documentPath(id),
+                DocumentsAPI.contentPath(id), DocumentsAPI.driveCopyPath(id),
+            ]),
+            ("GoogleDriveConnect.swift", [GoogleDriveConnect.connectPath]),
             // A parcel's comments and closing notes (#465).
             ("ParcelCommentsAPI.swift", [ParcelCommentsAPI.path(parcel)]),
             // «Известия» (#471): the list and marking one read.

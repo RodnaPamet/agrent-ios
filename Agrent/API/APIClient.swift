@@ -851,7 +851,7 @@ actor APIClient {
     /// nothing useful. 122 bits of randomness is the cheap way not to think
     /// about it again.
     ///
-    /// No `Idempotency-Key`: the import routes document none, and the upload
+    /// No `Idempotency-Key` by default: the import routes document none, and the upload
     /// stages bytes and queues a job rather than writing a row, so a replay
     /// makes a second job rather than a duplicate record.
     func postMultipart(
@@ -859,15 +859,19 @@ actor APIClient {
         file: Data,
         fileName: String,
         mimeType: String,
-        fields: [String: String] = [:]
+        fields: [String: String] = [:],
+        idempotencyKey: String? = nil
     ) async throws -> Data {
         let boundary = "Boundary-\(UUID().uuidString)"
         let body = Self.multipartBody(
             boundary: boundary, file: file, fileName: fileName,
             mimeType: mimeType, fields: fields)
 
+        // A key only where the route dedupes on it: «Документи»'s upload
+        // (agri-saas #2495) does, so a retry of the same bytes after a lost
+        // answer makes one document, not two. The imports above don't.
         return try await send(
-            path: path, method: "POST", body: body, idempotencyKey: nil,
+            path: path, method: "POST", body: body, idempotencyKey: idempotencyKey,
             contentType: "multipart/form-data; boundary=\(boundary)"
         )
     }

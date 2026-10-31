@@ -110,6 +110,8 @@ final class FixtureSeamTests: XCTestCase {
             (LocationsAPI.rateUnitsPath, "units-rate"),
             (WorkItemAPI.listPath, "tasks-list"),
             (NotificationsAPI.listPath, "notifications-list"),
+            (DocumentsAPI.listPath, "documents-list"),
+            (DocumentsAPI.settingsPath, "documents-settings"),
             // #462: SYNTH-1's tasks from Блокове.
             (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
             (ParcelCommentsAPI.path("par_holes"), "parcel-comments"),
@@ -448,6 +450,8 @@ final class FixtureSeamTests: XCTestCase {
         ("ortho-blocks", { _ = try await APIClient.shared.decode($0, as: OrthoBlocks.self) }),
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("notifications-list", { _ = try await NotificationsAPI.decodeList(from: $0) }),
+        ("documents-list", { _ = try await DocumentsAPI.decodeList(from: $0) }),
+        ("documents-settings", { _ = try await APIClient.shared.decode($0, as: DocumentSettings.self) }),
         ("parcel-tasks", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("parcel-comments", { _ = try await ParcelCommentsAPI.decode(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),

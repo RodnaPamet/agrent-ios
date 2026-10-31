@@ -184,6 +184,11 @@ enum FixtureCatalogue {
         // #471: «Известия», three synthetic notifications, two unread, one
         // linking to the fixture task. Marking read is a write: refused.
         (NotificationsAPI.listPath, "notifications-list"),
+        // #468: «Документи», a synthetic library in every state a row can
+        // be in, and its settings. Previews have no fixture (`NO_FIXTURE`),
+        // and every write is refused as every write is.
+        (DocumentsAPI.listPath, "documents-list"),
+        (DocumentsAPI.settingsPath, "documents-settings"),
         // #465: the person's own queue, for a mechanisator's one screen, and
         // the field operation's parcels, for the numbers on its map.
         (FarmTasksAPI.queuePath, "farm-tasks-mine"),

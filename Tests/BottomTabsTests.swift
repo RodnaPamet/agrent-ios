@@ -112,7 +112,7 @@ final class BottomTabsTests: XCTestCase {
         let s = store(["/journal", "/news"])
         XCTAssertEqual(Set(s.overflow.map(\.id)),
                        Set([AppSurface.calculator, .exchange, .locations, .tasks,
-                            .trends, .farmRisk, .dashboard, .notifications].map(\.id)))
+                            .trends, .farmRisk, .dashboard, .notifications, .documents].map(\.id)))
     }
 
     /// An empty array is a deliberate clear, and distinct from nil in the

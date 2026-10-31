@@ -1,0 +1,10 @@
+{
+  "retention": "P1Y",
+  "driveSync": true,
+  "usedBytes": 131072000,
+  "limitBytes": 2147483648,
+  "mayEdit": true,
+  "google": {
+    "connected": true
+  }
+}

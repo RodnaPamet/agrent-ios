@@ -2315,6 +2315,57 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertFalse(app.buttons["Кошче"].exists, "«Кошче» was removed (#411)")
     }
 
+    /// «Документи» (#468, owner 2026-10-30), from the menu: a synthetic
+    /// library in every state a row can be in, the upload's choices, a
+    /// document's «Изтрий» with its question and «Отмени» (inside the
+    /// window, so no delete is built), and the settings at the bottom.
+    func testDocuments() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» on the root")
+        XCTAssertTrue(tapMenuRow("Документи", in: app), "«Документи» is not in the menu")
+        XCTAssertTrue(app.navigationBars["Документи"].waitForExistence(timeout: 15), "the menu opened no «Документи»")
+        let live = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Сертификат за семена'")).firstMatch
+        XCTAssertTrue(live.waitForExistence(timeout: 15), "no fixture document\n\(app.debugDescription)")
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Изтрит документ'")).firstMatch.exists,
+                      "the deleted document's tombstone is not listed")
+        XCTAssertTrue(app.buttons["Сканирай"].exists, "no camera button at the top right")
+        Thread.sleep(forTimeInterval: 1)
+        capture("21-documents", app: app)
+
+        app.buttons["Качи документ"].tap()
+        XCTAssertTrue(app.buttons["От файловете"].waitForExistence(timeout: 5), "the upload offers no choices")
+        capture("21b-documents-upload", app: app)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+
+        live.swipeLeft()
+        let delete = app.buttons["Изтрий"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the document offered no «Изтрий»")
+        delete.tap()
+        let question = app.alerts["Сигурни ли сте, че искате да изтриете документа?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "«Изтрий» asked nothing")
+        question.buttons["Изтрий"].tap()
+        let undo = app.buttons["Отмени"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»")
+        capture("21c-documents-undo", app: app)
+        undo.tap()
+        XCTAssertTrue(live.waitForExistence(timeout: 5), "«Отмени» did not bring the document back")
+
+        // Down to the settings: a List reports a row past the fold as
+        // hittable, so the swipes are not conditional on it.
+        for _ in 0..<3 {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        let settings = app.switches.matching(NSPredicate(format: "label BEGINSWITH 'Копие в Google Drive'")).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 5), "no Drive switch under the list\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("21d-documents-settings", app: app)
+    }
+
     /// «Известия» (#471, owner 2026-10-30), from the menu, whose row carries
     /// the unread count: the list, then a task's notification opening the
     /// task. Marking it read is a write, which the seam refuses, so the list
@@ -2457,6 +2508,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(labelled("Админ", in: app.buttons).exists, "«Админ» is not in the menu")
         XCTAssertFalse(labelled("Блокове", in: app.buttons).exists, "«Блокове» is in the menu")
         XCTAssertFalse(labelled("Известия", in: app.buttons).exists, "a mechanisator has «Известия» (#471: outside the operator allowlist)")
+        XCTAssertFalse(labelled("Документи", in: app.buttons).exists, "a mechanisator has «Документи» (#468: no access)")
         Thread.sleep(forTimeInterval: 1)
         capture("20d-mechanisator-menu", app: app)
     }
