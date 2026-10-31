@@ -21,10 +21,7 @@ struct TaskCommentsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // The task screen's section heading, as «Парцели» has.
-            Text("Коментари")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.secondaryText)
-                .accessibilityAddTraits(.isHeader)
+            SectionTitle("Коментари")
             if comments.isEmpty {
                 Text("Няма коментари.")
                     .font(.footnote)

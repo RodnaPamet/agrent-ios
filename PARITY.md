@@ -118,6 +118,8 @@ says the same thing twice.
 - Every section title («Разходи», «Култури» and the rest, through `SectionHeader` and `Section(titled:)`) is the gold, no longer off-white. The owner chose every screen over Калкулатор alone. Footers stay muted.
 - «Слънце» uses the deeper brand gold for them. The accent on a form's ground there measures 4.48, under AA, so they use `--brand-emphasis`, as the avatar's fill does.
 - The cost names under «Разходи» are rows, not titles, and stay white. The first pass (#460) put the gold on them by mistake.
+- Headings a screen draws itself are gold too (owner 2026-10-31: «no titles should be white / similar color as the text below»). These are the cards on a parcel's «История» («Риск», «Задачи», «Коментари», «РЕКОЛТИ», «ДЕЙНОСТИ», «ПЛЕВЕЛИ»), «Коментари», «Парцели» and the field operation on a task, «Корекции» on a treatment, and the headings of the index explainer. They go through `SectionTitle`, and `ListChromeTests` fails on a header trait written anywhere else.
+- Still white, as before: the navigation bar's title, a full-screen page's own title (suspended, deletion pending, second factor, farm wizard, treatment saved), the parcel's name over «История», and row names. Labels above a value («Описание», «Бележки», a fact's name) stay muted, as a field's label does.
 
 ### «Нов разход» is EUR only (owner 2026-10-26)
 

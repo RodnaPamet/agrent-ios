@@ -58,10 +58,7 @@ struct TaskParcelsSection: View {
     private func section<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // The field operation's heading, so the two sections read alike.
-            Text("Парцели")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.secondaryText)
-                .accessibilityAddTraits(.isHeader)
+            SectionTitle("Парцели")
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)

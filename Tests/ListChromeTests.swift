@@ -110,6 +110,34 @@ final class ListChromeTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(house, 60, "the ~60 headers and footers of #159")
     }
 
+    /// A heading a screen draws by hand is `SectionTitle` (owner,
+    /// 2026-10-31). The parcel screen's «Риск», «Задачи» and «РЕКОЛТИ» and a
+    /// task's «Коментари» were a `Text` in `.primary` or the muted grey, so
+    /// #464's gold, which went through the List headers, never reached them.
+    /// The header trait is what marks a heading, so it may appear only in
+    /// the house view and on the screens whose heading IS the screen's
+    /// title, drawn in place of a navigation bar and in its colour.
+    private static let headerTrait = #"\.accessibilityAddTraits\(\.isHeader\)"#
+    private static let houseTitle = #"(?<![A-Za-z])SectionTitle\("#
+    private static let screenTitles: Set<String> = [
+        "DeletionPendingView.swift", "FarmWizardView.swift", "SecondFactorView.swift",
+        "SuspendedView.swift", "TreatmentSavedView.swift",
+    ]
+
+    func testHeadingsAreTheHouseOnes() {
+        let sources = appSources()
+        let offenders = sources.filter {
+            $0.0 != "FormChrome.swift" && !Self.screenTitles.contains($0.0)
+                && Self.count(Self.headerTrait, in: $0.1) != 0
+        }.map(\.0).sorted()
+        XCTAssertEqual(offenders, [],
+                       "a heading written by hand is white or grey, not the header gold — use SectionTitle")
+        let house = sources.map { Self.count(Self.houseTitle, in: $0.1) }.reduce(0, +)
+        XCTAssertGreaterThanOrEqual(house, 12, "the parcel screen's cards and the task and treatment headings")
+        let screens = sources.filter { Self.screenTitles.contains($0.0) && Self.count(Self.headerTrait, in: $0.1) != 0 }
+        XCTAssertEqual(screens.count, Self.screenTitles.count, "positive control: each listed screen still has its title")
+    }
+
     func testEveryTextFieldHasAStyledPrompt() {
         let sources = appSources()
         let offenders = sources.filter { $0.0 != "FormChrome.swift" && Self.unpromptedFields(in: $0.1) != 0 }
@@ -196,6 +224,11 @@ final class ListChromeTests: XCTestCase {
         XCTAssertEqual(Self.count(Self.bareChrome, in: "} footer: {\n    if a { Text(\"b\") }\n}"), 1)
         XCTAssertEqual(Self.count(Self.bareChrome, in: "} header: {\n    SectionHeader(\"Файл\")\n}"), 0)
         XCTAssertEqual(Self.count(Self.bareChrome, in: "} footer: { SectionFooter { x } }"), 0)
+
+        XCTAssertEqual(Self.count(Self.headerTrait, in: "Text(\"Коментари\")\n    .accessibilityAddTraits(.isHeader)"), 1)
+        XCTAssertEqual(Self.count(Self.headerTrait, in: ".accessibilityAddTraits(.isButton)"), 0)
+        XCTAssertEqual(Self.count(Self.houseTitle, in: "SectionTitle(\"Риск\", font: .headline)"), 1)
+        XCTAssertEqual(Self.count(Self.houseTitle, in: "struct SectionTitle: View {"), 0)
     }
 
     func testTheFieldMatcherSeesAMissingPrompt() {

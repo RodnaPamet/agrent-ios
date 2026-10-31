@@ -53,9 +53,7 @@ struct IndexExplainerView: View {
     /// the legend under the chart cannot come to mean different things.
     private var scale: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Скала")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.secondaryText)
+            SectionTitle("Скала")
 
             LinearGradient(colors: index.ramp, startPoint: .leading, endPoint: .trailing)
                 .frame(height: 12)
@@ -76,9 +74,7 @@ struct IndexExplainerView: View {
 
     private var notes: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Какво да имате предвид")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.secondaryText)
+            SectionTitle("Какво да имате предвид")
 
             ForEach(VegetationIndex.sharedNotes, id: \.self) { note in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
