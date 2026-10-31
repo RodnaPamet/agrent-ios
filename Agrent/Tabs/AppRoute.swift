@@ -33,6 +33,11 @@ enum AppRoute: Hashable, Sendable {
     /// screen reads the task first, then shows it as a row's tap would.
     case taskID(String)
     case location(Location)
+    /// A block named by id alone: an agro warning's link (#475). Its screen
+    /// finds the block in the farm's list first.
+    case locationID(String)
+    /// A listing named by id alone: a new interest or inquiry (#475).
+    case listingID(String)
     /// The name rides along so the header isn't blank while the archive
     /// loads — see `ParcelHistoryView.parcelName`.
     ///
@@ -56,6 +61,8 @@ enum AppRoute: Hashable, Sendable {
         case .task(let summary): hasher.combine("task"); hasher.combine(summary.id)
         case .taskID(let id): hasher.combine("taskID"); hasher.combine(id)
         case .location(let location): hasher.combine("location"); hasher.combine(location.id)
+        case .locationID(let id): hasher.combine("locationID"); hasher.combine(id)
+        case .listingID(let id): hasher.combine("listingID"); hasher.combine(id)
         case .parcelHistory(let parcelID, _, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
         case .exchangeInbox: hasher.combine("exchangeInbox")
         case .treatmentMap(let handle, _): hasher.combine("treatmentMap"); hasher.combine(handle)
@@ -67,9 +74,9 @@ enum AppRoute: Hashable, Sendable {
     var home: AppSurface {
         switch self {
         case .journalEntry, .treatmentMap: .journal
-        case .listing, .conversation, .exchangeInbox: .exchange
+        case .listing, .listingID, .conversation, .exchangeInbox: .exchange
         case .task, .taskID: .tasks
-        case .location: .locations
+        case .location, .locationID: .locations
         case .parcelHistory: .farmRisk
         }
     }
@@ -86,6 +93,8 @@ enum AppRoute: Hashable, Sendable {
         case .task(let summary): TaskDetailView(summary: summary)
         case .taskID(let id): TaskLinkView(id: id)
         case .location(let location): ParcelMapView(location: location)
+        case .locationID(let id): LocationLinkView(id: id)
+        case .listingID(let id): ListingLinkView(id: id)
         case .parcelHistory(let parcelID, let parcelName, let recordIn):
             ParcelHistoryView(parcelID: parcelID, parcelName: parcelName, recordIn: recordIn)
         case .exchangeInbox: ExchangeInboxScreen()
@@ -101,6 +110,8 @@ extension AppRoute {
         case .task(_, let id): self = .taskID(id)
         // The conversation reads its own commodity with the thread.
         case .thread(_, let id): self = .conversation(threadID: id, commodity: nil)
+        case .location(_, let id): self = .locationID(id)
+        case .listing(_, let id): self = .listingID(id)
         }
     }
 }

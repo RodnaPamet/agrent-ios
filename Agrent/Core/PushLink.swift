@@ -30,9 +30,19 @@ import Foundation
 /// say which farm (`inFarm`). A push can't: its payload names no other
 /// farm, and on a phone in two farms a guess opens the wrong farm's task.
 /// So without `inFarm` the unprefixed form is no link, as before.
+///
+/// ── A block, and a listing (#475) ──
+///
+/// The agro warnings (spray window, disease risk) write
+/// `/t/{slug}/locations/{locationId}`: that block's map. A new interest or
+/// inquiry on a listing writes `/t/{slug}/exchange/my-interests#listing-{id}`
+/// or `my-listings#listing-{id}`, the listing named in the FRAGMENT (kept so
+/// web bookmarks keep working, backend 1 on #2510): that listing.
 enum PushLink: Equatable, Sendable {
     case task(farm: String, id: String)
     case thread(farm: String, id: String)
+    case location(farm: String, id: String)
+    case listing(farm: String, id: String)
 
     /// nil for no link, an absolute URL (never followed: the server sends
     /// paths, so anything else did not come from it), or a path the app
@@ -52,6 +62,17 @@ enum PushLink: Equatable, Sendable {
            let farm = decoded(parts[2]), let id = decoded(parts[4]) {
             return .task(farm: farm, id: id)
         }
+        if parts.count == 5, parts[1] == "t", parts[3] == "locations",
+           let farm = decoded(parts[2]), let id = decoded(parts[4]) {
+            return .location(farm: farm, id: id)
+        }
+        if parts.count == 5, parts[1] == "t", parts[3] == "exchange",
+           parts[4] == "my-listings" || parts[4] == "my-interests",
+           let farm = decoded(parts[2]),
+           let fragment = components.fragment, fragment.hasPrefix("listing-"),
+           let id = decoded(String(fragment.dropFirst("listing-".count))) {
+            return .listing(farm: farm, id: id)
+        }
         if parts.count == 6, parts[1] == "t", parts[3] == "exchange", parts[4] == "threads",
            let farm = decoded(parts[2]), let id = decoded(parts[5]) {
             return .thread(farm: farm, id: id)
@@ -65,7 +86,7 @@ enum PushLink: Equatable, Sendable {
     /// The farm the link is in.
     var farm: String {
         switch self {
-        case .task(let farm, _), .thread(let farm, _): farm
+        case .task(let farm, _), .thread(let farm, _), .location(let farm, _), .listing(let farm, _): farm
         }
     }
 }

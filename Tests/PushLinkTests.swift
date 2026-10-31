@@ -25,7 +25,25 @@ final class PushLinkTests: XCTestCase {
         let route = AppRoute(.thread(farm: "ferma-1", id: "thr-7"))
         XCTAssertEqual(route, .conversation(threadID: "thr-7", commodity: nil))
         XCTAssertEqual(route.home, .exchange)
-        XCTAssertNil(PushLink.parse("/t/ferma-1/exchange/my-listings#listing-3"), "a listing has no screen by id yet")
+        XCTAssertNil(PushLink.parse("/t/ferma-1/grain/contracts"), "contracts have no phone screen")
+    }
+
+    /// An agro warning opens its block; an interest or inquiry its listing,
+    /// named in the fragment (#475).
+    func testABlockAndAListingOpen() {
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/locations/loc-3"), .location(farm: "ferma-1", id: "loc-3"))
+        XCTAssertEqual(AppRoute(.location(farm: "ferma-1", id: "loc-3")), .locationID("loc-3"))
+        XCTAssertEqual(AppRoute.locationID("loc-3").home, .locations)
+
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/my-interests#listing-lst-9"), .listing(farm: "ferma-1", id: "lst-9"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/my-listings#listing-lst-9"), .listing(farm: "ferma-1", id: "lst-9"))
+        XCTAssertEqual(AppRoute(.listing(farm: "ferma-1", id: "lst-9")), .listingID("lst-9"))
+        XCTAssertEqual(AppRoute.listingID("lst-9").home, .exchange)
+
+        XCTAssertNil(PushLink.parse("/t/ferma-1/exchange/my-listings"), "no fragment: no listing to open")
+        XCTAssertNil(PushLink.parse("/t/ferma-1/exchange/my-listings#other-9"))
+        XCTAssertNil(PushLink.parse("/t/ferma-1/locations/loc-3/parcels"), "only the block itself")
+        XCTAssertNil(PushLink.parse("/t/ferma-1/rent?locationId=loc-3"), "a lease has no phone screen")
     }
 
     /// The one unprefixed task link resolves only where the caller vouches
@@ -43,7 +61,7 @@ final class PushLinkTests: XCTestCase {
     func testAnythingElseIsNoLink() {
         for link in [nil, "", "t/ferma-1/farm-tasks/1", "//elsewhere/t/ferma-1/farm-tasks/1",
                      "https://app.agrent.bg/t/ferma-1/farm-tasks/1", "/t/ferma-1/farm-tasks/",
-                     "/t/ferma-1/farm-tasks/1/evidence", "/t//farm-tasks/1", "/t/ferma-1/locations/1",
+                     "/t/ferma-1/farm-tasks/1/evidence", "/t//farm-tasks/1", "/t/ferma-1/assets/1",
                      "/farm-tasks/1"] {
             XCTAssertNil(PushLink.parse(link), String(describing: link))
         }
@@ -66,7 +84,8 @@ final class PushLinkTests: XCTestCase {
         inbox.receive(link: "/t/ferma-1/farm-tasks/1")
         inbox.receive(link: "/t/ferma-1/farm-tasks/2")
         XCTAssertEqual(inbox.current, .task(farm: "ferma-1", id: "2"))
-        inbox.receive(link: "/t/ferma-1/locations/9")
+        // A lease's link: the phone has no screen for it.
+        inbox.receive(link: "/t/ferma-1/rent?locationId=9")
         XCTAssertNil(inbox.current)
     }
 
