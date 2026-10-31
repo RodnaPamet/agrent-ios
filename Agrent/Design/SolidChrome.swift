@@ -1,6 +1,7 @@
 import CoreText
 import SwiftUI
 import UIKit
+import VisionKit
 
 /// Opaque, token-coloured navigation and tab bars, for the whole process.
 ///
@@ -53,6 +54,20 @@ enum SolidChrome {
         navigation.scrollEdgeAppearance = scrollEdgeAppearance()
         navigation.compactScrollEdgeAppearance = scrollEdgeAppearance()
 
+        // APPLE'S CAMERA SCREENS KEEP THEIR OWN BAR (owner, 2026-10-31). The
+        // proxy above reached the document scanner's bar too, and its opaque
+        // band covered the scanner's own hint («Поставете документа…»): over
+        // a camera there is no page for a solid bar to belong to. So inside
+        // the scanner and the camera picker the bar has no background, and
+        // only its ✕ is drawn, over the picture, as Apple draws it.
+        for container in [VNDocumentCameraViewController.self, UIImagePickerController.self] {
+            let camera = UINavigationBar.appearance(whenContainedInInstancesOf: [container])
+            camera.standardAppearance = cameraAppearance()
+            camera.compactAppearance = cameraAppearance()
+            camera.scrollEdgeAppearance = cameraAppearance()
+            camera.compactScrollEdgeAppearance = cameraAppearance()
+        }
+
         let tabs = UITabBar.appearance()
         tabs.standardAppearance = tabAppearance()
         tabs.scrollEdgeAppearance = tabAppearance()
@@ -89,6 +104,14 @@ enum SolidChrome {
     /// At the scroll edge: no background, no blur, no line — the page
     /// beneath is the surface. See `install()` for why not opaque here.
     static func scrollEdgeAppearance() -> UINavigationBarAppearance {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        setTitleLanguage(appearance)
+        return appearance
+    }
+
+    /// Over a camera: nothing behind the bar, no line under it.
+    static func cameraAppearance() -> UINavigationBarAppearance {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
         setTitleLanguage(appearance)

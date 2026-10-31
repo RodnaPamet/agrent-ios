@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import VisionKit
 import XCTest
 @testable import Agrent
 
@@ -74,6 +75,24 @@ final class SolidChromeTests: XCTestCase {
         XCTAssertNil(UINavigationBar.appearance().scrollEdgeAppearance?.backgroundEffect)
         XCTAssertNotNil(UINavigationBar.appearance().scrollEdgeAppearance)
         XCTAssertNotNil(UITabBar.appearance().scrollEdgeAppearance)
+    }
+
+    /// Over a camera the bar draws nothing (owner, 2026-10-31): the
+    /// scanner's band covered its own hint. The app's bars elsewhere stay
+    /// the page, opaque — the positive control.
+    func testTheCameraScreensKeepABarWithNothingBehindIt() {
+        SolidChrome.install()
+        for container in [VNDocumentCameraViewController.self, UIImagePickerController.self] {
+            let bar = UINavigationBar.appearance(whenContainedInInstancesOf: [container])
+            for appearance in [bar.standardAppearance, bar.scrollEdgeAppearance, bar.compactAppearance] {
+                let appearance = try? XCTUnwrap(appearance)
+                XCTAssertNil(appearance?.backgroundEffect, "\(container)")
+                XCTAssertEqual(Self.rgba(appearance?.backgroundColor ?? .clear, Self.arms[0].1)[3], 0, "\(container)")
+                XCTAssertEqual(Self.rgba(appearance?.shadowColor ?? .clear, Self.arms[0].1)[3], 0, "\(container)")
+            }
+        }
+        XCTAssertEqual(Self.rgba(UINavigationBar.appearance().standardAppearance.backgroundColor, Self.arms[0].1)[3], 1,
+                       "the app's own bars are still opaque")
     }
 
     private static func rgba(_ color: UIColor?, _ traits: UITraitCollection) -> [Double] {
