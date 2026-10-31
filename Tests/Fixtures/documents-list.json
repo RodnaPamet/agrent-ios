@@ -1,0 +1,93 @@
+{
+  "rows": [
+    {
+      "id": "doc_fixture_scan",
+      "name": "Сертификат за семена",
+      "contentType": "application/pdf",
+      "sizeBytes": 1258291,
+      "uploadedAt": "2026-10-29T08:15:00.000Z",
+      "uploadedBy": {
+        "id": "usr_fixture_owner",
+        "name": "Иван Фикстуров",
+        "email": "owner@example.invalid"
+      },
+      "expiresOn": "2027-10-29",
+      "retention": "P1Y",
+      "purgedAt": null,
+      "purgeReason": null,
+      "purgedBy": null,
+      "mayDelete": true,
+      "drive": {
+        "state": "COPIED"
+      }
+    },
+    {
+      "id": "doc_fixture_photo",
+      "name": "Фактура за торове",
+      "contentType": "image/jpeg",
+      "sizeBytes": 340000,
+      "uploadedAt": "2026-10-20T10:00:00.000Z",
+      "uploadedBy": {
+        "id": "usr_fixture_operator",
+        "name": "Петър Механизаторов",
+        "email": "operator@example.invalid"
+      },
+      "expiresOn": null,
+      "retention": "NONE",
+      "purgedAt": null,
+      "purgeReason": null,
+      "purgedBy": null,
+      "mayDelete": true,
+      "drive": {
+        "state": "FAILED"
+      }
+    },
+    {
+      "id": "doc_fixture_expired",
+      "name": "Синтетичен анализ на почвата 2024",
+      "contentType": "application/pdf",
+      "sizeBytes": 880000,
+      "uploadedAt": "2025-10-01T07:00:00.000Z",
+      "uploadedBy": {
+        "id": "usr_fixture_owner",
+        "name": "Иван Фикстуров",
+        "email": "owner@example.invalid"
+      },
+      "expiresOn": "2026-10-01",
+      "retention": "P1Y",
+      "purgedAt": "2026-10-01T03:00:00.000Z",
+      "purgeReason": "EXPIRED",
+      "purgedBy": null,
+      "mayDelete": false,
+      "drive": {
+        "state": "COPIED"
+      }
+    },
+    {
+      "id": "doc_fixture_deleted",
+      "name": null,
+      "contentType": "application/pdf",
+      "sizeBytes": 150000,
+      "uploadedAt": "2026-09-12T09:30:00.000Z",
+      "uploadedBy": {
+        "id": "usr_fixture_owner",
+        "name": "Иван Фикстуров",
+        "email": "owner@example.invalid"
+      },
+      "expiresOn": "2027-09-12",
+      "retention": "P1Y",
+      "purgedAt": "2026-09-13T11:00:00.000Z",
+      "purgeReason": "DELETED",
+      "purgedBy": {
+        "id": "usr_fixture_owner",
+        "name": "Иван Фикстуров",
+        "email": "owner@example.invalid"
+      },
+      "mayDelete": false,
+      "drive": {
+        "state": "OFF"
+      }
+    }
+  ],
+  "truncated": false
+}

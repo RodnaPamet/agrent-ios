@@ -113,6 +113,10 @@ enum A11y {
         static let cancel = spokenNames("Отказ", "Cancel")
         static let close = spokenNames("Затвори", "Close")
         static let save = spokenNames("Запази", "Save")
+        /// «Документи» (#468): the upload, its menu and the scanner.
+        static let upload = spokenNames("Качи", "Upload")
+        static let uploadDocument = spokenNames("Качи документ", "Upload document")
+        static let scan = spokenNames("Сканирай", "Scan")
         /// The operation sheet's own verb. "Save" as well — see above.
         static let record = spokenNames("Запиши", "Save")
         static let create = spokenNames("Създай", "Create")

@@ -1585,6 +1585,22 @@ caller of `.sensoryFeedback`.
 - **Not for a MECHANISATOR yet:** `notifications` is outside the operator allowlist, as raised on #2510. Their task pushes reach them.
 - **Never cached on disk:** rows name people.
 
+## «Документи» (#468)
+
+### Matched to the owner's design, server pending (owner 2026-10-30)
+
+- **The farm's library**, in the menu by default and choosable for the bar (`/documents`). Not for a MECHANISATOR: it will hold lease contracts naming third parties. READER and AUDITOR view; OWNER, ADMIN and writers upload; OWNER and ADMIN change the settings.
+- **Upload at the top** (Files, Photos, scan), plus **a camera button at the top right** that opens VisionKit's scanner straight away. The pages become one PDF on the phone, each scaled to 2000 px as JPEG. Where there's no scanner, the button takes a plain photo. A scan asks for its name, prefilled «Сканиран документ 30 октомври».
+- **The preview is Quick Look with its share button.** The bytes sit in a temporary file only while it is open.
+- **«Копие в Google Drive»** copies one way into an «Agrent» folder. Turning it on for a farm with no Google account opens Google's consent and returns to `bg.agrent.app://integrations/google`, the native variant of #2495 step 6. Turning it off stops new copies and keeps the connection.
+- **«Срок на съхранение»:** 3 months, 6 months, 1 year (default), 2 years, 5 years, «Без срок». A change applies to new uploads only, and each row says «Изтича на …».
+- **The warning before an upload** appears when nothing would be kept: Drive off or not connected, and a period other than «Без срок».
+- **Tombstones:** «Само в Google Drive» (expired, with a copy), «Изтекъл срок на …» (expired, without one), and «Изтрит документ» / «Изтрит на … от …» (deleted by hand, name cleared).
+- **Delete** works as on Задачи: swipe, the question, five seconds of «Отмени».
+- **Never cached on disk:** names can name third parties.
+
+Built against agri-saas #2495's agreed shapes. The routes sit on `pendingServerRoutes`, and the PR stays a draft until they're live.
+
 ## A mechanisator's one screen (#465)
 
 ### Divergence: one screen instead of tabs (owner 2026-10-29)

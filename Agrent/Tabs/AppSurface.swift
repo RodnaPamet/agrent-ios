@@ -39,6 +39,10 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     /// the menu with the unread count, choosable for the bar (owner,
     /// 2026-10-30). The web's page is `/notifications` as well.
     case notifications = "/notifications"
+    /// «Документи» (#468): in the menu by default, choosable for the bar
+    /// (owner, 2026-10-30). The web uses the same suffix if it gets a page,
+    /// so an order saved on either client resolves on the other.
+    case documents = "/documents"
 
     var id: String { rawValue }
 
@@ -54,6 +58,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .farmRisk: "Риск"
         case .dashboard: "Табло"
         case .notifications: "Известия"
+        case .documents: "Документи"
         }
     }
 
@@ -69,6 +74,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .farmRisk: "exclamationmark.shield"
         case .dashboard: "square.grid.2x2"
         case .notifications: "bell"
+        case .documents: "doc.on.doc"
         }
     }
 
@@ -121,6 +127,9 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         // `notifications` is outside the server's operator allowlist (raised
         // on agri-saas #2510); an operator's task pushes still reach them.
         case .notifications: false
+        // The library will hold lease contracts naming third parties; the
+        // operator's confinement to field work stands (owner, 2026-10-30).
+        case .documents: false
         }
     }
 
@@ -156,6 +165,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .farmRisk: FarmRiskView()
         case .dashboard: DashboardView()
         case .notifications: NotificationsView()
+        case .documents: DocumentsView()
         }
     }
 }

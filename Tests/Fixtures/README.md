@@ -469,3 +469,11 @@ invented notifications in Bulgarian, as the server now renders them: a task
 assigned (linking to `tsk_fixture_2`, whose detail has a fixture), a
 message on Борса (linking to `thr_synthetic_1`, #473) and a lease ending, the
 last one read.
+
+## «Документи»
+
+`documents-list.json`: `GET /documents` (#468, agri-saas #2495), a synthetic
+library with one row in each state: a live PDF copied to Drive, a live photo
+whose Drive copy failed (no expiry), an expired one kept only in Drive, and
+one deleted by hand, whose name the server cleared. `documents-settings.json`:
+its settings, one year, Drive on and connected (the server sends no account address), 125 MiB of the 2 GiB ceiling.
