@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ListingDetailView: View {
     let listing: ExchangeListing
+    /// Its status, and «Оттегли» / «Изпълнена» on your own (#478).
+    @State private var custody: ListingCustody
     @State private var opener = ListingThreadOpener()
     /// The conversation goes onto Борса's stack as a value once the server
     /// answers with its id (#194) — a push no tap starts directly.
@@ -17,6 +19,11 @@ struct ListingDetailView: View {
     /// The seller's farm page, while it's open.
     @State private var farmPage: InAppPage?
     @Environment(\.dynamicTypeSize) private var typeSize
+
+    init(listing: ExchangeListing) {
+        self.listing = listing
+        _custody = State(initialValue: ListingCustody(status: listing.status))
+    }
 
     var body: some View {
         List {
@@ -37,7 +44,7 @@ struct ListingDetailView: View {
                             Text("\(Exchange.money(price) ?? price) \(listing.priceCurrency ?? "")")
                         }
                     }
-                    ValueRow("Състояние") { Text(listing.status.label) }
+                    ValueRow("Състояние") { Text(custody.status.label) }
                 }
 
                 if let region = listing.region {
@@ -96,6 +103,7 @@ struct ListingDetailView: View {
                             .font(.footnote)
                             .foregroundStyle(Palette.secondaryText)
                     }
+                    custodySection
                 }
 
                 if MessagingPolicy.offersMessageParty(
@@ -111,6 +119,28 @@ struct ListingDetailView: View {
         .onAppear { isShown = true }
         .onDisappear { isShown = false }
         .sheet(item: $farmPage) { InAppBrowser(url: $0.url).ignoresSafeArea() }
+    }
+
+    /// «Изпълнена» and «Оттегли» on your own listing (#478), each behind its
+    /// question. Gone once the listing is terminal, which is also what the
+    /// server's answer to either leaves it.
+    @ViewBuilder
+    private var custodySection: some View {
+        let actions = ListingCustodyAction.offered(status: custody.status, isOwn: listing.isOwn,
+                                                   mayWrite: user.user?.mayWrite ?? false)
+        if !actions.isEmpty || custody.failure != nil {
+            Section {
+                ForEach(actions, id: \.self) { action in
+                    ListingCustodyButton(action: action, custody: custody, listingID: listing.id)
+                }
+                if let failure = custody.failure {
+                    Text(failure)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.error)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 
     /// PARITY GAP 7. «Message the other party» — the ONLY action on another
@@ -155,6 +185,48 @@ struct ListingDetailView: View {
                     .foregroundStyle(Palette.error)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+}
+
+/// One of «Изпълнена» / «Оттегли» and its question, which iOS 26 draws as a
+/// popover on the button that asked it. Not one dialog for both on the
+/// section: that one pointed at «Изпълнена» while asking about «Оттегли».
+private struct ListingCustodyButton: View {
+    let action: ListingCustodyAction
+    let custody: ListingCustody
+    let listingID: String
+    @State private var asking = false
+
+    var body: some View {
+        Button(role: action == .withdraw ? .destructive : nil) {
+            asking = true
+        } label: {
+            HStack(spacing: 8) {
+                Text(action.title)
+                    .foregroundStyle(action == .withdraw ? Palette.destructive : Palette.accent)
+                if custody.sending == action {
+                    Spacer()
+                    ProgressView()
+                }
+            }
+        }
+        .disabled(custody.sending != nil)
+        .accessibilityInputLabels(action.spokenNames)
+        .confirmationDialog(action.confirmTitle, isPresented: $asking, titleVisibility: .visible) {
+            Button(action.title, role: action == .withdraw ? .destructive : nil) {
+                Task {
+                    await custody.perform(action, listingID: listingID)
+                    if let done = custody.done {
+                        AccessibilityNotification.Announcement(done).post()
+                    }
+                }
+            }
+            .accessibilityInputLabels(action.spokenNames)
+            Button("Отказ", role: .cancel) {}
+                .accessibilityInputLabels(A11y.Spoken.cancel)
+        } message: {
+            Text(action.confirmMessage)
         }
     }
 }

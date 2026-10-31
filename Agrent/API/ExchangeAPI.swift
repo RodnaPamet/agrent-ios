@@ -76,6 +76,18 @@ enum ExchangeAPI {
         )
     }
 
+    /// Your own listing withdrawn or marked fulfilled (#478): `PATCH` on the
+    /// listing with `{action}`. No idempotency key: the route reads none,
+    /// and a repeat of a move that took is refused as terminal rather than
+    /// done twice.
+    ///
+    /// NOT EXERCISED: it takes a listing off the board for every tenant.
+    /// Built, wired, and the first real press is the owner's.
+    static func setListingStatus(_ id: String, _ action: ListingCustodyAction) async throws -> ListingStatusChanged {
+        let data = try await APIClient.shared.patchReturningData(listingPath(id), body: ["action": action])
+        return try await APIClient.shared.decode(data, as: ListingStatusChanged.self)
+    }
+
     // MARK: - Messaging (agrent-ios#114)
     //
     // Nine operations: the inbox, one conversation page, open-a-thread, send,

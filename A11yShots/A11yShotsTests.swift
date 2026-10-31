@@ -2349,6 +2349,44 @@ final class A11yShotsTests: XCTestCase {
         capture("22c-notification-thread", app: app)
     }
 
+    /// Your own listing from «Моите обяви» (#478, owner 2026-10-31): the
+    /// active row opens the listing's screen, which offers «Изпълнена» and
+    /// «Оттегли»; «Оттегли» asks first. The question is photographed and
+    /// answered «Отказ» — confirming is a write that takes a listing off the
+    /// board, and the first real one is the owner's.
+    func testMyListingOpensWithItsMoves() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(app.tabBars.buttons["Борса"].waitForExistence(timeout: 15), "no «Борса» in the tab bar")
+        app.tabBars.buttons["Борса"].tap()
+        let mine = app.buttons["Моите обяви"]
+        XCTAssertTrue(mine.waitForExistence(timeout: 10), "no «Моите обяви» on Борса")
+        mine.tap()
+        let active = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Активна'")).firstMatch
+        XCTAssertTrue(active.waitForExistence(timeout: 15), "no active row in «Моите обяви»\n\(app.debugDescription)")
+        active.tap()
+        let withdraw = app.buttons["Оттегли"]
+        XCTAssertTrue(withdraw.waitForExistence(timeout: 10), "the listing offers no «Оттегли»\n\(app.debugDescription)")
+        XCTAssertTrue(app.buttons["Изпълнена"].exists, "the listing offers no «Изпълнена»")
+        // Below the fold, under the tab bar: the facts come first.
+        for _ in 0..<4 where !withdraw.isHittable { app.swipeUp() }
+        Thread.sleep(forTimeInterval: 1)
+        capture("09d-my-listing", app: app)
+        withdraw.tap()
+        // iOS 26 draws the question as a popover on the button, without
+        // «Отказ»: a tap outside it is the way out, and the only one taken.
+        let question = app.sheets["Да се оттегли ли обявата?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 5), "«Оттегли» asked nothing\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09e-my-listing-withdraw", app: app)
+        let outside = app.otherElements["PopoverDismissRegion"]
+        if outside.exists { outside.tap() } else { app.buttons["Отказ"].tap() }
+        XCTAssertTrue(question.waitForNonExistence(timeout: 5), "the question did not go away")
+        XCTAssertTrue(withdraw.exists, "leaving the question left the listing")
+    }
+
     /// A MECHANISATOR's one screen (#465, owner 2026-10-29): no tab bar, the
     /// farm's map with the person's task count on SYNTH-1, their current
     /// tasks under it (the queue fixture's closed row left out), the
