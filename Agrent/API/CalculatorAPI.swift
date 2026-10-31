@@ -171,6 +171,10 @@ enum CostsAPI {
     /// is no half-saved sheet for the screen to explain (#260).
     static var batchPath: String { "\(base)/batch" }
 
+    /// `POST /grain/costs/invoice-scan` (#482, agri-saas): an invoice read
+    /// into proposed lines. It saves nothing.
+    static var invoiceScanPath: String { "\(base)/invoice-scan" }
+
     /// The request body, and also what the sheet's key is minted from: every
     /// line, in order, so changing any of them is a new write.
     struct Sheet: Encodable, Sendable {
