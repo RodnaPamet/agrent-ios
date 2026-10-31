@@ -312,7 +312,8 @@ final class RouteContractTests: XCTestCase {
             ]),
             ("CalculatorAPI.swift", [CalculatorAPI.path, CostsAPI.listPath, CostsAPI.defaultsPath,
                                      CostsAPI.cropDefaultsPath("wheat"),
-                                     CostsAPI.machineryPath, CostsAPI.batchPath]),
+                                     CostsAPI.machineryPath, CostsAPI.batchPath,
+                                     CostsAPI.entryPath("{costEntryId}")]),
             ("ParcelHistoryAPI.swift", [
                 ParcelHistoryAPI.cropSeasonsPath(parcel),
                 ParcelHistoryAPI.weedObservationsPath(parcel),

@@ -229,6 +229,13 @@ Two things found on the way that the original entry did not anticipate:
 
 ---
 
+### «Разходи»: swipe to delete an expense (owner, 2026-10-31, #481)
+
+- **Same as tasks and treatments.** Swipe gives «Изтрий», then «Сигурни ли сте, че искате да изтриете разхода?», then a 5-second «Отмени» bar (20 s under VoiceOver or Switch Control) before `DELETE /grain/costs/{id}` is sent.
+- **Who:** anyone who may write, the route's own rule; the list carries no per-row flag.
+- **After it lands,** the calculator reads again, because an expense is a term in every figure above it. A 404 counts as already gone.
+- **The web** gets the same from backend 1.
+
 ## Exchange
 
 Web `exchange` (683) + `exchange/my-listings` (367) + `exchange/my-interests`

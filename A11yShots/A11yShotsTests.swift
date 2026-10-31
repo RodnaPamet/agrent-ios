@@ -2531,6 +2531,38 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the task back")
     }
 
+    /// An expense swiped away in Калкулатор (#481, owner 2026-10-31):
+    /// «Изтрий», the question, the row gone with «Отмени», and «Отмени»
+    /// bringing it back inside the five seconds — so nothing is ever sent.
+    func testCostSwipeDeleteAndUndo() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let tab = labelled("Калкулатор", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        tab.tap()
+        let row = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Торове, 1'")).firstMatch
+        for _ in 0..<8 where !(row.exists && row.isHittable) { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "no fixture expense in «Разходи»\n\(app.debugDescription)")
+        row.swipeLeft()
+        let delete = app.buttons["Изтрий"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the swipe offered no «Изтрий»\n\(app.debugDescription)")
+        capture("21a-cost-swipe", app: app)
+        delete.tap()
+        let question = app.alerts["Сигурни ли сте, че искате да изтриете разхода?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "«Изтрий» asked nothing\n\(app.debugDescription)")
+        capture("21b-cost-swipe-confirm", app: app)
+        question.buttons["Изтрий"].tap()
+        let undo = app.buttons["Отмени"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»\n\(app.debugDescription)")
+        XCTAssertFalse(row.exists, "the expense stayed in the list")
+        capture("21c-cost-undo", app: app)
+        undo.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the expense back")
+    }
+
     private func capture(_ name: String, app: XCUIApplication) {
         let size = UIApplication.shared.preferredContentSizeCategory.rawValue
             .replacingOccurrences(of: "UICTContentSizeCategory", with: "")

@@ -24,6 +24,21 @@ enum CostsAPI {
     /// list itself.
     static var listPath: String { base }
 
+    static func entryPath(_ id: String) -> String { "\(base)/\(URLEscape.segment(id))" }
+
+    /// A «Разходи» row swiped away (#481): a soft delete for anyone who may
+    /// write, answering `{ id }`. NOT EXERCISED from dev, CI or A11yShots:
+    /// it moves every figure on the farm's calculator.
+    static func delete(_ id: String) async throws {
+        _ = try await APIClient.shared.deleteReturningData(entryPath(id))
+    }
+
+    /// Already gone: deleted from the web or another phone.
+    static func isGone(_ error: Error) -> Bool {
+        if case APIClient.APIError.http(404, "COST_ENTRY_NOT_FOUND"?, _, _, _) = error { return true }
+        return false
+    }
+
     /// The farm's last overhead figures, for the «Общи» sheet's prefill
     /// (#245, agri-saas #1523). See `OverheadDefaults`.
     static var defaultsPath: String { "\(base)/defaults" }
