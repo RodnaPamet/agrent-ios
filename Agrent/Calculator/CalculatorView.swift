@@ -6,6 +6,10 @@ struct CalculatorView: View {
     @State private var addingCost = false
     /// Whose role decides whether «Нов разход» is offered.
     @State private var people = CurrentUserStore.shared
+    /// A «Разходи» row swiped away (#481), and the one being asked about.
+    @State private var removal = CostRemoval()
+    @State private var askingCost: CostEntry?
+    @State private var confirmingCost = false
 
     var body: some View {
         RoutedStack {
@@ -16,6 +20,12 @@ struct CalculatorView: View {
             VStack(spacing: 0) {
                 content
             }
+                // Inside «Нов разход»'s bar: the five seconds of «Отмени»
+                // sit above it, over the list they belong to.
+                .costRemoval(removal, asking: $askingCost, confirming: $confirmingCost) {
+                    await costs.load()
+                    await store.load()
+                }
                 .safeAreaInset(edge: .bottom, spacing: 0) { newCostButton }
             .navigationTitle("Калкулатор")
             .appMenu()
@@ -184,7 +194,14 @@ struct CalculatorView: View {
 
         case .loaded(let page, _):
             Section {
-                ForEach(page.items) { cost in CostRow(cost: cost).pageRow() }
+                ForEach(removal.visible(page.items)) { cost in
+                    CostRow(cost: cost)
+                        .costRemovalSwipe(me: people.user) {
+                            askingCost = cost
+                            confirmingCost = true
+                        }
+                        .pageRow()
+                }
             } header: {
                 SectionHeader("Разходи")
             } footer: {
