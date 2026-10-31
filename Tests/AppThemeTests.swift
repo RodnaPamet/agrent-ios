@@ -45,6 +45,10 @@ final class AppThemeTests: XCTestCase {
         let footer = try XCTUnwrap(chrome.range(of: "struct SectionFooter"))
         XCTAssertTrue(chrome[header.upperBound..<footer.lowerBound].contains("Palette.ListChrome.header"))
         XCTAssertTrue(chrome[footer.upperBound...].contains("Palette.ListChrome.footer"), "footers stay muted")
+        // A heading a screen draws itself, in the same gold (owner, 2026-10-31).
+        let heading = try XCTUnwrap(chrome.range(of: "struct SectionTitle"))
+        let headingEnd = try XCTUnwrap(chrome.range(of: "// MARK:", range: heading.upperBound..<chrome.endIndex))
+        XCTAssertTrue(chrome[heading.upperBound..<headingEnd.lowerBound].contains("Palette.ListChrome.header"))
 
         let calculator = try source("Agrent/Calculator/CalculatorView.swift")
         let row = try XCTUnwrap(calculator.range(of: "struct CostRow"))

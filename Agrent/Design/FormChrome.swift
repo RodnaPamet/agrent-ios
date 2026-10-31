@@ -71,6 +71,34 @@ extension Section where Parent == Text, Content: View, Footer == EmptyView {
     }
 }
 
+/// A heading a screen draws itself, over content that is not a List
+/// section: the cards on a parcel's «История» («Риск», «Задачи»,
+/// «РЕКОЛТИ»), «Коментари» and «Парцели» on a task. In the header's gold,
+/// as `Section(titled:)` is (owner, 2026-10-31: no title white, or in the
+/// grey of the text under it). #464 golded the List headers and these,
+/// written by hand in `.primary` or `secondaryText`, kept their colour;
+/// `ListChromeTests` now fails on a heading written anywhere but here.
+///
+/// The font stays the caller's: «Риск» heads a screen-wide reading and a
+/// card title sits in a row, and only the colour was wrong.
+struct SectionTitle: View {
+    let text: String
+    let font: Font
+
+    init(_ text: String, font: Font = .footnote.weight(.semibold)) {
+        self.text = text
+        self.font = font
+    }
+
+    var body: some View {
+        Text(text)
+            .font(font)
+            .foregroundStyle(Palette.ListChrome.header)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
 // MARK: - Field prompts
 
 extension Text {

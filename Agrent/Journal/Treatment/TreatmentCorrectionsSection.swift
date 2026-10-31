@@ -21,10 +21,7 @@ struct TreatmentCorrectionsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Корекции")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.secondaryText)
-                .accessibilityAddTraits(.isHeader)
+            SectionTitle("Корекции")
             ForEach(Array(trail.corrections.enumerated()), id: \.offset) { _, entry in
                 CorrectionEntry(entry: entry)
             }

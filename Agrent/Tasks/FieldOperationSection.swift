@@ -28,10 +28,7 @@ struct FieldOperationSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(FieldOperationText.title)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Palette.secondaryText)
-                .accessibilityAddTraits(.isHeader)
+            SectionTitle(FieldOperationText.title)
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -258,7 +258,7 @@ struct ParcelHistoryView: View {
             EmptyView()
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
-                Text("Риск").font(.headline)
+                SectionTitle("Риск", font: .headline)
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
@@ -267,7 +267,7 @@ struct ParcelHistoryView: View {
             .padding(.vertical, 6)
         case .loaded(let reading, let freshness):
             VStack(alignment: .leading, spacing: 8) {
-                Text("Риск").font(.headline)
+                SectionTitle("Риск", font: .headline)
                 ParcelRiskReadings(risk: reading, freshness: freshness)
             }
             .padding(.vertical, 6)
@@ -372,8 +372,7 @@ struct ParcelHistoryView: View {
             EmptyView()
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
-                Text(ParcelTasksCard.title)
-                    .font(.subheadline.weight(.semibold))
+                SectionTitle(ParcelTasksCard.title, font: .subheadline.weight(.semibold))
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
@@ -396,8 +395,7 @@ struct ParcelHistoryView: View {
             EmptyView()
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
-                Text(ParcelCommentsCard.title)
-                    .font(.subheadline.weight(.semibold))
+                SectionTitle(ParcelCommentsCard.title, font: .subheadline.weight(.semibold))
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
@@ -426,8 +424,7 @@ struct ParcelHistoryView: View {
     private func summaryCardBody(_ card: some ParcelSummaryCard, chevron: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(card.title)
-                    .font(.subheadline.weight(.semibold))
+                SectionTitle(card.title, font: .subheadline.weight(.semibold))
                 Spacer(minLength: 8)
                 if let count = card.count {
                     Text(count)
@@ -478,9 +475,7 @@ struct ParcelHistoryView: View {
     private func cardBody(_ card: ParcelHistoryCard) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(card.title)
-                    .font(.subheadline.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
+                SectionTitle(card.title, font: .subheadline.weight(.semibold))
                 Spacer(minLength: 8)
                 // THE COUNT, OR NOTHING AT ALL.
                 //
