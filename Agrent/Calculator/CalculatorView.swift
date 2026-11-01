@@ -14,6 +14,8 @@ struct CalculatorView: View {
     /// types unfolded.
     @State private var chosenTypes: Set<CostCategory> = []
     @State private var openTypes: Set<CostCategory> = []
+    /// «Общо» unfolded to its types; folded when the screen opens.
+    @State private var totalOpen = false
     /// The month graph's month (owner, 2026-11-01): nil is «Всички месеци».
     @State private var chartMonth: Date?
 
@@ -208,26 +210,32 @@ struct CalculatorView: View {
                     CostTypeFilter(available: breakdown.available, chosen: $chosenTypes)
                         .pageRow()
                 }
-                CostTotalRow(count: breakdown.count, totals: breakdown.totals)
-                    .pageRow()
-                ForEach(breakdown.groups) { group in
-                    // Opened, a type is its expenses and nothing else: its
-                    // own month graph went (owner, 2026-11-01: "not needed,
-                    // replace them with the actual rows").
-                    DisclosureGroup(isExpanded: openBinding(group.category)) {
-                        ForEach(group.entries) { cost in
-                            CostRow(cost: cost)
-                                .costRemovalSwipe(me: people.user) {
-                                    askingCost = cost
-                                    confirmingCost = true
-                                }
-                                .pageRow()
+                // «Общо» folds the types (owner, 2026-11-01: "folded into the
+                // General row with an expander"), and each type folds its
+                // expenses: three levels, the screen opening on one line.
+                DisclosureGroup(isExpanded: $totalOpen) {
+                    ForEach(breakdown.groups) { group in
+                        // Opened, a type is its expenses and nothing else:
+                        // its own month graph went (owner, 2026-11-01: "not
+                        // needed, replace them with the actual rows").
+                        DisclosureGroup(isExpanded: openBinding(group.category)) {
+                            ForEach(group.entries) { cost in
+                                CostRow(cost: cost)
+                                    .costRemovalSwipe(me: people.user) {
+                                        askingCost = cost
+                                        confirmingCost = true
+                                    }
+                                    .pageRow()
+                            }
+                        } label: {
+                            CostTypeRow(group: group)
                         }
-                    } label: {
-                        CostTypeRow(group: group)
+                        .pageRow()
                     }
-                    .pageRow()
+                } label: {
+                    CostTotalRow(count: breakdown.count, totals: breakdown.totals)
                 }
+                .pageRow()
             } header: {
                 SectionHeader("Разходи")
             } footer: {

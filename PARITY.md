@@ -1682,6 +1682,7 @@ Owner, 2026-11-01: "Sentry, like the web". It is the app's only third-party code
 
 Owner, 2026-11-01: "expenses needs to be folded and clickable to unfold … a filter on types of expenses … graphs for all expenses and per expense". Each part was asked as a choice.
 
+- **«Общо» folds the types** (owner, 2026-11-01: "folded into the General row with an expander"): the section opens on one line, the count and the sum. A tap shows the types, and a type shows its expenses.
 - **Folded, one row per type:** «Торове, 2 записа, 4892,58 EUR», biggest first. A tap unfolds that type's expenses, newest first, and nothing else. Its own month graph was removed the same day: "These graphs are not needed - replace them with the actual rows of expenses". Swipe-to-delete (#481) works inside.
 - **One currency, one code:** «EURO», «EUROS», «€» and a blank fold to EUR, as agri-saas `canonicalCostCurrency` does (`CostCurrency`). The owner's «Рента» read «13 343,40 EUR и 40,00 EURO». Nothing is converted: lev stays lev, summed apart.
 - **«Общо»** above: the count and the sum, per currency, never added across one.
