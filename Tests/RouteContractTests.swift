@@ -262,7 +262,8 @@ final class RouteContractTests: XCTestCase {
                                     TreatmentAPI.documentPath("{treatmentGroupId}")]),
             // «Коригирай»: the prefill and the correction, one path (#392).
             // Other work from «Нов запис» (#439, agri-saas `/journal/activities`).
-            ("ActivityAPI.swift", [ActivityAPI.recordPath(tenant: FarmPath.openSlug)]),
+            ("ActivityAPI.swift", [ActivityAPI.recordPath(tenant: FarmPath.openSlug),
+                                   ActivityAPI.diaryPath("{treatmentGroupId}")]),
             ("ActivityCorrectionAPI.swift", [ActivityCorrectionAPI.definitionPath("{treatmentGroupId}"),
                                              ActivityCorrectionAPI.correctionsPath("{treatmentGroupId}")]),
             ("TreatmentCorrectionAPI.swift", [TreatmentCorrectionAPI.definitionPath("{treatmentGroupId}"),

@@ -20,18 +20,24 @@ final class TreatmentDocument {
     var document: URL?
 
     @ObservationIgnored private let recorder: TreatmentRecorder
+    /// An activity's page of «Дневник на стопанството» (#516).
+    @ObservationIgnored private let activityDiary: @MainActor (String) async throws -> URL
 
-    init(recorder: TreatmentRecorder = LiveTreatmentRecorder()) {
+    init(recorder: TreatmentRecorder = LiveTreatmentRecorder(),
+         activityDiary: @escaping @MainActor (String) async throws -> URL = { try await ActivityAPI.diary(forActivity: $0) }) {
         self.recorder = recorder
+        self.activityDiary = activityDiary
     }
 
-    func download(_ handle: String) async {
+    /// A treatment's ДНЕВНИК pages, or, for other work, its page of
+    /// «Дневник на стопанството»: never the БАБХ form for an activity.
+    func download(_ handle: String, activity: Bool = false) async {
         guard !generating else { return }
         generating = true
         failure = nil
         defer { generating = false }
         do {
-            document = try await recorder.document(forTreatment: handle)
+            document = activity ? try await activityDiary(handle) : try await recorder.document(forTreatment: handle)
         } catch {
             failure = UserMessage.text(for: error)
         }

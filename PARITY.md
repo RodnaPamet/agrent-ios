@@ -1694,6 +1694,10 @@ Owner, 2026-11-01: "expenses needs to be folded and clickable to unfold … a fi
 - **Interim:** sums come from the list (newest 500); a truncated list says the graphs are by those. agri-saas will serve an exact `GET /grain/costs/summary` (backend 1, 2026-11-01). When it is live, it REPLACES the local summing outright, with no fallback path.
 - **Web too** (owner): backend 1 builds the same on the web's «Разходи».
 
+## An activity's page of «Дневник на стопанството» (#516)
+
+Owner, 2026-11-01: "This can not be printed" (a cultivation entry), and asked as a choice: "Print button on each entry". An activity's entry screen has «Дневник на стопанството» in its bar: `GET /journal/activities/{treatmentGroupId}/campaign-diary` (agri-saas #2700), the campaign register's renderer scoped to one handle, opened in Quick Look. Never the treatment's `farm-record`: that is Приложение 1, the БАБХ form, which has no row for a cultivation and prints it as a spray with empty columns (agri-saas #2697). The БАБХ pages stay on sprays and fertilising only (`isApplication && isInBabhRegister`). The same day, the server stopped listing the tasks behind a diary record in Задачи (`Task.treatmentGroupId`, all task reads).
+
 ## Usage visibility (#493)
 
 Owner, 2026-11-01: "our server, per account". `POST /api/t/{tenantSlug}/usage-events` follows backend 1's frozen contract.

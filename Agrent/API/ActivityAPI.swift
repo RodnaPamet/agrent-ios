@@ -15,6 +15,24 @@ enum ActivityAPI {
         "\(FarmPath.root(for: tenant))/journal/activities"
     }
 
+    /// One activity's page of «Дневник на стопанството» (#516, agri-saas
+    /// #2700): the campaign register's renderer scoped to one handle. NOT
+    /// the treatment's `farm-record`, which is Приложение 1, the БАБХ form
+    /// with no row for a cultivation, a pruning or a harvest.
+    static func diaryPath(_ handle: String) -> String {
+        "\(recordPath(tenant: FarmPath.openSlug))/\(URLEscape.segment(handle))/campaign-diary"
+    }
+
+    /// That page as a local PDF for Quick Look, kept as every register is
+    /// (`FarmRecordAPI.keep`): bytes inline, checked for `%PDF`, removed when
+    /// the preview closes. A GET; the server files nothing.
+    static func diary(forActivity handle: String) async throws -> URL {
+        let (data, served) = try await APIClient.shared.getForDocument(diaryPath(handle))
+        UsageEvents.note(.farmDiaryDownloaded)
+        return try FarmRecordAPI.keep(
+            data, named: FarmRecordAPI.fileName(served, fallback: "dnevnik-stopanstvo-\(handle).pdf"))
+    }
+
     struct Body: Encodable, Equatable, Sendable {
         let kind: String
         let occurredOn: String
