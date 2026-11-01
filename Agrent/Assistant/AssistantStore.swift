@@ -34,6 +34,9 @@ final class AssistantStore {
     /// A turn's stream is open: from the question until `refusal`, `halt`
     /// or `done` — past the answer, which can come before a `halt`.
     private(set) var asking = false
+    /// The server's conversation, once it has named one: sent back with
+    /// every next question until «Нов разговор».
+    private(set) var conversationId: String?
     private var running: Task<Void, Never>?
     private let asker: Asker
     /// The connection kept up while the person steps out of the app.
@@ -58,7 +61,16 @@ final class AssistantStore {
         turns.append(Turn(question: question, phase: .working(AssistantText.thinking)))
         UsageEvents.shared.record(.assistantAsked)
         let index = turns.count - 1
-        running = Task { await run(AssistantRequest(question: question, pageContext: context), at: index) }
+        let request = AssistantRequest(question: question, pageContext: context, conversationId: conversationId)
+        running = Task { await run(request, at: index) }
+    }
+
+    /// «Нов разговор»: the next question starts a fresh conversation, and the
+    /// screen clears. Nothing is deleted: the server keeps every exchange.
+    func newConversation() {
+        stop()
+        turns = []
+        conversationId = nil
     }
 
     /// The running turn, to its end. For the tests, which must not race it.
@@ -98,6 +110,8 @@ final class AssistantStore {
             opened = true
             for try await event in events {
                 switch event {
+                case .conversation(let id):
+                    conversationId = id
                 case .thinking:
                     if answer == nil { turns[index].phase = .working(AssistantText.thinking) }
                 case .toolCall(let name):

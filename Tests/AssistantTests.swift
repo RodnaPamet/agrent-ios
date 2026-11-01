@@ -376,6 +376,52 @@ final class AssistantTests: XCTestCase {
         XCTAssertTrue(UserMessage.isBulgarianSentence(AssistantText.lostMidAnswer))
     }
 
+    // MARK: - A conversation (#507, agri-saas #2694)
+
+    /// The first event names the conversation; the next question carries it
+    /// back; «Нов разговор» drops it. No id is sent before the server gave
+    /// one, so a server without conversations never sees the field.
+    func testTheNextQuestionContinuesTheConversation() async throws {
+        XCTAssertEqual(try event(#"{"type":"conversation","conversationId":"conv_1"}"#), .conversation(id: "conv_1"))
+        XCTAssertEqual(try event(#"{"type":"conversation"}"#), .unknown(type: "conversation"))
+
+        final class Sent: @unchecked Sendable { var requests: [AssistantRequest] = [] }
+        let sent = Sent()
+        let store = AssistantStore { request in
+            sent.requests.append(request)
+            return AsyncThrowingStream { continuation in
+                continuation.yield(.conversation(id: "conv_1"))
+                continuation.yield(.answer(text: "Повитица.", links: [], proposal: nil))
+                continuation.yield(.done(truncatedAny: false))
+                continuation.finish()
+            }
+        }
+        store.draft = "Какъв е този плевел?"
+        store.send(context: nil)
+        await store.settled()
+        XCTAssertNil(sent.requests[0].conversationId, "the first question names no conversation")
+        XCTAssertEqual(store.conversationId, "conv_1")
+
+        store.draft = "С какво да го третирам?"
+        store.send(context: nil)
+        await store.settled()
+        XCTAssertEqual(sent.requests[1].conversationId, "conv_1", "the follow-up continues the conversation")
+
+        store.newConversation()
+        XCTAssertNil(store.conversationId)
+        XCTAssertTrue(store.turns.isEmpty)
+        store.draft = "Нещо друго"
+        store.send(context: nil)
+        await store.settled()
+        XCTAssertNil(sent.requests[2].conversationId, "«Нов разговор» starts fresh")
+
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(sent.requests[0])) as? [String: Any]
+        XCTAssertNil(encoded?["conversationId"], "absent, not null, while there is none")
+        let carried = try JSONSerialization.jsonObject(with: JSONEncoder().encode(sent.requests[1])) as? [String: Any]
+        XCTAssertEqual(carried?["conversationId"] as? String, "conv_1")
+        XCTAssertTrue(UserMessage.isBulgarianSentence(AssistantText.newConversation + "."))
+    }
+
     // MARK: - Words
 
     func testEverySentenceIsBulgarian() {
