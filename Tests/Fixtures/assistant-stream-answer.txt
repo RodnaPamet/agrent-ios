@@ -1,0 +1,10 @@
+data: {"type": "thinking"}
+
+data: {"type": "tool_call", "name": "list_journal_entries"}
+
+data: {"type": "tool_result", "name": "list_journal_entries", "ok": true, "truncated": false}
+
+data: {"type": "answer", "text": "В Дневника има **8 записа**. Ето ги по вид:\n\n| Вид | Брой |\n|---|---|\n| Дейност | 3 |\n| Внасяне на препарат/тор | 3 |\n| Присаждане | 1 |\n| Наблюдение | 1 |\n\nНай-скорошни:\n- Пръскане срещу плевели\n- Торене на SYNTH-1\n\nИскаш ли подробности за някой от тях?", "links": []}
+
+data: {"type": "done", "truncatedAny": false, "partialAny": false}
+

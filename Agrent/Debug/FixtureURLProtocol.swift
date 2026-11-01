@@ -108,6 +108,17 @@ final class FixtureURLProtocol: URLProtocol {
             return
         }
 
+        // The ONE post answered (#483): the assistant's question, under its
+        // own seam argument only, from a canned synthetic stream, so the
+        // answer's drawing (a table, a list) can be photographed. It is a
+        // read of the farm, not a write, and here nothing leaves the process.
+        if method == "POST", UITestSeam.isAssistant, path == AssistantAPI.streamPath,
+           let file = Self.bundle.url(forResource: "assistant-stream-answer", withExtension: "txt"),
+           let data = try? Data(contentsOf: file) {
+            finish(status: 200, body: data, contentType: "text/event-stream")
+            return
+        }
+
         guard method == "GET" else {
             Log.api.error(
                 "fixture seam refused \(method, privacy: .public) \(loggable.value, privacy: .public)"
@@ -159,13 +170,13 @@ final class FixtureURLProtocol: URLProtocol {
 
     // MARK: - internals
 
-    private func finish(status: Int, body: Data) {
+    private func finish(status: Int, body: Data, contentType: String = "application/json") {
         guard let url = request.url else { return }
         let response = HTTPURLResponse(
             url: url,
             statusCode: status,
             httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": "application/json"]
+            headerFields: ["Content-Type": contentType]
         )!
         // `.notAllowed`, so URLSession's own HTTP cache never stores a
         // fixture and never answers a later request from one. The app's
