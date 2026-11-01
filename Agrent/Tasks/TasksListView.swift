@@ -26,7 +26,9 @@ struct TasksListView: View {
             // `JournalListView` for why this is no longer a
             // `safeAreaInset(edge: .top)`.
             // Борса's shape — see `JournalListView` for what it costs.
-            // «Нова задача», at the bottom right (owner, 2026-10-20, #372).
+            // «Нова задача», at the bottom LEFT (owner, 2026-11-01): the
+            // assistant's button has the bottom right on every screen, and
+            // the two sat on each other. It was bottom right from #372.
             //
             // A ZStack layer, NOT an `.overlay` (#388). The button presents
             // «Нова задача» as a sheet, and a sheet presented from inside an
@@ -34,7 +36,7 @@ struct TasksListView: View {
             // tree: VoiceOver, Voice Control and XCUITest saw the list under
             // it, so the form couldn't be used with them. Found by A11yShots
             // `testNewTaskParcelsStep`.
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .bottomLeading) {
                 content
                     .background(Palette.Surface.page)
                 NewTaskButton { await store.load() }
