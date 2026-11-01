@@ -262,6 +262,26 @@ final class AssistantTests: XCTestCase {
         XCTAssertEqual(store.turns[0].phase, .unanswered(AssistantText.interrupted))
     }
 
+    // MARK: - The stream's patience
+
+    /// The server's heartbeat is every 25 seconds while the model and its
+    /// tools work (agri-saas `HEARTBEAT_INTERVAL_MS`). The stream waits two
+    /// of them, so a question is not given up on while it is being answered.
+    /// It was the ordinary 15, and the owner's question ended in «Сървърът
+    /// не отговори навреме.» (2026-11-01).
+    func testTheStreamOutwaitsTheServersHeartbeat() {
+        let stream = APIClient.streamSessionConfiguration()
+        let heartbeat: TimeInterval = 25
+        XCTAssertGreaterThanOrEqual(stream.timeoutIntervalForRequest, 2 * heartbeat)
+        XCTAssertNil(stream.urlCache, "a stream reaching Cache.db (#134)")
+        XCTAssertEqual(APIClient.sessionConfiguration().timeoutIntervalForRequest, 15,
+                       "positive control: the ordinary session is unchanged")
+        let source = try? String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Agrent/API/APIClient.swift"), encoding: .utf8)
+        XCTAssertTrue(source?.contains("try await streamSession.bytes(for: req)") == true,
+                      "the stream opens on its own session")
+    }
+
     // MARK: - Words
 
     func testEverySentenceIsBulgarian() {
