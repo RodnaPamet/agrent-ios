@@ -86,8 +86,11 @@ final class AssistantStore {
                 switch event {
                 case .thinking:
                     if answer == nil { turns[index].phase = .working(AssistantText.thinking) }
-                case .toolCall, .toolResult:
-                    if answer == nil { turns[index].phase = .working(AssistantText.reading) }
+                case .toolCall(let name):
+                    if answer == nil { turns[index].phase = .working(AssistantText.reading(name)) }
+                case .toolResult:
+                    // Read; the model writes next, unless it asks for more.
+                    if answer == nil { turns[index].phase = .working(AssistantText.writing) }
                 case .answer(let text, let links, let proposal):
                     answer = text
                     answerLinks = links

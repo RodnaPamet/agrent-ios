@@ -282,11 +282,56 @@ final class AssistantTests: XCTestCase {
                       "the stream opens on its own session")
     }
 
+    // MARK: - The wait says what it is doing
+
+    /// Every tool the server has (agri-saas `tools.ts`, 2026-11-01) has its
+    /// own Bulgarian sentence, and an unknown one the general sentence.
+    func testTheWaitNamesWhatIsBeingRead() {
+        let tools = ["list_farm_tasks", "list_journal_entries", "list_blocks", "analyze_block_risk",
+                     "grain_calculator", "list_cost_entries", "list_exchange_listings", "price_trends",
+                     "propose_activity", "propose_treatment"]
+        for tool in tools {
+            XCTAssertNotEqual(AssistantText.reading(tool), AssistantText.reading, "\(tool) has no sentence of its own")
+            XCTAssertTrue(AssistantText.reading(tool).hasSuffix("…"), tool)
+        }
+        XCTAssertEqual(AssistantText.reading("something_new"), AssistantText.reading)
+    }
+
+    /// A tool call says what it reads; its result says the answer is being
+    /// written; the answer replaces both.
+    func testTheWaitFollowsTheTurn() async {
+        var feed: AsyncThrowingStream<AssistantEvent, Error>.Continuation?
+        let store = AssistantStore { _ in
+            AsyncThrowingStream { feed = $0 }
+        }
+        store.draft = "Колко задачи имам?"
+        store.send(context: nil)
+        func phase(becomes expected: AssistantStore.Turn.Phase) async -> Bool {
+            for _ in 0..<100 {
+                if store.turns.first?.phase == expected { return true }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            return false
+        }
+        for _ in 0..<100 where feed == nil { try? await Task.sleep(for: .milliseconds(10)) }
+        feed?.yield(.toolCall(name: "list_farm_tasks"))
+        let reading = await phase(becomes: .working(AssistantText.reading("list_farm_tasks")))
+        XCTAssertTrue(reading, "the wait does not name the tasks")
+        feed?.yield(.toolResult(name: "list_farm_tasks", ok: true, truncated: false))
+        let writing = await phase(becomes: .working(AssistantText.writing))
+        XCTAssertTrue(writing, "the wait does not say the answer is being written")
+        feed?.yield(.answer(text: "Имате 3 задачи.", links: [], proposal: nil))
+        feed?.yield(.done(truncatedAny: false))
+        feed?.finish()
+        await store.settled()
+        XCTAssertEqual(store.turns.first?.phase, .answered("Имате 3 задачи.", note: nil))
+    }
+
     // MARK: - Words
 
     func testEverySentenceIsBulgarian() {
         var sentences = [AssistantText.intro, AssistantText.noAnswer, AssistantText.interrupted,
-                         AssistantText.switchedOff]
+                         AssistantText.switchedOff, AssistantText.writing, AssistantText.reading("list_blocks")]
         sentences += ["ASSISTANT_NO_GROUNDING", "ASSISTANT_OUT_OF_SCOPE", "ASSISTANT_HIGH_STAKES_NEEDS_SOURCE",
                       "ASSISTANT_EGRESS_BLOCKED", "ASSISTANT_INPUT_REJECTED", "SOMETHING_NEW"].map(AssistantText.refusal)
         sentences += ["ASSISTANT_TOOL_BUDGET", "ASSISTANT_SPEND_CEILING", "ASSISTANT_TIME_BUDGET",
