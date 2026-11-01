@@ -22,9 +22,9 @@
   is refused. The list of categories and reasons is Apple's:
   https://developer.apple.com/documentation/bundleresources/privacy-manifest-files/describing-use-of-required-reason-api
 
-  COLLECTED DATA describes what leaves the device, all of it sent to
-  app.agrent.bg for the app to function, linked to the user, never used for
-  tracking. No third-party SDKs, no tracking domains.
+  COLLECTED DATA describes what leaves the device, never used for tracking,
+  and no tracking domains. Sent to app.agrent.bg for the app to function and
+  linked to the user, except the three diagnostics types at the end.
 
     User ID          the signed-in account's identifier.
     Email Address    Sign in with Apple asks for the `.email` scope, and the
@@ -36,6 +36,20 @@
     Other User Content
                      the farm records the user enters (journal, tasks,
                      costs, parcels) and Борса listings and messages.
+
+  And to Sentry, the one third-party SDK (#494, owner 2026-11-01), NOT
+  linked to the user: no user, IP, device name, screenshot, request or
+  address goes with them (CrashReporting). Sentry's own manifest, inside
+  its framework, declares the same three. Sent only from a build that
+  carries the DSN, which is TestFlight's and the App Store's.
+
+    Crash Data       crash reports and their stack traces.
+    Performance Data freezes (2 s and longer), app start and screen render
+                     times, a 2% sample of slow screens.
+    Other Diagnostic Data
+                     Apple's MetricKit diagnostics (hangs, CPU and disk
+                     exceptions) and the device model and iOS version each
+                     report carries.
 
   The device location is read but NOT collected (#492, owner 2026-11-01):
   the «you are here» dot on the farm's maps and the parcel «Нов запис»
@@ -97,6 +111,42 @@
 			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePerformanceData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>
 			<false/>
 			<key>NSPrivacyCollectedDataTypePurposes</key>
