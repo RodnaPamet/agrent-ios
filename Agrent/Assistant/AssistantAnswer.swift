@@ -20,6 +20,9 @@ enum AssistantAnswer {
         case numbered([String])
         /// The header's cells, then each row's; rows as wide as the header.
         case table(header: [String], rows: [[String]])
+        /// `---`, `***` or `___` on its own line: a rule between parts, which
+        /// reached the owner's screen as a row of dashes (2026-11-01).
+        case divider
     }
 
     static func blocks(_ text: String) -> [Block] {
@@ -38,6 +41,10 @@ enum AssistantAnswer {
             let line = lines[index].trimmingCharacters(in: .whitespaces)
             if line.isEmpty {
                 flushParagraph()
+                index += 1
+            } else if isRule(line) {
+                flushParagraph()
+                blocks.append(.divider)
                 index += 1
             } else if line.hasPrefix("|") {
                 flushParagraph()
@@ -100,6 +107,13 @@ enum AssistantAnswer {
         return .table(header: header, rows: body)
     }
 
+    /// Three or more of one of `-`, `*`, `_`, spaces allowed between.
+    private static func isRule(_ line: String) -> Bool {
+        let marks = line.filter { $0 != " " }
+        guard marks.count >= 3, let first = marks.first, "-*_".contains(first) else { return false }
+        return marks.allSatisfy { $0 == first }
+    }
+
     private static func cells(_ line: String) -> [String] {
         var inner = line
         if inner.hasPrefix("|") { inner.removeFirst() }
@@ -140,8 +154,11 @@ enum AssistantAnswer {
                 return items.map(plain).joined(separator: ". ")
             case .table(_, let rows):
                 return rows.map { $0.map(plain).filter { !$0.isEmpty }.joined(separator: ", ") }.joined(separator: ". ")
+            case .divider:
+                return ""
             }
         }
+        .filter { !$0.isEmpty }
         .joined(separator: " ")
     }
 
@@ -178,6 +195,8 @@ struct AssistantAnswerView: View {
             list(items.enumerated().map { ("\($0.offset + 1).", $0.element) })
         case .table(let header, let rows):
             table(header: header, rows: rows)
+        case .divider:
+            Divider().padding(.vertical, 4)
         }
     }
 

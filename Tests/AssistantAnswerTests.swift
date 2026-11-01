@@ -58,6 +58,14 @@ final class AssistantAnswerTests: XCTestCase {
                        "a year is not a numbered list")
     }
 
+    /// `---` on its own line is a divider, not a row of dashes; a bullet that
+    /// starts with `*` stays a bullet.
+    func testARuleIsADivider() {
+        XCTAssertEqual(AssistantAnswer.blocks("Едно.\n\n---\n\nДруго.\n* * *\n- точка"),
+                       [.paragraph("Едно."), .divider, .paragraph("Друго."), .divider, .bullets(["точка"])])
+        XCTAssertFalse(AssistantAnswer.spoken("Едно.\n---\nДруго.").contains("-"))
+    }
+
     /// A row the model got wrong still lines up; a table without a rule has
     /// no header rather than eating its first row.
     func testAnUnevenTableStillReads() {
