@@ -98,6 +98,22 @@ actor APIClient {
     /// the one request in this app that is allowed to think.
     private let documentSession = URLSession(configuration: APIClient.documentSessionConfiguration())
 
+    /// The session for the assistant's STREAM (#483): `session` in every way
+    /// but its idle limit. The server sends a heartbeat every 25 seconds
+    /// (agri-saas `HEARTBEAT_INTERVAL_MS`) while the model and its tools
+    /// work, and nothing else between events, so fifteen seconds of quiet
+    /// is a question being thought about, not a dead line. With fifteen, the
+    /// owner's second question ended in «Сървърът не отговори навреме.»
+    /// while the server was still answering (2026-11-01). Sixty: two
+    /// heartbeats, so one late beat does not end the turn.
+    private let streamSession = URLSession(configuration: APIClient.streamSessionConfiguration())
+
+    static func streamSessionConfiguration() -> URLSessionConfiguration {
+        let configuration = sessionConfiguration()
+        configuration.timeoutIntervalForRequest = 60
+        return configuration
+    }
+
     static func documentSessionConfiguration() -> URLSessionConfiguration {
         let configuration = sessionConfiguration()
         configuration.timeoutIntervalForRequest = 90
@@ -1156,7 +1172,7 @@ actor APIClient {
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         let loggable = LoggablePath(path)
         Log.request("POST", loggable)
-        let (bytes, response) = try await session.bytes(for: req)
+        let (bytes, response) = try await streamSession.bytes(for: req)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
         Log.response("POST", loggable, status: http.statusCode, bytes: 0, ms: 0)
         return (bytes, http)
