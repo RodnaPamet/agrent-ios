@@ -17,7 +17,7 @@ final class AssistantStore {
             case working(String)
             /// The answer, the screens it points at, and what stopped it
             /// short, if anything did.
-            case answered(String, links: [AssistantLink] = [], note: String?)
+            case answered(String, links: [AssistantLink] = [], note: String?, proposal: AssistantProposal? = nil)
             /// Refused or failed: the sentence that says why.
             case unanswered(String)
         }
@@ -76,6 +76,7 @@ final class AssistantStore {
         defer { if !Task.isCancelled { asking = false } }
         var answer: String?
         var answerLinks: [AssistantLink] = []
+        var answerProposal: AssistantProposal?
         do {
             let events = try await asker(request)
             for try await event in events {
@@ -84,10 +85,11 @@ final class AssistantStore {
                     if answer == nil { turns[index].phase = .working(AssistantText.thinking) }
                 case .toolCall, .toolResult:
                     if answer == nil { turns[index].phase = .working(AssistantText.reading) }
-                case .answer(let text, let links, _):
+                case .answer(let text, let links, let proposal):
                     answer = text
                     answerLinks = links
-                    turns[index].phase = .answered(text, links: links, note: nil)
+                    answerProposal = proposal
+                    turns[index].phase = .answered(text, links: links, note: nil, proposal: proposal)
                 case .refusal(let reason, let message):
                     // Any answer already shown goes: a refusal is "no answer",
                     // and an egress block discards it outright.
@@ -95,7 +97,9 @@ final class AssistantStore {
                     return
                 case .halt(let outcome, let message, let counts):
                     let note = AssistantText.said(message, else: AssistantText.halt(outcome, counts: counts))
-                    turns[index].phase = answer.map { .answered($0, links: answerLinks, note: note) } ?? .unanswered(note)
+                    turns[index].phase = answer.map {
+                        .answered($0, links: answerLinks, note: note, proposal: answerProposal)
+                    } ?? .unanswered(note)
                     return
                 case .done:
                     if answer == nil { turns[index].phase = .unanswered(AssistantText.noAnswer) }

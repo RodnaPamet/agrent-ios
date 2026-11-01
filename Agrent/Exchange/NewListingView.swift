@@ -85,7 +85,7 @@ struct NewListingView: View {
 
     /// A stored decimal as the field shows it: the comma a Bulgarian
     /// keyboard types, no grouping, so `decimal(_:)` reads it straight back.
-    static func fieldText(_ value: Decimal) -> String {
+    nonisolated static func fieldText(_ value: Decimal) -> String {
         NSDecimalNumber(decimal: value).description(withLocale: WireDecimal.wireLocale)
             .replacingOccurrences(of: ".", with: ",")
     }
