@@ -2594,12 +2594,23 @@ final class A11yShotsTests: XCTestCase {
         let tab = labelled("Калкулатор", in: app.tabBars.buttons)
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
         tab.tap()
+        // Folded by type since #500: «Торове» opens first.
+        let type = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Торове, 2 записа'")).firstMatch
+        for _ in 0..<8 where !(type.exists && type.isHittable) { app.swipeUp() }
+        XCTAssertTrue(type.waitForExistence(timeout: 15), "no «Торове» type row\n\(app.debugDescription)")
+        type.tap()
+        // By its amount: «Торове, 1 запис» is the type row once one is gone.
         let row = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH 'Торове, 1'")).firstMatch
+            .matching(NSPredicate(format: "label BEGINSWITH 'Торове, 1779'")).firstMatch
         for _ in 0..<8 where !(row.exists && row.isHittable) { app.swipeUp() }
         XCTAssertTrue(row.waitForExistence(timeout: 15), "no fixture expense in «Разходи»\n\(app.debugDescription)")
+        // The unfold animates, and a swipe that lands during it is lost:
+        // one more try before calling it a failure.
+        Thread.sleep(forTimeInterval: 1)
         row.swipeLeft()
         let delete = app.buttons["Изтрий"]
+        if !delete.waitForExistence(timeout: 3) { row.swipeLeft() }
         XCTAssertTrue(delete.waitForExistence(timeout: 5), "the swipe offered no «Изтрий»\n\(app.debugDescription)")
         capture("21a-cost-swipe", app: app)
         delete.tap()
@@ -2613,6 +2624,45 @@ final class A11yShotsTests: XCTestCase {
         capture("21c-cost-undo", app: app)
         undo.tap()
         XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the expense back")
+    }
+
+    /// «Разходи» by type (#500): folded, one type opened with its own months,
+    /// the chips narrowing to one type, and the two graphs of the whole.
+    func testCalculatorExpensesByType() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let tab = labelled("Калкулатор", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
+        tab.tap()
+        let total = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Общо, 5 записа'")).firstMatch
+        for _ in 0..<8 where !(total.exists && total.isHittable) { app.swipeUp() }
+        XCTAssertTrue(total.waitForExistence(timeout: 15), "no «Общо» row\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09e-expenses-folded", app: app)
+
+        let type = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Торове, 2 записа'")).firstMatch
+        XCTAssertTrue(type.waitForExistence(timeout: 5), "no «Торове» type row\n\(app.debugDescription)")
+        type.tap()
+        Thread.sleep(forTimeInterval: 1)
+        capture("09f-expenses-one-type-open", app: app)
+        type.tap()
+
+        let chip = app.buttons["Препарати"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "no «Препарати» chip\n\(app.debugDescription)")
+        chip.tap()
+        Thread.sleep(forTimeInterval: 1)
+        capture("09g-expenses-filtered", app: app)
+        app.buttons["Всички"].tap()
+
+        let chart = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Разходи по месеци'")).firstMatch
+        for _ in 0..<8 where !(chart.exists && chart.isHittable) { app.swipeUp() }
+        XCTAssertTrue(chart.waitForExistence(timeout: 5), "no month graph\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09h-expenses-graphs", app: app)
     }
 
     /// The assistant (#483): its button lower right, above Калкулатор's
