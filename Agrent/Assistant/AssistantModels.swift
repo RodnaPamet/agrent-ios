@@ -2,16 +2,25 @@ import Foundation
 
 /// The assistant's wire (#483, agri-saas #2578, phase 1: answers only).
 ///
-/// ── One question, one turn ──
+/// ── A conversation, by its id (agri-saas #2694, #507) ──
 ///
-/// `POST /assistant/stream` takes `{ question, pageContext? }` and answers
-/// with server-sent events. Nothing of an earlier turn is sent back: history
-/// would be one more customer-written field reaching the prompt, and spend on
-/// every turn (backend 2, 2026-10-31). The sheet keeps the session's turns on
-/// screen only.
+/// `POST /assistant/stream` takes `{ question, pageContext?, conversationId? }`
+/// and answers with server-sent events, the FIRST of which names the
+/// conversation it used. The phone sends that id back with the next question,
+/// so «а каква доза?» follows the question before it: the server replays the
+/// conversation's recent turns, fenced as data, and keeps every exchange
+/// (owner, 2026-11-01). Never a turn's text from the phone: the history is the
+/// server's, and the phone only names it.
+///
+/// No id is sent until the server has given one, so a server without
+/// conversations (which answers 400 to a field it does not know) never sees
+/// it. An unknown or someone else's id starts a fresh conversation there, and
+/// the first event says which.
 struct AssistantRequest: Encodable, Sendable {
     let question: String
     let pageContext: AssistantPageContext?
+    /// Absent, not null, while there is none: `encodeIfPresent`.
+    var conversationId: String? = nil
 }
 
 /// What the person is looking at, as IDENTIFIERS only: the web PAGE
@@ -52,6 +61,9 @@ struct AssistantPageContext: Encodable, Equatable, Sendable {
 /// `done`. A connection that closes without one of those is a transport
 /// failure and nothing else.
 enum AssistantEvent: Decodable, Equatable, Sendable {
+    /// The conversation this turn belongs to: first, before any work, so a
+    /// stream that drops still leaves the phone holding it.
+    case conversation(id: String)
     case thinking
     case toolCall(name: String)
     case toolResult(name: String, ok: Bool, truncated: Bool)
@@ -69,6 +81,7 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case type, name, ok, truncated, text, links, proposal, code, reason, outcome, truncatedAny, partialAny, message
+        case conversationId
         case toolCalls, limit, elapsedMs
     }
 
@@ -76,6 +89,14 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let type = try c.decode(String.self, forKey: .type)
         switch type {
+        case "conversation":
+            // No id is a frame this phone cannot use: read as unknown, so it
+            // costs the follow-up, never the answer.
+            if let id = try? c.decode(String.self, forKey: .conversationId), !id.isEmpty {
+                self = .conversation(id: id)
+            } else {
+                self = .unknown(type: type)
+            }
         case "thinking":
             self = .thinking
         case "tool_call":

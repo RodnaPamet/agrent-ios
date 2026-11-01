@@ -52,6 +52,16 @@ struct AssistantSheet: View {
                     Button("Затвори") { dismiss() }
                         .accessibilityInputLabels(A11y.Spoken.close)
                 }
+                // A fresh conversation: the next question no longer follows
+                // the ones on screen (#507). The server keeps them all.
+                if !store.turns.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(AssistantText.newConversation, systemImage: "square.and.pencil") {
+                            store.newConversation()
+                        }
+                        .accessibilityInputLabels(A11y.spokenNames(AssistantText.newConversation, "New conversation"))
+                    }
+                }
             }
         }
         .presentationDetents([.medium, .large])

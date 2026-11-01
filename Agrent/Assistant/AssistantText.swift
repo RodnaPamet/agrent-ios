@@ -37,6 +37,9 @@ enum AssistantText {
     /// writing it, which is the longest single wait.
     static let writing = "Пиша отговора…"
 
+    /// The sheet's button for a fresh conversation (#507).
+    static let newConversation = "Нов разговор"
+
     /// The connection went while the answer was coming (`AssistantKeepAlive`
     /// covers a short trip out of the app; this is past it, or the signal).
     static let lostMidAnswer = "Връзката прекъсна, преди отговорът да пристигне. Задайте въпроса отново."
