@@ -175,11 +175,16 @@ jobs:
       # -allowProvisioningUpdates with the API key lets Xcode create what the
       # archive step needs; the DISTRIBUTION signature is applied at export,
       # from Apple's cloud-managed certificate.
+      #
+      # AGRENT_SENTRY_DSN (#494) is the one build that reports crashes to
+      # Sentry: every other build has it empty and starts nothing. Unset
+      # secret → empty → this build reports nothing either, and still ships.
       - name: Archive
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
           set -o pipefail
           xcodebuild archive \
@@ -193,6 +198,7 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build }}" \
+            AGRENT_SENTRY_DSN="$SENTRY_DSN" \
             | tee archive.log | grep -E "error:|warning:|\*\* ARCHIVE" \
             || { echo "::error::the archive failed"; tail -80 archive.log; exit 1; }
 
@@ -244,6 +250,25 @@ jobs:
             echo "Agrent **${{ steps.version.outputs.marketing }} (${{ steps.version.outputs.build }})** — "
             echo "App Store Connect processes it for 5–30 min before it appears under TestFlight."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Sentry names a crash's functions only with this build's dSYMs (#494).
+      # After the upload, and never failing the run: the build is already on
+      # its way to TestFlight, and a crash without names is still a crash.
+      # Skipped, saying so, until the owner has set the Sentry secrets.
+      # sentry-cli is pinned; it reads SENTRY_ORG and SENTRY_PROJECT from the
+      # environment, and an organisation token carries its own (EU) region.
+      - name: Upload the dSYMs to Sentry
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
+            echo "Sentry secrets are not set: no dSYMs uploaded (#494)."
+            exit 0
+          fi
+          npx --yes @sentry/cli@3.8.2 debug-files upload "$RUNNER_TEMP/Agrent.xcarchive/dSYMs"
 
       # #407: the archive step created an Apple Development certificate whose
       # private key exists only on this runner. Revoked here, whether or not

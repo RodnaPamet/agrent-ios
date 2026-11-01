@@ -1667,6 +1667,17 @@ Owner, 2026-11-01: help mechanisators know where they stand on a field. **Phone 
 - **The GPS runs only while such a map is on screen,** and the fix is forgotten when the last one closes.
 - **Unverified on a device:** the system prompt's wording and the dot in a real field. Owner check on the next build.
 
+## Diagnostics: Sentry (#494)
+
+Owner, 2026-11-01: "Sentry, like the web". It is the app's only third-party code, pinned to the commit of sentry-cocoa 9.32.0. It reports to the same organisation as agri-saas, in its EU region (backend 1 measured `ingest.de.sentry.io`). The web's browser reporting was turned on the same day (agri-saas `NEXT_PUBLIC_SENTRY_DSN`).
+
+- **What:** crashes, freezes of 2 s or more, watchdog terminations, Apple's MetricKit diagnostics, and a 2% sample of slow screens, as the web samples its traces.
+- **Nothing personal:** no user, IP, device name, screenshot or view hierarchy. No request breadcrumbs, request spans, failed-request events or file I/O spans, whose addresses name the farm. No tap breadcrumbs: usage is #493's, on our own server. `CrashReporting.scrub` strips user, request and device name from every event, and drops any breadcrumb with an address or a screen title.
+- **Declared** as Crash, Performance and Other Diagnostic Data: App Functionality, NOT linked, not tracking. That matches App Store Connect (#350).
+- **Off unless the build carries a DSN.** Only TestFlight's archive does, from the `SENTRY_DSN` secret. Development, CI, the tests and A11yShots never report. The dSYM upload step runs after the TestFlight upload, never fails the run, and is skipped until `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are set.
+- **Owner steps** (in #494): an iOS project in the web's Sentry organisation, an organisation auth token with `project:releases`, and four `gh secret set` commands run in their own Terminal.
+- **Unverified:** a real crash reaching Sentry with readable stacks. That needs the secrets, then one TestFlight build.
+
 ## Blocks (Блокове)
 
 ### A parcel's risk on its own screen (owner 2026-10-29)

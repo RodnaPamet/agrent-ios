@@ -20,21 +20,48 @@ final class PrivacyManifestTests: XCTestCase {
             PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
         let entries = try XCTUnwrap(plist["NSPrivacyCollectedDataTypes"] as? [[String: Any]])
         for entry in entries {
-            XCTAssertEqual(entry["NSPrivacyCollectedDataTypeTracking"] as? Bool, false,
-                           "\(entry["NSPrivacyCollectedDataType"] ?? "?") is declared as tracking")
-            XCTAssertEqual(entry["NSPrivacyCollectedDataTypeLinked"] as? Bool, true)
+            let type = entry["NSPrivacyCollectedDataType"] as? String ?? "?"
+            XCTAssertEqual(entry["NSPrivacyCollectedDataTypeTracking"] as? Bool, false, "\(type) is declared as tracking")
+            // Linked, except Sentry's diagnostics, which carry no user (#494).
+            XCTAssertEqual(entry["NSPrivacyCollectedDataTypeLinked"] as? Bool, !Self.diagnostics.contains(type), type)
         }
         return entries.compactMap { $0["NSPrivacyCollectedDataType"] as? String }
     }
 
+    /// What Sentry receives (#494): not linked to the account.
+    private static let diagnostics: Set = [
+        "NSPrivacyCollectedDataTypeCrashData",
+        "NSPrivacyCollectedDataTypePerformanceData",
+        "NSPrivacyCollectedDataTypeOtherDiagnosticData",
+    ]
+
     func testEveryKindOfDataThatLeavesThePhoneIsDeclared() throws {
         let declared = try collectedTypes()
         XCTAssertEqual(declared.sorted(), [
+            "NSPrivacyCollectedDataTypeCrashData",
             "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeOtherDiagnosticData",
             "NSPrivacyCollectedDataTypeOtherUserContent",
+            "NSPrivacyCollectedDataTypePerformanceData",
             "NSPrivacyCollectedDataTypePhotosorVideos",
             "NSPrivacyCollectedDataTypeUserID",
         ], "a change here needs the same change in App Store Connect's App Privacy answers")
+    }
+
+    /// The diagnostics' reason in the code: Sentry, started only with a DSN,
+    /// with every channel that would carry a person's data switched off.
+    func testTheDiagnosticsAreSentrysAndCarryNoPerson() throws {
+        let declared = try collectedTypes()
+        XCTAssertTrue(Self.diagnostics.isSubset(of: declared))
+        let reporting = try read("Agrent/Diagnostics/CrashReporting.swift")
+        for off in ["sendDefaultPii = false", "attachScreenshot = false", "attachViewHierarchy = false",
+                    "enableNetworkBreadcrumbs = false", "enableNetworkTracking = false",
+                    "enableCaptureFailedRequests = false", "enableFileIOTracing = false",
+                    "enableUserInteractionTracing = false", "beforeSend = { scrub($0) }"] {
+            XCTAssertTrue(reporting.contains("options.\(off)"), "CrashReporting no longer sets \(off)")
+        }
+        XCTAssertTrue(try read("Agrent/AgrentApp.swift").contains("CrashReporting.start()"),
+                      "positive control: Sentry is started from the app")
     }
 
     /// The reasons, read from the code: Sign in with Apple asks for the

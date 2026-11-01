@@ -30,6 +30,18 @@ options:
                          # MainActor.assumeIsolated, ContentUnavailableView
   createIntermediateGroups: true
 
+# THE APP'S ONLY THIRD-PARTY CODE (#494, owner 2026-11-01: "Sentry, like the
+# web"): crashes, freezes and slow screens to the same Sentry organisation as
+# agri-saas, in its EU region. Pinned to the COMMIT of the 9.32.0 tag, not the
+# tag: a tag can be moved, and this repo commits no Package.resolved (the
+# .xcodeproj it would live in is generated). Its binary xcframework is checked
+# against the checksum in that commit's Package.swift. Bump deliberately:
+#   gh api repos/getsentry/sentry-cocoa/git/ref/tags/<version> -q .object.sha
+packages:
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    revision: 4e1e4ba9ce329f91ad6bfb63bab6da576a3f348c
+
 settings:
   base:
     # SWIFT 6 LANGUAGE MODE (P4.6, agrent-ios#195): complete strict
@@ -42,11 +54,19 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # The Sentry DSN, EMPTY here and in every build but TestFlight's, which
+    # passes the repository secret on the archive's command line. Empty means
+    # Sentry never starts (`CrashReporting`), so development, CI and the
+    # screenshot harness report nothing anywhere.
+    AGRENT_SENTRY_DSN: ""
 
 targets:
   Agrent:
     type: application
     platform: iOS
+    dependencies:
+      - package: Sentry
+        product: Sentry
     sources:
       - path: Agrent
       # THE RECORDED PAYLOADS, INTO THE APP — in Debug only.
@@ -138,6 +158,8 @@ targets:
         LSRequiresIPhoneOS: true
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Read by `CrashReporting`; see AGRENT_SENTRY_DSN above.
+        AgrentSentryDSN: "$(AGRENT_SENTRY_DSN)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

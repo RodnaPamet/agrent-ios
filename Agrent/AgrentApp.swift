@@ -18,7 +18,10 @@ struct AgrentApp: App {
     /// the confirmation button on a write with no undo. See
     /// `BulgarianLayout`.
     init() {
-        // FIRST, before any text is laid out: Bulgarian at the head of the
+        // Before everything, so a crash in the start-up below is reported
+        // too. Starts nothing in a build without a DSN (#494).
+        CrashReporting.start()
+        // Then, before any text is laid out: Bulgarian at the head of the
         // app's language list, so every piece of text this app draws is
         // set in Bulgarian letterforms on any phone (#205). Ahead of
         // `BulgarianLayout`, so its priming measures those shapes.
