@@ -2595,7 +2595,13 @@ final class A11yShotsTests: XCTestCase {
         let tab = labelled("Калкулатор", in: app.tabBars.buttons)
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Калкулатор» tab")
         tab.tap()
-        // Folded by type since #500: «Торове» opens first.
+        // Folded twice since #500: «Общо» opens to the types, «Торове» to
+        // its expenses.
+        let total = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Общо, 5 записа'")).firstMatch
+        for _ in 0..<8 where !(total.exists && total.isHittable) { app.swipeUp() }
+        XCTAssertTrue(total.waitForExistence(timeout: 15), "no «Общо» row\n\(app.debugDescription)")
+        total.tap()
         let type = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH 'Торове, 2 записа'")).firstMatch
         for _ in 0..<8 where !(type.exists && type.isHittable) { app.swipeUp() }
@@ -2643,6 +2649,10 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(total.waitForExistence(timeout: 15), "no «Общо» row\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
         capture("09e-expenses-folded", app: app)
+        // «Общо» folds the types (owner, 2026-11-01): open it.
+        total.tap()
+        Thread.sleep(forTimeInterval: 1)
+        capture("09e2-expenses-types", app: app)
 
         let type = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH 'Торове, 2 записа'")).firstMatch
