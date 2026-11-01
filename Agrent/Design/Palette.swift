@@ -263,6 +263,21 @@ enum Palette {
     /// the web itself declares, and no value is invented. Filed as
     /// agri-saas#1331; when tokens.json gains one token that passes on the
     /// tint everywhere, this becomes a plain `Color(token:)`.
+    /// A graph's series, in the design system's order (#500): the six
+    /// `--chart-series-N-start` colours, then the muted one for whatever is
+    /// past the sixth, folded into «Останали».
+    enum ChartSeries {
+        static let colors: [Color] = [
+            Color(token: AgrentColor.chartSeries1Start),
+            Color(token: AgrentColor.chartSeries2Start),
+            Color(token: AgrentColor.chartSeries3Start),
+            Color(token: AgrentColor.chartSeries4Start),
+            Color(token: AgrentColor.chartSeries5Start),
+            Color(token: AgrentColor.chartSeries6Start),
+        ]
+        static let rest = Color(token: AgrentColor.chartSeriesMuted)
+    }
+
     enum Chip {
         static let inputText = Color(token: { theme in
             theme == .dark ? AgrentColor.brandMuted(theme) : AgrentColor.brandEmphasis(theme)

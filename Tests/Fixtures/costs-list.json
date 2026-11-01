@@ -14,8 +14,18 @@
       "incurredOn": "2026-10-02T00:00:00.000Z", "supplier": null, "description": null,
       "allocationBasis": "TARGET", "seasonId": null, "plantingId": null, "locationId": null, "parcelId": null,
       "leaseId": null, "itemId": null, "invoiceFileId": null,
-      "createdAt": "2026-10-02T08:00:00.000Z", "updatedAt": "2026-10-02T08:00:00.000Z" }
+      "createdAt": "2026-10-02T08:00:00.000Z", "updatedAt": "2026-10-02T08:00:00.000Z" },
+    { "id": "cost_fixture_4", "category": "FERTILIZER", "amount": 3113.46, "currency": "EUR",
+      "incurredOn": "2026-09-15T00:00:00.000Z", "supplier": null, "description": null,
+      "allocationBasis": "TARGET", "seasonId": null, "plantingId": null, "locationId": null, "parcelId": null,
+      "leaseId": null, "itemId": null, "invoiceFileId": null,
+      "createdAt": "2026-09-15T08:00:00.000Z", "updatedAt": "2026-09-15T08:00:00.000Z" },
+    { "id": "cost_fixture_5", "category": "FUEL", "amount": 420, "currency": "EUR",
+      "incurredOn": "2026-09-08T00:00:00.000Z", "supplier": null, "description": null,
+      "allocationBasis": "TARGET", "seasonId": null, "plantingId": null, "locationId": null, "parcelId": null,
+      "leaseId": null, "itemId": null, "invoiceFileId": null,
+      "createdAt": "2026-09-08T08:00:00.000Z", "updatedAt": "2026-09-08T08:00:00.000Z" }
   ],
-  "totalCount": 3,
+  "totalCount": 5,
   "truncated": false
 }

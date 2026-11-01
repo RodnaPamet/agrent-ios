@@ -429,10 +429,11 @@ the map shows the plain ground it draws with no photo.
 
 ## The calculator's «Разходи»
 
-`costs-list.json`: `GET /grain/costs`, three synthetic costs (fertiliser,
-plant protection, seed) in EUR, invented amounts, so the screenshots show the
-cost list's titles in the accent gold (owner, 2026-10-29). Its POST, a write,
-stays `501 WRITE_REFUSED`.
+`costs-list.json`: `GET /grain/costs`, five synthetic costs in EUR with
+invented amounts: fertiliser twice, plant protection, seed and fuel, across
+September and October. That gives the screenshots the cost list's gold
+titles (owner, 2026-10-29), and two months and several types for «Разходи» by
+type and its graphs (#500). Its POST, a write, stays `501 WRITE_REFUSED`.
 
 
 ## A parcel's tasks from Блокове

@@ -10,6 +10,10 @@ struct CalculatorView: View {
     @State private var removal = CostRemoval()
     @State private var askingCost: CostEntry?
     @State private var confirmingCost = false
+    /// «Разходи» by type (#500): the chosen chips (none is «Всички») and the
+    /// types unfolded.
+    @State private var chosenTypes: Set<CostCategory> = []
+    @State private var openTypes: Set<CostCategory> = []
 
     var body: some View {
         RoutedStack {
@@ -193,21 +197,87 @@ struct CalculatorView: View {
             }
 
         case .loaded(let page, _):
+            // Folded by type, filtered by the chips, and graphed from the
+            // same value, so the three never disagree (#500, owner
+            // 2026-11-01).
+            let breakdown = CostBreakdown(removal.visible(page.items), chosen: chosenTypes)
             Section {
-                ForEach(removal.visible(page.items)) { cost in
-                    CostRow(cost: cost)
-                        .costRemovalSwipe(me: people.user) {
-                            askingCost = cost
-                            confirmingCost = true
-                        }
+                if breakdown.available.count > 1 {
+                    CostTypeFilter(available: breakdown.available, chosen: $chosenTypes)
                         .pageRow()
+                }
+                CostTotalRow(count: breakdown.count, totals: breakdown.totals)
+                    .pageRow()
+                ForEach(breakdown.groups) { group in
+                    DisclosureGroup(isExpanded: openBinding(group.category)) {
+                        let months = breakdown.months(of: group.category)
+                        if !months.isEmpty {
+                            CostMonthsChart(months: months, order: breakdown.groups.map(\.category))
+                                .padding(.vertical, 6)
+                                .pageRow()
+                        }
+                        ForEach(group.entries) { cost in
+                            CostRow(cost: cost)
+                                .costRemovalSwipe(me: people.user) {
+                                    askingCost = cost
+                                    confirmingCost = true
+                                }
+                                .pageRow()
+                        }
+                    } label: {
+                        CostTypeRow(group: group)
+                    }
+                    .pageRow()
                 }
             } header: {
                 SectionHeader("Разходи")
             } footer: {
                 SectionFooter { costsFooter(page) }
             }
+            costCharts(breakdown, truncated: page.truncated)
         }
+    }
+
+    /// Whether a type is unfolded, as a binding for its `DisclosureGroup`.
+    private func openBinding(_ category: CostCategory) -> Binding<Bool> {
+        Binding {
+            openTypes.contains(category)
+        } set: { open in
+            if open { openTypes.insert(category) } else { openTypes.remove(category) }
+        }
+    }
+
+    /// The two graphs of the chosen expenses: by type, when there is more
+    /// than one, and by month.
+    @ViewBuilder
+    private func costCharts(_ breakdown: CostBreakdown, truncated: Bool) -> some View {
+        let types = breakdown.groups.filter { $0.chartAmount > 0 }
+        if types.count > 1 {
+            Section(titled: "Разходи по вид") {
+                CostTypeTotalsChart(groups: types).pageRow()
+            }
+        }
+        if !breakdown.months.isEmpty {
+            Section {
+                CostMonthsChart(months: breakdown.months, order: breakdown.groups.map(\.category))
+                    .padding(.vertical, 6)
+                    .pageRow()
+            } header: {
+                SectionHeader("Разходи по месеци")
+            } footer: {
+                SectionFooter { costChartsNote(breakdown, truncated: truncated) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func costChartsNote(_ breakdown: CostBreakdown, truncated: Bool) -> some View {
+        let notes = [
+            truncated ? "Графиките са по последните \(Plural.bg(breakdown.count, "разход", "разхода"))." : nil,
+            breakdown.otherCurrencies.isEmpty ? nil
+                : "В графиките са само разходите в EUR, без тези в \(breakdown.otherCurrencies.joined(separator: ", "))."
+        ].compactMap { $0 }
+        if !notes.isEmpty { Text(notes.joined(separator: " ")) }
     }
 
     @ViewBuilder
@@ -572,6 +642,57 @@ enum Money {
         )
         guard let currency, !currency.isEmpty else { return amount }
         return "\(amount) \(currency)"
+    }
+}
+
+/// «Общо»: how many expenses the chips leave, and their sum per currency.
+struct CostTotalRow: View {
+    let count: Int
+    let totals: [CostBreakdown.Total]
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Общо").font(.subheadline.weight(.semibold))
+                Text(Plural.bg(count, "запис", "записа"))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+            }
+            Spacer(minLength: 12)
+            Text(totals.text)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(A11y.sentence(["Общо", Plural.bg(count, "запис", "записа"), totals.text]))
+    }
+}
+
+/// A type, folded: its name, how many expenses, and their sum. The
+/// `DisclosureGroup` around it says folded or unfolded.
+struct CostTypeRow: View {
+    let group: CostBreakdown.TypeGroup
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(group.category.label).font(.subheadline.weight(.medium))
+                Text(Plural.bg(group.count, "запис", "записа"))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+            }
+            Spacer(minLength: 12)
+            Text(group.totals.text)
+                .font(.subheadline.monospacedDigit())
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(A11y.sentence([group.category.label, Plural.bg(group.count, "запис", "записа"),
+                                           group.totals.text]))
     }
 }
 

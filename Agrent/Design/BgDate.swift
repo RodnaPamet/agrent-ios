@@ -42,6 +42,25 @@ enum BgDate {
         date.formatted(.dateTime.day().month(.wide).year().locale(locale))
     }
 
+    /// «окт», a chart's month (#500), in the phone's own zone, which is the
+    /// one Swift Charts places its month marks in (`CostBreakdown.month`).
+    ///
+    /// The stand-alone pattern «LLL», not `.month(.abbreviated)`: in bg_BG
+    /// the format style's month skeleton resolves to the NUMBER, so an axis
+    /// read «9 10 11». Measured 2026-11-01. A formatter per call, as an axis
+    /// draws a handful.
+    static func monthShort(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.dateFormat = "LLL"
+        return formatter.string(from: date)
+    }
+
+    /// «октомври 2026 г.», a month said in full: VoiceOver's reading of a bar.
+    static func monthYear(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.wide).year().locale(locale))
+    }
+
     /// 21 септември — for rows, where the year is usually noise.
     static func dayMonth(_ date: Date) -> String {
         date.formatted(.dateTime.day().month(.wide).locale(locale))
