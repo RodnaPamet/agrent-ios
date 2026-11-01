@@ -13,6 +13,12 @@ import Foundation
 /// app is EUR-only now (#456), but an older row may still carry another
 /// code, and adding BGN to EUR would print a number no ledger has. The
 /// graphs draw EUR only, and `otherCurrencies` says what they left out.
+///
+/// "Per currency" means per CURRENCY, not per spelling: the phone's old
+/// free-text «Валута» stored «EURO», and the owner's «Торове» read
+/// «11 119,50 EUR и 10,00 EURO» (2026-11-01). `CostCurrency.code` folds the
+/// euro's spellings to EUR exactly as agri-saas `canonicalCostCurrency`
+/// does, and converts nothing: lev stays lev.
 struct CostBreakdown: Equatable {
     /// The currency the graphs are drawn in.
     static let chartCurrency = "EUR"
@@ -65,10 +71,10 @@ struct CostBreakdown: Equatable {
         groups = Self.biggestFirst(Dictionary(grouping: shown, by: \.category).map { Self.group($0.key, $0.value) })
         totals = Self.totals(shown)
         count = shown.count
-        otherCurrencies = Array(Set(shown.map(\.currency)).subtracting([Self.chartCurrency])).sorted()
+        otherCurrencies = Array(Set(shown.map(\.currencyCode)).subtracting([Self.chartCurrency])).sorted()
 
         var sums: [Date: [CostCategory: Decimal]] = [:]
-        for entry in shown where entry.currency == Self.chartCurrency {
+        for entry in shown where entry.currencyCode == Self.chartCurrency {
             sums[Self.month(of: entry.incurredOn), default: [:]][entry.category, default: 0] += entry.amount.value
         }
         months = sums.keys.sorted().flatMap { month in
@@ -77,11 +83,6 @@ struct CostBreakdown: Equatable {
                 .map { MonthAmount(month: month, category: $0.key,
                                    amount: NSDecimalNumber(decimal: $0.value).doubleValue) }
         }
-    }
-
-    /// One type's months, for its own graph when it is opened.
-    func months(of category: CostCategory) -> [MonthAmount] {
-        months.filter { $0.category == category }
     }
 
     /// The month an expense falls in, as the 1st of that month at the
@@ -112,7 +113,7 @@ struct CostBreakdown: Equatable {
 
     private static func totals(_ entries: [CostEntry]) -> [Total] {
         var sums: [String: Decimal] = [:]
-        for entry in entries { sums[entry.currency, default: 0] += entry.amount.value }
+        for entry in entries { sums[entry.currencyCode, default: 0] += entry.amount.value }
         return sums.map { Total(currency: $0.key, amount: $0.value) }
             .sorted { ($0.currency == chartCurrency ? 0 : 1, $0.currency) < ($1.currency == chartCurrency ? 0 : 1, $1.currency) }
     }
@@ -133,4 +134,23 @@ extension Array where Element == CostBreakdown.Total {
     var text: String {
         isEmpty ? Money.text(0, CostBreakdown.chartCurrency) : map(\.text).joined(separator: " и ")
     }
+}
+
+/// A cost's currency as a CODE rather than as typed: the euro's spellings are
+/// one currency (agri-saas `EURO_SPELLINGS`: EUR, EURO, EUROS, €, E, and a
+/// blank, which on an EUR-only farm is a missing label). Anything else keeps
+/// its own uppercased code; nothing is converted here.
+enum CostCurrency {
+    static let euroSpellings: Set = ["EUR", "EURO", "EUROS", "€", "E", ""]
+
+    static func code(_ stored: String?) -> String {
+        let code = (stored ?? "").trimmingCharacters(in: .whitespaces).uppercased()
+        return euroSpellings.contains(code) ? CostBreakdown.chartCurrency : code
+    }
+}
+
+extension CostEntry {
+    /// `currency` as one code per currency (`CostCurrency`): what is summed,
+    /// grouped and shown.
+    var currencyCode: String { CostCurrency.code(currency) }
 }

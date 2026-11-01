@@ -2627,8 +2627,9 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the expense back")
     }
 
-    /// «Разходи» by type (#500): folded, one type opened with its own months,
-    /// the chips narrowing to one type, and the two graphs of the whole.
+    /// «Разходи» by type (#500): folded, one type opened to its rows (its own
+    /// month graph removed at the owner's word, 2026-11-01), the chips
+    /// narrowing to one type, and the two graphs of the whole.
     func testCalculatorExpensesByType() {
         let app = XCUIApplication()
         app.launchArguments.append(Self.seamArgument)
@@ -2651,12 +2652,26 @@ final class A11yShotsTests: XCTestCase {
         capture("09f-expenses-one-type-open", app: app)
         type.tap()
 
-        let chip = app.buttons["Препарати"]
-        XCTAssertTrue(chip.waitForExistence(timeout: 5), "no «Препарати» chip\n\(app.debugDescription)")
-        chip.tap()
+        // The type dropdown (owner, 2026-11-01): it stays open while types
+        // are ticked, so it is photographed open, then closed by a tap above.
+        let types = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Видове разходи:'")).firstMatch
+        XCTAssertTrue(types.waitForExistence(timeout: 5), "no type dropdown\n\(app.debugDescription)")
+        types.tap()
+        let pesticide = app.buttons["Препарати"].firstMatch
+        XCTAssertTrue(pesticide.waitForExistence(timeout: 5), "no «Препарати» in the dropdown\n\(app.debugDescription)")
+        pesticide.tap()
+        Thread.sleep(forTimeInterval: 1)
+        capture("09g-expenses-type-menu", app: app)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
+        let filtered = app.buttons["Видове разходи: Препарати"]
+        XCTAssertTrue(filtered.waitForExistence(timeout: 5), "the dropdown does not say «Препарати»\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
         capture("09g-expenses-filtered", app: app)
-        app.buttons["Всички"].tap()
+        filtered.tap()
+        let all = app.buttons["Всички видове"].firstMatch
+        XCTAssertTrue(all.waitForExistence(timeout: 5), "no «Всички видове»")
+        all.tap()
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
 
         let chart = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH 'Разходи по месеци'")).firstMatch
@@ -2664,6 +2679,19 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(chart.waitForExistence(timeout: 5), "no month graph\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
         capture("09h-expenses-graphs", app: app)
+
+        // The month graph's dropdown (owner, 2026-11-01): one month, by type.
+        let picker = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Месец:'")).firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 5), "no month dropdown\n\(app.debugDescription)")
+        picker.tap()
+        let october = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Октомври'")).firstMatch
+        XCTAssertTrue(october.waitForExistence(timeout: 5), "no «Октомври» in the dropdown\n\(app.debugDescription)")
+        october.tap()
+        let oneMonth = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Разходи за октомври'")).firstMatch
+        XCTAssertTrue(oneMonth.waitForExistence(timeout: 5), "the graph did not show one month\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09i-expenses-one-month", app: app)
     }
 
     /// The assistant (#483): its button lower right, above Калкулатор's

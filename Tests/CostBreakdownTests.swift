@@ -39,6 +39,28 @@ final class CostBreakdownTests: XCTestCase {
         XCTAssertEqual(breakdown.otherCurrencies, ["BGN"])
     }
 
+    /// «EURO», the phone's old free-text currency, is the euro: one sum, one
+    /// code, as agri-saas `canonicalCostCurrency` reads it. Lev is not.
+    func testTheEurosSpellingsAreOneCurrency() async throws {
+        let rows = [
+            row("a", "RENT", "13343.40", "2026-10-20"),
+            row("b", "RENT", "40", "2026-10-05", currency: "EURO"),
+            row("c", "RENT", "5", "2026-10-06", currency: " euros "),
+            row("d", "RENT", "1", "2026-10-07", currency: "€"),
+            row("e", "RENT", "10", "2026-10-08", currency: "BGN"),
+        ]
+        let page = #"{"rows":[\#(rows.joined(separator: ","))],"totalCount":5,"truncated":false}"#
+        let entries = try await CostsAPI.decodeList(from: Data(page.utf8)).items
+        let breakdown = CostBreakdown(entries)
+        XCTAssertEqual(breakdown.groups[0].totals.map(\.currency), ["EUR", "BGN"])
+        XCTAssertEqual(breakdown.groups[0].totals.first?.amount, Decimal(string: "13389.40"))
+        XCTAssertEqual(breakdown.otherCurrencies, ["BGN"])
+        XCTAssertEqual(CostCurrency.code("EURO"), "EUR")
+        XCTAssertEqual(CostCurrency.code(nil), "EUR", "a blank on an EUR-only farm is a missing label")
+        XCTAssertEqual(CostCurrency.code("bgn"), "BGN")
+        XCTAssertEqual(CostCurrency.code("USD"), "USD")
+    }
+
     /// The chips: several types at once; none is «Всички». The chips keep
     /// offering every type whatever is chosen.
     func testTheChipsFilterEverything() async throws {
@@ -60,7 +82,7 @@ final class CostBreakdownTests: XCTestCase {
         let october = breakdown.months.filter { $0.month == CostBreakdown.month(of: BgDate.parseISODay("2026-10-15")!) }
         XCTAssertEqual(october.first { $0.category == .fertilizer }?.amount ?? 0, 6226.92, accuracy: 0.001)
         XCTAssertEqual(october.first { $0.category == .fuel }?.amount ?? 0, 200, accuracy: 0.001, "the BGN fuel is left out")
-        XCTAssertEqual(breakdown.months(of: .fertilizer).count, 2)
+        XCTAssertEqual(breakdown.months.filter { $0.category == .fertilizer }.count, 2)
         XCTAssertEqual(BgDate.monthShort(CostBreakdown.month(of: BgDate.parseInstant("2026-10-01T00:00:00.000Z")!)), "окт")
         // The 1st, stored as UTC midnight, is October on a phone west of
         // Greenwich too, and the bar sits at that phone's own midnight.

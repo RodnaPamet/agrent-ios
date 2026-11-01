@@ -1,98 +1,65 @@
 import SwiftUI
 
-/// «Разходи»'s type chips (#500, owner 2026-11-01: "several types at
-/// once"). Each chip turns one type on or off; «Всички» clears the choice.
-/// The list, the totals and the graphs all follow it (`CostBreakdown`).
-///
-/// They WRAP rather than scroll sideways: a horizontal strip hides the types
-/// past the edge from anyone who does not think to swipe it, and at the
-/// accessibility text sizes that is most of them.
+/// «Разходи»'s type filter (#500), as a DROPDOWN (owner, 2026-11-01: the
+/// chips "need to be a dropdown"). Several types at once, as the owner chose
+/// first: each type is a tick in the menu, and the menu stays open while
+/// they are ticked. «Всички видове» clears them. The list, the totals and the
+/// graphs all follow it (`CostBreakdown`).
 struct CostTypeFilter: View {
     /// The types in the list, biggest first.
     let available: [CostCategory]
     @Binding var chosen: Set<CostCategory>
 
     var body: some View {
-        ChipFlow(spacing: 8) {
-            chip("Всички", on: chosen.isEmpty) { chosen = [] }
-            ForEach(available, id: \.self) { category in
-                chip(category.label, on: chosen.contains(category)) {
-                    if chosen.contains(category) { chosen.remove(category) } else { chosen.insert(category) }
+        Menu {
+            Button {
+                chosen = []
+            } label: {
+                if chosen.isEmpty {
+                    Label(Self.all, systemImage: "checkmark")
+                } else {
+                    Text(Self.all)
                 }
             }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Видове разходи")
-    }
-
-    private func chip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(on ? .semibold : .regular))
-                .foregroundStyle(on ? Palette.onAccent : Color.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .frame(minHeight: 36)
-                .background(on ? Palette.accent : Palette.Surface.bar, in: Capsule())
-                .overlay { Capsule().strokeBorder(on ? Color.clear : Palette.Surface.edge, lineWidth: 1) }
-                // 44 to the finger, whatever the chip draws.
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .accessibilityInputLabels([title])
-    }
-}
-
-/// Children left to right, wrapping onto a new line when the next would not
-/// fit: the chips' layout.
-struct ChipFlow: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let rows = arrange(subviews, in: width)
-        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(rows.count - 1, 0))
-        let widest = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width ?? widest, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in arrange(subviews, in: bounds.width) {
-            var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
-                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
+            Section(titled: "Видове") {
+                ForEach(available, id: \.self) { category in
+                    Toggle(category.label, isOn: ticked(category))
+                }
             }
-            y += row.height + spacing
-        }
-    }
-
-    private struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
-
-    private func arrange(_ subviews: Subviews, in width: CGFloat) -> [Row] {
-        var rows: [Row] = []
-        var row = Row()
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(ProposedViewSize(width: width, height: nil))
-            let needed = row.indices.isEmpty ? size.width : row.width + spacing + size.width
-            if needed > width, !row.indices.isEmpty {
-                rows.append(row)
-                row = Row()
+        } label: {
+            HStack(spacing: 6) {
+                Text(label).font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "chevron.down").font(.footnote.weight(.semibold))
             }
-            row.width = row.indices.isEmpty ? size.width : row.width + spacing + size.width
-            row.height = max(row.height, size.height)
-            row.indices.append(index)
+            .foregroundStyle(Palette.accent)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        if !row.indices.isEmpty { rows.append(row) }
-        return rows
+        // Several ticks in one visit, rather than one per opening.
+        .menuActionDismissBehavior(.disabled)
+        .accessibilityLabel("Видове разходи: \(label)")
+        .accessibilityHint("Избира кои видове разходи се показват")
+        .accessibilityInputLabels(A11y.spokenNames("Видове разходи", "Expense types"))
+    }
+
+    static let all = "Всички видове"
+
+    /// «Всички видове», one type's name, two names, or how many.
+    var label: String {
+        let names = available.filter(chosen.contains).map(\.label)
+        switch names.count {
+        case 0: return Self.all
+        case 1, 2: return names.joined(separator: ", ")
+        default: return Plural.bg(names.count, "вид", "вида")
+        }
+    }
+
+    private func ticked(_ category: CostCategory) -> Binding<Bool> {
+        Binding {
+            chosen.contains(category)
+        } set: { on in
+            if on { chosen.insert(category) } else { chosen.remove(category) }
+        }
     }
 }

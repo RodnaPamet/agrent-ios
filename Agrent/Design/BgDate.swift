@@ -61,6 +61,13 @@ enum BgDate {
         date.formatted(.dateTime.month(.wide).year().locale(locale))
     }
 
+    /// «Октомври 2026 г.», a month standing alone as a menu's choice: the
+    /// first letter only, as `capitalized` would also make «Г.».
+    static func monthYearTitle(_ date: Date) -> String {
+        let text = monthYear(date)
+        return text.prefix(1).uppercased() + text.dropFirst()
+    }
+
     /// 21 септември — for rows, where the year is usually noise.
     static func dayMonth(_ date: Date) -> String {
         date.formatted(.dateTime.day().month(.wide).locale(locale))
