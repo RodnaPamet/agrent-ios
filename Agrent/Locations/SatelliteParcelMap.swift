@@ -105,6 +105,11 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// mechanisator's own current tasks on it (#465). Empty everywhere else.
     var badges: [String: Int] = [:]
 
+    /// The phone's dot (#492), once the location is allowed: MapKit's own,
+    /// drawn from the position on the phone and sent nowhere. The caller
+    /// reads `DeviceLocation.access`, so a change of mind redraws this.
+    var showsDeviceLocation = false
+
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> MKMapView {
@@ -133,6 +138,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         // view is actually being built with, which is the better answer in
         // every case.
         view.setRegion(region, animated: false)
+        view.showsUserLocation = showsDeviceLocation
         context.coordinator.seed(camera?.tick)
         context.coordinator.shape = shape
         context.coordinator.contrast = contrast
@@ -189,6 +195,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         context.coordinator.syncLabels(base == .orthophoto ? parcels : [], in: view)
         context.coordinator.syncBadges(badges, on: parcels, in: view)
         context.coordinator.apply(camera, in: view)
+        if view.showsUserLocation != showsDeviceLocation { view.showsUserLocation = showsDeviceLocation }
 
         // Repaint what MapKit has already drawn. `renderer(for:)` returns nil
         // for anything not yet on screen, which is fine — those get their

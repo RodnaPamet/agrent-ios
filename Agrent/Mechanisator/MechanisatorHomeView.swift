@@ -42,6 +42,10 @@ private struct MechanisatorHome: View {
     @State private var tasks = MyTasksStore()
     @State private var counts = TaskParcelCounts()
     @State private var choosing: ParcelChoice?
+    /// The phone's dot, and «Моето местоположение»'s camera moves (#492).
+    @State private var location = DeviceLocation.shared
+    @State private var cameraTick = 0
+    @State private var camera: SatelliteParcelMap.CameraCommand?
     @Environment(\.pushRoute) private var pushRoute
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -92,12 +96,26 @@ private struct MechanisatorHome: View {
                     region: MKCoordinateRegion(fitting: drawable) ?? .bulgaria,
                     tileTemplate: nil,
                     contrast: contrast,
+                    camera: camera,
                     onTap: { tapped($0) },
-                    badges: counts.counts
+                    badges: counts.counts,
+                    showsDeviceLocation: location.access == .allowed
                 )
                 // The map is a picture to VoiceOver; the parcels list under
                 // the tasks is its way in.
                 .accessibilityLabel("Карта на стопанството")
+                // Where the mechanisator stands on the farm (#492): the dot,
+                // the parcel it is in by name, and the button that asks and
+                // then centres.
+                .overlay(alignment: .bottomTrailing) {
+                    MapLocationButton { coordinate in
+                        cameraTick += 1
+                        camera = .init(tick: cameraTick, region: .around(coordinate))
+                    }
+                    .padding(.bottom, 16)
+                }
+                .overlay(alignment: .topLeading) { StandingInLabel(parcels: drawable) }
+                .showsDeviceLocation()
             }
         }
     }

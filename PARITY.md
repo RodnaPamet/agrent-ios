@@ -1652,6 +1652,21 @@ Built against agri-saas #2495's agreed shapes. The routes sit on `pendingServerR
 - **«Коментари»** (owner: both kinds) is on every parcel's screen, as part of its history: comments on the parcel's tasks and each closed task's closing note, newest first, from `GET /agro/parcels/{parcelId}/comments`. A row opens its task. A closing note names no one, as the server doesn't record who wrote it (2026-10-29).
 - **The parcels list** is the way into a parcel without the map, for VoiceOver, Voice Control and Switch Control, and for a field too small to hit at the farm's zoom.
 
+## «Намирате се в …»: the phone's place on the farm's maps (#492)
+
+Owner, 2026-11-01: help mechanisators know where they stand on a field. **Phone only.** The position is drawn and compared on the phone and never sent, stored or logged (`DeviceLocation`). So App Privacy and `PrivacyInfo.xcprivacy` have no Location entry, because Apple counts data as collected only once it leaves the device. `PrivacyManifestTests.testTheDeviceLocationNeverLeavesThePhone` keeps the readers to the map files and checks that none of them has a way out.
+
+- **Where:**
+  - Блокове (all three modes, Ортофотокарта included);
+  - the mechanisator's whole-farm map;
+  - the «Нов запис» and «Нова задача» parcel maps and a recorded treatment's map (`TreatmentParcelMap`);
+  - a task's parcels (`TaskParcelMap`, the dot only: it cannot pan).
+- **Asked from a map, never at launch.** «Моето местоположение» sits above the target button. The first press asks "When In Use". Once allowed, a press centres on the phone, 400 m across. Once refused, a press explains, offers «Настройки» and never asks again. Before an answer, and after a refusal, every map is as it was.
+- **«Намирате се в «…»»** at the top of the map while the phone stands in one of the map's parcels: the smaller where two overlap, as a tap resolves it. Only on a fix of 30 m or better, so it never guesses across a boundary. It is a separate element, so VoiceOver reads it although the map is a picture.
+- **«Нов запис» ticks the parcel you stand in:** once per crop, only while nothing is chosen, so an untick stands. Said aloud: «Отбелязан е парцелът, в който се намирате: …».
+- **The GPS runs only while such a map is on screen,** and the fix is forgotten when the last one closes.
+- **Unverified on a device:** the system prompt's wording and the dot in a real field. Owner check on the next build.
+
 ## Blocks (Блокове)
 
 ### A parcel's risk on its own screen (owner 2026-10-29)

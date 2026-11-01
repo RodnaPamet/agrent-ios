@@ -18,6 +18,13 @@ import SwiftUI
 /// No pan, no zoom. In a `ScrollView` a map that takes the drag steals the
 /// page's scroll, and the camera already frames the task's parcels, which is
 /// what this map is for. The location screen is where a farm is explored.
+///
+/// ── The phone's dot (#492) ──
+///
+/// Shown once the location is allowed (asked on the farm's other maps, which
+/// have the button), with «Намирате се в …» while the phone stands in one of
+/// the task's parcels. No button here: a map that cannot pan has nowhere to
+/// centre.
 struct TaskParcelMap: View {
     let content: TaskParcelMapContent
 
@@ -27,6 +34,7 @@ struct TaskParcelMap: View {
 
     @Environment(\.colorSchemeContrast) private var contrast
     @ScaledMetric(relativeTo: .body) private var scaledHeight: CGFloat = 220
+    @State private var location = DeviceLocation.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -58,6 +66,7 @@ struct TaskParcelMap: View {
                         .stroke(stroke(item.mark), style: strokeStyle(item.mark))
                 }
             }
+            if location.access == .allowed { UserAnnotation() }
         }
         .mapStyle(.hybrid(elevation: .flat, pointsOfInterest: .excludingAll))
         // Taller with the text, so the map keeps its share of a page whose
@@ -69,6 +78,8 @@ struct TaskParcelMap: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(content.spokenSummary)
         .accessibilityAddTraits(.isImage)
+        .overlay(alignment: .top) { StandingInLabel(parcels: content.marked.map(\.parcel) + content.context) }
+        .showsDeviceLocation()
     }
 
     private var legend: some View {

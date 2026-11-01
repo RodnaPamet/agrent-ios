@@ -15,6 +15,11 @@ import SwiftUI
 /// «Продължи» carries the total, so the area being recorded is in view at
 /// the moment it is chosen — and so does a problem, above the button it
 /// stopped. The save itself is step three's (`TreatmentCheckView`, #362).
+///
+/// Standing in one of the crop's parcels with the location allowed, that
+/// parcel is ticked (#492, owner 2026-11-01): once per crop, and only while
+/// nothing is chosen, so an untick stands and a choice is never added to.
+/// Said aloud, since the tick lands without a touch.
 struct TreatmentPlaceView: View {
     let store: TreatmentPlaceStore
     let kind: TreatmentDraft.Kind
@@ -33,6 +38,9 @@ struct TreatmentPlaceView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .body) private var scaledMapHeight: CGFloat = 230
     @State private var camera: MapCameraPosition = .region(.bulgaria)
+    @State private var location = DeviceLocation.shared
+    /// The crop whose parcel the position ticked: once per crop.
+    @State private var pickedHereFor: String?
 
     private var crops: [TreatmentPlace.Crop] { store.state.value ?? [] }
     private var crop: TreatmentPlace.Crop? { crops.first { $0.key == cropKey } }
@@ -84,7 +92,9 @@ struct TreatmentPlaceView: View {
             if !fields.isEmpty {
                 camera = .region(MKCoordinateRegion(fitting: fields.map(\.parcel)) ?? .bulgaria)
             }
+            pickWhereIStand()
         }
+        .onChange(of: location.position) { _, _ in pickWhereIStand() }
         // Said, not only drawn: the refusal replaces the spinner under the
         // cursor, and on a long crop it would otherwise be heard by nobody.
         .onChange(of: failure) { _, now in
@@ -312,6 +322,18 @@ struct TreatmentPlaceView: View {
 
     private func toggle(_ id: String) {
         if chosen.contains(id) { chosen.remove(id) } else { chosen.insert(id) }
+    }
+
+    /// The parcel the phone stands in, ticked: see the type's note.
+    private func pickWhereIStand() {
+        guard let cropKey, pickedHereFor != cropKey, chosen.isEmpty,
+              let here = location.usablePosition,
+              let field = TreatmentPlace.fields(at: here.coordinate, in: fields, outlines: store.outlines).first
+        else { return }
+        pickedHereFor = cropKey
+        chosen.insert(field.id)
+        AccessibilityNotification.Announcement(
+            "Отбелязан е парцелът, в който се намирате: \(field.parcel.name).").post()
     }
 
     private func retryRow(_ message: String, retry: @escaping @MainActor () async -> Void) -> some View {

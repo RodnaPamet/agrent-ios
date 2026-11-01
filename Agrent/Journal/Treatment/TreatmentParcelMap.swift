@@ -24,6 +24,12 @@ import SwiftUI
 ///
 /// `onToggle` is nil on a map that only shows (#399): a tap there changes
 /// nothing.
+///
+/// ── And the phone's place (#492) ──
+///
+/// `MapLocationButton` above the target button asks for the location, then
+/// centres on it; the dot is drawn once it is allowed, and «Намирате се в …»
+/// names the parcel under it, in words VoiceOver reads.
 struct TreatmentParcelMap: View {
     let fields: [TreatmentPlace.Field]
     let outlines: [String: [MKPolygon]]
@@ -32,6 +38,7 @@ struct TreatmentParcelMap: View {
     let onToggle: ((String) -> Void)?
 
     @State private var focusedID: String?
+    @State private var location = DeviceLocation.shared
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -55,10 +62,15 @@ struct TreatmentParcelMap: View {
     var body: some View {
         map
             .overlay(alignment: .bottomTrailing) {
-                if !drawable.isEmpty {
-                    ParcelTargetButton(parcelCount: drawable.count, action: focusNext)
+                VStack(spacing: 0) {
+                    MapLocationButton { camera = .region(.around($0)) }
+                    if !drawable.isEmpty {
+                        ParcelTargetButton(parcelCount: drawable.count, action: focusNext)
+                    }
                 }
             }
+            .overlay(alignment: .top) { StandingInLabel(parcels: fields.map(\.parcel)) }
+            .showsDeviceLocation()
     }
 
     private var map: some View {
@@ -69,6 +81,7 @@ struct TreatmentParcelMap: View {
                         .foregroundStyle(fill(outline.picked))
                         .stroke(stroke(outline.picked), lineWidth: width(outline.picked))
                 }
+                if location.access == .allowed { UserAnnotation() }
             }
             .mapStyle(.hybrid(elevation: .flat, pointsOfInterest: .excludingAll))
             .onTapGesture { point in

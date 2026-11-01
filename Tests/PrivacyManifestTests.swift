@@ -50,22 +50,51 @@ final class PrivacyManifestTests: XCTestCase {
         XCTAssertTrue(declared.contains("NSPrivacyCollectedDataTypePhotosorVideos"))
     }
 
-    /// No device location: nothing asks for it, so nothing to declare. A
-    /// first use must come with a manifest entry. Searched by the calls
-    /// that read it, not by `import CoreLocation`: MapKit brings those
-    /// types in without the import.
-    func testNoDeviceLocationIsRead() throws {
-        let readers = ["CLLocationManager", "UserAnnotation(", "MapUserLocationButton", "showsUserLocation"]
+    /// The device location is read for the farm's maps and NEVER leaves the
+    /// phone (#492, owner 2026-11-01), which is why nothing is declared for
+    /// it. Two halves: only the map files may read it, so the surface stays
+    /// small enough to review; and none of them has a way out (a request, a
+    /// cache, a log, a store on disk). Searched by the calls that read it,
+    /// not by `import CoreLocation`: MapKit brings those types in without
+    /// the import.
+    func testTheDeviceLocationNeverLeavesThePhone() throws {
+        let readers = ["CLLocationManager", "UserAnnotation(", "MapUserLocationButton", "showsUserLocation",
+                       "DeviceLocation", "StandingIn"]
+        // The core, which holds the position: no way out of any kind.
+        let core: Set = ["DeviceLocation.swift", "StandingIn.swift", "MapLocationButton.swift"]
+        // The maps that draw it or name the parcel under it.
+        let maps: Set = ["SatelliteParcelMap.swift", "ParcelMapView.swift", "MechanisatorHomeView.swift",
+                         "TaskParcelMap.swift", "TreatmentParcelMap.swift", "TreatmentPlaceView.swift"]
+        let ways = ["APIClient", "URLRequest", "URLSession", "ResponseCache", "UserDefaults", "Log.",
+                    "FileManager", "PendingOperations", "Outbox", "print("]
+
         let sources = try XCTUnwrap(FileManager.default.enumerator(
             at: Self.root.appendingPathComponent("Agrent"), includingPropertiesForKeys: nil))
         var files = 0
+        var readersSeen: Set<String> = []
         for case let url as URL in sources where url.pathExtension == "swift" {
             files += 1
+            let name = url.lastPathComponent
             let text = try String(contentsOf: url, encoding: .utf8)
-            for reader in readers {
-                XCTAssertFalse(text.contains(reader), "\(url.lastPathComponent) reads the device's location (\(reader))")
+            let reads = readers.filter { text.contains($0) }
+            guard !reads.isEmpty else { continue }
+            readersSeen.insert(name)
+            XCTAssertTrue(core.contains(name) || maps.contains(name),
+                          "\(name) reads the device's location (\(reads)); only the maps may, and only to draw it")
+            for way in ways + (core.contains(name) ? ["AppStorage"] : []) {
+                XCTAssertFalse(text.contains(way), "\(name) holds the position and has a way out: \(way)")
             }
         }
         XCTAssertGreaterThan(files, 50, "positive control: the sources were found")
+        XCTAssertTrue(readersSeen.isSuperset(of: core), "positive control: the location's own files moved")
+
+        // Not collected, so not declared: App Store Connect has no Location
+        // entry either.
+        let declared = try collectedTypes()
+        XCTAssertFalse(declared.contains { $0.contains("Location") }, "a declared location means it now leaves the phone")
+        XCTAssertTrue(try read("project.yml").contains("NSLocationWhenInUseUsageDescription: Местоположението"),
+                      "the system's question needs the Bulgarian reason")
+        XCTAssertFalse(try read("project.yml").contains("NSLocationAlwaysAndWhenInUseUsageDescription"),
+                       "When In Use only: never in the background")
     }
 }

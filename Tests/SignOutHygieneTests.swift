@@ -585,6 +585,7 @@ final class SignOutHygieneTests: XCTestCase {
         "SessionIdentity.shared": "cleared by endSession and TokenStore.clear",
         "ActiveFarm.shared": "a mirror only FarmStore writes, and FarmStore.reset() clears it",
         "JournalChanges.shared": "a counter that cues the journal to read again; holds no user data",
+        "DeviceLocation.shared": "the phone's own position, in memory while a map is open and forgotten when it closes; never stored or sent (#492)",
     ]
 
     /// A type's instance of ITSELF held in a static — `static let messages =
