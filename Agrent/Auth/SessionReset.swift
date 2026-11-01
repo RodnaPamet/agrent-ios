@@ -174,6 +174,8 @@ enum SessionReset {
         PushRegistrar.shared.reset()
         PushInbox.shared.reset()
         PushPermission.shared.reset()
+        // Usage events not yet sent were this person's (#493).
+        UsageEvents.shared.reset()
         // A half-made farm's name does not stay on a shared phone after its
         // person has gone (#197).
         FarmWizardDrafts(defaults: .standard).clear()

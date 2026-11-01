@@ -39,6 +39,7 @@ enum NewTaskAPI {
     /// read is still a task on the list, which the reload shows.
     static func create(_ body: Body) async throws -> String? {
         let data = try await APIClient.shared.postReturningData(path, body: body, idempotencyKey: nil)
+        UsageEvents.note(.taskCreated)
         struct Created: Decodable { let id: String? }
         return (try? JSONDecoder().decode(Created.self, from: data))?.id
     }

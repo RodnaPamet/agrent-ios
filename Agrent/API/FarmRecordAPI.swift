@@ -106,6 +106,7 @@ enum FarmRecordAPI {
     /// design, so the document session waits, and the sheet shows a spinner.
     static func generate(_ campaign: Campaign) async throws -> URL {
         let (data, served) = try await APIClient.shared.postForDocument(campaignPath(campaign), body: NoBody())
+        UsageEvents.note(.farmDiaryDownloaded)
         return try keep(data, named: fileName(served, fallback: fallbackName(campaign)))
     }
 

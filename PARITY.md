@@ -1693,6 +1693,30 @@ Owner, 2026-11-01: "expenses needs to be folded and clickable to unfold … a fi
 - **Interim:** sums come from the list (newest 500); a truncated list says the graphs are by those. agri-saas will serve an exact `GET /grain/costs/summary` (backend 1, 2026-11-01). When it is live, it REPLACES the local summing outright, with no fallback path.
 - **Web too** (owner): backend 1 builds the same on the web's «Разходи».
 
+## Usage visibility (#493)
+
+Owner, 2026-11-01: "our server, per account". `POST /api/t/{tenantSlug}/usage-events` follows backend 1's frozen contract.
+
+- **What is sent:** `screen_opened`, with a static surface, each time a surface's screen, the mechanisator's home or Профил appears. Also 25 action names, each noted where the write succeeds:
+  - treatment, activity, correction, delete;
+  - both diary PDFs;
+  - cost saved and deleted, invoice scanned;
+  - task created, closed and commented;
+  - document uploaded and scanned, Drive copy;
+  - listing created, edited, fulfilled and withdrawn, inquiry, message;
+  - assistant asked and its entry opened;
+  - notification opened;
+  - `parcel_located`, when «Нов запис» ticks the parcel you stand in (#492).
+- **Not sent:** «Меню» opening. SwiftUI's `Menu` has no open callback; the surface the menu opens is counted instead.
+- **Nothing personal:** names and surfaces are closed enums, so no id, crop, parcel, position or typed text can reach a body. A test pins the body to `name`, `surface` and `at`. The server takes the user and farm from the session.
+- **Never in the way:**
+  - recorded only while `/me` resolves `usage.events` on for the person (default off; the owner switches it);
+  - kept in memory only;
+  - sent at 20 events, every 2 minutes, and on going to the background;
+  - any non-2xx drops the batch, and a 403 or 404 stops sending for the session.
+- **Whose:** each event keeps its farm and goes to that farm's path. Sign-out empties the queue.
+- **Declared** as Product Interaction for Analytics, linked to the user, not tracking (#350). The server keeps it 90 days.
+
 ## Blocks (Блокове)
 
 ### A parcel's risk on its own screen (owner 2026-10-29)

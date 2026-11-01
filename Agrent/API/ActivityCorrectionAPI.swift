@@ -40,8 +40,10 @@ enum ActivityCorrectionAPI {
     /// `APIError.conflict`, as on a treatment.
     static func correct(_ handle: String, _ correction: ActivityCorrection.Body,
                         version: Int) async throws -> ActivityDefinition {
-        try await APIClient.shared.put(definitionPath(handle), body: correction,
-                                       ifMatch: version, as: ActivityDefinition.self)
+        let corrected = try await APIClient.shared.put(definitionPath(handle), body: correction,
+                                                       ifMatch: version, as: ActivityDefinition.self)
+        UsageEvents.note(.treatmentCorrected)
+        return corrected
     }
 
     /// Its corrections, newest first: a READ gate, as a treatment's trail.

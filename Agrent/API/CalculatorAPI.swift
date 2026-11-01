@@ -31,6 +31,7 @@ enum CostsAPI {
     /// it moves every figure on the farm's calculator.
     static func delete(_ id: String) async throws {
         _ = try await APIClient.shared.deleteReturningData(entryPath(id))
+        UsageEvents.note(.costDeleted)
     }
 
     /// Already gone: deleted from the web or another phone.
@@ -158,9 +159,11 @@ enum CostsAPI {
     static func create(
         _ entry: CreateCostEntry, idempotencyKey: String
     ) async throws -> Data {
-        try await APIClient.shared.postReturningData(
+        let data = try await APIClient.shared.postReturningData(
             base, body: entry, idempotencyKey: idempotencyKey
         )
+        UsageEvents.note(.costSaved)
+        return data
     }
 
     // MARK: - A whole sheet
@@ -190,8 +193,10 @@ enum CostsAPI {
     static func createSheet(
         _ sheet: Sheet, idempotencyKey: String
     ) async throws -> Data {
-        try await APIClient.shared.postReturningData(
+        let data = try await APIClient.shared.postReturningData(
             batchPath, body: sheet, idempotencyKey: idempotencyKey
         )
+        UsageEvents.note(.costSaved)
+        return data
     }
 }

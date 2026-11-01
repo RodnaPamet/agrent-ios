@@ -178,6 +178,7 @@ enum TreatmentAPI {
     static func record(_ record: TreatmentRecord, idempotencyKey: String) async throws -> TreatmentReceipt {
         let data = try await APIClient.shared.postReturningData(
             recordPath, body: Body(record), idempotencyKey: idempotencyKey)
+        UsageEvents.note(.treatmentSaved)
         return receipt(from: data, key: idempotencyKey)
     }
 
@@ -247,6 +248,7 @@ enum TreatmentAPI {
     /// aren't read: the entry's screen closes and the list is read again.
     static func abandon(_ handle: String) async throws {
         _ = try await APIClient.shared.deleteReturningData(treatmentPath(handle))
+        UsageEvents.note(.treatmentDeleted)
     }
 
     /// The treatment's ДНЕВНИК pages, kept as the per-block register is
@@ -254,6 +256,7 @@ enum TreatmentAPI {
     /// the sheet closes. A GET, and a pure read — the server files nothing.
     static func document(forTreatment handle: String) async throws -> URL {
         let (data, served) = try await APIClient.shared.getForDocument(documentPath(handle))
+        UsageEvents.note(.diaryPDFDownloaded)
         return try FarmRecordAPI.keep(data, named: FarmRecordAPI.fileName(served, fallback: "dnevnik-\(handle).pdf"))
     }
 

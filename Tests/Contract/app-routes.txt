@@ -116,4 +116,5 @@
 /api/t/{tenantSlug}/trends/news/tags
 /api/t/{tenantSlug}/trends/prices
 /api/t/{tenantSlug}/units
+/api/t/{tenantSlug}/usage-events
 /api/t/{tenantSlug}/users/assignable

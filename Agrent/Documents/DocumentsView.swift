@@ -103,7 +103,10 @@ private struct DocumentsScreen: View {
                     scanning = false
                     guard !pages.isEmpty else { return }
                     let pdf = ScanPDF.make(pages)
-                    DispatchQueue.main.async { pending = DocumentUploads.scan(pdf) }
+                    DispatchQueue.main.async {
+                        pending = DocumentUploads.scan(pdf)
+                        UsageEvents.shared.record(.documentScanned)
+                    }
                 } onCancel: {
                     scanning = false
                 }

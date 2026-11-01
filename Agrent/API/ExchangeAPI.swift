@@ -71,9 +71,11 @@ enum ExchangeAPI {
     /// platform. Built, wired,
     /// and the first real send is the owner's.
     static func createListing(_ draft: CreateExchangeListing) async throws -> Data {
-        try await APIClient.shared.postReturningData(
+        let data = try await APIClient.shared.postReturningData(
             "\(base)/listings", body: draft, idempotencyKey: nil
         )
+        UsageEvents.note(.listingCreated)
+        return data
     }
 
     /// Your own listing withdrawn or marked fulfilled (#478): `PATCH` on the
@@ -85,6 +87,7 @@ enum ExchangeAPI {
     /// Built, wired, and the first real press is the owner's.
     static func setListingStatus(_ id: String, _ action: ListingCustodyAction) async throws -> ListingStatusChanged {
         let data = try await APIClient.shared.patchReturningData(listingPath(id), body: ["action": action])
+        UsageEvents.note(action == .fulfil ? .listingFulfilled : .listingWithdrawn)
         return try await APIClient.shared.decode(data, as: ListingStatusChanged.self)
     }
 
@@ -100,6 +103,7 @@ enum ExchangeAPI {
     /// wired, and the first real save is the owner's.
     static func updateListing(_ id: String, _ update: UpdateExchangeListing) async throws -> OwnExchangeListing {
         let data = try await APIClient.shared.putReturningData(listingPath(id), body: update)
+        UsageEvents.note(.listingEdited)
         return try await APIClient.shared.decode(data, as: OwnExchangeListing.self)
     }
 
@@ -236,6 +240,7 @@ enum ExchangeAPI {
         let data = try await APIClient.shared.postReturningData(
             openThreadPath(listingID: listingID), body: NoBody(), idempotencyKey: nil
         )
+        UsageEvents.note(.inquirySent)
         return try await APIClient.shared.decode(data, as: ExchangeThreadOpened.self)
     }
 
@@ -261,12 +266,14 @@ enum ExchangeAPI {
     static func sendMessage(
         threadID: String, text: String, idempotencyKey: MessageSendKey
     ) async throws -> ExchangeMessageSent {
-        try await APIClient.shared.post(
+        let sent = try await APIClient.shared.post(
             messagesPath(threadID: threadID),
             body: SendExchangeMessage(body: text),
             as: ExchangeMessageSent.self,
             idempotencyKey: idempotencyKey.value
         )
+        UsageEvents.note(.messageSent)
+        return sent
     }
 
     /// NOT EXERCISED against production from development or CI: it moves the

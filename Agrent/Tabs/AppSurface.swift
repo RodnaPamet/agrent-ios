@@ -151,9 +151,15 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     /// which buries features behind an extra tap and reads as a bug.
     static let capacity = 5
 
-    /// On the main actor, where views are built (#195).
-    @MainActor @ViewBuilder
+    /// On the main actor, where views are built (#195). Each opening is a
+    /// `screen_opened` for the usage page (#493), by this static route.
+    @MainActor
     var screen: some View {
+        surfaceScreen.onAppear { UsageEvents.shared.screen(.app(self)) }
+    }
+
+    @MainActor @ViewBuilder
+    private var surfaceScreen: some View {
         switch self {
         case .journal: JournalListView()
         case .calculator: CalculatorView()

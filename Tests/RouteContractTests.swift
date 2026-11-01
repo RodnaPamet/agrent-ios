@@ -177,6 +177,10 @@ final class RouteContractTests: XCTestCase {
     /// Empty again from agri-saas main 3611e9b: the invoice read (#482),
     /// built against backend 1's agreed contract, came off with the refresh
     /// once agri-saas #2604 was live (2026-11-01).
+    ///
+    /// Empty again from agri-saas main 154a39f: the usage events (#493), built
+    /// against backend 1's frozen contract, came off with the refresh once
+    /// agri-saas #2658 was live (2026-11-01).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -239,6 +243,8 @@ final class RouteContractTests: XCTestCase {
             ("ParcelCommentsAPI.swift", [ParcelCommentsAPI.path(parcel)]),
             // «Известия» (#471): the list and marking one read.
             ("NotificationsAPI.swift", [NotificationsAPI.listPath, NotificationsAPI.readPath(id)]),
+            // The usage page's events (#493), to the farm they happened in.
+            ("UsageEvents.swift", [UsageEvents.path(farm: "{tenantSlug}")]),
             ("AssistantAPI.swift", [AssistantAPI.streamPath]),
             ("InvoiceScan.swift", [InvoiceScanAPI.path]),
             // A mechanisator's own queue, for their one screen (#465).

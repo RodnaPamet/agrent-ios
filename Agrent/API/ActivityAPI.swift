@@ -46,6 +46,7 @@ enum ActivityAPI {
         guard let body = Body(record) else { throw NotAnActivity() }
         let data = try await APIClient.shared.postReturningData(
             recordPath(tenant: FarmPath.openSlug), body: body, idempotencyKey: idempotencyKey)
+        UsageEvents.note(.activitySaved)
         return TreatmentAPI.receipt(from: data, key: idempotencyKey)
     }
 

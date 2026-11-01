@@ -189,6 +189,7 @@ struct ProfileView: View {
         }
         .pageBackground()
         .inlineTitle("Профил")
+        .onAppear { UsageEvents.shared.screen(.profile) }
         // Its own stack: a sheet over Профил, wherever Профил was opened.
         // Opening the new farm rebuilds the tabs for it (`FarmGate`), which
         // takes this sheet and the screens under it away with the old farm.

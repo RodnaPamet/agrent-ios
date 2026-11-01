@@ -332,6 +332,8 @@ struct TreatmentPlaceView: View {
         else { return }
         pickedHereFor = cropKey
         chosen.insert(field.id)
+        // That the tick was used, never where (#493): the position stays here.
+        UsageEvents.shared.record(.parcelLocated)
         AccessibilityNotification.Announcement(
             "Отбелязан е парцелът, в който се намирате: \(field.parcel.name).").post()
     }
