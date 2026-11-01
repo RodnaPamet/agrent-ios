@@ -140,13 +140,10 @@ private struct AssistantTurnView: View {
                 .font(.subheadline)
                 .accessibilityElement(children: .combine)
             case .answered(let text, let links, let note, let proposal):
-                Text(AssistantRendering.answer(text))
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    // The words as shown: the raw text's Markdown marks would
-                    // be read out.
-                    .accessibilityLabel(AssistantText.answered(String(AssistantRendering.answer(text).characters)))
+                // Paragraphs, lists and tables as blocks (owner, 2026-11-01:
+                // tables reached the screen as rows of «|»). VoiceOver hears
+                // the words, never the Markdown marks.
+                AssistantAnswerView(text: text)
                 ForEach(AssistantSheet.followable(links, bar: router?.bar ?? [], farm: FarmPath.openSlug),
                         id: \.self) { link in
                     Button {

@@ -478,3 +478,12 @@ library with one row in each state: a live PDF copied to Drive, a live photo
 whose Drive copy failed (no expiry), an expired one kept only in Drive, and
 one deleted by hand, whose name the server cleared. `documents-settings.json`:
 its settings, one year, Drive on and connected (the server sends no account address), 125 MiB of the 2 GiB ceiling.
+
+## The assistant's answer
+
+`assistant-stream-answer.txt`: a canned server-sent stream for
+`POST /assistant/stream`. It holds a tool call, then an answer with a Markdown
+table and a list, then `done`. It is served only under `AGRENT_UITEST_ASSISTANT`, the
+one POST the seam answers, so the answer's drawing can be photographed
+(owner, 2026-11-01: tables reached the screen as rows of «|»). The text is
+synthetic; nothing leaves the process.
