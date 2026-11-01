@@ -43,6 +43,7 @@ struct AssistantLauncher: View {
                 if let pending {
                     entry = PreparedEntry(draft: pending)
                     self.pending = nil
+                    UsageEvents.shared.record(.assistantEntryOpened)
                 }
             }) {
                 AssistantSheet(store: store, context: surface.flatMap(AssistantPageContext.surface)) { draft in

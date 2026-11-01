@@ -52,6 +52,7 @@ final class AssistantStore {
         draft = ""
         asking = true
         turns.append(Turn(question: question, phase: .working(AssistantText.thinking)))
+        UsageEvents.shared.record(.assistantAsked)
         let index = turns.count - 1
         running = Task { await run(AssistantRequest(question: question, pageContext: context), at: index) }
     }

@@ -68,6 +68,7 @@ enum DocumentsAPI {
         let data = try await APIClient.shared.postMultipart(
             listPath, file: file, fileName: fileName, mimeType: mimeType,
             fields: ["name": name], idempotencyKey: idempotencyKey)
+        UsageEvents.note(.documentUploaded)
         return try await APIClient.shared.decode(data, as: FarmDocument.self)
     }
 
@@ -82,6 +83,7 @@ enum DocumentsAPI {
     static func retryDriveCopy(_ id: String) async throws {
         _ = try await APIClient.shared.postReturningData(
             driveCopyPath(id), body: EmptyBody(), idempotencyKey: nil)
+        UsageEvents.note(.driveCopyRequested)
     }
 
     private struct EmptyBody: Encodable, Sendable {}

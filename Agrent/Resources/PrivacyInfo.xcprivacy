@@ -36,6 +36,13 @@
     Other User Content
                      the farm records the user enters (journal, tasks,
                      costs, parcels) and Борса listings and messages.
+    Product Interaction
+                     which screens open and which key actions are done
+                     (#493, UsageEvents), for the usage page, PURPOSE
+                     ANALYTICS. Names from a closed list only: no record id,
+                     crop, parcel, position or typed text. Recorded only
+                     while the server's `usage.events` flag is on; kept 90
+                     days by the server.
 
   And to Sentry, the one third-party SDK (#494, owner 2026-11-01), NOT
   linked to the user: no user, IP, device name, screenshot, request or
@@ -152,6 +159,18 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 			</array>
 		</dict>
 	</array>

@@ -34,6 +34,7 @@ struct MechanisatorHomeView: View {
         RoutedStack {
             MechanisatorHome()
         }
+        .onAppear { UsageEvents.shared.screen(.mechanisatorHome) }
     }
 }
 

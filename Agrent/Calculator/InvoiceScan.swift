@@ -98,6 +98,7 @@ enum InvoiceScanAPI {
     /// spends the farm's AI budget, and a second read is the person's choice.
     static func scan(_ file: Data, fileName: String, mimeType: String) async throws -> InvoiceScan {
         let data = try await APIClient.shared.postMultipart(path, file: file, fileName: fileName, mimeType: mimeType)
+        UsageEvents.note(.invoiceScanned)
         return try await APIClient.shared.decode(data, as: InvoiceScan.self)
     }
 
@@ -105,6 +106,7 @@ enum InvoiceScanAPI {
     /// bytes it holds, so nothing is uploaded twice.
     static func scan(documentId: String) async throws -> InvoiceScan {
         let data = try await APIClient.shared.postMultipart(path, fields: ["documentId": documentId])
+        UsageEvents.note(.invoiceScanned)
         return try await APIClient.shared.decode(data, as: InvoiceScan.self)
     }
 }

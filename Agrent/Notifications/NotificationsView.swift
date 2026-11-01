@@ -65,6 +65,7 @@ private struct NotificationsScreen: View {
 
     /// Read, then where it leads: a screen of the app, or a page outside it.
     private func open(_ item: AppNotification) async {
+        UsageEvents.shared.record(.notificationOpened)
         await store.markRead(item)
         if let link = item.link(inFarm: store.farm) {
             pushRoute(AppRoute(link))

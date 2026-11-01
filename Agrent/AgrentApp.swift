@@ -235,6 +235,11 @@ struct MainTabView: View {
         // likely just found signal. Waiting for them to press a button
         // would make the queue their job rather than the app's.
         .onChange(of: scenePhase) { _, phase in
+            // What the usage page has waiting goes as the app leaves the
+            // screen (#493): the last chance before a pocket or a kill.
+            if phase == .background {
+                Task { await UsageEvents.shared.flush() }
+            }
             if phase == .active {
                 Task {
                     await outbox.flush()

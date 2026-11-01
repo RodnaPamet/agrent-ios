@@ -38,8 +38,10 @@ enum TreatmentCorrectionAPI {
     /// `STALE_DATA` (someone corrected it meanwhile) is `APIError.conflict`.
     static func correct(_ handle: String, _ correction: TreatmentCorrection.Body,
                         version: Int) async throws -> TreatmentDefinition {
-        try await APIClient.shared.put(definitionPath(handle), body: correction,
-                                       ifMatch: version, as: TreatmentDefinition.self)
+        let corrected = try await APIClient.shared.put(definitionPath(handle), body: correction,
+                                                       ifMatch: version, as: TreatmentDefinition.self)
+        UsageEvents.note(.treatmentCorrected)
+        return corrected
     }
 
     /// The treatment's corrections, newest first (agri-saas #2292).

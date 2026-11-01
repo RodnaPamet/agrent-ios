@@ -44,6 +44,7 @@ final class PrivacyManifestTests: XCTestCase {
             "NSPrivacyCollectedDataTypeOtherUserContent",
             "NSPrivacyCollectedDataTypePerformanceData",
             "NSPrivacyCollectedDataTypePhotosorVideos",
+            "NSPrivacyCollectedDataTypeProductInteraction",
             "NSPrivacyCollectedDataTypeUserID",
         ], "a change here needs the same change in App Store Connect's App Privacy answers")
     }
@@ -62,6 +63,21 @@ final class PrivacyManifestTests: XCTestCase {
         }
         XCTAssertTrue(try read("Agrent/AgrentApp.swift").contains("CrashReporting.start()"),
                       "positive control: Sentry is started from the app")
+    }
+
+    /// Product Interaction's reason in the code: the usage events, for
+    /// Analytics, and only from the closed list of names (#493).
+    func testUsageIsDeclaredForAnalytics() throws {
+        let data = try Data(contentsOf: Self.root.appendingPathComponent("Agrent/Resources/PrivacyInfo.xcprivacy"))
+        let plist = try XCTUnwrap(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+        let entries = try XCTUnwrap(plist["NSPrivacyCollectedDataTypes"] as? [[String: Any]])
+        let usage = try XCTUnwrap(entries.first {
+            $0["NSPrivacyCollectedDataType"] as? String == "NSPrivacyCollectedDataTypeProductInteraction"
+        })
+        XCTAssertEqual(usage["NSPrivacyCollectedDataTypePurposes"] as? [String],
+                       ["NSPrivacyCollectedDataTypePurposeAnalytics"])
+        let source = try read("Agrent/Diagnostics/UsageEvents.swift")
+        XCTAssertTrue(source.contains("func record(_ name: Name)"), "positive control: events are recorded by name")
     }
 
     /// The reasons, read from the code: Sign in with Apple asks for the

@@ -175,11 +175,13 @@ extension WorkItemAPI {
         resolution: String?,
         idempotencyKey: String
     ) async throws -> Data {
-        try await APIClient.shared.postReturningData(
+        let data = try await APIClient.shared.postReturningData(
             statusPath(id),
             body: SetStatus(status: status.rawValue, resolution: resolution),
             idempotencyKey: idempotencyKey
         )
+        if [.resolved, .closed].contains(status) { UsageEvents.note(.taskClosed) }
+        return data
     }
 
     /// `resolution` is encoded even when nil, because the schema
@@ -285,6 +287,7 @@ extension WorkItemAPI {
     static func addComment(_ id: String, text: String, idempotencyKey: String) async throws {
         _ = try await APIClient.shared.postReturningData(
             commentsPath(id), body: CommentBody(body: text), idempotencyKey: idempotencyKey)
+        UsageEvents.note(.taskCommentAdded)
     }
 
     private struct CommentBody: Encodable, Sendable {
