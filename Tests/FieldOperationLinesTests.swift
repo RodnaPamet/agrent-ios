@@ -80,8 +80,8 @@ final class OperationLineDecodingTests: XCTestCase {
         XCTAssertEqual(first.id, "opl_1")
         XCTAssertEqual(first.status, .pending)
         XCTAssertEqual(first.version, 3, "the lock's version was not read with the line")
-        XCTAssertEqual(first.product.name, "Примерен хербицид")
-        XCTAssertEqual(first.doseUnit.symbol, "л/дка")
+        XCTAssertEqual(first.product?.name, "Примерен хербицид")
+        XCTAssertEqual(first.doseUnit?.symbol, "л/дка")
         XCTAssertEqual(first.parcel.name, "SYNTH-1")
         XCTAssertEqual(detail.task.assigneeUserId, "usr_operator")
         XCTAssertEqual(detail.task.key, "FT-1")
@@ -97,6 +97,29 @@ final class OperationLineDecodingTests: XCTestCase {
     }
 
     /// `version` is REQUIRED (agri-saas#1381; the column is `Int @default(0)`).
+    /// Work with nothing applied: soil cultivation has a line with no
+    /// product, no dose and no unit (all nullable in `OperationParcel`,
+    /// whatever the spec says). It reads, beside a sprayed line, instead of
+    /// failing the section (the owner's «Обработка на почвата», 2026-11-01).
+    func testALineWithNothingAppliedStillReads() async throws {
+        let soilWork = lineJSON(id: "opl_2")
+            .replacingOccurrences(of: #""productItemId":"itm_1","doseValue":"0.25","doseUnitId":"unt_1""#,
+                                  with: #""productItemId":null,"doseValue":null,"doseUnitId":null"#)
+            .replacingOccurrences(of: #""product":{"id":"itm_1","name":"Примерен хербицид"}"#, with: #""product":null"#)
+            .replacingOccurrences(of: #""doseUnit":{"id":"unt_1","symbol":"л/дка","name":"литра на декар"}"#,
+                                  with: #""doseUnit":null"#)
+        XCTAssertTrue(soilWork.contains(#""product":null"#), "positive control: the fixture lost its product")
+        let detail = try await decodeDetail(detailJSON(lines: [lineJSON(), soilWork]))
+        XCTAssertEqual(detail.lines.count, 2)
+        let bare = try XCTUnwrap(detail.lines.last)
+        XCTAssertNil(bare.product)
+        XCTAssertNil(bare.doseLabel)
+        XCTAssertNil(bare.doseSpoken)
+        XCTAssertEqual(bare.parcel.name, "SYNTH-1")
+        XCTAssertEqual(detail.lines.first?.doseLabel, "0,25 л/дка")
+        XCTAssertEqual(detail.lines.first?.doseSpoken, "0,25 литра на декар")
+    }
+
     /// A line without one is a broken contract, and the decode says so rather
     /// than showing a line that could only ever be marked unguarded (#173).
     func testALineWithoutAVersionIsABrokenContract() async {
