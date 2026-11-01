@@ -14,6 +14,8 @@ struct CalculatorView: View {
     /// types unfolded.
     @State private var chosenTypes: Set<CostCategory> = []
     @State private var openTypes: Set<CostCategory> = []
+    /// The month graph's month (owner, 2026-11-01): nil is «Всички месеци».
+    @State private var chartMonth: Date?
 
     var body: some View {
         RoutedStack {
@@ -209,13 +211,10 @@ struct CalculatorView: View {
                 CostTotalRow(count: breakdown.count, totals: breakdown.totals)
                     .pageRow()
                 ForEach(breakdown.groups) { group in
+                    // Opened, a type is its expenses and nothing else: its
+                    // own month graph went (owner, 2026-11-01: "not needed,
+                    // replace them with the actual rows").
                     DisclosureGroup(isExpanded: openBinding(group.category)) {
-                        let months = breakdown.months(of: group.category)
-                        if !months.isEmpty {
-                            CostMonthsChart(months: months, order: breakdown.groups.map(\.category))
-                                .padding(.vertical, 6)
-                                .pageRow()
-                        }
                         ForEach(group.entries) { cost in
                             CostRow(cost: cost)
                                 .costRemovalSwipe(me: people.user) {
@@ -248,36 +247,78 @@ struct CalculatorView: View {
     }
 
     /// The two graphs of the chosen expenses: by type, when there is more
-    /// than one, and by month.
+    /// than one, and by month, with a dropdown for one month (owner,
+    /// 2026-11-01: "a dropdown to select a specific month and default to all
+    /// months"). No note under them: the owner, the same day, "the text at
+    /// the bottom is not needed".
     @ViewBuilder
     private func costCharts(_ breakdown: CostBreakdown, truncated: Bool) -> some View {
+        let order = breakdown.groups.map(\.category)
         let types = breakdown.groups.filter { $0.chartAmount > 0 }
         if types.count > 1 {
             Section(titled: "Разходи по вид") {
-                CostTypeTotalsChart(groups: types).pageRow()
+                CostTypeTotalsChart(bars: types.map { .init(category: $0.category, amount: $0.chartAmount) },
+                                    order: order)
+                    .pageRow()
             }
         }
         if !breakdown.months.isEmpty {
+            let monthsShown = Array(Set(breakdown.months.map(\.month))).sorted(by: >)
+            // A month the chips have since emptied falls back to all of them.
+            let month = chartMonth.flatMap { monthsShown.contains($0) ? $0 : nil }
             Section {
-                CostMonthsChart(months: breakdown.months, order: breakdown.groups.map(\.category))
-                    .padding(.vertical, 6)
+                monthPicker(monthsShown, showing: month,
+                            total: breakdown.months.filter { month == nil || $0.month == month }
+                                .reduce(0) { $0 + $1.amount })
                     .pageRow()
+                if let month {
+                    CostTypeTotalsChart(
+                        bars: breakdown.months.filter { $0.month == month }
+                            .map { .init(category: $0.category, amount: $0.amount) },
+                        order: order,
+                        spokenTitle: "Разходи за \(BgDate.monthYear(month)), в евро")
+                        .padding(.vertical, 6)
+                        .pageRow()
+                } else {
+                    CostMonthsChart(months: breakdown.months, order: order)
+                        .padding(.vertical, 6)
+                        .pageRow()
+                }
             } header: {
                 SectionHeader("Разходи по месеци")
-            } footer: {
-                SectionFooter { costChartsNote(breakdown, truncated: truncated) }
             }
         }
     }
 
-    @ViewBuilder
-    private func costChartsNote(_ breakdown: CostBreakdown, truncated: Bool) -> some View {
-        let notes = [
-            truncated ? "Графиките са по последните \(Plural.bg(breakdown.count, "разход", "разхода"))." : nil,
-            breakdown.otherCurrencies.isEmpty ? nil
-                : "В графиките са само разходите в EUR, без тези в \(breakdown.otherCurrencies.joined(separator: ", "))."
-        ].compactMap { $0 }
-        if !notes.isEmpty { Text(notes.joined(separator: " ")) }
+    /// «Всички месеци» or one month, newest first, with what the graph under
+    /// it adds up to.
+    private func monthPicker(_ months: [Date], showing month: Date?, total: Double) -> some View {
+        let label = month.map(BgDate.monthYearTitle) ?? "Всички месеци"
+        return HStack(alignment: .firstTextBaseline) {
+            Menu {
+                Button("Всички месеци") { chartMonth = nil }
+                Section(titled: "Месеци") {
+                    ForEach(months, id: \.self) { item in
+                        Button(BgDate.monthYearTitle(item)) { chartMonth = item }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(label).font(.subheadline.weight(.semibold))
+                    Image(systemName: "chevron.down").font(.footnote.weight(.semibold))
+                }
+                .foregroundStyle(Palette.accent)
+                .frame(minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Месец: \(label)")
+            .accessibilityHint("Избира дали графиката показва всички месеци или един")
+            .accessibilityInputLabels(A11y.spokenNames("Месец", "Month"))
+            Spacer(minLength: 12)
+            Text(Money.text(total, CostBreakdown.chartCurrency))
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .accessibilityLabel("Общо \(Money.text(total, CostBreakdown.chartCurrency))")
+        }
     }
 
     @ViewBuilder
@@ -710,7 +751,7 @@ struct CostRow: View {
             Spacer(minLength: 12)
             // Padded back to the column's scale: 1.00 arrives as 1, and
             // "1 лв" on a books screen is not what the ledger says.
-            Text("\(cost.amountText) \(cost.currency)")
+            Text("\(cost.amountText) \(cost.currencyCode)")
                 .font(.subheadline.monospacedDigit())
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -718,7 +759,7 @@ struct CostRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.sentence([
             cost.category.label,
-            "\(cost.amountText) \(cost.currency)",
+            "\(cost.amountText) \(cost.currencyCode)",
             BgDate.full(cost.incurredOn),
             cost.supplier,
         ]))

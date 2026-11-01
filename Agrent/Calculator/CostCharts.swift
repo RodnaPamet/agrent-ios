@@ -2,13 +2,14 @@ import Charts
 import SwiftUI
 
 /// «Разходи»'s graphs (#500, owner 2026-11-01): the chosen expenses by type,
-/// and by month split by type; and, when a type is opened, its own months.
-/// EUR only (`CostBreakdown.chartCurrency`).
+/// and by month split by type. EUR only (`CostBreakdown.chartCurrency`). A
+/// type's own month graph, shown when it was opened, was taken out the same
+/// day at the owner's word: opened, a type shows its rows.
 ///
 /// Each is ONE element to VoiceOver, read as the numbers it draws, as the
 /// dashboard's charts are: a bar is a picture, and its figure is the point.
 ///
-/// A type has ONE colour in all three (`CostChartColours`): the six biggest
+/// A type has ONE colour in both (`CostChartColours`): the six biggest
 /// take the design system's six series colours in order, the rest share the
 /// muted one as «Останали».
 enum CostChartColours {
@@ -27,20 +28,33 @@ enum CostChartColours {
     }
 }
 
-/// One bar per type, biggest first, each with its amount at its end.
+/// One bar per type, biggest first, each with its amount at its end: the
+/// chosen expenses' types, or one month's when the month graph's dropdown
+/// picks a month.
 struct CostTypeTotalsChart: View {
-    let groups: [CostBreakdown.TypeGroup]
+    struct Bar: Identifiable, Equatable {
+        let category: CostCategory
+        let amount: Double
+        var id: CostCategory { category }
+    }
+
+    let bars: [Bar]
+    /// Every shown type, biggest first: the colours' order, so a type is the
+    /// same colour here as in the month graph.
+    let order: [CostCategory]
+    /// What VoiceOver hears before the figures.
+    var spokenTitle = "Разходи по вид, в евро"
 
     @ScaledMetric(relativeTo: .body) private var barRoom: CGFloat = 34
 
-    private var bars: [CostBreakdown.TypeGroup] { groups.filter { $0.chartAmount > 0 } }
+    private var shown: [Bar] { bars.filter { $0.amount > 0 }.sorted { $0.amount > $1.amount } }
 
     var body: some View {
-        Chart(bars) { group in
-            BarMark(x: .value("Сума", group.chartAmount), y: .value("Вид", group.category.label))
-                .foregroundStyle(CostChartColours.colour(group.category, in: groups.map(\.category)))
+        Chart(shown) { bar in
+            BarMark(x: .value("Сума", bar.amount), y: .value("Вид", bar.category.label))
+                .foregroundStyle(CostChartColours.colour(bar.category, in: order))
                 .annotation(position: .trailing, alignment: .leading) {
-                    Text(Money.text(group.chartAmount, nil))
+                    Text(Money.text(bar.amount, nil))
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(Palette.secondaryText)
                 }
@@ -57,11 +71,11 @@ struct CostTypeTotalsChart: View {
         }
         .chartXAxis(.hidden)
         // Room at the end for the longest amount.
-        .chartXScale(domain: 0...((bars.map(\.chartAmount).max() ?? 1) * 1.35))
-        .frame(height: barRoom * CGFloat(max(bars.count, 1)) + 8)
+        .chartXScale(domain: 0...((shown.map(\.amount).max() ?? 1) * 1.35))
+        .frame(height: barRoom * CGFloat(max(shown.count, 1)) + 8)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(A11y.sentence(["Разходи по вид, в евро"]
-            + bars.map { "\($0.category.label) \(Money.text($0.chartAmount, CostBreakdown.chartCurrency))" }))
+        .accessibilityLabel(A11y.sentence([spokenTitle]
+            + shown.map { "\($0.category.label) \(Money.text($0.amount, CostBreakdown.chartCurrency))" }))
     }
 }
 
