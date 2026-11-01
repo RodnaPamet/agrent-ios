@@ -59,6 +59,12 @@ enum AssistantText {
         case "ASSISTANT_TRUNCATED_RESULT":
             "Отговорът по-горе използва част от данните — един от списъците, които прочетох, беше твърде дълъг, "
                 + "за да го използвам цял."
+        // agri-saas #2648 (#490): a read that did not gather everything that
+        // exists, such as satellite risk for 24 of a block's 30 parcels. Not
+        // the truncation above: there the list was read and then shortened.
+        case "ASSISTANT_PARTIAL_DATA":
+            "Отговорът по-горе е непълен — част от Вашите записи не можаха да бъдат включени, "
+                + "така че го приемете като частична картина."
         default:
             "Отговорът е непълен."
         }

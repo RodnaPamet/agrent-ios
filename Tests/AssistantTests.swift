@@ -47,6 +47,8 @@ final class AssistantTests: XCTestCase {
         XCTAssertEqual(try event(#"{"type":"halt","outcome":"ASSISTANT_TOOL_BUDGET","toolCalls":8,"limit":8}"#),
                        .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil, counts: ["toolCalls": 8, "limit": 8]))
         XCTAssertEqual(try event(#"{"type":"done","truncatedAny":false}"#), .done(truncatedAny: false))
+        XCTAssertEqual(try event(#"{"type":"done","truncatedAny":false,"partialAny":true}"#),
+                       .done(truncatedAny: false, partialAny: true))
     }
 
     /// A type this build does not know is ignored, not a failure: the server
@@ -188,6 +190,35 @@ final class AssistantTests: XCTestCase {
         XCTAssertEqual(before.turns[0].phase, .unanswered(AssistantText.halt("ASSISTANT_PROVIDER_UNAVAILABLE")))
     }
 
+    /// Partial and out of time (agri-saas #2648): the halt says the time,
+    /// `done` says the partial read, and both are said under the answer.
+    /// The partial halt itself is not said twice.
+    func testAPartialReadIsSaidEvenWhenTimeEndedTheTurn() async {
+        let both = store([.answer(text: "Рискът е нисък.", links: [], proposal: nil),
+                          .halt(outcome: "ASSISTANT_TIME_BUDGET", message: nil, counts: [:]),
+                          .done(truncatedAny: false, partialAny: true)])
+        await ask(both)
+        XCTAssertEqual(both.turns[0].phase, .answered("Рискът е нисък.", note:
+            AssistantText.halt("ASSISTANT_TIME_BUDGET") + " " + AssistantText.halt("ASSISTANT_PARTIAL_DATA")))
+
+        let once = store([.answer(text: "Рискът е нисък.", links: [], proposal: nil),
+                          .halt(outcome: "ASSISTANT_PARTIAL_DATA", message: nil, counts: [:]),
+                          .done(truncatedAny: false, partialAny: true)])
+        await ask(once)
+        XCTAssertEqual(once.turns[0].phase, .answered("Рискът е нисък.", note: AssistantText.halt("ASSISTANT_PARTIAL_DATA")))
+
+        let noHalt = store([.answer(text: "Имате 20 блока.", links: [], proposal: nil),
+                            .done(truncatedAny: true, partialAny: false)])
+        await ask(noHalt)
+        XCTAssertEqual(noHalt.turns[0].phase, .answered("Имате 20 блока.", note: AssistantText.halt("ASSISTANT_TRUNCATED_RESULT")))
+
+        // A halt with no `done` after it ends the turn as the halt said.
+        let cut = store([.answer(text: "Частичен.", links: [], proposal: nil),
+                         .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil, counts: [:])])
+        await ask(cut)
+        XCTAssertEqual(cut.turns[0].phase, .answered("Частичен.", note: AssistantText.halt("ASSISTANT_TOOL_BUDGET")))
+    }
+
     /// No `refusal`, `halt` or `done`: the transport, and nothing else.
     func testAStreamThatJustEndsIsAnInterruption() async {
         let store = store([.thinking])
@@ -239,7 +270,8 @@ final class AssistantTests: XCTestCase {
         sentences += ["ASSISTANT_NO_GROUNDING", "ASSISTANT_OUT_OF_SCOPE", "ASSISTANT_HIGH_STAKES_NEEDS_SOURCE",
                       "ASSISTANT_EGRESS_BLOCKED", "ASSISTANT_INPUT_REJECTED", "SOMETHING_NEW"].map(AssistantText.refusal)
         sentences += ["ASSISTANT_TOOL_BUDGET", "ASSISTANT_SPEND_CEILING", "ASSISTANT_TIME_BUDGET",
-                      "ASSISTANT_PROVIDER_UNAVAILABLE", "ASSISTANT_TRUNCATED_RESULT", "SOMETHING_NEW"]
+                      "ASSISTANT_PROVIDER_UNAVAILABLE", "ASSISTANT_TRUNCATED_RESULT", "ASSISTANT_PARTIAL_DATA",
+                      "SOMETHING_NEW"]
             .map { AssistantText.halt($0) }
         for code in ["ASSISTANT_QUESTION_INVALID", "ASSISTANT_CONTEXT_INVALID", "AI_BUDGET_EXCEEDED"] {
             sentences.append(UserMessage.bulgarian[code] ?? "missing \(code)")
@@ -253,6 +285,10 @@ final class AssistantTests: XCTestCase {
                        "Не намерих нищо в данните на стопанството, с което да отговоря, и няма да предполагам.")
         XCTAssertEqual(AssistantText.halt("ASSISTANT_PROVIDER_UNAVAILABLE"),
                        "Не успях да се свържа с модела. Данните на стопанството не бяха прочетени и нищо не беше създадено.")
+        XCTAssertEqual(AssistantText.halt("ASSISTANT_PARTIAL_DATA"),
+                       "Отговорът по-горе е непълен — част от Вашите записи не можаха да бъдат включени, "
+                       + "така че го приемете като частична картина.", "agri-saas #2648's own words")
+        XCTAssertNotEqual(AssistantText.halt("ASSISTANT_PARTIAL_DATA"), AssistantText.halt("SOMETHING_NEW"))
         XCTAssertFalse(AssistantText.halt("ASSISTANT_PROVIDER_UNAVAILABLE").contains("непълен"),
                        "an outage can come before any answer, and does not call one incomplete")
     }
