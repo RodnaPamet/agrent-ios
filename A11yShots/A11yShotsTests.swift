@@ -2105,12 +2105,13 @@ final class A11yShotsTests: XCTestCase {
         let opened = app.navigationBars["История"].waitForExistence(timeout: 10)
         capture("05b-risk-history", app: app)
         XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
-        // The floating action, renamed and moved (#386): bottom right.
+        // The floating action: bottom LEFT since the assistant took the
+        // right (owner, 2026-11-01).
         app.navigationBars.buttons.firstMatch.tap()
         let insure = app.buttons["Застраховай"]
         XCTAssertTrue(insure.waitForExistence(timeout: 5), "no «Застраховай»")
-        XCTAssertGreaterThan(insure.frame.midX, app.windows.firstMatch.frame.midX,
-                             "«Застраховай» is not on the right")
+        XCTAssertLessThan(insure.frame.midX, app.windows.firstMatch.frame.midX,
+                          "«Застраховай» is not on the left")
         capture("05c-risk-insure", app: app)
     }
 
@@ -2702,6 +2703,42 @@ final class A11yShotsTests: XCTestCase {
         app.buttons["Попитай"].tap()
         Thread.sleep(forTimeInterval: 2)
         capture("23d-assistant-turn", app: app)
+    }
+
+    /// The assistant's button holds the bottom right on every screen; the
+    /// screens' own floating buttons must not sit under it (owner,
+    /// 2026-11-01: «Нова задача» and «Застраховай» to the bottom left). On a
+    /// block's map, the map's own two buttons must stay clear of it too.
+    func testFloatingButtonsKeepClearOfTheAssistant() {
+        let app = XCUIApplication()
+        app.launchArguments += [Self.seamArgument, "AGRENT_UITEST_ASSISTANT"]
+        app.launch()
+        assertSeamActive(app)
+        let assistant = app.buttons["Асистент"]
+
+        let tasks = labelled("Задачи", in: app.tabBars.buttons)
+        XCTAssertTrue(tasks.waitForExistence(timeout: 10), "no «Задачи» tab")
+        tasks.tap()
+        let newTask = app.buttons["Нова задача"]
+        XCTAssertTrue(newTask.waitForExistence(timeout: 15), "no «Нова задача»\n\(app.debugDescription)")
+        XCTAssertTrue(assistant.waitForExistence(timeout: 10), "no assistant button on Задачи")
+        XCTAssertLessThan(newTask.frame.midX, app.windows.firstMatch.frame.midX, "«Нова задача» is not on the left")
+        XCTAssertFalse(newTask.frame.intersects(assistant.frame), "«Нова задача» sits under the assistant")
+        Thread.sleep(forTimeInterval: 1)
+        capture("24a-floating-tasks", app: app)
+
+        app.tabBars.buttons["Блокове"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.cells.firstMatch.tap()
+        let target = app.buttons["Следващ парцел"]
+        XCTAssertTrue(target.waitForExistence(timeout: 20), "no target button on the map\n\(app.debugDescription)")
+        let locate = app.buttons["Моето местоположение"]
+        XCTAssertTrue(locate.waitForExistence(timeout: 5), "no location button on the map")
+        XCTAssertTrue(assistant.waitForExistence(timeout: 10), "no assistant button on the map")
+        XCTAssertFalse(target.frame.intersects(assistant.frame), "the target button sits under the assistant")
+        XCTAssertFalse(locate.frame.intersects(assistant.frame), "the location button sits under the assistant")
+        Thread.sleep(forTimeInterval: 3)
+        capture("24b-floating-map", app: app)
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

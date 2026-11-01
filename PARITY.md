@@ -1039,7 +1039,7 @@ priority, due date, assignee and links. **iOS** asks what a phone needs:
   - **Assignee:** from `/users/assignable`, «Без изпълнител» by default as on the web, kept in memory only.
   - **Due day:** sent as UTC midnight of the day, as the web's `ymdToInstant` sends it.
   - **Type and severity:** the web's defaults, `TASK` and `MEDIUM`, sent as the web sends them. No priority (owner, 2026-10-09).
-- **Opened from:** a **+ at the bottom right** of «Задачи», the owner's choice, offered only to someone who may write in the farm.
+- **Opened from:** a **+ at the bottom left** of «Задачи» (bottom right until 2026-11-01, when the assistant's button took that corner; owner), offered only to someone who may write in the farm.
 - **After a save:** the list reloads and the new task opens.
 - **Not idempotent:** the route honours no key, so a lost answer is said as possibly created, never retried.
 - **A second step, «Парцели» (#388, owner 2026-10-21):** «Напред» opens the task's parcels, chosen by block, on a map and in a list, and «Създай» is there. They are optional. A choice in one block stays when another block is opened.
@@ -1593,7 +1593,7 @@ caller of `.sensoryFeedback`.
 ### Divergence — one «Застраховай», bottom right; «История» works (#386, owner 2026-10-21)
 
 - **One way to ask:** the screen's floating «Застраховай» at the bottom right. It opens the enquiry form with no parcel chosen, and the person picks it there. The per-row «Запитай за оферта» / «Запитай отново» is removed. A row still shows «Изпраща се…» while an ask is out, and «Заявено запитване» once one was made.
-- **The floating button moved** from bottom-left to bottom-right, where Задачи's + is. The risk page is its only user.
+- **The floating button moved** from bottom-left to bottom-right, where Задачи's + was. The risk page is its only user. **2026-11-01, owner: back to the bottom LEFT, with Задачи's +,** because the assistant's button (#483) holds the bottom right on every screen and the two overlapped.
 - **«История» on a row opens the parcel's history.** It did nothing before, because the button read `pushRoute` from outside the stack it pushes onto.
 
 ### The enquiry form's words (owner 2026-10-26, the web too)
