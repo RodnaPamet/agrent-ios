@@ -172,6 +172,14 @@ struct JournalDetailView: View {
                 ToolbarItem(placement: .primaryAction) {
                     TreatmentDocumentButton(document: pdf, handle: handle)
                 }
+            } else if let treatment, treatment.activityKind != nil,
+                      let handle = treatment.treatmentGroupId?.recorded {
+                // Other work's page of «Дневник на стопанството» (owner,
+                // 2026-11-01: "this can not be printed"), never the БАБХ form,
+                // which has no row for it (agri-saas #2697).
+                ToolbarItem(placement: .primaryAction) {
+                    TreatmentDocumentButton(document: pdf, handle: handle, activity: true)
+                }
             }
         }
         .sheet(isPresented: $correcting) {
