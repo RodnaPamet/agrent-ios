@@ -138,9 +138,18 @@ struct OperationLine: Decodable, Identifiable, Equatable, Sendable {
 
     /// `Decimal(14,4)` through Prisma's `toJSON` — a STRING on this route,
     /// which `WireDecimal` reads along with the number form.
-    let doseValue: WireDecimal
-    let product: Named
-    let doseUnit: DoseUnit
+    ///
+    /// ── The product, the dose and its unit are OPTIONAL ──
+    ///
+    /// The spec lists all three as required, and `OperationParcel` has all
+    /// three nullable: work with nothing applied (soil cultivation, sowing
+    /// without a registered seed lot) has a line with none. Read strictly,
+    /// one such line failed the whole section in «Сървърът върна отговор в
+    /// неочакван формат.», the owner's «Обработка на почвата» (2026-11-01).
+    /// The line still shows its parcel, its state and its area.
+    let doseValue: WireDecimal?
+    let product: Named?
+    let doseUnit: DoseUnit?
     let parcel: ParcelRef
     let completedAt: Date?
 
@@ -169,10 +178,25 @@ struct OperationLine: Decodable, Identifiable, Equatable, Sendable {
     /// The decimal dose, in Bulgarian — «0,25». Up to the column's four
     /// places, trailing zeros dropped: the server's string has already lost
     /// them, and a rate is read as the farmer typed it, not padded.
-    var doseText: String {
-        doseValue.value.formatted(
+    var doseText: String? {
+        doseValue?.value.formatted(
             .number.precision(.fractionLength(0...4)).grouping(.automatic).locale(BgDate.locale)
         )
+    }
+
+    /// «0,25 л/дка», or nil for a line with nothing applied.
+    var doseLabel: String? {
+        guard let doseText else { return nil }
+        guard let symbol = doseUnit?.symbol else { return doseText }
+        return "\(doseText) \(symbol)"
+    }
+
+    /// The same, said: the unit's name rather than its symbol, which a
+    /// screen reader would spell out letter by letter.
+    var doseSpoken: String? {
+        guard let doseText else { return nil }
+        guard let unit = doseUnit else { return doseText }
+        return "\(doseText) \(unit.name ?? unit.symbol)"
     }
 
     /// The parcel's area, in decares like every other area in the app.

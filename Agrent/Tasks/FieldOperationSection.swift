@@ -174,17 +174,19 @@ private struct LineRow: View {
                     background: row.shown.chipColors.background
                 )
             }
-            MetaRow {
-                Text(row.line.product.name)
-                MetaSeparator()
-                Text("\(row.line.doseText) \(row.line.doseUnit.symbol)")
-                if let area = row.line.area {
-                    MetaSeparator()
-                    Text(area.text)
+            // Product, dose, area: whichever the line has. Soil work has
+            // no product and no dose, and says only its area.
+            let facts = [row.line.product?.name, row.line.doseLabel, row.line.area?.text].compactMap { $0 }
+            if !facts.isEmpty {
+                MetaRow {
+                    ForEach(Array(facts.enumerated()), id: \.offset) { index, fact in
+                        if index > 0 { MetaSeparator() }
+                        Text(fact)
+                    }
                 }
+                .font(.footnote)
+                .foregroundStyle(Palette.secondaryText)
             }
-            .font(.footnote)
-            .foregroundStyle(Palette.secondaryText)
             if row.waiting != nil {
                 Label(FieldOperationText.notOnServer, systemImage: "iphone")
                     .font(.footnote)
@@ -196,8 +198,8 @@ private struct LineRow: View {
             row.line.parcel.name,
             row.shown.label,
             row.waiting != nil ? FieldOperationText.notOnServer : nil,
-            row.line.product.name,
-            "\(row.line.doseText) \(row.line.doseUnit.name ?? row.line.doseUnit.symbol)",
+            row.line.product?.name,
+            row.line.doseSpoken,
             row.line.area?.spoken,
         ]))
     }
