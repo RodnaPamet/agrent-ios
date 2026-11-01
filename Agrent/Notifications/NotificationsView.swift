@@ -3,7 +3,8 @@ import SwiftUI
 /// «Известия» (#471, owner 2026-10-30): the server's notifications for the
 /// signed-in person, newest first. In the menu with the unread count, as
 /// Борса's row has, and choosable for the bar. A notification opens what it
-/// is about where the app can show it (`PushLink`), and is marked read.
+/// is about where the app can show it (`PushLink`), or a page outside the
+/// app in Safari's view (#488), and is marked read.
 struct NotificationsView: View {
     var body: some View {
         RoutedStack {
@@ -14,6 +15,8 @@ struct NotificationsView: View {
 
 private struct NotificationsScreen: View {
     @State private var store = NotificationsStore.shared
+    /// The page outside the app a notification opened, while it is open.
+    @State private var webPage: InAppPage?
     @Environment(\.pushRoute) private var pushRoute
 
     var body: some View {
@@ -21,6 +24,7 @@ private struct NotificationsScreen: View {
             .navigationTitle("Известия")
             .appMenu()
             .task { await store.refresh() }
+            .sheet(item: $webPage) { InAppBrowser(url: $0.url).ignoresSafeArea() }
     }
 
     @ViewBuilder
@@ -38,7 +42,7 @@ private struct NotificationsScreen: View {
                 Group {
                     ForEach(items) { item in
                         Button { Task { await open(item) } } label: {
-                            NotificationRow(item: item, opens: item.link(inFarm: store.farm) != nil)
+                            NotificationRow(item: item, leads: NotificationRow.Lead(item, inFarm: store.farm))
                         }
                             .buttonStyle(.plain)
                     }
@@ -59,11 +63,13 @@ private struct NotificationsScreen: View {
         }
     }
 
-    /// Read, then where it leads, if the app can show it there.
+    /// Read, then where it leads: a screen of the app, or a page outside it.
     private func open(_ item: AppNotification) async {
         await store.markRead(item)
         if let link = item.link(inFarm: store.farm) {
             pushRoute(AppRoute(link))
+        } else if let url = item.webPage(inFarm: store.farm) {
+            webPage = InAppPage(url: url)
         }
     }
 }
@@ -72,8 +78,23 @@ private struct NotificationsScreen: View {
 /// title, its text, and when.
 private struct NotificationRow: View {
     let item: AppNotification
-    /// Whether a tap leads somewhere: the chevron says so.
-    let opens: Bool
+    /// Where a tap leads, if anywhere: a chevron for a screen of the app, the
+    /// box-and-arrow Safari links use for a page outside it.
+    let leads: Lead?
+
+    enum Lead: Equatable {
+        case screen, web
+
+        init?(_ item: AppNotification, inFarm farm: String?) {
+            if item.link(inFarm: farm) != nil {
+                self = .screen
+            } else if item.webPage(inFarm: farm) != nil {
+                self = .web
+            } else {
+                return nil
+            }
+        }
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -99,8 +120,8 @@ private struct NotificationRow: View {
                 }
             }
             Spacer(minLength: 0)
-            if opens {
-                Image(systemName: "chevron.right")
+            if let leads {
+                Image(systemName: leads == .web ? "arrow.up.right.square" : "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Palette.secondaryText)
                     .accessibilityHidden(true)
@@ -110,6 +131,7 @@ private struct NotificationRow: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.sentence([item.read ? nil : "Ново", item.title, item.message, when]))
+        .accessibilityHint(leads == .web ? "Отваря страница извън приложението." : "")
         .accessibilityAddTraits(.isButton)
     }
 
