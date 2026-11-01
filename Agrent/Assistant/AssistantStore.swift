@@ -36,9 +36,13 @@ final class AssistantStore {
     private(set) var asking = false
     private var running: Task<Void, Never>?
     private let asker: Asker
+    /// The connection kept up while the person steps out of the app.
+    let keepAlive: AssistantKeepAlive
 
-    init(ask: @escaping Asker = { try await AssistantAPI.ask($0) }) {
+    init(ask: @escaping Asker = { try await AssistantAPI.ask($0) },
+         keepAlive: AssistantKeepAlive = AssistantKeepAlive()) {
         self.asker = ask
+        self.keepAlive = keepAlive
     }
 
     var canSend: Bool {
@@ -68,13 +72,21 @@ final class AssistantStore {
         running?.cancel()
         running = nil
         asking = false
+        keepAlive.end()
         if let last = turns.indices.last, turns[last].isWorking {
             turns[last].phase = .unanswered(AssistantText.interrupted)
         }
     }
 
     func run(_ request: AssistantRequest, at index: Int) async {
-        defer { if !Task.isCancelled { asking = false } }
+        keepAlive.begin()
+        defer {
+            keepAlive.end()
+            if !Task.isCancelled { asking = false }
+        }
+        // The stream opened: a connection lost from here on was lost
+        // mid-answer, and says so.
+        var opened = false
         var answer: String?
         var answerLinks: [AssistantLink] = []
         var answerProposal: AssistantProposal?
@@ -83,6 +95,7 @@ final class AssistantStore {
         var halted: (code: String, note: String)?
         do {
             let events = try await asker(request)
+            opened = true
             for try await event in events {
                 switch event {
                 case .thinking:
@@ -136,7 +149,8 @@ final class AssistantStore {
             if !Task.isCancelled, halted == nil { turns[index].phase = .unanswered(AssistantText.interrupted) }
         } catch {
             guard !Task.isCancelled else { return }
-            turns[index].phase = .unanswered(Self.sentence(for: error))
+            turns[index].phase = .unanswered(
+                opened && Self.isLostConnection(error) ? AssistantText.lostMidAnswer : Self.sentence(for: error))
         }
     }
 
@@ -144,6 +158,14 @@ final class AssistantStore {
     /// off makes the surface not exist) or 204 (the contract's first draft)
     /// is "off"; the coded ones have their sentences in `UserMessage`; a
     /// dropped connection is the transport's own sentence.
+    /// The network went while the answer was coming: the person left the
+    /// app past iOS's grace, or the signal did.
+    nonisolated static func isLostConnection(_ error: Error) -> Bool {
+        guard let error = error as? URLError else { return false }
+        return [.networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .timedOut]
+            .contains(error.code)
+    }
+
     nonisolated static func sentence(for error: Error) -> String {
         switch error {
         case APIClient.APIError.http(204, _, _, _, _), APIClient.APIError.http(404, _, _, _, _):

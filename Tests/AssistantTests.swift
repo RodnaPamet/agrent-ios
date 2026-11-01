@@ -327,6 +327,55 @@ final class AssistantTests: XCTestCase {
         XCTAssertEqual(store.turns.first?.phase, .answered("Имате 3 задачи.", note: nil))
     }
 
+    // MARK: - A short trip out of the app
+
+    /// A background task is held while a turn's stream is open, and given
+    /// back when it ends or is stopped: the owner's answer was lost to iOS
+    /// suspending the app while they sent a screenshot (2026-11-01).
+    func testTheConnectionIsKeptWhileAnAnswerComes() async {
+        var feed: AsyncThrowingStream<AssistantEvent, Error>.Continuation?
+        let store = AssistantStore { _ in AsyncThrowingStream { feed = $0 } }
+        store.draft = "Колко задачи имам?"
+        store.send(context: nil)
+        for _ in 0..<100 where feed == nil { try? await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertTrue(store.keepAlive.isHolding, "no background task while the answer is coming")
+        feed?.yield(.answer(text: "Три.", links: [], proposal: nil))
+        feed?.yield(.done(truncatedAny: false))
+        feed?.finish()
+        await store.settled()
+        XCTAssertFalse(store.keepAlive.isHolding, "the background task outlived the turn")
+
+        var second: AsyncThrowingStream<AssistantEvent, Error>.Continuation?
+        let stopped = AssistantStore { _ in AsyncThrowingStream { second = $0 } }
+        stopped.draft = "Още?"
+        stopped.send(context: nil)
+        for _ in 0..<100 where second == nil { try? await Task.sleep(for: .milliseconds(10)) }
+        stopped.stop()
+        XCTAssertFalse(stopped.keepAlive.isHolding, "stopping kept the background task")
+    }
+
+    /// Lost once the stream had opened: said as an answer that did not
+    /// arrive, to be asked again. Lost before: the transport's sentence.
+    func testAConnectionLostMidAnswerSaysAskAgain() async {
+        let mid = AssistantStore { _ in
+            AsyncThrowingStream { continuation in
+                continuation.yield(.thinking)
+                continuation.finish(throwing: URLError(.networkConnectionLost))
+            }
+        }
+        mid.draft = "Какво съм записал?"
+        mid.send(context: nil)
+        await mid.settled()
+        XCTAssertEqual(mid.turns.first?.phase, .unanswered(AssistantText.lostMidAnswer))
+
+        let before = AssistantStore { _ in throw URLError(.networkConnectionLost) }
+        before.draft = "Какво съм записал?"
+        before.send(context: nil)
+        await before.settled()
+        XCTAssertEqual(before.turns.first?.phase, .unanswered(UserMessage.text(for: URLError(.networkConnectionLost))))
+        XCTAssertTrue(UserMessage.isBulgarianSentence(AssistantText.lostMidAnswer))
+    }
+
     // MARK: - Words
 
     func testEverySentenceIsBulgarian() {
