@@ -12,11 +12,11 @@ import Foundation
 /// is `POST /journal/activities`'. Never an id: the parcels, the product
 /// from the catalogue and the dose's unit are the person's, picked in the
 /// form where they can see them. A kind this build does not know is shown
-/// as text only, never opened.
+/// as text only, never opened. The proposal is `{kind, draft}` and nothing
+/// else: a draft the server refuses arrives as no proposal at all.
 struct AssistantProposal: Decodable, Equatable, Sendable {
     let kind: String
     let draft: Draft?
-    let status: String?
 
     enum Draft: Equatable, Sendable {
         case treatment(TreatmentFields)
@@ -42,19 +42,17 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
         let harvestKg: WireDecimal?
     }
 
-    private enum CodingKeys: String, CodingKey { case kind, draft, status }
+    private enum CodingKeys: String, CodingKey { case kind, draft }
 
-    init(kind: String, draft: Draft?, status: String? = nil) {
+    init(kind: String, draft: Draft?) {
         self.kind = kind
         self.draft = draft
-        self.status = status
     }
 
     /// A draft that does not decode costs the button, never the answer.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = try c.decode(String.self, forKey: .kind)
-        status = try? c.decodeIfPresent(String.self, forKey: .status)
         switch kind {
         case "treatment":
             draft = (try? c.decode(TreatmentFields.self, forKey: .draft)).map(Draft.treatment)
@@ -66,10 +64,9 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
     }
 
     /// «Нов запис» filled from the draft, or nil when there is nothing this
-    /// phone can open: an unknown kind, an unreadable draft, or one the
-    /// server's guard held back (`status`).
+    /// phone can open: an unknown kind or an unreadable draft.
     func entry(today: Date = Date()) -> TreatmentDraft? {
-        guard status == nil || status == "READY", let draft else { return nil }
+        guard let draft else { return nil }
         var entry = TreatmentDraft(date: today)
         switch draft {
         case .treatment(let fields):

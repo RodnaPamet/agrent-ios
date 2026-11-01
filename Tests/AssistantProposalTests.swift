@@ -51,13 +51,11 @@ final class AssistantProposalTests: XCTestCase {
     }
 
     /// Nothing to open: a kind this phone has no form for, a draft that does
-    /// not read, an activity with no kind, or one the server held back.
+    /// not read, or an activity with no kind.
     func testOnlyAFormThePhoneHasIsOffered() throws {
-        XCTAssertNil(try proposal(#"{"kind":"journal-entry","draft":{"title":"x"}}"#).entry(today: today))
+        XCTAssertNil(try proposal(#"{"kind":"journal-entry","draft":{"occurredOn":"2026-10-30"}}"#).entry(today: today))
         XCTAssertNil(try proposal(#"{"kind":"treatment","draft":"not an object"}"#).entry(today: today))
         XCTAssertNil(try proposal(#"{"kind":"activity","draft":{"occurredOn":"2026-10-30"}}"#).entry(today: today))
-        XCTAssertNil(try proposal(#"{"kind":"treatment","status":"QUARANTINED","draft":{"kind":"SPRAY"}}"#)
-            .entry(today: today))
     }
 
     /// The answer carries it, and a halt after the answer keeps it.
