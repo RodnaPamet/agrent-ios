@@ -58,6 +58,14 @@ struct NewCostView: View {
     ///     diesel bought twice in a day — must mint different keys, or the
     ///     second legitimate cost is deduped away and never written.
     @State private var nonce = UUID().uuidString
+    /// An invoice read into its lines (#482): the camera, the read, and
+    /// «От фактура» once there is something to check.
+    @State private var scanningInvoice = false
+    @State private var photographingInvoice = false
+    @State private var readingInvoice = false
+    @State private var invoiceFailure: String?
+    @State private var invoice: InvoiceReview?
+    @State private var invoiceSaved = false
 
     /// «Култура» or «Общи», chosen first (owner, 2026-10-09, #245). «Общи»
     /// is the owner's word for the farm's overheads, renamed the same day
@@ -174,6 +182,34 @@ struct NewCostView: View {
                     }
                 }
 
+                // An invoice instead of typing (owner, 2026-10-31): scanned,
+                // read by the server into its lines, and opened in «От
+                // фактура» for the person to check and save.
+                Section {
+                    Button {
+                        startInvoiceScan()
+                    } label: {
+                        if readingInvoice {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text("Чета фактурата…")
+                            }
+                        } else {
+                            Label("Сканирай фактура", systemImage: "doc.viewfinder")
+                        }
+                    }
+                    .disabled(saving || readingInvoice || answerLost)
+                    .accessibilityInputLabels(A11y.spokenNames("Сканирай фактура", "Фактура", "Scan invoice"))
+                    if let invoiceFailure {
+                        Text(invoiceFailure)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.error)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } footer: {
+                    SectionFooter("Редовете на фактурата се попълват сами; проверявате ги и записвате.")
+                }
+
                 // At the top, under the choice it fixes: a lost answer dims
                 // the whole sheet, and the reason belongs where the operator
                 // is looking, not under six sections.
@@ -212,7 +248,37 @@ struct NewCostView: View {
                     }
                 }
             }
-            .interactiveDismissDisabled(saving)
+            .interactiveDismissDisabled(saving || readingInvoice)
+            .fullScreenCover(isPresented: $scanningInvoice) {
+                DocumentScanner { pages in
+                    scanningInvoice = false
+                    guard !pages.isEmpty else { return }
+                    let pdf = ScanPDF.make(pages)
+                    Task { await readInvoice(pdf, fileName: "invoice.pdf", mimeType: "application/pdf") }
+                } onCancel: {
+                    scanningInvoice = false
+                }
+                .ignoresSafeArea()
+            }
+            .fullScreenCover(isPresented: $photographingInvoice) {
+                CameraPicker { image in
+                    photographingInvoice = false
+                    guard let photo = DocumentUploads.photo(image) else { return }
+                    Task { await readInvoice(photo.data, fileName: photo.fileName, mimeType: photo.mimeType) }
+                } onCancel: {
+                    photographingInvoice = false
+                }
+                .ignoresSafeArea()
+            }
+            // Saved from «От фактура»: this sheet goes too, once that one has.
+            .sheet(item: $invoice, onDismiss: {
+                if invoiceSaved {
+                    onSaved()
+                    dismiss()
+                }
+            }) { review in
+                InvoiceReviewView(review: review, crops: crops) { invoiceSaved = true }
+            }
             .task(id: scope) { if scope == .overhead { await prefillOverheads() } }
             .task(id: commodity) { await prefillCrop() }
             .onChange(of: commodity) { old, new in
@@ -406,6 +472,37 @@ struct NewCostView: View {
     /// The date goes as yyyy-mm-dd IN THE DEVICE'S ZONE (`BgDate.isoDay`).
     /// It once went through `.iso8601`, which is GMT, and a cost dated 25.09
     /// between midnight and 03:00 was booked to the 24th.
+    /// The scanner where the device has it, a photo otherwise.
+    private func startInvoiceScan() {
+        invoiceFailure = nil
+        if DocumentScanner.isAvailable {
+            scanningInvoice = true
+        } else if CameraPicker.isAvailable {
+            photographingInvoice = true
+        } else {
+            invoiceFailure = "Камерата не е достъпна на това устройство."
+        }
+    }
+
+    /// The invoice read: «От фактура» with its lines, or why not. Not
+    /// retried: a read spends the farm's AI budget, and another is the
+    /// person's choice.
+    private func readInvoice(_ file: Data, fileName: String, mimeType: String) async {
+        readingInvoice = true
+        defer { readingInvoice = false }
+        do {
+            let scan = try await InvoiceScanAPI.scan(file, fileName: fileName, mimeType: mimeType)
+            if scan.lines.isEmpty {
+                invoiceFailure = UserMessage.bulgarian["INVOICE_NO_USABLE_LINES"]
+            } else {
+                invoiceSaved = false
+                invoice = InvoiceReview(scan, crops: crops)
+            }
+        } catch {
+            invoiceFailure = UserMessage.text(for: error)
+        }
+    }
+
     private func saveSheet() async {
         guard canSave else { return }
         let day = BgDate.isoDay(incurredOn)

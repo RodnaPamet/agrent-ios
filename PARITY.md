@@ -229,6 +229,22 @@ Two things found on the way that the original entry did not anticipate:
 
 ---
 
+### Invoices into expenses: «Сканирай фактура» and «Към разходи» (owner, 2026-10-31, #482)
+
+**Owner's rulings:**
+- Both «Нов разход» (a camera button) and «Документи» (a document's swipe «Към разходи»).
+- "Fill the form, you tap «Запиши»": nothing is stored before the tap.
+- One expense per invoice line, each pointing at the invoice.
+
+**How it works:**
+- `POST /grain/costs/invoice-scan` (agri-saas, backend 1) reads the scan, or a document by `documentId`, into lines in the batch's own shape. It saves nothing.
+- «От фактура» shows them for checking. Each line is a TOTAL, on one crop (`CROP`, no rate, no place) or «Общи (за цялото стопанство)» (`HOLDING`, as the «Общи» sheet books). The crop sheet's per-дка rates don't fit an invoice's totals.
+- Lev is already euros at 1,95583, the original in the line's note. At most 25 lines, and a warning says how many there were.
+- **Warnings come as a code and numbers** (`INVOICE_LINES_TRUNCATED` found/proposed, `INVOICE_LINES_UNREADABLE`, `INVOICE_LINE_FOREIGN_CURRENCY`, `INVOICE_LINE_AMOUNT_UNREADABLE` count). The server sends no prose there, so the phone words them.
+- **The six error codes** are copied word for word from the server catalogue. `INVOICE_NOT_RECOGNISED` (retake the photo) and `INVOICE_NO_USABLE_LINES` (read, nothing to record; type it) stay different sentences.
+- A lost answer on «Запиши» is not resent from the review, the cost rule since 2026-09-25.
+- A spent AI budget is `AI_BUDGET_EXCEEDED`, coded with its plan, limit and used. Its sentence on the phone is now the server catalogue's own, «Месечният бюджет на стопанството за ИИ е изчерпан…», so the phone and the web say one thing.
+
 ### «Разходи»: swipe to delete an expense (owner, 2026-10-31, #481)
 
 - **Same as tasks and treatments.** Swipe gives «Изтрий», then «Сигурни ли сте, че искате да изтриете разхода?», then a 5-second «Отмени» bar (20 s under VoiceOver or Switch Control) before `DELETE /grain/costs/{id}` is sent.

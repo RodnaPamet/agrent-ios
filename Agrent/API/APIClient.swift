@@ -876,6 +876,28 @@ actor APIClient {
         )
     }
 
+    /// Fields only, no file: a route that takes an id in place of bytes
+    /// (#482's `documentId`).
+    func postMultipart(_ path: String, fields: [String: String]) async throws -> Data {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        return try await send(
+            path: path, method: "POST", body: Self.multipartFieldsBody(boundary: boundary, fields: fields),
+            idempotencyKey: nil, contentType: "multipart/form-data; boundary=\(boundary)"
+        )
+    }
+
+    static func multipartFieldsBody(boundary: String, fields: [String: String]) -> Data {
+        var body = Data()
+        func append(_ text: String) { body.append(Data(text.utf8)) }
+        for (name, value) in fields.sorted(by: { $0.key < $1.key }) {
+            append("--\(boundary)\r\n")
+            append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+            append("\(value)\r\n")
+        }
+        append("--\(boundary)--\r\n")
+        return body
+    }
+
     /// The body bytes, PURE so the framing can be tested.
     ///
     /// Multipart fails silently when it fails: a missing CRLF or a mis-spelled

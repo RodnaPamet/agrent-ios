@@ -173,6 +173,10 @@ final class RouteContractTests: XCTestCase {
     /// Empty again from agri-saas main 324f7ba: the assistant's stream
     /// (#483), built against agri-saas #2578's agreed contract, came off with
     /// the refresh once #2599 was live (2026-11-01).
+    ///
+    /// Empty again from agri-saas main 3611e9b: the invoice read (#482),
+    /// built against backend 1's agreed contract, came off with the refresh
+    /// once agri-saas #2604 was live (2026-11-01).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -236,6 +240,7 @@ final class RouteContractTests: XCTestCase {
             // «Известия» (#471): the list and marking one read.
             ("NotificationsAPI.swift", [NotificationsAPI.listPath, NotificationsAPI.readPath(id)]),
             ("AssistantAPI.swift", [AssistantAPI.streamPath]),
+            ("InvoiceScan.swift", [InvoiceScanAPI.path]),
             // A mechanisator's own queue, for their one screen (#465).
             ("FarmTasksAPI.swift", [FarmTasksAPI.queuePath]),
             // «Нова задача» posts to the task list (#372).
@@ -332,7 +337,7 @@ final class RouteContractTests: XCTestCase {
             ("CalculatorAPI.swift", [CalculatorAPI.path, CostsAPI.listPath, CostsAPI.defaultsPath,
                                      CostsAPI.cropDefaultsPath("wheat"),
                                      CostsAPI.machineryPath, CostsAPI.batchPath,
-                                     CostsAPI.entryPath("{costEntryId}")]),
+                                     CostsAPI.entryPath("{costEntryId}"), CostsAPI.invoiceScanPath]),
             ("ParcelHistoryAPI.swift", [
                 ParcelHistoryAPI.cropSeasonsPath(parcel),
                 ParcelHistoryAPI.weedObservationsPath(parcel),
