@@ -71,6 +71,11 @@ enum AssistantText {
         return copy
     }
 
+    // ── A prepared entry ──
+
+    static let openEntry = "Отвори в «Нов запис»"
+    static let preparedNote = "Асистентът попълни записа. Проверете го, изберете парцелите и мерната единица и го запазете."
+
     /// `done` with no answer before it.
     static let noAnswer = "Асистентът няма отговор на този въпрос."
 

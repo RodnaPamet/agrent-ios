@@ -14,6 +14,10 @@ struct AssistantLauncher: View {
 
     @State private var open = false
     @State private var store = AssistantStore()
+    /// A prepared entry chosen in the sheet, opened in «Нов запис» once the
+    /// sheet has gone.
+    @State private var pending: TreatmentDraft?
+    @State private var entry: PreparedEntry?
     @State private var flags = FeatureFlags.shared
 
     var body: some View {
@@ -35,11 +39,30 @@ struct AssistantLauncher: View {
             .accessibilityShowsLargeContentViewer {
                 Label(AssistantText.title, systemImage: "sparkles")
             }
-            .sheet(isPresented: $open) {
-                AssistantSheet(store: store, context: surface.flatMap(AssistantPageContext.surface))
+            .sheet(isPresented: $open, onDismiss: {
+                if let pending {
+                    entry = PreparedEntry(draft: pending)
+                    self.pending = nil
+                }
+            }) {
+                AssistantSheet(store: store, context: surface.flatMap(AssistantPageContext.surface)) { draft in
+                    pending = draft
+                    open = false
+                }
+            }
+            // The usual form, filled: the person checks it, picks the
+            // parcels and the unit, and sends it as any record.
+            .sheet(item: $entry, onDismiss: FarmRecordAPI.removeGenerated) { entry in
+                TreatmentEntryFlow(recorder: LiveTreatmentRecorder(), prefill: entry.draft) {}
             }
         }
     }
+}
+
+/// A prepared entry on its way into «Нов запис».
+private struct PreparedEntry: Identifiable {
+    let id = UUID()
+    let draft: TreatmentDraft
 }
 
 /// How much of a stack's bottom its screens' bars take, so the assistant's

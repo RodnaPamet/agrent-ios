@@ -268,6 +268,10 @@ Ported in shape from inflect-compliance's assistant: a launcher in the app shell
   - The phone shows the server's own `message` when it is Bulgarian; otherwise its copy of the server catalogue's sentence for the code, word for word, since the phone shows no English (owner, 2026-10-13).
   - The phone branches on the code, not the words. A halt keeps the answer above it; a refusal (an egress block included) removes it.
 - **The button** shows while `assistant.enabled` is on in `/auth/me`, which is re-read on each return to the foreground. Every bottom bar (`solidBar(hairline: .top)`) reports its height to its stack (`BottomChrome`), so the button sits above «Нов разход», «Ново мероприятие» and the «Отмени» bar. The sheet opens at half height.
+- **Phase 2, a prepared entry** (agri-saas #2636): `answer.proposal` is `{kind, draft}`.
+  - `treatment` carries the human-readable fields of `POST /journal/treatments`; `activity` those of `/journal/activities`. Never an id, a unit or parcels.
+  - Under the answer, «Отвори в «Нов запис»» closes the sheet and opens the usual «Нов запис» filled, for a person who may write. They check it, pick the parcels and the unit, and send it as any record (owner, 2026-10-31). The assistant never posts.
+  - A kind the phone has no form for is text only. A draft date ahead of today becomes today.
 - **The answer is ONE `answer` event,** never a token stream: the server scans it for credentials before a byte leaves (`ASSISTANT_EGRESS_BLOCKED`). `tool_call` / `tool_result` are tolerated but not yet sent; the first server (#2599) reads no farm data until its tool loop lands.
 - **Links come in their own field,** `answer.links: [{route, label}]`, checked by the server against its page table. They are never Markdown in the text, and a stray Markdown link is shown as its words. A link to a bar tab closes the sheet and opens that tab. A link to a record (`/locations/{id}`, `/farm-tasks/{id}`, with the real id, which the server sends only for a record the turn read) opens the way a notification's link does. A menu-only page is not offered yet.
 

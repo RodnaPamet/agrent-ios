@@ -62,8 +62,8 @@ final class AssistantTests: XCTestCase {
     /// Phase 2's proposal decodes on a phase-1 phone rather than failing the
     /// answer it rides on.
     func testAProposalDoesNotBreakTheAnswer() throws {
-        let answer = try event(#"{"type":"answer","text":"Готово.","proposal":{"kind":"cost","status":"READY"}}"#)
-        XCTAssertEqual(answer, .answer(text: "Готово.", links: [], proposal: AssistantProposal(kind: "cost", status: "READY")))
+        let answer = try event(#"{"type":"answer","text":"Готово.","proposal":{"kind":"cost","draft":{"amount":12}}}"#)
+        XCTAssertEqual(answer, .answer(text: "Готово.", links: [], proposal: AssistantProposal(kind: "cost", draft: nil)))
     }
 
     /// Links are a field of their own, never Markdown in the text; a link

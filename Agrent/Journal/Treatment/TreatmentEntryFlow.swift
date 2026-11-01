@@ -22,7 +22,15 @@ struct TreatmentEntryFlow: View {
     let onSaved: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var draft = TreatmentDraft()
+    @State private var draft: TreatmentDraft
+
+    /// `prefill`: a draft the assistant prepared (#483 phase 2), for the
+    /// person to check, complete and send through this same form.
+    init(recorder: TreatmentRecorder, prefill: TreatmentDraft? = nil, onSaved: @escaping () -> Void) {
+        self.recorder = recorder
+        self.onSaved = onSaved
+        _draft = State(initialValue: prefill ?? TreatmentDraft())
+    }
     @State private var reference = OperationReferenceStore()
     @State private var place = TreatmentPlaceStore()
     @State private var path: [Step] = []

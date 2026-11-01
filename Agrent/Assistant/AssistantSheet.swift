@@ -10,6 +10,9 @@ import SwiftUI
 struct AssistantSheet: View {
     let store: AssistantStore
     let context: AssistantPageContext?
+    /// A prepared entry the person chose to open: the launcher closes this
+    /// sheet and opens «Нов запис» with it (#483 phase 2).
+    var open: (TreatmentDraft) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
     /// The sheet's own bars: the composer's must not lift the button on the
@@ -29,7 +32,7 @@ struct AssistantSheet: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         ForEach(store.turns) { turn in
-                            AssistantTurnView(turn: turn, follow: follow).id(turn.id)
+                            AssistantTurnView(turn: turn, follow: follow, open: open).id(turn.id)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,6 +114,8 @@ struct AssistantSheet: View {
 private struct AssistantTurnView: View {
     let turn: AssistantStore.Turn
     let follow: (AssistantLink) -> Void
+    let open: (TreatmentDraft) -> Void
+    @State private var people = CurrentUserStore.shared
     @Environment(AppRouter.self) private var router: AppRouter?
 
     var body: some View {
@@ -134,7 +139,7 @@ private struct AssistantTurnView: View {
                 }
                 .font(.subheadline)
                 .accessibilityElement(children: .combine)
-            case .answered(let text, let links, let note):
+            case .answered(let text, let links, let note, let proposal):
                 Text(AssistantRendering.answer(text))
                     .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
@@ -151,6 +156,24 @@ private struct AssistantTurnView: View {
                             .font(.subheadline.weight(.medium))
                     }
                     .accessibilityInputLabels(A11y.spokenNames(link.label))
+                }
+                // A prepared entry (owner, 2026-10-31): the usual form,
+                // filled, for the person to check and send. Only for someone
+                // who may write, and only a draft this phone has a form for.
+                if let entry = proposal?.entry(), people.user?.mayWrite ?? false {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button {
+                            open(entry)
+                        } label: {
+                            Label(AssistantText.openEntry, systemImage: "square.and.pencil")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .accessibilityInputLabels(A11y.spokenNames(AssistantText.openEntry, "Нов запис"))
+                        Text(AssistantText.preparedNote)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 if let note {
                     Label(note, systemImage: "exclamationmark.circle")

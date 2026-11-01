@@ -141,11 +141,3 @@ struct AssistantLink: Decodable, Equatable, Sendable, Hashable {
         return PushLink.parse("/t/\(URLEscape.segment(farm))\(page)").map(AppRoute.init)
     }
 }
-
-/// Phase 2's prepared change (owner, 2026-10-31: the usual form opens
-/// filled and the person taps «Запиши»). Decoded so a phase-2 server does
-/// not fail a phase-1 phone; nothing here acts on it yet.
-struct AssistantProposal: Decodable, Equatable, Sendable {
-    let kind: String
-    let status: String?
-}
