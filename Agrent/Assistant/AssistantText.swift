@@ -37,6 +37,10 @@ enum AssistantText {
     /// writing it, which is the longest single wait.
     static let writing = "Пиша отговора…"
 
+    /// The connection went while the answer was coming (`AssistantKeepAlive`
+    /// covers a short trip out of the app; this is past it, or the signal).
+    static let lostMidAnswer = "Връзката прекъсна, преди отговорът да пристигне. Задайте въпроса отново."
+
     // MARK: - How a turn ended
 
     // ── The server's own sentences ──
