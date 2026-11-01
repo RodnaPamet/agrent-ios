@@ -1062,6 +1062,84 @@ actor APIClient {
         return url
     }
 
+    /// A server-sent event stream (`text/event-stream`): each `data:` line's
+    /// payload, as the server wrote it, for as long as the connection is open.
+    /// The assistant's turn (#483, agri-saas #2578) is the first consumer.
+    ///
+    /// ── The status before a byte of the body ──
+    ///
+    /// A refusal before the stream opens — a 401 after the one refresh, 403,
+    /// 426, 429 — is the same `APIError` any other request throws, read from
+    /// the body in full. Only a 2xx is streamed.
+    ///
+    /// ── Only `data:` ──
+    ///
+    /// A comment line (`:` — the heartbeat), `event:` and `id:` are skipped:
+    /// the payload's own `type` names the event, so an event this build does
+    /// not know arrives as data and is ignored by its decoder rather than by
+    /// a subscription it never made.
+    func eventStream<B: Encodable>(_ path: String, body: B) async throws -> AsyncThrowingStream<Data, Error> {
+        guard !FarmPath.isUnscoped(path) else { throw APIError.noFarmOpen }
+        let payload = try encoder.encode(body)
+        var tokens = try currentTokens()
+        if tokens.isExpired { tokens = try await refresh(tokens) }
+        var (bytes, http) = try await openEventStream(path, payload, tokens)
+        if http.statusCode == 401 {
+            tokens = try await refresh(tokens)
+            (bytes, http) = try await openEventStream(path, payload, tokens)
+        }
+        // 204: the route is switched off for this person (agri-saas #2578
+        // answers it rather than a 403, so nothing reconnects). A status,
+        // not a stream with nothing in it.
+        if http.statusCode == 204 { throw APIError.http(status: 204, code: nil, message: nil) }
+        guard (200..<300).contains(http.statusCode) else {
+            var data = Data()
+            for try await byte in bytes { data.append(byte) }
+            if http.statusCode == 426 { throw APIError.clientTooOld }
+            let env = Self.envelope(from: data)
+            throw APIError.http(
+                status: http.statusCode, code: env?.code, message: env?.message,
+                params: env?.params, retryAfterSeconds: Self.retryAfterSeconds(for: http)
+            )
+        }
+        let body = bytes
+        return AsyncThrowingStream { continuation in
+            let reading = Task {
+                do {
+                    for try await line in body.lines {
+                        if let event = Self.eventPayload(line) { continuation.yield(event) }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in reading.cancel() }
+        }
+    }
+
+    /// The payload of one `data:` line, or nil for anything else.
+    nonisolated static func eventPayload(_ line: String) -> Data? {
+        guard line.hasPrefix("data:") else { return nil }
+        let value = line.dropFirst(5).drop(while: { $0 == " " })
+        return value.isEmpty ? nil : Data(value.utf8)
+    }
+
+    private func openEventStream(
+        _ path: String, _ body: Data, _ tokens: Tokens
+    ) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
+        var req = try Self.request(for: path, method: "POST", accessToken: tokens.accessToken)
+        req.httpBody = body
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let loggable = LoggablePath(path)
+        Log.request("POST", loggable)
+        let (bytes, response) = try await session.bytes(for: req)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        Log.response("POST", loggable, status: http.statusCode, bytes: 0, ms: 0)
+        return (bytes, http)
+    }
+
     /// The request every `APIClient` call starts from: the API host, the
     /// client header and THIS APP'S BEARER. Pure, so a test can see which
     /// requests carry the token — the account card's picture sends it for a

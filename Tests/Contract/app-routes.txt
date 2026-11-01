@@ -42,6 +42,7 @@
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/tasks
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations/{observationId}
+/api/t/{tenantSlug}/assistant/stream
 /api/t/{tenantSlug}/costs/machinery
 /api/t/{tenantSlug}/dashboard/ag
 /api/t/{tenantSlug}/dashboard/task-trend

@@ -77,9 +77,23 @@ extension View {
 private struct SolidBar: ViewModifier {
     let hairline: VerticalEdge
     @Environment(\.displayScale) private var displayScale
+    /// A bottom bar's height, told to its stack while it is on screen, so
+    /// the assistant's button sits above it (#483).
+    @Environment(BottomChrome.self) private var chrome: BottomChrome?
+    @State private var id = UUID()
 
     func body(content: Content) -> some View {
         content
+            .background {
+                if hairline == .top, let chrome {
+                    GeometryReader { geometry in
+                        Color.clear
+                            .onAppear { chrome.report(id, geometry.size.height) }
+                            .onChange(of: geometry.size.height) { _, height in chrome.report(id, height) }
+                            .onDisappear { chrome.withdraw(id) }
+                    }
+                }
+            }
             .background(Palette.Surface.bar)
             .overlay(alignment: hairline == .top ? .top : .bottom) {
                 Palette.Surface.edge

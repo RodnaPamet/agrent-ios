@@ -169,6 +169,10 @@ final class RouteContractTests: XCTestCase {
     /// Empty again from agri-saas main 8cc4408: «Документи» (#468), built
     /// against agri-saas #2495's agreed shape step by step, came off as each
     /// step went live; the Drive copy (step 4, #2573) last, live 2026-10-31.
+    ///
+    /// Empty again from agri-saas main 324f7ba: the assistant's stream
+    /// (#483), built against agri-saas #2578's agreed contract, came off with
+    /// the refresh once #2599 was live (2026-11-01).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -180,6 +184,9 @@ final class RouteContractTests: XCTestCase {
         "DeleteAccountView.swift": "the web's /privacy page, not an API path",
         // A farm's public page (#323), opened in Safari and shared.
         "PublicProfileLink.swift": "the public page /f/{handle}, not an API path",
+        // An assistant link (#483) read as a web page link, the way a
+        // notification's is (`PushLink`). Never requested.
+        "AssistantModels.swift": "a web page link for PushLink, not an API path",
     ]
 
     // MARK: - Every path the app builds
@@ -228,6 +235,7 @@ final class RouteContractTests: XCTestCase {
             ("ParcelCommentsAPI.swift", [ParcelCommentsAPI.path(parcel)]),
             // «Известия» (#471): the list and marking one read.
             ("NotificationsAPI.swift", [NotificationsAPI.listPath, NotificationsAPI.readPath(id)]),
+            ("AssistantAPI.swift", [AssistantAPI.streamPath]),
             // A mechanisator's own queue, for their one screen (#465).
             ("FarmTasksAPI.swift", [FarmTasksAPI.queuePath]),
             // «Нова задача» posts to the task list (#372).
