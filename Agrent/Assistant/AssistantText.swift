@@ -14,6 +14,29 @@ enum AssistantText {
     static let thinking = "Мисля…"
     static let reading = "Чета данните на стопанството…"
 
+    /// What the wait says while a tool runs (owner, 2026-11-01: "a bit slow
+    /// in answering"): the data being read, by the tool's name, so twenty
+    /// seconds read as work being done rather than a stuck screen. A tool
+    /// this build does not know is the general sentence above.
+    static func reading(_ tool: String) -> String {
+        switch tool {
+        case "list_farm_tasks": "Чета задачите…"
+        case "list_journal_entries": "Чета дневника…"
+        case "list_blocks": "Чета блоковете…"
+        case "analyze_block_risk": "Проверявам риска по парцелите…"
+        case "grain_calculator": "Смятам в калкулатора…"
+        case "list_cost_entries": "Чета разходите…"
+        case "list_exchange_listings": "Чета обявите в Борса…"
+        case "price_trends": "Проверявам цените…"
+        case "propose_activity", "propose_treatment": "Подготвям записа…"
+        default: reading
+        }
+    }
+
+    /// After the data is read and before the answer arrives: the model
+    /// writing it, which is the longest single wait.
+    static let writing = "Пиша отговора…"
+
     // MARK: - How a turn ended
 
     // ── The server's own sentences ──
