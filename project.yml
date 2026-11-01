@@ -177,6 +177,11 @@ targets:
         # «Документи»'s scanner and its plain-camera fallback (#468): the
         # app's first use of the camera. Bulgarian, as every word in it.
         NSCameraUsageDescription: Камерата се използва за снимане и сканиране на документи.
+        # The «you are here» dot on the farm's maps (#492): When In Use only,
+        # asked from a map's location button. Says that it stays on the
+        # phone, which is the owner's choice and why App Privacy has no
+        # Location entry.
+        NSLocationWhenInUseUsageDescription: Местоположението се показва само на картата, за да виждате в кой парцел се намирате. То остава в телефона и не се изпраща никъде.
 
   # The app shipped with NO tests at all. Two bugs this week were decode
   # failures that a decode test would have caught before a device did:

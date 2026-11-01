@@ -29,18 +29,14 @@ struct ParcelTargetButton: View {
             // A minimum rather than a fixed size: 44 is the floor Apple asks
             // for, and the control is allowed to grow with the type it
             // contains so the circle and the target stay the same shape.
+            //
+            // SOLID, not `.thinMaterial`: over a satellite tile a material is
+            // whatever colour the field beneath it is, so the glyph's
+            // contrast changed with every pan. The ring is what separates the
+            // disc from a pale field in «Слънце», where `Surface.bar` is
+            // white. `mapDisc()`, shared with `MapLocationButton`.
             Image(systemName: "dot.viewfinder")
-                .font(.title3)
-                .padding(11)
-                .frame(minWidth: 44, minHeight: 44)
-                // SOLID, not `.thinMaterial`: over a satellite tile a
-                // material is whatever colour the field beneath it is, so the
-                // glyph's contrast changed with every pan. The ring is what
-                // separates the disc from a pale field in «Слънце», where
-                // `Surface.bar` is white.
-                .background(Palette.Surface.bar, in: Circle())
-                .overlay { Circle().strokeBorder(Palette.Surface.edge, lineWidth: 1) }
-                .contentShape(Circle())
+                .mapDisc()
         }
         .buttonStyle(.plain)
         .padding(16)

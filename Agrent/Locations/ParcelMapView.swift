@@ -55,6 +55,8 @@ struct ParcelMapView: View {
     @State private var focusedID: String?
     @State private var cameraTick = 0
     @State private var camera: SatelliteParcelMap.CameraCommand?
+    /// Whether the phone's dot is drawn (#492).
+    @State private var deviceLocation = DeviceLocation.shared
 
     init(location: Location) {
         self.location = location
@@ -256,14 +258,24 @@ struct ParcelMapView: View {
                 shape: mode == .simplified ? .boundingBoxes : .outlines,
                 contrast: contrast,
                 camera: camera,
-                onTap: { tapped($0) }
+                onTap: { tapped($0) },
+                showsDeviceLocation: deviceLocation.access == .allowed
             )
-            .overlay(alignment: .bottomTrailing) { targetButton(drawable) }
-            // At the TOP: the bottom corners are the target button's and
-            // Apple's legal link's, which must stay visible.
-            .overlay(alignment: .topLeading) {
-                if mode == .orthophoto { orthophotoFooter }
+            .overlay(alignment: .bottomTrailing) {
+                VStack(spacing: 0) {
+                    MapLocationButton { centre(on: $0) }
+                    targetButton(drawable)
+                }
             }
+            // At the TOP: the bottom corners are the buttons' and Apple's
+            // legal link's, which must stay visible.
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if mode == .orthophoto { orthophotoFooter }
+                    StandingInLabel(parcels: drawable)
+                }
+            }
+            .showsDeviceLocation()
             .task { await indices.refreshIfNeeded() }
             // The farm's flight date, and the blocks for where the map
             // opens: a pan reads them again (`onRegionChange`).
@@ -383,6 +395,12 @@ struct ParcelMapView: View {
     ///
     /// Bottom-trailing because bottom-leading is Apple's attribution, which
     /// must not be covered, and because that is where a thumb is.
+    /// «Моето местоположение» (#492): the camera to the phone, nothing else.
+    private func centre(on coordinate: CLLocationCoordinate2D) {
+        cameraTick += 1
+        camera = .init(tick: cameraTick, region: .around(coordinate))
+    }
+
     private func targetButton(_ drawable: [Parcel]) -> some View {
         ParcelTargetButton(parcelCount: drawable.count) { focusNext(drawable) }
     }

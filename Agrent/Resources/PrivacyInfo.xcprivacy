@@ -37,8 +37,12 @@
                      the farm records the user enters (journal, tasks,
                      costs, parcels) and Борса listings and messages.
 
-  No device location is read: parcels are drawn from the farm's own
-  geometry, and nothing calls CoreLocation.
+  The device location is read but NOT collected (#492, owner 2026-11-01):
+  the «you are here» dot on the farm's maps and the parcel «Нов запис»
+  ticks are worked out on the phone, and the position is never sent,
+  stored or logged (DeviceLocation). Apple counts data as collected only
+  once it leaves the device, so there is no Location entry here or in App
+  Store Connect. PrivacyManifestTests keeps the readers to the map files.
 
   This must agree with the "App Privacy" answers in App Store Connect,
   which the owner keeps. A new kind of data leaving the phone needs an
