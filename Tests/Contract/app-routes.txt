@@ -75,6 +75,7 @@
 /api/t/{tenantSlug}/grain/costs
 /api/t/{tenantSlug}/grain/costs/batch
 /api/t/{tenantSlug}/grain/costs/defaults
+/api/t/{tenantSlug}/grain/costs/invoice-scan
 /api/t/{tenantSlug}/grain/costs/{costEntryId}
 /api/t/{tenantSlug}/insurance/leads
 /api/t/{tenantSlug}/insurance/products

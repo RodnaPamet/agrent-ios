@@ -177,6 +177,9 @@ struct CreateCostEntry: Encodable, Sendable {
     /// The rate per decare AS TYPED, kept beside `amount`, which is what the
     /// books sum: rate × the crop's land (agri-saas #1518).
     var amountPerDca: Decimal? = nil
+    /// The invoice a line was read from (#482): the stored file every line
+    /// of that invoice points at.
+    var invoiceFileId: String? = nil
 
     /// Optional, so every existing call site builds the same one-line draft —
     /// and, being omitted when nil, mints the same idempotency key it always
@@ -184,7 +187,7 @@ struct CreateCostEntry: Encodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case category, amount, currency, incurredOn, supplier, description
         case allocationBasis, payrollHeadcount, payrollAnnualPerPerson
-        case commodityCanonical, amountPerDca
+        case commodityCanonical, amountPerDca, invoiceFileId
     }
 
     func encode(to encoder: Encoder) throws {
@@ -204,6 +207,7 @@ struct CreateCostEntry: Encodable, Sendable {
         try c.encodeIfPresent(payrollAnnualPerPerson, forKey: .payrollAnnualPerPerson)
         try c.encodeIfPresent(commodityCanonical, forKey: .commodityCanonical)
         try c.encodeIfPresent(amountPerDca, forKey: .amountPerDca)
+        try c.encodeIfPresent(invoiceFileId, forKey: .invoiceFileId)
     }
 
     /// The server's bounds, mirrored so the operator learns before the

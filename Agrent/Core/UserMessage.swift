@@ -897,8 +897,10 @@ enum UserMessage {
         // The one that waiting does lift: a token cap per UTC month, so
         // «next month» is honest. Not «from the 1st»: in Bulgaria the UTC
         // month turns at 02:00 or 03:00 that day.
+        // The server's own catalogue wording (agri-saas messages/bg.json,
+        // 2026-10-31), so the phone and the web say one sentence.
         "AI_BUDGET_EXCEEDED":
-            "Месечният лимит за функциите с изкуствен интелект е изчерпан. "
+            "Месечният бюджет на стопанството за ИИ е изчерпан. "
             + "Той се подновява в началото на следващия месец.",
         // Refused on capability, not spend, so the month changes nothing.
         // The app picks no tier, so there is no other choice to point at.
@@ -1156,6 +1158,23 @@ enum UserMessage {
         "DOCUMENT_DRIVE_SYNC_OFF": "Копирането в Google Drive е изключено за това стопанство. Включете го в настройките на «Документи».",
         "DOCUMENT_DRIVE_COPY_IN_PROGRESS": "Копието вече е на път. Опитайте отново след няколко минути.",
         "DOCUMENT_DRIVE_ALREADY_COPIED": "Документът вече е в Google Drive.",
+        // An invoice read into expenses (#482, agri-saas invoice-scan), in
+        // the server catalogue's words: shown to an `en` account, since the
+        // server sends a `bg` one these itself.
+        "INVOICE_SCAN_INPUT_AMBIGUOUS": "Изпратете или файла с фактурата, или номера на вече качен файл, но не и двете.",
+        // Not read as an invoice: a better photo helps.
+        "INVOICE_NOT_RECOGNISED": "Това не изглежда като фактура, която можем да разчетем. Опитайте с по-ясна снимка на цялата страница.",
+        // Read, and nothing on it can be a cost: another photo does not help.
+        "INVOICE_NO_USABLE_LINES": "Фактурата беше разчетена, но нито един от редовете ѝ не може да бъде записан като разход.",
+        "INVOICE_SCAN_MEDIA_UNSUPPORTED": "Фактурата трябва да е снимка (JPEG, PNG, GIF или WebP) или PDF файл.",
+        "INVOICE_SCAN_TOO_LARGE": "Тази фактура е прекалено голяма, за да бъде разчетена.",
+        "INVOICE_SCAN_UNAVAILABLE": "Сканирането на фактури не е настроено в тази инсталация.",
+        "FILE_NOT_FOUND": "Файлът не беше намерен.",
+        // The stored invoice an invoice read points at (agri-saas
+        // `assertUsableInvoice`), in the server catalogue's words.
+        "COST_ENTRY_INVOICE_FILE_NOT_FOUND": "Файлът с фактурата не беше намерен.",
+        "COST_ENTRY_INVOICE_UPLOAD_INCOMPLETE": "Качването на фактурата не е завършило.",
+        "COST_ENTRY_INVOICE_FILE_DELETED": "Файлът с фактурата е изтрит.",
         // agri-saas #2581: the deployment cannot return a native consent to
         // the app. The connection is the farm's, so the web can make it.
         "GOOGLE_NATIVE_RETURN_NOT_ALLOWED": "Свързването с Google от приложението не е налично. Свържете Google Drive от уеб приложението.",
