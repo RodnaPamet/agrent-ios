@@ -77,6 +77,9 @@ final class AssistantStore {
         var answer: String?
         var answerLinks: [AssistantLink] = []
         var answerProposal: AssistantProposal?
+        // The halt that was said, if any: `done` follows it (agri-saas: answer,
+        // then halt, then done) and may add what the halt did not say.
+        var halted: (code: String, note: String)?
         do {
             let events = try await asker(request)
             for try await event in events {
@@ -97,19 +100,36 @@ final class AssistantStore {
                     return
                 case .halt(let outcome, let message, let counts):
                     let note = AssistantText.said(message, else: AssistantText.halt(outcome, counts: counts))
+                    halted = (outcome, note)
                     turns[index].phase = answer.map {
                         .answered($0, links: answerLinks, note: note, proposal: answerProposal)
                     } ?? .unanswered(note)
-                    return
-                case .done:
-                    if answer == nil { turns[index].phase = .unanswered(AssistantText.noAnswer) }
+                case .done(let truncatedAny, let partialAny):
+                    // A turn that was partial AND ran out of time is halted
+                    // for the time; the partial fact rides on `done` and is
+                    // said too, so an answer from 24 of 30 parcels never
+                    // reads as complete (agri-saas #2648).
+                    var notes = halted.map { [$0.note] } ?? []
+                    if partialAny, halted?.code != "ASSISTANT_PARTIAL_DATA" {
+                        notes.append(AssistantText.halt("ASSISTANT_PARTIAL_DATA"))
+                    }
+                    if truncatedAny, halted?.code != "ASSISTANT_TRUNCATED_RESULT" {
+                        notes.append(AssistantText.halt("ASSISTANT_TRUNCATED_RESULT"))
+                    }
+                    if let answer {
+                        let note = notes.isEmpty ? nil : notes.joined(separator: " ")
+                        turns[index].phase = .answered(answer, links: answerLinks, note: note, proposal: answerProposal)
+                    } else if halted == nil {
+                        turns[index].phase = .unanswered(AssistantText.noAnswer)
+                    }
                     return
                 case .unknown:
                     continue
                 }
             }
-            // Closed with no `refusal`, `halt` or `done`.
-            if !Task.isCancelled { turns[index].phase = .unanswered(AssistantText.interrupted) }
+            // Closed with no `refusal`, `halt` or `done`. After a halt that
+            // is the halt's ending, already shown.
+            if !Task.isCancelled, halted == nil { turns[index].phase = .unanswered(AssistantText.interrupted) }
         } catch {
             guard !Task.isCancelled else { return }
             turns[index].phase = .unanswered(Self.sentence(for: error))

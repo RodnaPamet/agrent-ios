@@ -61,11 +61,14 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
     case refusal(reason: String, message: String?)
     /// A bound was reached: what came before is real but incomplete.
     case halt(outcome: String, message: String?, counts: [String: Int])
-    case done(truncatedAny: Bool)
+    /// The turn is over. `truncatedAny` / `partialAny` (agri-saas #2648):
+    /// some read was shortened, or did not gather everything, even when a
+    /// halt of higher precedence (time, tool calls) was the one sent.
+    case done(truncatedAny: Bool, partialAny: Bool = false)
     case unknown(type: String)
 
     private enum CodingKeys: String, CodingKey {
-        case type, name, ok, truncated, text, links, proposal, code, reason, outcome, truncatedAny, message
+        case type, name, ok, truncated, text, links, proposal, code, reason, outcome, truncatedAny, partialAny, message
         case toolCalls, limit, elapsedMs
     }
 
@@ -98,7 +101,8 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
             self = .halt(outcome: code ?? "", message: try? c.decodeIfPresent(String.self, forKey: .message),
                          counts: counts)
         case "done":
-            self = .done(truncatedAny: (try? c.decode(Bool.self, forKey: .truncatedAny)) ?? false)
+            self = .done(truncatedAny: (try? c.decode(Bool.self, forKey: .truncatedAny)) ?? false,
+                         partialAny: (try? c.decode(Bool.self, forKey: .partialAny)) ?? false)
         default:
             self = .unknown(type: type)
         }
