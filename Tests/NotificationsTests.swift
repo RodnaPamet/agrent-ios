@@ -34,6 +34,36 @@ final class NotificationsTests: XCTestCase {
         XCTAssertEqual(rows[0].title, "Известие")
     }
 
+    /// agri-saas #2512's third shape (#488): an absolute https address a
+    /// farm's automation rule wrote opens in Safari's view; one on this app's
+    /// own server opens the screen its path names; anything else opens
+    /// nothing.
+    func testAnAddressOutsideTheAppIsAWebPage() {
+        func row(_ link: String?) -> AppNotification {
+            AppNotification(id: "n", type: nil, title: "Известие", message: nil, linkUrl: link, read: false, createdAt: nil)
+        }
+        let document = row("https://docs.example.org/fixture/report.pdf?v=2")
+        XCTAssertNil(document.link(inFarm: "agrent"))
+        XCTAssertEqual(document.webPage(inFarm: "agrent")?.absoluteString, "https://docs.example.org/fixture/report.pdf?v=2")
+
+        let own = row("https://app.agrent.bg/t/agrent/farm-tasks/tsk_fixture_2")
+        XCTAssertEqual(own.link(inFarm: "agrent"), .task(farm: "agrent", id: "tsk_fixture_2"))
+        XCTAssertNil(own.webPage(inFarm: "agrent"), "a screen the app shows is never the web's")
+        XCTAssertEqual(row("HTTPS://APP.AGRENT.BG/t/agrent/locations/loc_1").link(inFarm: nil),
+                       .location(farm: "agrent", id: "loc_1"))
+        XCTAssertEqual(row("https://app.agrent.bg/t/agrent/settings").webPage(inFarm: "agrent")?.host,
+                       "app.agrent.bg", "a web page of the app's own server the phone has no screen for")
+
+        for refused in ["http://docs.example.org/report.pdf", "javascript:alert(1)", "bg.agrent.app://x",
+                        "mailto:fixture@example.org", "https://app.agrent.bg@docs.example.org/x",
+                        "https:///no-host", "//docs.example.org/x", "", "не е адрес"] {
+            XCTAssertNil(row(refused).webPage(inFarm: "agrent"), refused)
+        }
+        XCTAssertNil(row("https://app.agrent.bg:8443/t/agrent/farm-tasks/t").link(inFarm: "agrent"),
+                     "another port is not this app's server")
+        XCTAssertNil(row(nil).webPage(inFarm: "agrent"))
+    }
+
     /// Opened: read on the phone at once and told to the server; a refusal
     /// reads the list again, whose answer stands.
     @MainActor
