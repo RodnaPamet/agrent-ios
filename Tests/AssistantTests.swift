@@ -291,6 +291,7 @@ final class AssistantTests: XCTestCase {
                       "ASSISTANT_EGRESS_BLOCKED", "ASSISTANT_INPUT_REJECTED", "SOMETHING_NEW"].map(AssistantText.refusal)
         sentences += ["ASSISTANT_TOOL_BUDGET", "ASSISTANT_SPEND_CEILING", "ASSISTANT_TIME_BUDGET",
                       "ASSISTANT_PROVIDER_UNAVAILABLE", "ASSISTANT_TRUNCATED_RESULT", "ASSISTANT_PARTIAL_DATA",
+                      "ASSISTANT_REQUEST_REJECTED",
                       "SOMETHING_NEW"]
             .map { AssistantText.halt($0) }
         for code in ["ASSISTANT_QUESTION_INVALID", "ASSISTANT_CONTEXT_INVALID", "AI_BUDGET_EXCEEDED"] {
@@ -309,6 +310,11 @@ final class AssistantTests: XCTestCase {
                        "Отговорът по-горе е непълен — част от Вашите записи не можаха да бъдат включени, "
                        + "така че го приемете като частична картина.", "agri-saas #2648's own words")
         XCTAssertNotEqual(AssistantText.halt("ASSISTANT_PARTIAL_DATA"), AssistantText.halt("SOMETHING_NEW"))
+        XCTAssertEqual(AssistantText.halt("ASSISTANT_REQUEST_REJECTED"),
+                       "Моделът отказа заявката, така че няма отговор и нищо не беше създадено. "
+                       + "Това е наша грешка, не Ваша — моля, съобщете за нея.", "agri-saas #2663's own words")
+        XCTAssertFalse(AssistantText.halt("ASSISTANT_REQUEST_REJECTED").contains("свържа"),
+                       "a refusal is not «could not reach the model»")
         XCTAssertFalse(AssistantText.halt("ASSISTANT_PROVIDER_UNAVAILABLE").contains("непълен"),
                        "an outage can come before any answer, and does not call one incomplete")
     }

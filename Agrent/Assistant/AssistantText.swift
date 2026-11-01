@@ -62,6 +62,12 @@ enum AssistantText {
         // agri-saas #2648 (#490): a read that did not gather everything that
         // exists, such as satellite risk for 24 of a block's 30 parcels. Not
         // the truncation above: there the list was read and then shortened.
+        // agri-saas #2663 (#506): the model REFUSED the request (a 400),
+        // which used to come back as «could not reach the model». Ours, not
+        // the person's, and it says so.
+        case "ASSISTANT_REQUEST_REJECTED":
+            "Моделът отказа заявката, така че няма отговор и нищо не беше създадено. "
+                + "Това е наша грешка, не Ваша — моля, съобщете за нея."
         case "ASSISTANT_PARTIAL_DATA":
             "Отговорът по-горе е непълен — част от Вашите записи не можаха да бъдат включени, "
                 + "така че го приемете като частична картина."
