@@ -348,6 +348,8 @@ final class RouteContractTests: XCTestCase {
                                      CostsAPI.cropDefaultsPath("wheat"),
                                      CostsAPI.machineryPath, CostsAPI.batchPath,
                                      CostsAPI.entryPath("{costEntryId}"), CostsAPI.invoiceScanPath]),
+            // «Разходи»'s exact totals (#503, agri-saas #2656).
+            ("CostSummary.swift", [CostsAPI.summaryPath]),
             ("ParcelHistoryAPI.swift", [
                 ParcelHistoryAPI.cropSeasonsPath(parcel),
                 ParcelHistoryAPI.weedObservationsPath(parcel),

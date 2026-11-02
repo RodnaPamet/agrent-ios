@@ -207,6 +207,8 @@ enum FixtureCatalogue {
         // The calculator's «Разходи» (owner, 2026-10-29, gold titles): three
         // synthetic costs. Its POST is a write and stays `WRITE_REFUSED`.
         (CostsAPI.listPath, "costs-list"),
+        // #503: the same five, summed as agri-saas #2656 sums them.
+        (CostsAPI.summaryPath, "costs-summary"),
         (ExchangeAPI.listingsPath, "exchange-listings"),
         (ExchangeAPI.myListingsPath, "exchange-my-listings"),
         (ExchangeAPI.threadsPath, "exchange-threads"),

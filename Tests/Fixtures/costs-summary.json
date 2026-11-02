@@ -1,0 +1,85 @@
+{
+  "byType": [
+    {
+      "category": "FERTILIZER",
+      "currency": "EUR",
+      "totalMinor": 489258,
+      "count": 2
+    },
+    {
+      "category": "FUEL",
+      "currency": "EUR",
+      "totalMinor": 42000,
+      "count": 1
+    },
+    {
+      "category": "PESTICIDE",
+      "currency": "EUR",
+      "totalMinor": 64050,
+      "count": 1
+    },
+    {
+      "category": "SEED",
+      "currency": "EUR",
+      "totalMinor": 98000,
+      "count": 1
+    }
+  ],
+  "byMonth": [
+    {
+      "month": "2026-09",
+      "currency": "EUR",
+      "totalMinor": 353346,
+      "count": 2
+    },
+    {
+      "month": "2026-10",
+      "currency": "EUR",
+      "totalMinor": 339962,
+      "count": 3
+    }
+  ],
+  "byTypeAndMonth": [
+    {
+      "category": "FERTILIZER",
+      "month": "2026-09",
+      "currency": "EUR",
+      "totalMinor": 311346,
+      "count": 1
+    },
+    {
+      "category": "FERTILIZER",
+      "month": "2026-10",
+      "currency": "EUR",
+      "totalMinor": 177912,
+      "count": 1
+    },
+    {
+      "category": "FUEL",
+      "month": "2026-09",
+      "currency": "EUR",
+      "totalMinor": 42000,
+      "count": 1
+    },
+    {
+      "category": "PESTICIDE",
+      "month": "2026-10",
+      "currency": "EUR",
+      "totalMinor": 64050,
+      "count": 1
+    },
+    {
+      "category": "SEED",
+      "month": "2026-10",
+      "currency": "EUR",
+      "totalMinor": 98000,
+      "count": 1
+    }
+  ],
+  "currencies": [
+    {
+      "currency": "EUR",
+      "count": 5
+    }
+  ]
+}
