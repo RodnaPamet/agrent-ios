@@ -184,6 +184,9 @@ enum FixtureCatalogue {
         // #471: «Известия», three synthetic notifications, two unread, one
         // linking to the fixture task. Marking read is a write: refused.
         (NotificationsAPI.listPath, "notifications-list"),
+        // #507: «Какво помни асистентът», three synthetic points. Forgetting
+        // and correcting are writes: refused, as every write.
+        (AssistantMemoryAPI.path, "assistant-memory"),
         // #468: «Документи», a synthetic library in every state a row can
         // be in, and its settings. Previews have no fixture (`NO_FIXTURE`),
         // and every write is refused as every write is.

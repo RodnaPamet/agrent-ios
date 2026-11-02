@@ -246,6 +246,9 @@ final class RouteContractTests: XCTestCase {
             // The usage page's events (#493), to the farm they happened in.
             ("UsageEvents.swift", [UsageEvents.path(farm: "{tenantSlug}")]),
             ("AssistantAPI.swift", [AssistantAPI.streamPath]),
+            // «Какво помни асистентът» (#507): the person's points, across
+            // farms, and one of them to correct or forget.
+            ("AssistantMemoryAPI.swift", [AssistantMemoryAPI.path, AssistantMemoryAPI.pointPath(id)]),
             ("InvoiceScan.swift", [InvoiceScanAPI.path]),
             // A mechanisator's own queue, for their one screen (#465).
             ("FarmTasksAPI.swift", [FarmTasksAPI.queuePath]),

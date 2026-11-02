@@ -110,6 +110,7 @@ final class FixtureSeamTests: XCTestCase {
             (LocationsAPI.rateUnitsPath, "units-rate"),
             (WorkItemAPI.listPath, "tasks-list"),
             (NotificationsAPI.listPath, "notifications-list"),
+            (AssistantMemoryAPI.path, "assistant-memory"),
             (DocumentsAPI.listPath, "documents-list"),
             (DocumentsAPI.settingsPath, "documents-settings"),
             // #462: SYNTH-1's tasks from Блокове.
@@ -451,6 +452,15 @@ final class FixtureSeamTests: XCTestCase {
         ("ortho-blocks", { _ = try await APIClient.shared.decode($0, as: OrthoBlocks.self) }),
         ("tasks-list", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("notifications-list", { _ = try await NotificationsAPI.decodeList(from: $0) }),
+        // Strict here, though the app reads it lossily: a fixture point that
+        // does not read would vanish from the screenshot unnoticed.
+        ("assistant-memory", {
+            struct Strict: Decodable { let facts: [AssistantMemoryAPI.Point] }
+            let points = try await APIClient.shared.decode($0, as: Strict.self).facts
+            if points.count != 3 || points.contains(where: { $0.rememberedAt == nil }) {
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "assistant-memory: \(points)"))
+            }
+        }),
         ("documents-list", { _ = try await DocumentsAPI.decodeList(from: $0) }),
         ("documents-settings", { _ = try await APIClient.shared.decode($0, as: DocumentSettings.self) }),
         ("parcel-tasks", { _ = try await WorkItemAPI.decodeList(from: $0) }),
