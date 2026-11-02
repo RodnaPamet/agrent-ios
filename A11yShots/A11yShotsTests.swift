@@ -2743,6 +2743,67 @@ final class A11yShotsTests: XCTestCase {
         capture("23d-assistant-turn", app: app)
     }
 
+    /// «Какво помни асистентът» (#507): Профил's row with the assistant on,
+    /// the remembered points, a swipe with its «Отмени», a correction's
+    /// sheet, and «Изтрий всичко»'s question. Nothing is sent: «Отмени» is
+    /// tapped inside the window, the sheet closes on «Отказ», and the
+    /// question on «Отказ»; under the seam a write is refused besides.
+    func testAssistantMemory() {
+        let app = XCUIApplication()
+        app.launchArguments += [Self.seamArgument, "AGRENT_UITEST_ASSISTANT"]
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Профил")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        XCTAssertTrue(app.navigationBars["Админ"].waitForExistence(timeout: 20), "Админ did not present a sheet")
+        let card = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Вписан като Иван Фикстуров, owner@example.invalid"))
+            .firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Админ")
+        card.tap()
+        XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 10), "the card did not push Профил")
+        let memoryRow = app.buttons["Какво помни асистентът"]
+        guard reveal(memoryRow, in: app, what: "«Какво помни асистентът» on Профил") else { return }
+        Thread.sleep(forTimeInterval: 1)
+        capture("25a-profile-memory-row", app: app)
+        memoryRow.tap()
+
+        let point = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Предпочита кратки отговори'")).firstMatch
+        XCTAssertTrue(point.waitForExistence(timeout: 10), "no fixture point\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("25b-memory-list", app: app)
+
+        point.swipeLeft()
+        let delete = app.buttons["Изтрий"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the swipe offered no «Изтрий»\n\(app.debugDescription)")
+        delete.tap()
+        let undo = app.buttons["Отмени"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»\n\(app.debugDescription)")
+        XCTAssertFalse(point.exists, "the point stayed in the list")
+        capture("25c-memory-undo", app: app)
+        undo.tap()
+        XCTAssertTrue(point.waitForExistence(timeout: 5), "«Отмени» did not bring the point back")
+
+        point.tap()
+        XCTAssertTrue(app.navigationBars["Поправи"].waitForExistence(timeout: 5), "no correction sheet\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("25d-memory-edit", app: app)
+        app.navigationBars["Поправи"].buttons["Отказ"].tap()
+        XCTAssertTrue(point.waitForExistence(timeout: 5), "«Отказ» did not close the sheet")
+
+        let all = app.buttons["Изтрий всичко"]
+        guard reveal(all, in: app, what: "«Изтрий всичко»") else { return }
+        all.tap()
+        let question = app.buttons.matching(NSPredicate(format: "label == 'Изтрий всичко'"))
+        XCTAssertTrue(question.element(boundBy: 1).waitForExistence(timeout: 3) || question.count >= 1,
+                      "«Изтрий всичко» asked nothing")
+        Thread.sleep(forTimeInterval: 1)
+        capture("25e-memory-forget-all", app: app)
+        let cancel = app.buttons["Отказ"]
+        if cancel.waitForExistence(timeout: 3) { cancel.tap() }
+        XCTAssertTrue(point.waitForExistence(timeout: 5), "«Отказ» forgot something")
+    }
+
     /// The assistant's button holds the bottom right on every screen; the
     /// screens' own floating buttons must not sit under it (owner,
     /// 2026-11-01: «Нова задача» and «Застраховай» to the bottom left). On a

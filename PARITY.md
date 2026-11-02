@@ -274,6 +274,11 @@ Ported in shape from inflect-compliance's assistant: a launcher in the app shell
   - A kind the phone has no form for is text only. A draft date ahead of today becomes today.
 - **The answer is ONE `answer` event,** never a token stream: the server scans it for credentials before a byte leaves (`ASSISTANT_EGRESS_BLOCKED`). `tool_call` / `tool_result` are tolerated but not yet sent; the first server (#2599) reads no farm data until its tool loop lands.
 - **Links come in their own field,** `answer.links: [{route, label}]`, checked by the server against its page table. They are never Markdown in the text, and a stray Markdown link is shown as its words. A link to a bar tab closes the sheet and opens that tab. A link to a record (`/locations/{id}`, `/farm-tasks/{id}`, with the real id, which the server sends only for a record the turn read) opens the way a notification's link does. A menu-only page is not offered yet.
+- **«Какво помни асистентът» in Профил** (#507, owner 2026-11-01: "a profile, plus the conversation; yes, see and delete; per person, across farms; while the account exists"). Server: agri-saas #2686, `/api/account/assistant-memory` (list, forget one, forget all, correct one).
+  - A tap corrects a point in the person's own words, ≤ 280 characters; the server never rewrites a corrected point (rule 6 of the design adopted from ai-memory).
+  - A swipe hides the point at once and sends the forget after five seconds of «Отмени», as an expense's «Изтрий» does, but without the question first: one remembered sentence is not a register record. Leaving the screen sends it at once. A forgotten point is not learned again from the same words (rule 5).
+  - «Изтрий всичко» asks first. The row shows only while `assistant.enabled` is on. The list is read live, never cached on disk.
+  - Not yet: the past conversations, which wait for agri-saas #2695.
 
 ## Exchange
 

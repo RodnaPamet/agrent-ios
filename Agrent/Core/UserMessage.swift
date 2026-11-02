@@ -994,6 +994,12 @@ enum UserMessage {
         // Those after the stream opens are `AssistantText`.
         "ASSISTANT_QUESTION_INVALID": "Въпросът беше празен, твърде дълъг или не беше текст. Опитайте да го съкратите.",
         "ASSISTANT_CONTEXT_INVALID": "Приложението изпрати непознат екран. Опитайте отново от екрана, за който искате да попитате.",
+        // «Какво помни асистентът» (#507, agri-saas #2686), word for word
+        // from the server catalogue. The first is also said before sending,
+        // as a correction that is all spaces never needs the trip.
+        "MEMORY_POINT_EMPTY": "Записът не може да бъде празен.",
+        "MEMORY_POINT_INVALID": "Този запис не е валиден.",
+        "MEMORY_POINT_NOT_FOUND": "Този запис не беше намерен.",
         // agri-saas #2541/#2543 (2026-10-31): the exchange's refusals, which
         // reached the phone as BAD_REQUEST with the code in `message` until
         // then. The server sends these sentences itself for a `bg` session

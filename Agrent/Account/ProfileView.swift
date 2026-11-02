@@ -137,6 +137,21 @@ struct ProfileView: View {
             }
             .pageRow()
 
+            // What the assistant has learned about this person, across farms
+            // (#507, owner 2026-11-01: "see and delete"). Here and not on a
+            // farm's page, because it is the person's, as the account is.
+            if flags.isOn(AssistantAPI.flag) {
+                Section {
+                    NavigationLink {
+                        AssistantMemoryView()
+                    } label: {
+                        Label(AssistantMemoryText.title, systemImage: "brain")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames(AssistantMemoryText.title, "Assistant memory"))
+                }
+                .pageRow()
+            }
+
             // Its own section, so the destructive row never reads as one more
             // fact about the account. ALWAYS drawn — a page that cannot say
             // who you are must still let you leave, and an offline launch with
