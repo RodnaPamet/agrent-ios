@@ -78,12 +78,73 @@ final class TreatmentRemovalTests: XCTestCase {
         XCTAssertEqual(row.mayDelete, false)
     }
 
-    func testAnEntryThatIsNoTreatmentHasNoSwipe() {
-        XCTAssertFalse(TreatmentRemoval.offered(entry(parcels: 0), to: me(id: "u", canAdmin: true)),
-                       "an entry folded to itself is one parcel's row, not a treatment")
-        XCTAssertFalse(TreatmentRemoval.offered(entry(nil), to: me(id: "u", canAdmin: true)),
-                       "no handle, nothing to address the delete to")
-        XCTAssertTrue(TreatmentRemoval.offered(entry(), to: me(id: "u", canAdmin: true)), "positive control")
+    // MARK: - Manual entries (owner, 2026-11-02)
+
+    /// An ordinary manual entry, as the folding list sends it: its own
+    /// treatment object, every count 0, `mayDelete` false ("no treatment to
+    /// withdraw").
+    private func manual(_ id: String = "e_manual", title: String = "Наблюдение на посева") -> LogEntry {
+        LogEntry(id: id, type: .observation, status: .done, title: title, occurredAt: nil,
+                 treatment: JournalTreatment(treatmentGroupId: nil, parcelCount: 0, mayDelete: false))
+    }
+
+    /// "Add a swipe to delete for manual entries after all": any writer,
+    /// the entry route's rule, whatever `mayDelete` says.
+    func testAManualEntryIsOfferedToAnyWriter() {
+        XCTAssertTrue(TreatmentRemoval.offered(manual(), to: me(id: "u")))
+        XCTAssertFalse(TreatmentRemoval.offered(manual(), to: me(id: "u_reader", canWrite: false)))
+        XCTAssertFalse(TreatmentRemoval.offered(manual(), to: nil))
+        XCTAssertEqual(TreatmentRemoval.key(manual("e_1")), "entry:e_1")
+        XCTAssertEqual(TreatmentRemoval.entryID("entry:e_1"), "e_1")
+        XCTAssertEqual(TreatmentRemoval.key(entry("tg_1")), "tg_1", "a treatment still goes by its handle")
+        XCTAssertNil(TreatmentRemoval.entryID("tg_1"))
+    }
+
+    /// Where the row cannot say what it is, nothing is offered: a read that
+    /// does not fold (no `treatment`) may be showing one parcel's entry of a
+    /// treatment, and a treatment with lines still to write is no manual
+    /// entry.
+    func testARowThatCannotSayWhatItIsHasNoSwipe() {
+        var plain = manual()
+        plain.treatment = nil
+        XCTAssertNil(TreatmentRemoval.key(plain))
+        XCTAssertFalse(TreatmentRemoval.offered(plain, to: me(id: "u", canAdmin: true)))
+        var pending = manual()
+        pending.treatment?.pendingCount = 2
+        pending.treatment?.lineCount = 2
+        XCTAssertNil(TreatmentRemoval.key(pending))
+        XCTAssertFalse(TreatmentRemoval.offered(pending, to: me(id: "u", canAdmin: true)))
+        XCTAssertTrue(TreatmentRemoval.offered(manual(), to: me(id: "u", canAdmin: true)), "positive control")
+    }
+
+    /// The same five seconds, sent by the entry's own key, and nothing asked
+    /// of the outbox, which holds treatments only.
+    func testAManualEntryIsSentByItsIdAndTheOutboxIsLeftAlone() async {
+        let calls = Calls()
+        let store = removal(calls)
+        let row = manual("e_7")
+        store.remove(row)
+        XCTAssertTrue(store.isHidden(row))
+        XCTAssertEqual(calls.log, [], "nothing sent inside the window")
+        XCTAssertEqual(TreatmentRemoval.removedText(store.undoable!), "Изтрито: Наблюдение на посева")
+        await store.commit("entry:e_7")
+        XCTAssertEqual(calls.log, ["send entry:e_7", "changed"])
+        XCTAssertEqual(TreatmentRemoval.confirmMessage(row), "Наблюдение на посева", "no parcels to count")
+    }
+
+    func testAManualEntryAlreadyGoneCountsAsDone() async {
+        let calls = Calls()
+        calls.refusal = APIClient.APIError.http(status: 404, code: "JOURNAL_ENTRY_NOT_FOUND", message: nil)
+        let store = removal(calls)
+        store.remove(manual("e_8"))
+        await store.commit("entry:e_8")
+        XCTAssertNil(store.failure)
+        XCTAssertEqual(calls.log, ["send entry:e_8", "changed"])
+    }
+
+    func testTheEntryPathIsOneEscapedSegment() {
+        XCTAssertTrue(JournalAPI.entryPath("e 1/x").hasSuffix("/journal/e%201%2Fx"))
+        XCTAssertFalse(JournalAPI.isGone(APIClient.APIError.http(status: 404, code: "TREATMENT_NOT_FOUND", message: nil)))
     }
 
     // MARK: - The window

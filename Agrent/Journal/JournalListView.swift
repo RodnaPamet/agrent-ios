@@ -282,7 +282,8 @@ struct JournalListView: View {
                         JournalRow(entry: entry, partial: entry.treatment?.treatmentGroupId.flatMap { partial[$0] })
                     }
                     .pageRow()
-                    // The WHOLE treatment, every parcel and block (#395).
+                    // The WHOLE treatment, every parcel and block (#395),
+                    // or a manual entry on its own (owner, 2026-11-02).
                     // Not a full swipe: on a register, removing a record
                     // takes the tap on «Изтрий», then the question
                     // «Сигурни ли сте…?» (owner, 2026-10-26), and the bar

@@ -4,6 +4,17 @@ import Observation
 /// A Дневник row swiped away (#395, owner 2026-10-22): the WHOLE treatment,
 /// with five seconds to take it back before anything is sent.
 ///
+/// ── Manual entries too ──
+///
+/// Owner, 2026-11-02: "add a swipe to delete for manual entries after all",
+/// over sample and test entries that had no way out. A row that stands for
+/// a treatment or an activity goes whole, by its handle; an ordinary manual
+/// entry (`parcelCount` 0, the server's own discriminator) goes by its id,
+/// `DELETE /journal/{id}`. Both are erased, and both get the same question
+/// and the same five seconds. `Self.key` is the one place that tells them
+/// apart, and an entry's key carries `entryPrefix`, so the two can never be
+/// mistaken for each other in the stages or in what is sent.
+///
 /// ── Hidden at once, sent after the window ──
 ///
 /// The row leaves the list the moment it is swiped, and the bar under the
@@ -105,7 +116,7 @@ final class TreatmentRemoval {
     private let changed: @MainActor () -> Void
 
     init(window: Duration = TreatmentRemoval.window,
-         send: @escaping @MainActor (String) async throws -> Void = { try await TreatmentAPI.abandon($0) },
+         send: @escaping @MainActor (String) async throws -> Void = { try await TreatmentRemoval.sendDelete($0) },
          forget: @escaping @MainActor (String) async -> Void = { await OutboxStore.shared.forget($0) },
          changed: @escaping @MainActor () -> Void = { JournalChanges.shared.changed() }) {
         self.window = window
@@ -114,17 +125,46 @@ final class TreatmentRemoval {
         self.changed = changed
     }
 
-    /// The handles the list leaves out.
+    /// The keys the list leaves out.
     var hidden: Set<String> { Set(stages.keys) }
 
     func isHidden(_ entry: LogEntry) -> Bool {
-        entry.treatment?.treatmentGroupId.map { stages[$0] != nil } ?? false
+        Self.key(entry).map { stages[$0] != nil } ?? false
     }
 
-    /// The swipe. Nothing for a row that is no treatment, or is already going.
-    /// `window` overrides the store's, for a person using assistive technology.
+    /// What a row is removed BY: its treatment's handle when it stands for
+    /// one, `entry:<id>` when it is an ordinary manual entry, nil when the
+    /// row cannot say. A read that does not fold sends no `treatment`, and
+    /// there an entry may be one parcel's row of a treatment: removed alone,
+    /// it would leave the treatment short a parcel.
+    nonisolated static func key(_ entry: LogEntry) -> String? {
+        guard let treatment = entry.treatment else { return nil }
+        if treatment.isTreatment { return treatment.treatmentGroupId }
+        guard treatment.pendingCount == 0, treatment.lineCount == 0 else { return nil }
+        return entryPrefix + entry.id
+    }
+
+    nonisolated static let entryPrefix = "entry:"
+
+    /// The entry id inside a manual entry's key, nil for a treatment's handle.
+    nonisolated static func entryID(_ key: String) -> String? {
+        key.hasPrefix(entryPrefix) ? String(key.dropFirst(entryPrefix.count)) : nil
+    }
+
+    /// The server's delete for either kind of key.
+    static func sendDelete(_ key: String) async throws {
+        if let id = entryID(key) {
+            try await JournalAPI.deleteEntry(id)
+        } else {
+            try await TreatmentAPI.abandon(key)
+        }
+    }
+
+    /// The swipe. Nothing for a row that cannot be removed, or is already
+    /// going. `window` overrides the store's, for a person using assistive
+    /// technology.
     func remove(_ entry: LogEntry, window override: Duration? = nil) {
-        guard let handle = entry.treatment?.treatmentGroupId, stages[handle] == nil else { return }
+        guard let handle = Self.key(entry), stages[handle] == nil else { return }
         if let earlier = undoable { sendNow(earlier.handle) }
         failure = nil
         stages[handle] = .waiting
@@ -165,30 +205,33 @@ final class TreatmentRemoval {
         stages[handle] = .sent
         do {
             try await send(handle)
-        } catch let error where TreatmentAPI.isNothingRecorded(error) {
+        } catch let error where TreatmentAPI.isNothingRecorded(error) || JournalAPI.isGone(error) {
             // Already gone, from the web or another phone.
         } catch {
             stages[handle] = nil
             failure = UserMessage.text(for: error)
             return
         }
-        await forget(handle)
+        // Only a treatment can be waiting in the outbox under its key.
+        if Self.entryID(handle) == nil { await forget(handle) }
         changed()
     }
 
-    /// Offered where the server says pressing it would succeed: the row's
-    /// `mayDelete` (agri-saas #2184), for someone who may write. A row from
-    /// before the field (a cached page) offers it to any writer, and the
-    /// server's refusal is read out. Only a row that stands for a
-    /// treatment: an entry folded to itself has no handle.
+    /// Offered to someone who may write, where the server would take it.
+    ///
+    /// A treatment or an activity: the row's `mayDelete` (agri-saas #2184),
+    /// and a row from before the field (a cached page) offers it to any
+    /// writer, the server's refusal read out. Any work on parcels, a bare
+    /// activity included: the same route withdraws pruning or a harvest as
+    /// it does a spraying (agri-saas, proven by its test 2026-10-25).
+    ///
+    /// A manual entry: any writer, the entry route's own rule. Its
+    /// `mayDelete` is false by definition ("no treatment to withdraw") and
+    /// is not read.
     nonisolated static func offered(_ entry: LogEntry, to me: CurrentUser?) -> Bool {
-        // Any work on parcels, a bare activity included: the same route
-        // withdraws pruning or a harvest as it does a spraying (agri-saas,
-        // proven by its test 2026-10-25), under the same `mayDelete` rule.
-        guard let treatment = entry.treatment, treatment.isTreatment,
-              treatment.treatmentGroupId != nil,
-              let me, me.mayWrite else { return false }
-        return treatment.mayDelete ?? true
+        guard let key = key(entry), let me, me.mayWrite else { return false }
+        if entryID(key) != nil { return true }
+        return entry.treatment?.mayDelete ?? true
     }
 
     static let actionTitle = "Изтрий"

@@ -2316,6 +2316,33 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertFalse(app.buttons["Кошче"].exists, "«Кошче» was removed (#411)")
     }
 
+    /// A manual entry's «Изтрий» (owner, 2026-11-02: "add a swipe to delete
+    /// for manual entries after all"): the same question and five seconds
+    /// as a treatment. Nothing is sent: «Отмени» inside the window, and
+    /// under the seam a write is refused besides.
+    func testManualEntrySwipeDeleteAndUndo() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Поява на житна дървеница'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "no fixture observation on Дневник\n\(app.debugDescription)")
+        row.swipeLeft()
+        let delete = app.buttons["Изтрий"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "a manual entry offered no «Изтрий»\n\(app.debugDescription)")
+        capture("01j-journal-manual-swipe", app: app)
+        delete.tap()
+        let question = app.alerts["Сигурни ли сте, че искате да изтриете записа?"]
+        XCTAssertTrue(question.waitForExistence(timeout: 3), "«Изтрий» asked nothing\n\(app.debugDescription)")
+        question.buttons["Изтрий"].tap()
+        let undo = app.buttons["Отмени"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»\n\(app.debugDescription)")
+        XCTAssertFalse(row.exists, "the entry stayed in the list")
+        capture("01k-journal-manual-undo", app: app)
+        undo.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "«Отмени» did not bring the entry back")
+    }
+
     /// «Документи» (#468, owner 2026-10-30), from the menu: a synthetic
     /// library in every state a row can be in, the upload's choices, a
     /// document's «Изтрий» with its question and «Отмени» (inside the

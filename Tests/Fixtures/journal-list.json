@@ -55,7 +55,15 @@
       "title": "Поява на житна дървеница",
       "notes": "Единични екземпляри в северния край.",
       "occurredAt": "2026-09-12T08:15:00.000Z",
-      "version": 1
+      "version": 1,
+      "treatment": {
+        "treatmentGroupId": null,
+        "parcelCount": 0,
+        "blockNames": [],
+        "mayDelete": false,
+        "pendingCount": 0,
+        "lineCount": 0
+      }
     },
     {
       "id": "log_fixture_4",

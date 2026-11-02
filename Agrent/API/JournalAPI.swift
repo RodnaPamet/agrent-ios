@@ -5,6 +5,26 @@ enum JournalAPI {
 
     static var listPath: String { path(cursor: nil) }
 
+    /// One manual entry, for its «Изтрий» (owner, 2026-11-02: "add a swipe
+    /// to delete for manual entries after all"). The server ERASES it, with
+    /// its quantities, places and files, and keeps no «Кошче» (owner,
+    /// 2026-10-24), so the five seconds of «Отмени» are the only way back.
+    /// Any writer, as the route's own rule. Never for a row that stands for
+    /// a treatment: that is one parcel's entry, and the treatment goes whole
+    /// (`TreatmentAPI.abandon`).
+    static func entryPath(_ id: String) -> String { "\(base)/\(URLEscape.segment(id))" }
+
+    static func deleteEntry(_ id: String) async throws {
+        _ = try await APIClient.shared.deleteReturningData(entryPath(id))
+    }
+
+    /// The entry is already gone (from the web, or another phone): what was
+    /// asked for.
+    static func isGone(_ error: Error) -> Bool {
+        if case APIClient.APIError.http(404, "JOURNAL_ENTRY_NOT_FOUND"?, _, _, _) = error { return true }
+        return false
+    }
+
     /// ── A CURSOR IN A QUERY STRING, and the rule it appears to break ──
     ///
     /// ROADMAP, Phase 0: "any future endpoint passing an id or anything
