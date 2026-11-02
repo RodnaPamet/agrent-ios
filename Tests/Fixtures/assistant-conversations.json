@@ -1,0 +1,25 @@
+{
+  "conversations": [
+    {
+      "id": "conv_fixture_today",
+      "startedAt": "2026-11-02T06:10:00.000Z",
+      "lastTurnAt": "2026-11-02T06:14:00.000Z",
+      "turns": 6,
+      "opening": "Колко задачи имам тази седмица?"
+    },
+    {
+      "id": "conv_fixture_spray",
+      "startedAt": "2026-10-30T15:02:00.000Z",
+      "lastTurnAt": "2026-10-30T15:20:00.000Z",
+      "turns": 10,
+      "opening": "Кога за последно пръскахме синтетичния блок 2 и с какво?"
+    },
+    {
+      "id": "conv_fixture_empty",
+      "startedAt": "2026-10-28T09:00:00.000Z",
+      "lastTurnAt": "2026-10-28T09:00:00.000Z",
+      "turns": 0,
+      "opening": null
+    }
+  ]
+}

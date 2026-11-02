@@ -2818,17 +2818,32 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars["Поправи"].buttons["Отказ"].tap()
         XCTAssertTrue(point.waitForExistence(timeout: 5), "«Отказ» did not close the sheet")
 
-        let all = app.buttons["Изтрий всичко"]
-        guard reveal(all, in: app, what: "«Изтрий всичко»") else { return }
+        let all = app.buttons["Изтрий всичко запомнено"]
+        guard reveal(all, in: app, what: "«Изтрий всичко запомнено»") else { return }
         all.tap()
-        let question = app.buttons.matching(NSPredicate(format: "label == 'Изтрий всичко'"))
-        XCTAssertTrue(question.element(boundBy: 1).waitForExistence(timeout: 3) || question.count >= 1,
-                      "«Изтрий всичко» asked nothing")
         Thread.sleep(forTimeInterval: 1)
         capture("25e-memory-forget-all", app: app)
         let cancel = app.buttons["Отказ"]
-        if cancel.waitForExistence(timeout: 3) { cancel.tap() }
+        if cancel.waitForExistence(timeout: 3) { cancel.tap() } else { app.navigationBars.firstMatch.tap() }
         XCTAssertTrue(point.waitForExistence(timeout: 5), "«Отказ» forgot something")
+
+        // «Минали разговори» (#521): below the points, swiped and undone.
+        let conversation = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH '«Кога за последно пръскахме'")).firstMatch
+        guard reveal(conversation, in: app, what: "a fixture past conversation") else { return }
+        Thread.sleep(forTimeInterval: 1)
+        capture("25f-memory-conversations", app: app)
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH '(разговор без въпрос)'")).firstMatch.exists,
+                      "a conversation without a question has no words of its own")
+        conversation.swipeLeft()
+        XCTAssertTrue(delete.waitForExistence(timeout: 5), "the conversation offered no «Изтрий»\n\(app.debugDescription)")
+        delete.tap()
+        let back = app.buttons["Отмени"]
+        XCTAssertTrue(back.waitForExistence(timeout: 3), "no «Отмени» for a conversation")
+        capture("25g-memory-conversation-undo", app: app)
+        back.tap()
+        XCTAssertTrue(conversation.waitForExistence(timeout: 5), "«Отмени» did not bring the conversation back")
     }
 
     /// The assistant's button holds the bottom right on every screen; the

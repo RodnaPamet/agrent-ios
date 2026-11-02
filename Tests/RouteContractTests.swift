@@ -248,7 +248,9 @@ final class RouteContractTests: XCTestCase {
             ("AssistantAPI.swift", [AssistantAPI.streamPath]),
             // «Какво помни асистентът» (#507): the person's points, across
             // farms, and one of them to correct or forget.
-            ("AssistantMemoryAPI.swift", [AssistantMemoryAPI.path, AssistantMemoryAPI.pointPath(id)]),
+            ("AssistantMemoryAPI.swift", [AssistantMemoryAPI.path, AssistantMemoryAPI.pointPath(id),
+                                          AssistantMemoryAPI.conversationsPath,
+                                          AssistantMemoryAPI.conversationPath(id)]),
             ("InvoiceScan.swift", [InvoiceScanAPI.path]),
             // A mechanisator's own queue, for their one screen (#465).
             ("FarmTasksAPI.swift", [FarmTasksAPI.queuePath]),

@@ -111,6 +111,7 @@ final class FixtureSeamTests: XCTestCase {
             (WorkItemAPI.listPath, "tasks-list"),
             (NotificationsAPI.listPath, "notifications-list"),
             (AssistantMemoryAPI.path, "assistant-memory"),
+            (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
             (DocumentsAPI.listPath, "documents-list"),
             (DocumentsAPI.settingsPath, "documents-settings"),
             // #462: SYNTH-1's tasks from Блокове.
@@ -454,6 +455,15 @@ final class FixtureSeamTests: XCTestCase {
         ("notifications-list", { _ = try await NotificationsAPI.decodeList(from: $0) }),
         // Strict here, though the app reads it lossily: a fixture point that
         // does not read would vanish from the screenshot unnoticed.
+        // Strict too: a fixture conversation that did not read would vanish
+        // from the screenshot unnoticed. One has no opening, on purpose.
+        ("assistant-conversations", {
+            struct Strict: Decodable { let conversations: [AssistantMemoryAPI.Conversation] }
+            let rows = try await APIClient.shared.decode($0, as: Strict.self).conversations
+            if rows.count != 3 || rows.filter({ $0.opening == nil }).count != 1 {
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "assistant-conversations: \(rows)"))
+            }
+        }),
         ("assistant-memory", {
             struct Strict: Decodable { let facts: [AssistantMemoryAPI.Point] }
             let points = try await APIClient.shared.decode($0, as: Strict.self).facts

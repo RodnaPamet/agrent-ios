@@ -187,6 +187,8 @@ enum FixtureCatalogue {
         // #507: «Какво помни асистентът», three synthetic points. Forgetting
         // and correcting are writes: refused, as every write.
         (AssistantMemoryAPI.path, "assistant-memory"),
+        // #521: three synthetic past conversations, one without a question.
+        (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
         // #468: «Документи», a synthetic library in every state a row can
         // be in, and its settings. Previews have no fixture (`NO_FIXTURE`),
         // and every write is refused as every write is.
