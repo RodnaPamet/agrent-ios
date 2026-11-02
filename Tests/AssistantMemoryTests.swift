@@ -224,17 +224,103 @@ final class AssistantMemoryTests: XCTestCase {
         XCTAssertEqual(AssistantMemoryText.forgotten(wheat), "Забравено: «Отглежда пшеница и слънчоглед.»")
     }
 
-    /// Профил offers it only where the assistant is on (a source read: the
-    /// row is a `NavigationLink` inside a `List`, with no runtime hook).
+    /// Профил offers it only where the assistant AND its memory are on: the
+    /// memory routes answer 404 while `assistant.memory` is off (a source
+    /// read: the row is a `NavigationLink` inside a `List`, with no runtime
+    /// hook).
     func testProfileOffersItBehindTheAssistantFlag() throws {
         let profile = try source("Agrent/Account/ProfileView.swift")
-        let gate = try XCTUnwrap(profile.range(of: "if flags.isOn(AssistantAPI.flag) {"))
+        let gate = try XCTUnwrap(profile.range(of: "if flags.isOn(AssistantAPI.flag), flags.isOn(AssistantMemoryAPI.flag) {"))
         let row = try XCTUnwrap(profile.range(of: "AssistantMemoryView()"))
         XCTAssertLessThan(gate.lowerBound, row.lowerBound)
         XCTAssertLessThan(profile.distance(from: gate.upperBound, to: row.lowerBound), 200,
                           "the row sits directly inside the flag check")
         // Positive control: the reader finds a row that is known to be there.
         XCTAssertTrue(profile.contains("DeleteAccountView()"))
+    }
+
+    // MARK: - Past conversations (#521)
+
+    private let today = AssistantMemoryAPI.Conversation(id: "c1", opening: "Колко задачи имам?", lastTurnAt: nil, turns: 6)
+    private let blank = AssistantMemoryAPI.Conversation(id: "c2", opening: nil, lastTurnAt: nil, turns: 0)
+
+    private func conversations(_ calls: Calls) -> PastConversationsStore {
+        let rows = [today, blank]
+        return PastConversationsStore(window: .seconds(600), api: PastConversationsStore.API(
+            list: { rows },
+            forget: { id in
+                calls.log.append("forget \(id)")
+                if let refusal = calls.refusal { throw refusal }
+            },
+            forgetAll: {
+                calls.log.append("forget all")
+                if let refusal = calls.refusal { throw refusal }
+            }))
+    }
+
+    /// The person's own first question labels a row; a blank one is no
+    /// question; a row that does not read costs that row.
+    func testConversationsDecodeLossily() async throws {
+        let json = Data("""
+        {"conversations":[
+          {"id":"c1","startedAt":"2026-11-02T06:10:00.000Z","lastTurnAt":"2026-11-02T06:14:00.000Z","turns":6,"opening":"Колко задачи имам?"},
+          {"id":"c2","startedAt":"2026-10-28T09:00:00.000Z","lastTurnAt":"2026-10-28T09:00:00.000Z","turns":0,"opening":null},
+          {"id":"c3","startedAt":"2026-10-27T09:00:00.000Z","lastTurnAt":"2026-10-27T09:00:00.000Z","turns":2,"opening":"   "},
+          {"opening":"без id"}
+        ]}
+        """.utf8)
+        let rows = try await AssistantMemoryAPI.decodeConversations(from: json)
+        XCTAssertEqual(rows.map(\.id), ["c1", "c2", "c3"])
+        XCTAssertEqual(rows[0].opening, "Колко задачи имам?")
+        XCTAssertEqual(rows[0].turns, 6)
+        XCTAssertNotNil(rows[0].lastTurnAt)
+        XCTAssertNil(rows[1].opening)
+        XCTAssertNil(rows[2].opening, "spaces are no question")
+    }
+
+    func testTheConversationPathsArePerPerson() {
+        XCTAssertEqual(AssistantMemoryAPI.conversationsPath, "/api/account/assistant-conversations")
+        XCTAssertEqual(AssistantMemoryAPI.conversationPath("a b"), "/api/account/assistant-conversations/a%20b")
+        XCTAssertEqual(AssistantMemoryAPI.flag, "assistant.memory")
+    }
+
+    /// The same five seconds as a point: hidden at once, undone for
+    /// nothing, sent once.
+    func testAConversationIsForgottenOnceAfterItsWindow() async {
+        let calls = Calls()
+        let list = conversations(calls)
+        await list.load()
+        list.forget(today)
+        XCTAssertEqual(list.items, [blank])
+        list.undo()
+        XCTAssertEqual(list.items, [today, blank])
+        XCTAssertEqual(calls.log, [])
+        list.forget(today)
+        await list.commit(today)
+        await list.commit(today)
+        XCTAssertEqual(calls.log, ["forget c1"])
+        XCTAssertEqual(list.items, [blank])
+    }
+
+    func testForgettingAllConversationsLeavesThePoints() async {
+        let calls = Calls()
+        let list = conversations(calls)
+        let memory = store(calls)
+        await list.load()
+        await memory.load()
+        await list.forgetAll()
+        XCTAssertEqual(calls.log, ["forget all"])
+        XCTAssertEqual(list.items, [])
+        XCTAssertEqual(memory.points, [wheat, short], "the points are their own")
+        XCTAssertTrue(AssistantMemoryText.forgetAllConversationsNote.contains("Запомненото остава"))
+        XCTAssertTrue(AssistantMemoryText.forgetAllNote.contains("Минали разговори остават"))
+    }
+
+    /// The bar quotes the question; a conversation without one still says
+    /// what went.
+    func testTheConversationBarNamesIt() {
+        XCTAssertEqual(AssistantMemoryText.forgotten(today), "Разговорът е изтрит: «Колко задачи имам?»")
+        XCTAssertEqual(AssistantMemoryText.forgotten(blank), "Разговорът е изтрит.")
     }
 
     // MARK: - Helpers

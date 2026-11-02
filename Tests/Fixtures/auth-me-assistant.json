@@ -17,6 +17,7 @@
     "social.farm-registration": true,
     "social.public-profile": true,
     "agro.orthophoto": true,
-    "assistant.enabled": true
+    "assistant.enabled": true,
+    "assistant.memory": true
   }
 }

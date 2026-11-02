@@ -278,7 +278,8 @@ Ported in shape from inflect-compliance's assistant: a launcher in the app shell
   - A tap corrects a point in the person's own words, ≤ 280 characters; the server never rewrites a corrected point (rule 6 of the design adopted from ai-memory).
   - A swipe hides the point at once and sends the forget after five seconds of «Отмени», as an expense's «Изтрий» does, but without the question first: one remembered sentence is not a register record. Leaving the screen sends it at once. A forgotten point is not learned again from the same words (rule 5).
   - «Изтрий всичко» asks first. The row shows only while `assistant.enabled` is on. The list is read live, never cached on disk.
-  - Not yet: the past conversations, which wait for agri-saas #2695.
+  - **«Минали разговори»** (#521, agri-saas #2711, web #2715): every past exchange, from every farm, newest first, labelled by the person's own first question («(разговор без въпрос)» when there was none), its day and its number of turns. A swipe forgets one with the same five seconds of «Отмени»; «Изтрий всички разговори» asks first and says the remembered points stay, as «Изтрий всичко запомнено» says the conversations stay. Nothing opens on a tap: the server serves the list, not an exchange's turns.
+  - The row in Профил needs `assistant.memory` too: both halves answer 404 while it is off ("one screen, one switch").
 
 ## Exchange
 
