@@ -25,6 +25,12 @@ struct AssistantSheet: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 20) {
+                        if store.earlierLeftOut {
+                            Text(AssistantText.earlierLeftOut)
+                                .font(.footnote)
+                                .foregroundStyle(Palette.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if store.turns.isEmpty {
                             Text(AssistantText.intro)
                                 .font(.subheadline)

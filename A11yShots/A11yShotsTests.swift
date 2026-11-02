@@ -2844,6 +2844,18 @@ final class A11yShotsTests: XCTestCase {
         capture("25g-memory-conversation-undo", app: app)
         back.tap()
         XCTAssertTrue(conversation.waitForExistence(timeout: 5), "«Отмени» did not bring the conversation back")
+
+        // Opened (#525): read in the assistant's sheet, its start left out,
+        // one turn unread, and the composer under it to continue. Nothing
+        // is asked: the sheet closes on «Затвори».
+        conversation.tap()
+        let note = app.staticTexts["По-ранните реплики от този разговор не са показани."]
+        XCTAssertTrue(note.waitForExistence(timeout: 10), "the opened conversation did not say its start is left out\n\(app.debugDescription)")
+        XCTAssertTrue(app.textFields["Въпрос"].waitForExistence(timeout: 5), "no composer to continue it")
+        Thread.sleep(forTimeInterval: 1)
+        capture("25h-memory-conversation-open", app: app)
+        app.navigationBars.buttons["Затвори"].firstMatch.tap()
+        XCTAssertTrue(conversation.waitForExistence(timeout: 5), "«Затвори» did not come back to the list")
     }
 
     /// The assistant's button holds the bottom right on every screen; the

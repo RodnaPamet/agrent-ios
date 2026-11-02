@@ -144,6 +144,65 @@ enum AssistantMemoryAPI {
         return try await APIClient.shared.decode(data, as: Envelope.self).conversations.compactMap(\.value)
     }
 
+    /// One past exchange to read and continue (#525, agri-saas #2722): its
+    /// turns oldest first, as a transcript reads.
+    struct PastConversation: Decodable, Equatable, Sendable {
+        let id: String
+        let items: [Item]
+        /// The exchange is longer than `items`: the OLDEST turns were left
+        /// out, so the end always agrees with the list's day.
+        let truncated: Bool
+
+        struct Item: Decodable, Equatable, Sendable {
+            let role: Role
+            /// Nil when the server holds the turn and could not read it:
+            /// "never a storage envelope" (agri-saas #2722). An envelope
+            /// that arrives anyway reads as nil too (`Conversation.isSealed`).
+            let text: String?
+
+            enum Role: String, Decodable, Sendable { case user, assistant }
+
+            private enum CodingKeys: String, CodingKey { case role, text }
+
+            init(role: Role, text: String?) {
+                self.role = role
+                self.text = text
+            }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                role = try c.decode(Role.self, forKey: .role)
+                let said = (try? c.decodeIfPresent(String.self, forKey: .text))?.recorded
+                text = said.flatMap { Conversation.isSealed($0) ? nil : $0 }
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey { case id, items, truncated }
+
+        init(id: String, items: [Item], truncated: Bool) {
+            self.id = id
+            self.items = items
+            self.truncated = truncated
+        }
+
+        /// A turn that does not read costs that turn, never the exchange.
+        init(from decoder: Decoder) throws {
+            struct Lossy: Decodable {
+                let value: Item?
+                init(from decoder: Decoder) throws { value = try? Item(from: decoder) }
+            }
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            items = try c.decode([Lossy].self, forKey: .items).compactMap(\.value)
+            truncated = (try? c.decodeIfPresent(Bool.self, forKey: .truncated)) ?? false
+        }
+    }
+
+    static func pastConversation(_ id: String) async throws -> PastConversation {
+        let data = try await APIClient.shared.data(for: conversationPath(id))
+        return try await APIClient.shared.decode(data, as: PastConversation.self)
+    }
+
     /// Forget one. Gone already, or never this person's, is
     /// `CONVERSATION_NOT_FOUND` (deliberately one answer): what was asked for.
     static func forgetConversation(_ id: String) async throws {

@@ -18,6 +18,12 @@ struct AssistantMemoryView: View {
     @State private var editing: AssistantMemoryAPI.Point?
     @State private var confirmingPoints = false
     @State private var confirmingConversations = false
+    /// A past conversation opened to read and continue (#525).
+    @State private var reading: AssistantMemoryAPI.Conversation?
+    /// A prepared entry chosen in it, opened in «Нов запис» once its sheet
+    /// has gone, as the assistant's button does.
+    @State private var pending: TreatmentDraft?
+    @State private var entry: PreparedMemoryEntry?
 
     var body: some View {
         List {
@@ -57,6 +63,28 @@ struct AssistantMemoryView: View {
         }
         .sheet(item: $editing) { point in
             AssistantMemoryEditView(point: point, store: points)
+        }
+        .sheet(item: $reading, onDismiss: {
+            // Continued, it is newer and longer now; and what it taught the
+            // assistant may be among the points.
+            Task {
+                async let remembered: Void = points.load()
+                async let exchanged: Void = conversations.load()
+                _ = await (remembered, exchanged)
+            }
+            if let pending {
+                entry = PreparedMemoryEntry(draft: pending)
+                self.pending = nil
+                UsageEvents.shared.record(.assistantEntryOpened)
+            }
+        }) { conversation in
+            PastConversationSheet(conversation: conversation) { draft in
+                pending = draft
+                reading = nil
+            }
+        }
+        .sheet(item: $entry, onDismiss: FarmRecordAPI.removeGenerated) { entry in
+            TreatmentEntryFlow(recorder: LiveTreatmentRecorder(), prefill: entry.draft) {}
         }
         .confirmationDialog(AssistantMemoryText.forgetAllQuestion, isPresented: $confirmingPoints,
                             titleVisibility: .visible) {
@@ -164,7 +192,9 @@ struct AssistantMemoryView: View {
                 empty(AssistantMemoryText.noConversationsTitle, AssistantMemoryText.noConversationsMessage)
             case .loaded:
                 ForEach(conversations.items) { conversation in
-                    conversationRow(conversation)
+                    Button { reading = conversation } label: { conversationRow(conversation) }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(AssistantMemoryText.openHint)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             deleteButton { forget(conversation, in: conversations) }
                         }
@@ -179,8 +209,8 @@ struct AssistantMemoryView: View {
         }
     }
 
-    /// The person's first question, then when and how long. Nothing opens
-    /// on a tap: the server serves the list, not an exchange's turns.
+    /// The person's first question, then when and how long. A tap opens it
+    /// to read and continue (#525).
     private func conversationRow(_ conversation: AssistantMemoryAPI.Conversation) -> some View {
         let opening = conversation.opening.map { "«\($0)»" } ?? AssistantMemoryText.noOpening
         let turns = Plural.bg(conversation.turns, "реплика", "реплики")
@@ -202,6 +232,7 @@ struct AssistantMemoryView: View {
             .foregroundStyle(Palette.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .padding(.vertical, 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(A11y.sentence([opening, when, turns]))
@@ -358,6 +389,7 @@ enum AssistantMemoryText {
     static let editPlaceholder = "Какво да помни асистентът"
     static let editNote = "Вашите думи — асистентът не ги пренаписва."
     static let editHint = "Отваря за поправка"
+    static let openHint = "Отваря разговора, за да го прочетете и продължите"
     /// The bar names what went, so «Отмени» is a choice about a sentence
     /// the person can read, not about a row that is no longer there.
     static func forgotten(_ point: AssistantMemoryAPI.Point) -> String {
@@ -373,11 +405,17 @@ enum AssistantMemoryText {
     static let notForgotten = "Не е изтрито"
 
     static let conversationsTitle = "Минали разговори"
-    static let conversationsNote = "Всички Ваши разговори с асистента, от всички стопанства. Запазват се, докато съществува профилът Ви, и асистентът може да погледне в тях, когато го попитате за нещо отпреди. Изтриването на разговор не изтрива запомненото от него — то е отделно, по-горе."
+    static let conversationsNote = "Всички Ваши разговори с асистента, от всички стопанства. Докоснете, за да прочетете и продължите разговор, или плъзнете, за да го изтриете. Запазват се, докато съществува профилът Ви, и асистентът може да погледне в тях, когато го попитате за нещо отпреди. Изтриването на разговор не изтрива запомненото от него — то е отделно, по-горе."
     static let noConversationsTitle = "Няма записани разговори"
     static let noConversationsMessage = "Когато разговаряте с асистента, разговорът ще се появи тук и ще можете да го изтриете."
     static let noOpening = "(разговор без въпрос)"
     static let forgetAllConversations = "Изтрий всички разговори"
     static let forgetAllConversationsQuestion = "Да изтрия ли всички разговори?"
     static let forgetAllConversationsNote = "Асистентът ще забрави всички минали разговори и няма да може да поглежда в тях. Това не може да бъде върнато. Запомненото остава."
+}
+
+/// A prepared entry on its way into «Нов запис», from a past conversation.
+private struct PreparedMemoryEntry: Identifiable {
+    let id = UUID()
+    let draft: TreatmentDraft
 }

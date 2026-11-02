@@ -112,6 +112,7 @@ final class FixtureSeamTests: XCTestCase {
             (NotificationsAPI.listPath, "notifications-list"),
             (AssistantMemoryAPI.path, "assistant-memory"),
             (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
+            (AssistantMemoryAPI.conversationPath("conv_fixture_spray"), "assistant-conversation-spray"),
             (DocumentsAPI.listPath, "documents-list"),
             (DocumentsAPI.settingsPath, "documents-settings"),
             // #462: SYNTH-1's tasks from Блокове.
@@ -462,6 +463,13 @@ final class FixtureSeamTests: XCTestCase {
             let rows = try await APIClient.shared.decode($0, as: Strict.self).conversations
             if rows.count != 3 || rows.filter({ $0.opening == nil }).count != 1 {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "assistant-conversations: \(rows)"))
+            }
+        }),
+        // Strict: five turns, one unread, the start left out.
+        ("assistant-conversation-spray", {
+            let past = try await APIClient.shared.decode($0, as: AssistantMemoryAPI.PastConversation.self)
+            if past.items.count != 5 || past.items.filter({ $0.text == nil }).count != 1 || !past.truncated {
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "assistant-conversation-spray: \(past)"))
             }
         }),
         ("assistant-memory", {
