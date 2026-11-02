@@ -100,6 +100,17 @@ enum AssistantMemoryAPI {
 
         private enum CodingKeys: String, CodingKey { case id, opening, lastTurnAt, turns }
 
+        /// An encryption envelope (`v2:` and base64), never words. Turn text
+        /// is sealed under the FARM's key, and a read across a person's
+        /// farms resolved no key, so until agri-saas #2722 the list sent
+        /// every `opening` sealed, which would have been every row's label
+        /// (backend 2, 2026-11-02). Read as no question, never shown: a
+        /// person must not read ciphertext as their own words, whatever a
+        /// server does next.
+        static func isSealed(_ text: String) -> Bool {
+            text.range(of: #"^v[0-9]+:[A-Za-z0-9+/=_-]{16,}$"#, options: .regularExpression) != nil
+        }
+
         init(id: String, opening: String?, lastTurnAt: Date?, turns: Int) {
             self.id = id
             self.opening = opening
@@ -110,7 +121,8 @@ enum AssistantMemoryAPI {
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             id = try c.decode(String.self, forKey: .id)
-            opening = (try? c.decodeIfPresent(String.self, forKey: .opening))?.recorded
+            let said = (try? c.decodeIfPresent(String.self, forKey: .opening))?.recorded
+            opening = said.flatMap { Self.isSealed($0) ? nil : $0 }
             lastTurnAt = try? c.decodeIfPresent(Date.self, forKey: .lastTurnAt)
             turns = (try? c.decodeIfPresent(Int.self, forKey: .turns)) ?? 0
         }
