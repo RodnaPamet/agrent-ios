@@ -72,7 +72,9 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
     /// server's sentence for it in the person's language, when it sends one.
     case refusal(reason: String, message: String?)
     /// A bound was reached: what came before is real but incomplete.
-    case halt(outcome: String, message: String?, counts: [String: Int])
+    /// Exactly `{type, code, message}` (backend 2, measured 2026-11-01): no
+    /// counts ride on it, and the per-turn signals are `done`'s (#499).
+    case halt(outcome: String, message: String?)
     /// The turn is over. `truncatedAny` / `partialAny` (agri-saas #2648):
     /// some read was shortened, or did not gather everything, even when a
     /// halt of higher precedence (time, tool calls) was the one sent.
@@ -82,7 +84,6 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case type, name, ok, truncated, text, links, proposal, code, reason, outcome, truncatedAny, partialAny, message
         case conversationId
-        case toolCalls, limit, elapsedMs
     }
 
     init(from decoder: Decoder) throws {
@@ -114,13 +115,8 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
             let code = (try? c.decode(String.self, forKey: .code)) ?? (try? c.decode(String.self, forKey: .reason))
             self = .refusal(reason: code ?? "", message: try? c.decodeIfPresent(String.self, forKey: .message))
         case "halt":
-            var counts: [String: Int] = [:]
-            for key in [CodingKeys.toolCalls, .limit, .elapsedMs] {
-                if let value = try? c.decode(Int.self, forKey: key) { counts[key.stringValue] = value }
-            }
             let code = (try? c.decode(String.self, forKey: .code)) ?? (try? c.decode(String.self, forKey: .outcome))
-            self = .halt(outcome: code ?? "", message: try? c.decodeIfPresent(String.self, forKey: .message),
-                         counts: counts)
+            self = .halt(outcome: code ?? "", message: try? c.decodeIfPresent(String.self, forKey: .message))
         case "done":
             self = .done(truncatedAny: (try? c.decode(Bool.self, forKey: .truncatedAny)) ?? false,
                          partialAny: (try? c.decode(Bool.self, forKey: .partialAny)) ?? false)

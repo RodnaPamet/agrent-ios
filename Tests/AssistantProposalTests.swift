@@ -69,7 +69,7 @@ final class AssistantProposalTests: XCTestCase {
         let store = AssistantStore { _ in
             AsyncThrowingStream { continuation in
                 continuation.yield(answer)
-                continuation.yield(.halt(outcome: "ASSISTANT_TIME_BUDGET", message: nil, counts: [:]))
+                continuation.yield(.halt(outcome: "ASSISTANT_TIME_BUDGET", message: nil))
                 continuation.finish()
             }
         }

@@ -39,13 +39,14 @@ final class AssistantTests: XCTestCase {
         XCTAssertEqual(try event(#"{"type":"refusal","code":"ASSISTANT_INPUT_REJECTED","message":"Не можах."}"#),
                        .refusal(reason: "ASSISTANT_INPUT_REJECTED", message: "Не можах."))
         XCTAssertEqual(try event(#"{"type":"halt","code":"ASSISTANT_SPEND_CEILING","message":"Непълен."}"#),
-                       .halt(outcome: "ASSISTANT_SPEND_CEILING", message: "Непълен.", counts: [:]))
+                       .halt(outcome: "ASSISTANT_SPEND_CEILING", message: "Непълен."))
         XCTAssertEqual(try event(#"{"type":"refusal","reason":"ASSISTANT_INPUT_REJECTED"}"#),
                        .refusal(reason: "ASSISTANT_INPUT_REJECTED", message: nil), "the draft's name still reads")
         XCTAssertEqual(try event(#"{"type":"refusal","reason":"ASSISTANT_OUT_OF_SCOPE","message":"Извън."}"#),
                        .refusal(reason: "ASSISTANT_OUT_OF_SCOPE", message: "Извън."))
         XCTAssertEqual(try event(#"{"type":"halt","outcome":"ASSISTANT_TOOL_BUDGET","toolCalls":8,"limit":8}"#),
-                       .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil, counts: ["toolCalls": 8, "limit": 8]))
+                       .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil),
+                       "the draft's name still reads; counts the server never sends are not read")
         XCTAssertEqual(try event(#"{"type":"done","truncatedAny":false}"#), .done(truncatedAny: false))
         XCTAssertEqual(try event(#"{"type":"done","truncatedAny":false,"partialAny":true}"#),
                        .done(truncatedAny: false, partialAny: true))
@@ -181,11 +182,11 @@ final class AssistantTests: XCTestCase {
     /// halt before one says why there is none.
     func testAHaltIsIncompleteNotAnError() async {
         let after = store([.answer(text: "Частичен отговор.", links: [], proposal: nil),
-                           .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil, counts: ["toolCalls": 8, "limit": 8])])
+                           .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil)])
         await ask(after)
         XCTAssertEqual(after.turns[0].phase,
                        .answered("Частичен отговор.", note: AssistantText.halt("ASSISTANT_TOOL_BUDGET")))
-        let before = store([.thinking, .halt(outcome: "ASSISTANT_PROVIDER_UNAVAILABLE", message: nil, counts: [:])])
+        let before = store([.thinking, .halt(outcome: "ASSISTANT_PROVIDER_UNAVAILABLE", message: nil)])
         await ask(before)
         XCTAssertEqual(before.turns[0].phase, .unanswered(AssistantText.halt("ASSISTANT_PROVIDER_UNAVAILABLE")))
     }
@@ -195,14 +196,14 @@ final class AssistantTests: XCTestCase {
     /// The partial halt itself is not said twice.
     func testAPartialReadIsSaidEvenWhenTimeEndedTheTurn() async {
         let both = store([.answer(text: "Рискът е нисък.", links: [], proposal: nil),
-                          .halt(outcome: "ASSISTANT_TIME_BUDGET", message: nil, counts: [:]),
+                          .halt(outcome: "ASSISTANT_TIME_BUDGET", message: nil),
                           .done(truncatedAny: false, partialAny: true)])
         await ask(both)
         XCTAssertEqual(both.turns[0].phase, .answered("Рискът е нисък.", note:
             AssistantText.halt("ASSISTANT_TIME_BUDGET") + " " + AssistantText.halt("ASSISTANT_PARTIAL_DATA")))
 
         let once = store([.answer(text: "Рискът е нисък.", links: [], proposal: nil),
-                          .halt(outcome: "ASSISTANT_PARTIAL_DATA", message: nil, counts: [:]),
+                          .halt(outcome: "ASSISTANT_PARTIAL_DATA", message: nil),
                           .done(truncatedAny: false, partialAny: true)])
         await ask(once)
         XCTAssertEqual(once.turns[0].phase, .answered("Рискът е нисък.", note: AssistantText.halt("ASSISTANT_PARTIAL_DATA")))
@@ -214,7 +215,7 @@ final class AssistantTests: XCTestCase {
 
         // A halt with no `done` after it ends the turn as the halt said.
         let cut = store([.answer(text: "Частичен.", links: [], proposal: nil),
-                         .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil, counts: [:])])
+                         .halt(outcome: "ASSISTANT_TOOL_BUDGET", message: nil)])
         await ask(cut)
         XCTAssertEqual(cut.turns[0].phase, .answered("Частичен.", note: AssistantText.halt("ASSISTANT_TOOL_BUDGET")))
     }

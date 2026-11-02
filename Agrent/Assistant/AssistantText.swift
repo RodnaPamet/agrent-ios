@@ -76,7 +76,7 @@ enum AssistantText {
 
     /// `halt.outcome`: the answer above is real but incomplete — except a
     /// provider failure, which can come before any answer, and says so.
-    static func halt(_ outcome: String, counts: [String: Int] = [:]) -> String {
+    static func halt(_ outcome: String) -> String {
         switch outcome {
         case "ASSISTANT_TOOL_BUDGET":
             "Отговорът по-горе е верен, но непълен — достигнах ограничението колко мога да проверя за един въпрос."
