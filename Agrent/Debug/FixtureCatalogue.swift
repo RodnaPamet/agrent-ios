@@ -189,6 +189,8 @@ enum FixtureCatalogue {
         (AssistantMemoryAPI.path, "assistant-memory"),
         // #521: three synthetic past conversations, one without a question.
         (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
+        // #525: one of them opened, its start left out and one turn unread.
+        (AssistantMemoryAPI.conversationPath("conv_fixture_spray"), "assistant-conversation-spray"),
         // #468: «Документи», a synthetic library in every state a row can
         // be in, and its settings. Previews have no fixture (`NO_FIXTURE`),
         // and every write is refused as every write is.

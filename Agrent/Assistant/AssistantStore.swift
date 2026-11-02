@@ -37,6 +37,9 @@ final class AssistantStore {
     /// The server's conversation, once it has named one: sent back with
     /// every next question until «Нов разговор».
     private(set) var conversationId: String?
+    /// A past conversation opened with its oldest turns left out (#525):
+    /// the sheet says so above the first one shown.
+    private(set) var earlierLeftOut = false
     private var running: Task<Void, Never>?
     private let asker: Asker
     /// The connection kept up while the person steps out of the app.
@@ -71,6 +74,39 @@ final class AssistantStore {
         stop()
         turns = []
         conversationId = nil
+        earlierLeftOut = false
+    }
+
+    /// A past conversation, opened from «Минали разговори» (#525): its turns
+    /// on screen, and the next question continues it (`conversationId`,
+    /// agri-saas #2694), as a follow-up in the same sheet would.
+    func resume(_ past: AssistantMemoryAPI.PastConversation) {
+        stop()
+        turns = Self.turns(from: past.items)
+        conversationId = past.id
+        earlierLeftOut = past.truncated
+    }
+
+    /// A transcript as the sheet's turns: each question with the answer
+    /// after it. A question with none says the answer was not kept; an
+    /// answer whose question was left out (the oldest go first) stands under
+    /// «(по-ранен въпрос)»; a turn the server could not read says so.
+    nonisolated static func turns(from items: [AssistantMemoryAPI.PastConversation.Item]) -> [Turn] {
+        var turns: [Turn] = []
+        for item in items {
+            let text = item.text ?? AssistantText.unreadableTurn
+            switch item.role {
+            case .user:
+                turns.append(Turn(question: text, phase: .unanswered(AssistantText.answerNotKept)))
+            case .assistant:
+                if let last = turns.indices.last, case .unanswered(AssistantText.answerNotKept) = turns[last].phase {
+                    turns[last].phase = .answered(text, note: nil)
+                } else {
+                    turns.append(Turn(question: AssistantText.earlierQuestion, phase: .answered(text, note: nil)))
+                }
+            }
+        }
+        return turns
     }
 
     /// The running turn, to its end. For the tests, which must not race it.

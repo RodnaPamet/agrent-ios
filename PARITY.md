@@ -279,6 +279,7 @@ Ported in shape from inflect-compliance's assistant: a launcher in the app shell
   - A swipe hides the point at once and sends the forget after five seconds of «Отмени», as an expense's «Изтрий» does, but without the question first: one remembered sentence is not a register record. Leaving the screen sends it at once. A forgotten point is not learned again from the same words (rule 5).
   - «Изтрий всичко» asks first. The row shows only while `assistant.enabled` is on. The list is read live, never cached on disk.
   - **«Минали разговори»** (#521, agri-saas #2711, web #2715): every past exchange, from every farm, newest first, labelled by the person's own first question («(разговор без въпрос)» when there was none), its day and its number of turns. A swipe forgets one with the same five seconds of «Отмени»; «Изтрий всички разговори» asks first and says the remembered points stay, as «Изтрий всичко запомнено» says the conversations stay. Nothing opens on a tap: the server serves the list, not an exchange's turns.
+  - **A tap opens a past conversation** (#525, agri-saas #2722) in the assistant's own sheet: its turns oldest first, and the next question continues it (`conversationId`). The oldest turns may be left out («По-ранните реплики от този разговор не са показани.»); a turn the server could not read says so, and never shows an envelope; an answer whose question was left out stands under «(по-ранен въпрос)».
   - The row in Профил needs `assistant.memory` too: both halves answer 404 while it is off ("one screen, one switch").
 
 ## Exchange

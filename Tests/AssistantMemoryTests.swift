@@ -341,6 +341,71 @@ final class AssistantMemoryTests: XCTestCase {
         XCTAssertEqual(AssistantMemoryText.forgotten(blank), "Разговорът е изтрит.")
     }
 
+    // MARK: - Opening a past conversation (#525)
+
+    private typealias Item = AssistantMemoryAPI.PastConversation.Item
+
+    /// Oldest first, as a transcript reads; a turn that does not read costs
+    /// that turn; a sealed one reads as unread; `truncated` is kept.
+    func testAPastConversationDecodes() async throws {
+        let json = Data("""
+        {"id":"c1","startedAt":"2026-10-30T15:02:00.000Z","lastTurnAt":"2026-10-30T15:20:00.000Z","turns":9,"truncated":true,
+         "items":[
+          {"role":"user","text":"Кога пръскахме?","at":"2026-10-30T15:10:00.000Z"},
+          {"role":"assistant","text":null,"at":"2026-10-30T15:10:30.000Z"},
+          {"role":"user","text":"v2:8X18HAVpshGpwrCO8HZ4CRacoUjPZH+abc/=","at":"2026-10-30T15:11:00.000Z"},
+          {"role":"system","text":"непозната роля","at":"2026-10-30T15:12:00.000Z"}
+         ]}
+        """.utf8)
+        let past = try await APIClient.shared.decode(json, as: AssistantMemoryAPI.PastConversation.self)
+        XCTAssertEqual(past.id, "c1")
+        XCTAssertTrue(past.truncated)
+        XCTAssertEqual(past.items, [Item(role: .user, text: "Кога пръскахме?"),
+                                    Item(role: .assistant, text: nil),
+                                    Item(role: .user, text: nil)],
+                       "a null, a sealed and an unknown role: unread, unread, dropped")
+    }
+
+    /// Each question with the answer after it; a question with none says
+    /// so; an answer whose question the cap left out stands alone; an
+    /// unread turn says it could not be read.
+    func testATranscriptBecomesTheSheetsTurns() {
+        let turns = AssistantStore.turns(from: [
+            Item(role: .assistant, text: "Два пъти."),
+            Item(role: .user, text: "Кога пръскахме?"),
+            Item(role: .assistant, text: "На 18 септември."),
+            Item(role: .user, text: nil),
+            Item(role: .assistant, text: nil),
+            Item(role: .user, text: "А торене?"),
+        ])
+        XCTAssertEqual(turns.map(\.question),
+                       [AssistantText.earlierQuestion, "Кога пръскахме?", AssistantText.unreadableTurn, "А торене?"])
+        XCTAssertEqual(turns[0].phase, .answered("Два пъти.", note: nil))
+        XCTAssertEqual(turns[1].phase, .answered("На 18 септември.", note: nil))
+        XCTAssertEqual(turns[2].phase, .answered(AssistantText.unreadableTurn, note: nil))
+        XCTAssertEqual(turns[3].phase, .unanswered(AssistantText.answerNotKept))
+    }
+
+    /// Opened, the next question continues it; «Нов разговор» lets it go.
+    func testResumingCarriesTheConversationsId() {
+        let store = AssistantStore(ask: { _ in AsyncThrowingStream { $0.finish() } })
+        store.resume(AssistantMemoryAPI.PastConversation(
+            id: "conv_7", items: [Item(role: .user, text: "Кога?"), Item(role: .assistant, text: "Вчера.")],
+            truncated: true))
+        XCTAssertEqual(store.conversationId, "conv_7")
+        XCTAssertEqual(store.turns.count, 1)
+        XCTAssertTrue(store.earlierLeftOut)
+        store.newConversation()
+        XCTAssertNil(store.conversationId)
+        XCTAssertTrue(store.turns.isEmpty)
+        XCTAssertFalse(store.earlierLeftOut)
+    }
+
+    func testAConversationNotFoundIsBulgarian() {
+        XCTAssertEqual(UserMessage.text(for: refusal(404, "CONVERSATION_NOT_FOUND")),
+                       "Разговорът не беше намерен. Може да е изтрит.")
+    }
+
     // MARK: - Helpers
 
     /// Lets the unstructured send that `flush` and a second swipe start run.

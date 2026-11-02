@@ -39,6 +39,13 @@ enum AssistantText {
 
     /// The sheet's button for a fresh conversation (#507).
     static let newConversation = "Нов разговор"
+    /// A past conversation (#525): a turn the server holds but could not
+    /// read, an answer that was never kept, an answer whose question the
+    /// cap left out, and the note above a transcript that lost its start.
+    static let unreadableTurn = "(тази реплика не може да бъде прочетена)"
+    static let answerNotKept = "Отговорът не е запазен."
+    static let earlierQuestion = "(по-ранен въпрос)"
+    static let earlierLeftOut = "По-ранните реплики от този разговор не са показани."
 
     /// The connection went while the answer was coming (`AssistantKeepAlive`
     /// covers a short trip out of the app; this is past it, or the signal).

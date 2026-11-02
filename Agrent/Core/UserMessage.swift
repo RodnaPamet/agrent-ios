@@ -1000,6 +1000,9 @@ enum UserMessage {
         "MEMORY_POINT_EMPTY": "Записът не може да бъде празен.",
         "MEMORY_POINT_INVALID": "Този запис не е валиден.",
         "MEMORY_POINT_NOT_FOUND": "Този запис не беше намерен.",
+        // A past conversation (#525): unknown, deleted or not this
+        // person's, deliberately one answer (agri-saas #2711, #2722).
+        "CONVERSATION_NOT_FOUND": "Разговорът не беше намерен. Може да е изтрит.",
         // agri-saas #2541/#2543 (2026-10-31): the exchange's refusals, which
         // reached the phone as BAD_REQUEST with the code in `message` until
         // then. The server sends these sentences itself for a `bg` session
