@@ -93,6 +93,7 @@
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/corrections
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/definition
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/farm-record
+/api/t/{tenantSlug}/journal/{id}
 /api/t/{tenantSlug}/locations
 /api/t/{tenantSlug}/locations/{locationId}/operations
 /api/t/{tenantSlug}/locations/{locationId}/parcels

@@ -259,7 +259,7 @@ final class RouteContractTests: XCTestCase {
             // «Редактирай» on a task: the fields, then the assignee (#382).
             ("TaskEditAPI.swift", [WorkItemAPI.detailPath(id), TaskEditAPI.assignPath(id)]),
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
-            ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c")]),
+            ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c"), JournalAPI.entryPath(id)]),
             // «Ново мероприятие»'s save and its read by handle (#293).
             ("TreatmentAPI.swift", [TreatmentAPI.recordPath, TreatmentAPI.treatmentPath("{treatmentGroupId}"),
                                     TreatmentAPI.documentPath("{treatmentGroupId}")]),
