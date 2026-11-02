@@ -47,12 +47,45 @@ final class CalculatorStore {
 @Observable
 @MainActor
 final class CostsStore {
+    /// The rows: the newest 500.
     private(set) var state: LoadState<CostPage> = .loading
+    /// The totals over all of them (#503).
+    private(set) var summary: LoadState<CostSummary> = .loading
 
+    /// Read but not yet shown, waiting for its other half.
+    @ObservationIgnored private var heldList: LoadState<CostPage>?
+    @ObservationIgnored private var heldSummary: LoadState<CostSummary>?
+
+    /// Both at once, each cache first, and shown IN PAIRS: the cached pair,
+    /// then the fresh one. A fresh list under a cached summary would show
+    /// a deleted expense gone from the rows and still in «Общо» until the
+    /// second answer landed (`CostBreakdown`). Whatever is still held when
+    /// both are done is shown then, so a summary that failed with a cache
+    /// to fall back on never keeps the fresh rows off the screen, which is
+    /// where a person checks that a save landed.
     func load() async {
         if state.value == nil { state = .loading }
-        await CachedResource.loadShowingCacheFirst(CostsAPI.listPath) { data in
+        if summary.value == nil { summary = .loading }
+        async let rows: Void = CachedResource.loadShowingCacheFirst(CostsAPI.listPath) { data in
             try await CostsAPI.decodeList(from: data)
-        } publish: { [weak self] in self?.state = $0 }
+        } publish: { [weak self] in self?.hold(list: $0) }
+        async let totals: Void = CachedResource.loadShowingCacheFirst(CostsAPI.summaryPath) { data in
+            try await CostsAPI.decodeSummary(from: data)
+        } publish: { [weak self] in self?.hold(summary: $0) }
+        _ = await (rows, totals)
+        if let heldList { state = heldList }
+        if let heldSummary { summary = heldSummary }
+        heldList = nil
+        heldSummary = nil
+    }
+
+    private func hold(list: LoadState<CostPage>? = nil, summary: LoadState<CostSummary>? = nil) {
+        if let list { heldList = list }
+        if let summary { heldSummary = summary }
+        guard let heldList, let heldSummary else { return }
+        state = heldList
+        self.summary = heldSummary
+        self.heldList = nil
+        self.heldSummary = nil
     }
 }

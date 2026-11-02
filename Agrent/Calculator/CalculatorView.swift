@@ -201,48 +201,96 @@ struct CalculatorView: View {
             }
 
         case .loaded(let page, _):
-            // Folded by type, filtered by the chips, and graphed from the
-            // same value, so the three never disagree (#500, owner
-            // 2026-11-01).
-            let breakdown = CostBreakdown(removal.visible(page.items), chosen: chosenTypes)
-            Section {
-                if breakdown.available.count > 1 {
-                    CostTypeFilter(available: breakdown.available, chosen: $chosenTypes)
-                        .pageRow()
-                }
-                // «Общо» folds the types (owner, 2026-11-01: "folded into the
-                // General row with an expander"), and each type folds its
-                // expenses: three levels, the screen opening on one line.
-                DisclosureGroup(isExpanded: $totalOpen) {
-                    ForEach(breakdown.groups) { group in
-                        // Opened, a type is its expenses and nothing else:
-                        // its own month graph went (owner, 2026-11-01: "not
-                        // needed, replace them with the actual rows").
-                        DisclosureGroup(isExpanded: openBinding(group.category)) {
-                            ForEach(group.entries) { cost in
-                                CostRow(cost: cost)
-                                    .costRemovalSwipe(me: people.user) {
-                                        askingCost = cost
-                                        confirmingCost = true
-                                    }
-                                    .pageRow()
-                            }
-                        } label: {
-                            CostTypeRow(group: group)
-                        }
-                        .pageRow()
-                    }
-                } label: {
-                    CostTotalRow(count: breakdown.count, totals: breakdown.totals)
-                }
-                .pageRow()
-            } header: {
-                SectionHeader("Разходи")
-            } footer: {
-                SectionFooter { costsFooter(page) }
+            switch costs.summary {
+            case .loading:
+                Section(titled: "Разходи") { ProgressView() }
+            case .failed:
+                plainCosts(page)
+            case .loaded(let summary, _):
+                // Folded by type, filtered by the dropdown, and graphed from
+                // the same value, so the three never disagree (#500, owner
+                // 2026-11-01); its figures the server's, over every expense
+                // (#503).
+                let breakdown = CostBreakdown(summary: summary, entries: removal.visible(page.items),
+                                              chosen: chosenTypes,
+                                              hidden: page.items.filter { removal.hidden.contains($0.id) })
+                foldedCosts(breakdown)
             }
-            costCharts(breakdown, truncated: page.truncated)
         }
+    }
+
+    /// Without the totals, the rows as they are, newest first: this list
+    /// is where a person checks that a save landed, so it never waits on
+    /// the summary. Nothing is summed here instead (#503): a second way to
+    /// a total would be a second total.
+    @ViewBuilder
+    private func plainCosts(_ page: CostPage) -> some View {
+        Section {
+            ForEach(removal.visible(page.items).sorted { $0.incurredOn > $1.incurredOn }) { cost in
+                CostRow(cost: cost)
+                    .costRemovalSwipe(me: people.user) {
+                        askingCost = cost
+                        confirmingCost = true
+                    }
+                    .pageRow()
+            }
+        } header: {
+            SectionHeader("Разходи")
+        } footer: {
+            SectionFooter {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Сборовете не можаха да се заредят. Дръпнете надолу, за да опитате пак.")
+                    costsFooter(page)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func foldedCosts(_ breakdown: CostBreakdown) -> some View {
+        Section {
+            if breakdown.available.count > 1 {
+                CostTypeFilter(available: breakdown.available, chosen: $chosenTypes)
+                    .pageRow()
+            }
+            // «Общо» folds the types (owner, 2026-11-01: "folded into the
+            // General row with an expander"), and each type folds its
+            // expenses: three levels, the screen opening on one line.
+            DisclosureGroup(isExpanded: $totalOpen) {
+                ForEach(breakdown.groups) { group in
+                    // Opened, a type is its expenses and nothing else:
+                    // its own month graph went (owner, 2026-11-01: "not
+                    // needed, replace them with the actual rows").
+                    DisclosureGroup(isExpanded: openBinding(group.category)) {
+                        ForEach(group.entries) { cost in
+                            CostRow(cost: cost)
+                                .costRemovalSwipe(me: people.user) {
+                                    askingCost = cost
+                                    confirmingCost = true
+                                }
+                                .pageRow()
+                        }
+                        // The totals count every one; the list holds
+                        // the newest 500.
+                        if let note = group.shownNote {
+                            Text(note)
+                                .font(.footnote)
+                                .foregroundStyle(Palette.secondaryText)
+                                .pageRow()
+                        }
+                    } label: {
+                        CostTypeRow(group: group)
+                    }
+                    .pageRow()
+                }
+            } label: {
+                CostTotalRow(count: breakdown.count, totals: breakdown.totals)
+            }
+            .pageRow()
+        } header: {
+            SectionHeader("Разходи")
+        }
+        costCharts(breakdown)
     }
 
     /// Whether a type is unfolded, as a binding for its `DisclosureGroup`.
@@ -260,7 +308,7 @@ struct CalculatorView: View {
     /// months"). No note under them: the owner, the same day, "the text at
     /// the bottom is not needed".
     @ViewBuilder
-    private func costCharts(_ breakdown: CostBreakdown, truncated: Bool) -> some View {
+    private func costCharts(_ breakdown: CostBreakdown) -> some View {
         let order = breakdown.groups.map(\.category)
         let types = breakdown.groups.filter { $0.chartAmount > 0 }
         if types.count > 1 {
@@ -275,9 +323,7 @@ struct CalculatorView: View {
             // A month the chips have since emptied falls back to all of them.
             let month = chartMonth.flatMap { monthsShown.contains($0) ? $0 : nil }
             Section {
-                monthPicker(monthsShown, showing: month,
-                            total: breakdown.months.filter { month == nil || $0.month == month }
-                                .reduce(0) { $0 + $1.amount })
+                monthPicker(monthsShown, showing: month, total: breakdown.chartTotal(in: month))
                     .pageRow()
                 if let month {
                     CostTypeTotalsChart(
@@ -300,7 +346,7 @@ struct CalculatorView: View {
 
     /// «Всички месеци» or one month, newest first, with what the graph under
     /// it adds up to.
-    private func monthPicker(_ months: [Date], showing month: Date?, total: Double) -> some View {
+    private func monthPicker(_ months: [Date], showing month: Date?, total: CostBreakdown.Total) -> some View {
         let label = month.map(BgDate.monthYearTitle) ?? "Всички месеци"
         return HStack(alignment: .firstTextBaseline) {
             Menu {
@@ -323,9 +369,9 @@ struct CalculatorView: View {
             .accessibilityHint("Избира дали графиката показва всички месеци или един")
             .accessibilityInputLabels(A11y.spokenNames("Месец", "Month"))
             Spacer(minLength: 12)
-            Text(Money.text(total, CostBreakdown.chartCurrency))
+            Text(total.text)
                 .font(.subheadline.weight(.semibold).monospacedDigit())
-                .accessibilityLabel("Общо \(Money.text(total, CostBreakdown.chartCurrency))")
+                .accessibilityLabel("Общо \(total.text)")
         }
     }
 

@@ -470,6 +470,7 @@ final class FixtureSeamTests: XCTestCase {
         ("costs-defaults-crop", { _ = try await APIClient.shared.decode($0, as: CropCostDefaults.self) }),
         ("costs-machinery", { _ = try await APIClient.shared.decode($0, as: MachineryDepreciation.self) }),
         ("costs-list", { _ = try await CostsAPI.decodeList(from: $0) }),
+        ("costs-summary", { _ = try await CostsAPI.decodeSummary(from: $0) }),
         ("exchange-listings", { _ = try await ExchangeAPI.decodeListings(from: $0) }),
         ("exchange-listings-pleven", { _ = try await ExchangeAPI.decodeListings(from: $0) }),
         ("exchange-my-listings", { _ = try await ExchangeAPI.decodeMyListings(from: $0) }),
