@@ -129,8 +129,8 @@ final class AssistantStore {
                     // and an egress block discards it outright.
                     turns[index].phase = .unanswered(AssistantText.said(message, else: AssistantText.refusal(reason)))
                     return
-                case .halt(let outcome, let message, let counts):
-                    let note = AssistantText.said(message, else: AssistantText.halt(outcome, counts: counts))
+                case .halt(let outcome, let message):
+                    let note = AssistantText.said(message, else: AssistantText.halt(outcome))
                     halted = (outcome, note)
                     turns[index].phase = answer.map {
                         .answered($0, links: answerLinks, note: note, proposal: answerProposal)
