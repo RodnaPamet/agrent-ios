@@ -278,6 +278,24 @@ final class AssistantMemoryTests: XCTestCase {
         XCTAssertNil(rows[2].opening, "spaces are no question")
     }
 
+    /// A sealed `opening` (agri-saas #2722's defect: the envelope as every
+    /// row's label) reads as no question and is never shown. Words that
+    /// merely start like it are words.
+    func testASealedOpeningIsNeverShown() async throws {
+        let json = Data("""
+        {"conversations":[
+          {"id":"c1","lastTurnAt":"2026-11-02T06:14:00.000Z","turns":4,"opening":"v2:8X18HAVpshGpwrCO8HZ4CRacoUjPZH+abc/="},
+          {"id":"c2","lastTurnAt":"2026-11-02T06:14:00.000Z","turns":4,"opening":"v2: какво да пръскам?"}
+        ]}
+        """.utf8)
+        let rows = try await AssistantMemoryAPI.decodeConversations(from: json)
+        XCTAssertNil(rows[0].opening)
+        XCTAssertEqual(AssistantMemoryText.forgotten(rows[0]), "Разговорът е изтрит.")
+        XCTAssertEqual(rows[1].opening, "v2: какво да пръскам?", "positive control: a question is shown")
+        XCTAssertTrue(AssistantMemoryAPI.Conversation.isSealed("v2:8X18HAVpshGpwrCO8HZ4CRacoUjPZH"))
+        XCTAssertFalse(AssistantMemoryAPI.Conversation.isSealed("Колко задачи имам?"))
+    }
+
     func testTheConversationPathsArePerPerson() {
         XCTAssertEqual(AssistantMemoryAPI.conversationsPath, "/api/account/assistant-conversations")
         XCTAssertEqual(AssistantMemoryAPI.conversationPath("a b"), "/api/account/assistant-conversations/a%20b")
