@@ -1,0 +1,22 @@
+{
+  "leads": [
+    {
+      "id": "lead_fixture_1",
+      "farm": "Второ синтетично стопанство",
+      "person": "Тестово лице",
+      "message": "Колко струва за 2 тона с доставка до село Примерно?",
+      "consentedAt": "2026-11-05T07:40:00.000Z",
+      "createdAt": "2026-11-05T07:40:00.000Z",
+      "status": "PENDING"
+    },
+    {
+      "id": "lead_fixture_2",
+      "farm": "Трето синтетично стопанство",
+      "person": null,
+      "message": null,
+      "consentedAt": "2026-11-04T09:10:00.000Z",
+      "createdAt": "2026-11-04T09:10:00.000Z",
+      "status": "CONTACTED"
+    }
+  ]
+}

@@ -302,7 +302,7 @@ The superuser's catalogue, kept from the phone: on the platform farm only, to it
 - **The ПРЗ number** travels only when the owner changed it: omitted keeps the classification, null clears it, so a title fix can never declassify a pesticide.
 - **Taking down:** an offer nobody has asked about can be deleted; one with enquiries can only be taken down («Свали»), since a farm's enquiry is its record of having asked.
 - **«Доставчици»:** the suppliers, corrected here; a new one comes with its first promotion; two with one name are refused.
-- **Not yet:** «who asked» (the leads with their messages) waits for its route, which must read each farm's messages under that farm's key.
+- **«Кой е питал»** (agri-saas #2760), in an offer's editor: each enquiry's farm, person («Изтрит профил» after an erasure), day, state and message in full, selectable to pass to the supplier. Read live, never cached. A null message is a FAULT (the farm's key could not be opened), said as one in warning colour with "do not forward", never shown as blank; an envelope that arrives anyway is the same.
 - Every write reaches every farm, so none is made from development, CI or screenshots.
 
 ## Exchange

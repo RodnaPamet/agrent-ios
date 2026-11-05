@@ -40,6 +40,7 @@
 /api/t/{tenantSlug}/admin/promotions/leaflet-scan
 /api/t/{tenantSlug}/admin/promotions/{id}
 /api/t/{tenantSlug}/admin/promotions/{id}/image
+/api/t/{tenantSlug}/admin/promotions/{id}/leads
 /api/t/{tenantSlug}/agro/locations/{locationId}/evi-tiles
 /api/t/{tenantSlug}/agro/locations/{locationId}/gndvi-tiles
 /api/t/{tenantSlug}/agro/locations/{locationId}/ndmi-tiles

@@ -101,4 +101,27 @@ final class AdminPromotionsTests: XCTestCase {
         XCTAssertEqual(UserMessage.text(for: APIClient.APIError.http(status: 409, code: "COMPANY_NAME_TAKEN", message: nil)),
                        "Вече има доставчик с това име.")
     }
+
+    /// «Кой е питал»: a null message is a fault, said as one, never an empty
+    /// message; a sealed one is the same; an erased person is said.
+    func testLeadsDecodeAndANullMessageIsAFault() async throws {
+        let rows = try await AdminPromotionsAPI.decodeLeads(from: Data("""
+        {"leads":[
+          {"id":"l1","farm":"Синтетично стопанство","person":"Тестово лице","message":"Колко струва за 10 т?",
+           "consentedAt":"2026-11-05T08:00:00.000Z","createdAt":"2026-11-05T08:00:00.000Z","status":"PENDING"},
+          {"id":"l2","farm":"Второ стопанство","person":null,"message":null,
+           "consentedAt":"2026-11-04T08:00:00.000Z","createdAt":"2026-11-04T08:00:00.000Z","status":"CONTACTED"},
+          {"id":"l3","farm":"Трето","person":"Х","message":"v2:8X18HAVpshGpwrCO8HZ4CRacoUjPZH+abc/=",
+           "consentedAt":"2026-11-03T08:00:00.000Z","createdAt":"2026-11-03T08:00:00.000Z","status":"CLOSED"}
+        ]}
+        """.utf8))
+        XCTAssertEqual(rows.map(\.id), ["l1", "l2", "l3"])
+        XCTAssertEqual(rows[0].message, "Колко струва за 10 т?")
+        XCTAssertNil(rows[1].message)
+        XCTAssertNil(rows[1].person)
+        XCTAssertNil(rows[2].message, "ciphertext is never shown, never forwarded")
+        XCTAssertEqual(rows.map(\.status.label), ["Ново", "Свързани", "Затворено"])
+        XCTAssertTrue(AdminLeadsText.unreadable.contains("Не го препращайте"))
+        XCTAssertTrue(AdminPromotionsAPI.leadsPath("p1").hasSuffix("/admin/promotions/p1/leads"))
+    }
 }
