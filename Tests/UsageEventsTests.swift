@@ -50,7 +50,7 @@ final class UsageEventsTests: XCTestCase {
     /// Static routes only, each one the server's.
     func testTheSurfacesAreStatic() {
         let server: Set = ["/journal", "/grain/calculator", "/exchange", "/locations", "/farm-tasks", "/trends",
-                           "/news", "/farm-risk", "/dashboard", "/notifications", "/documents",
+                           "/news", "/farm-risk", "/dashboard", "/notifications", "/documents", "/offers",
                            "mechanisator_home", "profile", "menu"]
         var sent = AppSurface.allCases.map { UsageEvents.Surface.app($0).wire }
         sent += [UsageEvents.Surface.mechanisatorHome.wire, UsageEvents.Surface.profile.wire]

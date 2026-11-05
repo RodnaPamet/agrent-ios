@@ -171,6 +171,7 @@ final class RoutedStackTests: XCTestCase {
         .tasks: "Agrent/Tasks/TasksListView.swift",
         .notifications: "Agrent/Notifications/NotificationsView.swift",
         .documents: "Agrent/Documents/DocumentsView.swift",
+        .promotions: "Agrent/Promotions/PromotionsView.swift",
         .trends: "Agrent/Trends/TrendsView.swift",
         .news: "Agrent/Trends/NewsView.swift",
         .farmRisk: "Agrent/FarmRisk/FarmRiskView.swift",

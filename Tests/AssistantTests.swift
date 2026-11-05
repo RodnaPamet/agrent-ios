@@ -114,7 +114,7 @@ final class AssistantTests: XCTestCase {
             "/t/[tenantSlug]/journal", "/t/[tenantSlug]/grain/calculator", "/t/[tenantSlug]/exchange",
             "/t/[tenantSlug]/locations", "/t/[tenantSlug]/farm-tasks", "/t/[tenantSlug]/trends",
             "/t/[tenantSlug]/news", "/t/[tenantSlug]/farm-risk", "/t/[tenantSlug]/dashboard",
-            "/t/[tenantSlug]/notifications",
+            "/t/[tenantSlug]/notifications", "/t/[tenantSlug]/offers",
         ]
         for surface in AppSurface.allCases where !AssistantPageContext.unserved.contains(surface) {
             XCTAssertTrue(served.contains(AssistantPageContext.template(surface)), "\(surface)")

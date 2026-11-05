@@ -43,6 +43,10 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
     /// (owner, 2026-10-30). The web uses the same suffix if it gets a page,
     /// so an order saved on either client resolves on the other.
     case documents = "/documents"
+    /// «Промоции» (#528, owner 2026-11-02): supplier offers for every farm,
+    /// in the menu by default, choosable for the bar. `/offers` is the
+    /// web's page, and its word is «Промоции» there too (owner's choice).
+    case promotions = "/offers"
 
     var id: String { rawValue }
 
@@ -59,6 +63,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .dashboard: "Табло"
         case .notifications: "Известия"
         case .documents: "Документи"
+        case .promotions: "Промоции"
         }
     }
 
@@ -75,6 +80,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .dashboard: "square.grid.2x2"
         case .notifications: "bell"
         case .documents: "doc.on.doc"
+        case .promotions: "tag"
         }
     }
 
@@ -130,6 +136,9 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         // The library will hold lease contracts naming third parties; the
         // operator's confinement to field work stands (owner, 2026-10-30).
         case .documents: false
+        // Not on a mechanisator's one screen (owner, 2026-11-02), and
+        // `/offers` is outside the server's operator allowlist besides.
+        case .promotions: false
         }
     }
 
@@ -172,6 +181,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .dashboard: DashboardView()
         case .notifications: NotificationsView()
         case .documents: DocumentsView()
+        case .promotions: PromotionsView()
         }
     }
 }

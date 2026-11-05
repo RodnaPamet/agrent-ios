@@ -23,6 +23,7 @@
 /api/auth/token/refresh
 /api/me/farms
 /api/me/news-preferences
+/api/promotions/{id}/image
 /api/public/eik-check
 /api/public/farms
 /api/t/{tenantSlug}/admin/farm-profile
@@ -104,6 +105,8 @@
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import/{jobId}
 /api/t/{tenantSlug}/notifications
 /api/t/{tenantSlug}/notifications/{id}
+/api/t/{tenantSlug}/offers
+/api/t/{tenantSlug}/offers/leads
 /api/t/{tenantSlug}/ortho/blocks
 /api/t/{tenantSlug}/ortho/coverage
 /api/t/{tenantSlug}/ortho/tiles/{z}/{x}/{y}

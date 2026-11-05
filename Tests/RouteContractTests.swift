@@ -181,6 +181,10 @@ final class RouteContractTests: XCTestCase {
     /// Empty again from agri-saas main 154a39f: the usage events (#493), built
     /// against backend 1's frozen contract, came off with the refresh once
     /// agri-saas #2658 was live (2026-11-01).
+    ///
+    /// Empty again from agri-saas main 071d614: «Промоции» (#528), built
+    /// against backend 1's agreed contract, came off with the refresh once
+    /// agri-saas #2744 was live (2026-11-05).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -190,6 +194,8 @@ final class RouteContractTests: XCTestCase {
         "AppSurface.swift": "web page routes, not API paths",
         // The web's privacy notice, opened in Safari from «Изтрий профила».
         "DeleteAccountView.swift": "the web's /privacy page, not an API path",
+        // The same notice, beside the consent «Поискай оферта» asks for (#528).
+        "PromotionLeadSheet.swift": "the web's /privacy page, not an API path",
         // A farm's public page (#323), opened in Safari and shared.
         "PublicProfileLink.swift": "the public page /f/{handle}, not an API path",
         // An assistant link (#483) read as a web page link, the way a
@@ -246,6 +252,10 @@ final class RouteContractTests: XCTestCase {
             // The usage page's events (#493), to the farm they happened in.
             ("UsageEvents.swift", [UsageEvents.path(farm: "{tenantSlug}")]),
             ("AssistantAPI.swift", [AssistantAPI.streamPath]),
+            // «Промоции» (#528): the list, a farm's request, and a picture
+            // from the server's own route.
+            ("PromotionsAPI.swift", [PromotionsAPI.listPath, PromotionsAPI.leadsPath,
+                                     PromotionsAPI.imagePath(id)]),
             // «Какво помни асистентът» (#507): the person's points, across
             // farms, and one of them to correct or forget.
             ("AssistantMemoryAPI.swift", [AssistantMemoryAPI.path, AssistantMemoryAPI.pointPath(id),
