@@ -1003,6 +1003,13 @@ enum UserMessage {
         // A past conversation (#525): unknown, deleted or not this
         // person's, deliberately one answer (agri-saas #2711, #2722).
         "CONVERSATION_NOT_FOUND": "Разговорът не беше намерен. Може да е изтрит.",
+        // «Поискай оферта» (#528, agri-saas #2725). The first is the server
+        // catalogue's word for word; the two not-founds are backend 1's
+        // sentence for the case a cached card meets: withdrawn, not yet
+        // started or past its last day, all one code (agri-saas #2744).
+        "PROMOTION_LEAD_ALREADY_SENT": "Вече сте поискали оферта за тази промоция.",
+        "PROMOTION_NOT_AVAILABLE": "Тази оферта не е активна в момента. Възможно е да е изтекла, оттеглена или още да не е започнала.",
+        "PROMOTION_NOT_FOUND": "Тази оферта не е активна в момента. Възможно е да е изтекла, оттеглена или още да не е започнала.",
         // agri-saas #2541/#2543 (2026-10-31): the exchange's refusals, which
         // reached the phone as BAD_REQUEST with the code in `message` until
         // then. The server sends these sentences itself for a `bg` session

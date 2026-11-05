@@ -187,6 +187,9 @@ enum FixtureCatalogue {
         // #507: «Какво помни асистентът», three synthetic points. Forgetting
         // and correcting are writes: refused, as every write.
         (AssistantMemoryAPI.path, "assistant-memory"),
+        // #528: «Промоции», three synthetic offers: one asked already, one of
+        // a kind this build doesn't know. Asking is a write: refused.
+        (PromotionsAPI.listPath, "promotions-list"),
         // #521: three synthetic past conversations, one without a question.
         (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
         // #525: one of them opened, its start left out and one turn unread.

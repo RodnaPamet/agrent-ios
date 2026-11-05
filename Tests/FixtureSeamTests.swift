@@ -111,6 +111,7 @@ final class FixtureSeamTests: XCTestCase {
             (WorkItemAPI.listPath, "tasks-list"),
             (NotificationsAPI.listPath, "notifications-list"),
             (AssistantMemoryAPI.path, "assistant-memory"),
+            (PromotionsAPI.listPath, "promotions-list"),
             (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
             (AssistantMemoryAPI.conversationPath("conv_fixture_spray"), "assistant-conversation-spray"),
             (DocumentsAPI.listPath, "documents-list"),
@@ -471,6 +472,11 @@ final class FixtureSeamTests: XCTestCase {
             if past.items.count != 5 || past.items.filter({ $0.text == nil }).count != 1 || !past.truncated {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "assistant-conversation-spray: \(past)"))
             }
+        }),
+        // Strict: all three read, so a screenshot cannot lose one unnoticed.
+        ("promotions-list", {
+            let rows = try await PromotionsAPI.decodeList(from: $0)
+            if rows.count != 3 { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "promotions-list: \(rows)")) }
         }),
         ("assistant-memory", {
             struct Strict: Decodable { let facts: [AssistantMemoryAPI.Point] }

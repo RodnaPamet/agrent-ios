@@ -282,6 +282,16 @@ Ported in shape from inflect-compliance's assistant: a launcher in the app shell
   - **A tap opens a past conversation** (#525, agri-saas #2722) in the assistant's own sheet: its turns oldest first, and the next question continues it (`conversationId`). The oldest turns may be left out («По-ранните реплики от този разговор не са показани.»); a turn the server could not read says so, and never shows an envelope; an answer whose question was left out stands under «(по-ранен въпрос)».
   - The row in Профил needs `assistant.memory` too: both halves answer 404 while it is off ("one screen, one switch").
 
+### «Промоции»: supplier offers, and «Поискай оферта» (#528, owner 2026-11-02)
+
+The web's `/offers` page («Промоции» there too, the owner's choice of word), in «Меню», for everyone on the farm but a mechanisator, always shown: nothing is published yet, and the empty state says so rather than looking like a failed load. Server: agri-saas #2725 (backend 1).
+
+- **The list** (`GET /offers`, `{offers}`, weak ETag, cached per user and farm): supplier, title, plain text, the supplier's picture, «Валидна до …» (the campaign's last day, inclusive, read as a day in the farm's zone), the kind (the curated five; any other reads «Друго»), «Научете повече» in Safari's view.
+- **The picture** is fetched only from app.agrent.bg's own route (`/api/promotions/{id}/image`): any other `mediaUrl` is not fetched, so the person's bearer never leaves the server. The server strips a supplied `mediaUrl` on write.
+- **«Поискай оферта»**, for someone who may write (owner kept it so; a Читател sees but doesn't ask): a message (1..2000) and an EXPLICIT consent tick naming the supplier, unticked on every opening, with the privacy notice beside it. Once asked, the card says «Заявката е изпратена». Asked already elsewhere counts as asked; a card no longer running (withdrawn, not yet started, ended) says «Тази оферта не е активна в момента. …» and the list is read again.
+- **Outward-facing:** the request reaches a third party, so it is never sent from development, CI or the screenshots; the owner sends the first real one. No usage event (backend 1: the real number is the server's rows).
+- No ПРЗ withholding here (owner: that is the assistant's only, for now).
+
 ## Exchange
 
 Web `exchange` (683) + `exchange/my-listings` (367) + `exchange/my-interests`

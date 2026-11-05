@@ -2770,6 +2770,38 @@ final class A11yShotsTests: XCTestCase {
         capture("23d-assistant-turn", app: app)
     }
 
+    /// «Промоции» (#528): from «Меню», three synthetic offers (one asked
+    /// already, one of a kind this build does not know), and «Поискай
+    /// оферта»'s sheet with its consent unticked. NOTHING IS SENT: the sheet
+    /// closes on «Отказ», and «Изпрати» stays disabled without the
+    /// tick, which is never made here.
+    func testPromotions() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for «Промоции»")
+        XCTAssertTrue(tapMenuRow("Промоции", in: app), "«Промоции» is not in the menu")
+        let title = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Пшеница «Синтетик»'")).firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 15), "no fixture offer\n\(app.debugDescription)")
+        XCTAssertTrue(app.staticTexts["Заявката е изпратена"].exists || app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS 'Заявката е изпратена'")).firstMatch.exists,
+                      "the offer asked already does not say so")
+        Thread.sleep(forTimeInterval: 1)
+        capture("26a-promotions", app: app)
+
+        let ask = app.buttons["Поискай оферта"].firstMatch
+        XCTAssertTrue(ask.waitForExistence(timeout: 5), "no «Поискай оферта»")
+        ask.tap()
+        let send = app.buttons["Изпрати"]
+        XCTAssertTrue(send.waitForExistence(timeout: 5), "no request sheet\n\(app.debugDescription)")
+        XCTAssertFalse(send.isEnabled, "«Изпрати» is enabled without a message and the consent")
+        Thread.sleep(forTimeInterval: 1)
+        capture("26b-promotions-ask", app: app)
+        app.navigationBars.buttons["Отказ"].firstMatch.tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "«Отказ» did not come back to the offers")
+    }
+
     /// «Какво помни асистентът» (#507): Профил's row with the assistant on,
     /// the remembered points, a swipe with its «Отмени», a correction's
     /// sheet, and «Изтрий всичко»'s question. Nothing is sent: «Отмени» is
