@@ -14,6 +14,7 @@ struct AdminPromotionEditor: View {
     @State private var picture: Data?
     @State private var working = false
     @State private var refusal: String?
+    @State private var leads: LoadState<[AdminPromotionsAPI.Lead]>?
     @Environment(\.dismiss) private var dismiss
 
     init(target: EditorTarget, companies: [AdminPromotionsAPI.Company]) {
@@ -139,6 +140,10 @@ struct AdminPromotionEditor: View {
                         }
                     }
                 }
+                if let leads { leadsSection(leads) }
+            }
+            .task {
+                if let existing, existing.leadCount > 0 { await loadLeads(existing.id) }
             }
             .inlineTitle(existing == nil ? AdminPromotionsText.new : "Промоция")
             .toolbar {
@@ -166,6 +171,38 @@ struct AdminPromotionEditor: View {
             DatePicker(title, selection: Binding(get: { value }, set: { date.wrappedValue = $0 }),
                        displayedComponents: .date)
                 .tint(Palette.DatePill.tint)
+        }
+    }
+
+    // MARK: - «Кой е питал» (agri-saas #2760)
+
+    @ViewBuilder
+    private func leadsSection(_ state: LoadState<[AdminPromotionsAPI.Lead]>) -> some View {
+        Section {
+            switch state {
+            case .loading:
+                ProgressView().frame(maxWidth: .infinity)
+            case .failed(let failure):
+                Text(failure).font(.footnote).foregroundStyle(Palette.error)
+            case .loaded(let rows, _):
+                if rows.isEmpty {
+                    Text(AdminLeadsText.none).font(.subheadline).foregroundStyle(Palette.secondaryText)
+                }
+                ForEach(rows) { lead in AdminLeadRow(lead: lead) }
+            }
+        } header: {
+            SectionHeader(AdminLeadsText.title)
+        } footer: {
+            SectionFooter { Text(AdminLeadsText.note) }
+        }
+    }
+
+    private func loadLeads(_ id: String) async {
+        leads = .loading
+        do {
+            leads = .loaded(try await AdminPromotionsAPI.leads(id), .fresh)
+        } catch {
+            leads = .failed(UserMessage.text(for: error))
         }
     }
 
@@ -199,4 +236,47 @@ struct AdminPromotionEditor: View {
             refusal = UserMessage.text(for: error)
         }
     }
+}
+
+/// One farm's enquiry: who, when, its state, and what they wrote, in full
+/// and selectable, to pass to the supplier.
+private struct AdminLeadRow: View {
+    let lead: AdminPromotionsAPI.Lead
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(lead.farm).font(.subheadline.weight(.semibold))
+            MetaRow {
+                Text(lead.person ?? AdminLeadsText.erased)
+                if let when = lead.createdAt {
+                    MetaSeparator()
+                    Text(BgDate.rowDay(when))
+                }
+                MetaSeparator()
+                Text(lead.status.label)
+            }
+            .font(.footnote)
+            .foregroundStyle(Palette.secondaryText)
+            if let message = lead.message {
+                Text(message)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            } else {
+                Label(AdminLeadsText.unreadable, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+enum AdminLeadsText {
+    static let title = "Кой е питал"
+    static let none = "Още няма запитвания."
+    static let note = "Всяко запитване е изпратено със съгласието на питащия да бъде предадено на доставчика. Съобщението може да бъде копирано."
+    static let erased = "Изтрит профил"
+    static let unreadable = "Съобщението не може да бъде прочетено (грешка при разчитането на сървъра). Не го препращайте; съобщете за проблема."
 }

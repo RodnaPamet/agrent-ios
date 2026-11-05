@@ -257,7 +257,8 @@ final class RouteContractTests: XCTestCase {
             // The superuser's console (#529): promotions, a picture, a
             // leaflet's read, and the suppliers.
             ("AdminPromotionsAPI.swift", [AdminPromotionsAPI.listPath, AdminPromotionsAPI.promotionPath(id),
-                                          AdminPromotionsAPI.imagePath(id), AdminPromotionsAPI.leafletScanPath,
+                                          AdminPromotionsAPI.imagePath(id), AdminPromotionsAPI.leadsPath(id),
+                                          AdminPromotionsAPI.leafletScanPath,
                                           AdminPromotionsAPI.companiesPath, AdminPromotionsAPI.companyPath(id)]),
             ("PromotionsAPI.swift", [PromotionsAPI.listPath, PromotionsAPI.leadsPath,
                                      PromotionsAPI.imagePath(id)]),

@@ -17,6 +17,7 @@ enum AdminPromotionsAPI {
     static var listPath: String { base }
     static func promotionPath(_ id: String) -> String { "\(base)/\(URLEscape.segment(id))" }
     static func imagePath(_ id: String) -> String { "\(promotionPath(id))/image" }
+    static func leadsPath(_ id: String) -> String { "\(promotionPath(id))/leads" }
     static var leafletScanPath: String { "\(base)/leaflet-scan" }
     static var companiesPath: String { "\(FarmPath.root)/admin/companies" }
     static func companyPath(_ id: String) -> String { "\(companiesPath)/\(URLEscape.segment(id))" }
@@ -133,6 +134,64 @@ enum AdminPromotionsAPI {
             let note: String?
             var id: String { [productName, priceText ?? "", validityText ?? ""].joined(separator: "|") }
         }
+    }
+
+    /// One farm's enquiry about a promotion («Кой е питал», agri-saas #2760),
+    /// for the owner to pass to the supplier. Personal data: read live,
+    /// never cached on disk.
+    struct Lead: Decodable, Identifiable, Equatable, Sendable {
+        let id: String
+        /// The farm's name: a business.
+        let farm: String
+        /// Who sent it; nil once their account was pseudonymised by erasure.
+        let person: String?
+        /// In full, to be forwarded. NIL IS A FAULT, not an empty message:
+        /// the server could not open the farm's key and sent nothing rather
+        /// than ciphertext. Never shown as blank.
+        let message: String?
+        let consentedAt: Date?
+        let createdAt: Date?
+        let status: Status
+
+        enum Status: String, LenientDecodable, Sendable {
+            case pending = "PENDING", contacted = "CONTACTED", closed = "CLOSED"
+            case unknown = "__unknown__"
+            static var unknownCase: Self { .unknown }
+
+            var label: String {
+                switch self {
+                case .pending: "Ново"
+                case .contacted: "Свързани"
+                case .closed: "Затворено"
+                case .unknown: "—"
+                }
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey { case id, farm, person, message, consentedAt, createdAt, status }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            farm = try c.decode(String.self, forKey: .farm)
+            person = (try? c.decodeIfPresent(String.self, forKey: .person))?.recorded
+            // A sealed envelope that arrives anyway is the same fault.
+            message = (try? c.decodeIfPresent(String.self, forKey: .message))
+                .flatMap { AssistantMemoryAPI.Conversation.isSealed($0) ? nil : $0 }
+            consentedAt = (try? c.decodeIfPresent(String.self, forKey: .consentedAt)).flatMap(BgDate.parseInstant)
+            createdAt = (try? c.decodeIfPresent(String.self, forKey: .createdAt)).flatMap(BgDate.parseInstant)
+            status = (try? c.decodeIfPresent(Status.self, forKey: .status)) ?? .unknown
+        }
+    }
+
+    static func decodeLeads(from data: Data) async throws -> [Lead] {
+        struct Envelope: Decodable { let leads: [Lead] }
+        return try await APIClient.shared.decode(data, as: Envelope.self).leads
+    }
+
+    /// Live, never cached: what farms wrote, with who wrote it.
+    static func leads(_ id: String) async throws -> [Lead] {
+        try await decodeLeads(from: APIClient.shared.data(for: leadsPath(id)))
     }
 
     // MARK: - The draft that is sent

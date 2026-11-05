@@ -114,6 +114,7 @@ final class FixtureSeamTests: XCTestCase {
             (PromotionsAPI.listPath, "promotions-list"),
             (AdminPromotionsAPI.listPath, "admin-promotions"),
             (AdminPromotionsAPI.companiesPath, "admin-companies"),
+            (AdminPromotionsAPI.leadsPath("apromo_live"), "admin-promotion-leads"),
             (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
             (AssistantMemoryAPI.conversationPath("conv_fixture_spray"), "assistant-conversation-spray"),
             (DocumentsAPI.listPath, "documents-list"),
@@ -479,6 +480,12 @@ final class FixtureSeamTests: XCTestCase {
         ("admin-promotions", {
             if try await AdminPromotionsAPI.decodeList(from: $0).count != 3 {
                 throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "admin-promotions"))
+            }
+        }),
+        ("admin-promotion-leads", {
+            let rows = try await AdminPromotionsAPI.decodeLeads(from: $0)
+            if rows.count != 2 || rows.filter({ $0.message == nil }).count != 1 {
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "admin-promotion-leads"))
             }
         }),
         ("admin-companies", {

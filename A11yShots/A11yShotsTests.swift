@@ -2798,6 +2798,12 @@ final class A11yShotsTests: XCTestCase {
                       "a live offer's editor offers no «Свали»")
         Thread.sleep(forTimeInterval: 1)
         capture("27b2-admin-promotion-publish", app: app)
+        // «Кой е питал», below: one message in full, one the server could
+        // not read, said as a fault.
+        let unread = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Съобщението не може'")).firstMatch
+        XCTAssertTrue(reveal(unread, in: app, what: "an unreadable enquiry"), "a null message is not said as a fault")
+        Thread.sleep(forTimeInterval: 1)
+        capture("27b3-admin-promotion-leads", app: app)
         app.navigationBars.buttons["Отказ"].firstMatch.tap()
         let leaflet = app.buttons["От листовка"]
         XCTAssertTrue(leaflet.waitForExistence(timeout: 5), "no «От листовка»")

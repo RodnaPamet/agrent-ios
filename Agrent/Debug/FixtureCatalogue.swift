@@ -195,6 +195,9 @@ enum FixtureCatalogue {
         // refused, as every write is.
         (AdminPromotionsAPI.listPath, "admin-promotions"),
         (AdminPromotionsAPI.companiesPath, "admin-companies"),
+        // «Кой е питал» on the live one: a message, and one the server could
+        // not read (null), which the screen must call a fault.
+        (AdminPromotionsAPI.leadsPath("apromo_live"), "admin-promotion-leads"),
         // #521: three synthetic past conversations, one without a question.
         (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
         // #525: one of them opened, its start left out and one turn unread.
