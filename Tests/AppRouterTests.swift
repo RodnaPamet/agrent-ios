@@ -227,8 +227,10 @@ final class RoutedStackTests: XCTestCase {
         // Профил, which is pushed only inside the first two — held below, so
         // pushing it from a tab's stack makes this exemption fail rather
         // than quietly cover it (its «Изтрий профила» link, agrent-ios#281).
+        // And the superuser's «Промоции» console (#529), pushed only from
+        // Админ, held below as Профил is.
         let ownStacks: Set<String> = ["AdminView.swift", "FarmGate.swift", "FormChrome.swift",
-                                      "ProfileView.swift"]
+                                      "ProfileView.swift", "AdminPromotionsView.swift"]
         let pushesAView = #"NavigationLink\s*\{|NavigationLink\([^)]*destination:|NavigationLink\("[^"]*"\)\s*\{"#
 
         let root = URL(fileURLWithPath: #filePath)
@@ -255,6 +257,12 @@ final class RoutedStackTests: XCTestCase {
         }.map(\.lastPathComponent).sorted()
         XCTAssertEqual(profileHosts, ["AdminView.swift", "FarmGate.swift"],
                        "ProfileView is now built somewhere else; its exemption above no longer holds")
+
+        let consoleHosts = try files.filter {
+            SignOutHygieneTests.code(try String(contentsOf: $0, encoding: .utf8)).contains("AdminPromotionsView()")
+        }.map(\.lastPathComponent).sorted()
+        XCTAssertEqual(consoleHosts, ["AdminView.swift"],
+                       "AdminPromotionsView is now built somewhere else; its exemption above no longer holds")
 
         // Positive control: the pattern does find the view-pushing links in
         // a file allowed to have them.

@@ -1,0 +1,52 @@
+{
+  "promotions": [
+    {
+      "id": "apromo_draft",
+      "companyId": "co_seeds",
+      "companyName": "Синтетични семена ООД",
+      "title": "Пшеница «Синтетик» — 10% отстъпка",
+      "body": "Сертифицирани семена, клас Елит.",
+      "mediaUrl": null,
+      "category": "seeds",
+      "ctaUrl": null,
+      "pppRegistrationNo": null,
+      "publishedAt": null,
+      "validFrom": "2026-11-01T22:00:00.000Z",
+      "validTo": "2026-11-29T22:00:00.000Z",
+      "status": "DRAFT",
+      "leadCount": 0
+    },
+    {
+      "id": "apromo_live",
+      "companyId": "co_chem",
+      "companyName": "Синтетична химия АД",
+      "title": "Хербицид Пример на есенна цена",
+      "body": "-15% до края на месеца.",
+      "mediaUrl": null,
+      "category": "products",
+      "ctaUrl": "https://example.invalid/h",
+      "pppRegistrationNo": "0000-ППП-ТЕСТ",
+      "publishedAt": "2026-11-03T08:00:00.000Z",
+      "validFrom": null,
+      "validTo": "2026-11-29T22:00:00.000Z",
+      "status": "LIVE",
+      "leadCount": 3
+    },
+    {
+      "id": "apromo_old",
+      "companyId": "co_seeds",
+      "companyName": "Синтетични семена ООД",
+      "title": "Ечемик — пролетна кампания",
+      "body": null,
+      "mediaUrl": null,
+      "category": "seeds",
+      "ctaUrl": null,
+      "pppRegistrationNo": null,
+      "publishedAt": "2026-03-01T08:00:00.000Z",
+      "validFrom": null,
+      "validTo": "2026-04-29T21:00:00.000Z",
+      "status": "EXPIRED",
+      "leadCount": 0
+    }
+  ]
+}

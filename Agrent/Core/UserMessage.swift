@@ -1009,6 +1009,10 @@ enum UserMessage {
         // started or past its last day, all one code (agri-saas #2744).
         "PROMOTION_LEAD_ALREADY_SENT": "Вече сте поискали оферта за тази промоция.",
         "PROMOTION_NOT_AVAILABLE": "Тази оферта не е активна в момента. Възможно е да е изтекла, оттеглена или още да не е започнала.",
+        // The superuser's console (#529, agri-saas #2749): two suppliers with
+        // one name, and a leaflet that did not arrive.
+        "COMPANY_NAME_TAKEN": "Вече има доставчик с това име.",
+        "LEAFLET_SCAN_INPUT_MISSING": "Листовката не беше получена. Изберете снимка или PDF файл.",
         "PROMOTION_NOT_FOUND": "Тази оферта не е активна в момента. Възможно е да е изтекла, оттеглена или още да не е започнала.",
         // agri-saas #2541/#2543 (2026-10-31): the exchange's refusals, which
         // reached the phone as BAD_REQUEST with the code in `message` until

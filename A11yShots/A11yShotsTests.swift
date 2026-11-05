@@ -2770,6 +2770,44 @@ final class A11yShotsTests: XCTestCase {
         capture("23d-assistant-turn", app: app)
     }
 
+    /// The superuser's «Промоции» console (#529), from Админ on the platform
+    /// farm: the list, an offer's editor, and «От листовка». Opened and
+    /// photographed only: nothing is saved, published or deleted, because
+    /// any of those reaches every farm.
+    func testAdminPromotions() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root for Админ")
+        XCTAssertTrue(tapMenuRow("Админ", in: app), "«Админ» is not in the menu")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Промоции")).firstMatch
+        for _ in 0..<4 where !row.exists { app.swipeUp() }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Админ offered no «Промоции» on the platform farm")
+        row.tap()
+        let live = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Хербицид Пример'")).firstMatch
+        XCTAssertTrue(live.waitForExistence(timeout: 10), "no fixture promotion\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("27a-admin-promotions", app: app)
+        live.tap()
+        XCTAssertTrue(app.navigationBars["Промоция"].waitForExistence(timeout: 5), "no editor\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("27b-admin-promotion-editor", app: app)
+        // Below the fold: revealed, never tapped.
+        XCTAssertTrue(reveal(app.buttons["Свали"], in: app, what: "«Свали» on a live offer"),
+                      "a live offer's editor offers no «Свали»")
+        Thread.sleep(forTimeInterval: 1)
+        capture("27b2-admin-promotion-publish", app: app)
+        app.navigationBars.buttons["Отказ"].firstMatch.tap()
+        let leaflet = app.buttons["От листовка"]
+        XCTAssertTrue(leaflet.waitForExistence(timeout: 5), "no «От листовка»")
+        leaflet.tap()
+        XCTAssertTrue(app.buttons["Снимай листовката"].waitForExistence(timeout: 5), "no leaflet sheet")
+        Thread.sleep(forTimeInterval: 1)
+        capture("27c-admin-leaflet", app: app)
+        app.navigationBars.buttons["Затвори"].firstMatch.tap()
+    }
+
     /// «Промоции» (#528): from «Меню», three synthetic offers (one asked
     /// already, one of a kind this build does not know), and «Поискай
     /// оферта»'s sheet with its consent unticked. NOTHING IS SENT: the sheet

@@ -293,6 +293,18 @@ The web's `/offers` page («Промоции» there too, the owner's choice of 
 - **Outward-facing:** the request reaches a third party, so it is never sent from development, CI or the screenshots; the owner sends the first real one. No usage event (backend 1: the real number is the server's rows).
 - No ПРЗ withholding here (owner: that is the assistant's only, for now).
 
+### «Промоции» console in Админ (#529, owner 2026-11-02)
+
+The superuser's catalogue, kept from the phone: on the platform farm only, to its owner or admins (the prices' gate). Server: agri-saas #2727 (spec #2749).
+
+- **Adding:** «От листовка» (camera, Photos or a PDF): the server reads it and proposes offers, the price exactly as printed, and says how many it could not read; each is opened as a DRAFT for the owner to check and save. Or «Нова промоция», the form. Nothing reaches a farm until it is published, a separate act (`PUT`).
+- **The form:** supplier (from the list, or a new one by name, matched as the server matches names), title, text, kind, link, valid from/to as DAYS (`YYYY-MM-DD`, `validTo` inclusive: the server makes the farm's day, once), the ПРЗ registration number, and a picture.
+- **The ПРЗ number** travels only when the owner changed it: omitted keeps the classification, null clears it, so a title fix can never declassify a pesticide.
+- **Taking down:** an offer nobody has asked about can be deleted; one with enquiries can only be taken down («Свали»), since a farm's enquiry is its record of having asked.
+- **«Доставчици»:** the suppliers, corrected here; a new one comes with its first promotion; two with one name are refused.
+- **Not yet:** «who asked» (the leads with their messages) waits for its route, which must read each farm's messages under that farm's key.
+- Every write reaches every farm, so none is made from development, CI or screenshots.
+
 ## Exchange
 
 Web `exchange` (683) + `exchange/my-listings` (367) + `exchange/my-interests`
