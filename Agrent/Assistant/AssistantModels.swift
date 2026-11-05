@@ -67,7 +67,10 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
     case thinking
     case toolCall(name: String)
     case toolResult(name: String, ok: Bool, truncated: Bool)
-    case answer(text: String, links: [AssistantLink], proposal: AssistantProposal?)
+    /// `promotions` (#508, agri-saas #2665): the catalogue's, beside the
+    /// answer and never inside its text. Absent from the payload is none.
+    case answer(text: String, links: [AssistantLink], proposal: AssistantProposal?,
+                promotions: [AssistantPromotion] = [])
     /// No answer, and not a fault: the reason is a CODE, and `message` the
     /// server's sentence for it in the person's language, when it sends one.
     case refusal(reason: String, message: String?)
@@ -83,6 +86,7 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case type, name, ok, truncated, text, links, proposal, code, reason, outcome, truncatedAny, partialAny, message
+        case promotions
         case conversationId
     }
 
@@ -109,7 +113,9 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
         case "answer":
             self = .answer(text: try c.decode(String.self, forKey: .text),
                            links: (try? c.decodeIfPresent([AssistantLink].self, forKey: .links)) ?? [],
-                           proposal: try? c.decodeIfPresent(AssistantProposal.self, forKey: .proposal))
+                           proposal: try? c.decodeIfPresent(AssistantProposal.self, forKey: .proposal),
+                           promotions: ((try? c.decodeIfPresent([AssistantPromotion.Lossy].self, forKey: .promotions))
+                               ?? nil)?.compactMap(\.value) ?? [])
         case "refusal":
             // `code` (agri-saas #2595); `reason` was the draft's name for it.
             let code = (try? c.decode(String.self, forKey: .code)) ?? (try? c.decode(String.self, forKey: .reason))
