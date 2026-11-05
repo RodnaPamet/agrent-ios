@@ -63,7 +63,7 @@ final class AssistantProposalTests: XCTestCase {
         let answer = try JSONDecoder().decode(AssistantEvent.self, from: Data(#"""
         {"type":"answer","text":"Подготвих запис.","proposal":{"kind":"treatment","draft":{"kind":"SPRAY"}}}
         """#.utf8))
-        guard case .answer(_, _, let proposal) = answer else { return XCTFail("not an answer") }
+        guard case .answer(_, _, let proposal, _) = answer else { return XCTFail("not an answer") }
         XCTAssertEqual(proposal?.kind, "treatment")
 
         let store = AssistantStore { _ in
@@ -76,7 +76,7 @@ final class AssistantProposalTests: XCTestCase {
         store.draft = "Запиши пръскане"
         store.send(context: nil)
         await store.settled()
-        guard case .answered(_, _, let note, let kept) = store.turns[0].phase else { return XCTFail("not answered") }
+        guard case .answered(_, _, let note, let kept, _) = store.turns[0].phase else { return XCTFail("not answered") }
         XCTAssertNotNil(note)
         XCTAssertEqual(kept?.kind, "treatment")
     }

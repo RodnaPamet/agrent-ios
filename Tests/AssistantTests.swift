@@ -73,7 +73,7 @@ final class AssistantTests: XCTestCase {
     /// is offered only where it leads to a bar tab on this phone.
     func testLinksAreAFieldAndOnlyFollowableOnesAreOffered() throws {
         let answer = try event(#"{"type":"answer","text":"Имате 3 задачи.","links":[{"route":"/farm-tasks","label":"Задачи"},{"route":"/trends","label":"Тенденции"},{"route":"/reports/x","label":"Отчет"}]}"#)
-        guard case .answer(_, let links, _) = answer else { return XCTFail("not an answer") }
+        guard case .answer(_, let links, _, _) = answer else { return XCTFail("not an answer") }
         XCTAssertEqual(links.map(\.route), ["/farm-tasks", "/trends", "/reports/x"])
         XCTAssertEqual(links[0].surface, .tasks)
         XCTAssertNil(links[2].surface)

@@ -155,7 +155,7 @@ private struct AssistantTurnView: View {
                 }
                 .font(.subheadline)
                 .accessibilityElement(children: .combine)
-            case .answered(let text, let links, let note, let proposal):
+            case .answered(let text, let links, let note, let proposal, let promotions):
                 // Paragraphs, lists and tables as blocks (owner, 2026-11-01:
                 // tables reached the screen as rows of «|»). VoiceOver hears
                 // the words, never the Markdown marks.
@@ -193,6 +193,12 @@ private struct AssistantTurnView: View {
                         .font(.footnote)
                         .foregroundStyle(Palette.warning)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                // Under the advice and apart from it, each its own block
+                // marked «Промоция» (#508). Not a proposal: nothing opens a
+                // form from it.
+                ForEach(promotions) { promotion in
+                    AssistantPromotionView(promotion: promotion)
                 }
             case .unanswered(let sentence):
                 Label(sentence, systemImage: "info.circle")
