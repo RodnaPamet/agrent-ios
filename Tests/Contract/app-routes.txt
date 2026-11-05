@@ -26,6 +26,8 @@
 /api/promotions/{id}/image
 /api/public/eik-check
 /api/public/farms
+/api/t/{tenantSlug}/admin/companies
+/api/t/{tenantSlug}/admin/companies/{id}
 /api/t/{tenantSlug}/admin/farm-profile
 /api/t/{tenantSlug}/admin/integrations/google/connect
 /api/t/{tenantSlug}/admin/invites
@@ -34,6 +36,10 @@
 /api/t/{tenantSlug}/admin/members
 /api/t/{tenantSlug}/admin/members/{membershipId}/deactivate
 /api/t/{tenantSlug}/admin/members/{membershipId}/reactivate
+/api/t/{tenantSlug}/admin/promotions
+/api/t/{tenantSlug}/admin/promotions/leaflet-scan
+/api/t/{tenantSlug}/admin/promotions/{id}
+/api/t/{tenantSlug}/admin/promotions/{id}/image
 /api/t/{tenantSlug}/agro/locations/{locationId}/evi-tiles
 /api/t/{tenantSlug}/agro/locations/{locationId}/gndvi-tiles
 /api/t/{tenantSlug}/agro/locations/{locationId}/ndmi-tiles

@@ -94,6 +94,9 @@ struct AdminView: View {
                 // owner or admins. Every other farm's Админ looks as it did.
                 if farms.activeFarm?.offersPlatformPrices == true {
                     Section { pricesRow }.pageRow()
+                    // The supplier offers every farm sees (#529, owner
+                    // 2026-11-02): the same farm and people as the prices.
+                    Section { promotionsRow }.pageRow()
                 }
                 // The bottom-row editor, moved off every screen's toolbar
                 // and into the one place that holds settings.
@@ -220,6 +223,17 @@ struct AdminView: View {
         }
         .accessibilityHint("Дневните цени, които заменят цените от външния източник за всички стопанства")
         .accessibilityInputLabels(A11y.spokenNames("Цени", "Prices"))
+    }
+
+    /// The catalogue of supplier offers, for every farm.
+    private var promotionsRow: some View {
+        NavigationLink {
+            AdminPromotionsView()
+        } label: {
+            Label(AdminPromotionsText.title, systemImage: "tag")
+        }
+        .accessibilityHint("Промоциите от доставчици, които виждат всички стопанства")
+        .accessibilityInputLabels(A11y.spokenNames(AdminPromotionsText.title, "Promotions"))
     }
 
     /// No value on the row: a flag count would invite reading it as "how much

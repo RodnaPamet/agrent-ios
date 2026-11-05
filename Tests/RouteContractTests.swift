@@ -254,6 +254,11 @@ final class RouteContractTests: XCTestCase {
             ("AssistantAPI.swift", [AssistantAPI.streamPath]),
             // «Промоции» (#528): the list, a farm's request, and a picture
             // from the server's own route.
+            // The superuser's console (#529): promotions, a picture, a
+            // leaflet's read, and the suppliers.
+            ("AdminPromotionsAPI.swift", [AdminPromotionsAPI.listPath, AdminPromotionsAPI.promotionPath(id),
+                                          AdminPromotionsAPI.imagePath(id), AdminPromotionsAPI.leafletScanPath,
+                                          AdminPromotionsAPI.companiesPath, AdminPromotionsAPI.companyPath(id)]),
             ("PromotionsAPI.swift", [PromotionsAPI.listPath, PromotionsAPI.leadsPath,
                                      PromotionsAPI.imagePath(id)]),
             // «Какво помни асистентът» (#507): the person's points, across

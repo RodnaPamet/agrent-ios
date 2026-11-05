@@ -190,6 +190,11 @@ enum FixtureCatalogue {
         // #528: «Промоции», three synthetic offers: one asked already, one of
         // a kind this build doesn't know. Asking is a write: refused.
         (PromotionsAPI.listPath, "promotions-list"),
+        // #529: the superuser's console, a draft, a live ПРЗ offer with
+        // enquiries and an expired one, and two suppliers. Every write is
+        // refused, as every write is.
+        (AdminPromotionsAPI.listPath, "admin-promotions"),
+        (AdminPromotionsAPI.companiesPath, "admin-companies"),
         // #521: three synthetic past conversations, one without a question.
         (AssistantMemoryAPI.conversationsPath, "assistant-conversations"),
         // #525: one of them opened, its start left out and one turn unread.

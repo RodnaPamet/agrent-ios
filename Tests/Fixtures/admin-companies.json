@@ -1,0 +1,26 @@
+{
+  "companies": [
+    {
+      "id": "co_chem",
+      "name": "Синтетична химия АД",
+      "eik": null,
+      "websiteUrl": "https://example.invalid",
+      "contactName": null,
+      "contactEmail": null,
+      "contactPhone": null,
+      "notes": null,
+      "promotionCount": 1
+    },
+    {
+      "id": "co_seeds",
+      "name": "Синтетични семена ООД",
+      "eik": null,
+      "websiteUrl": null,
+      "contactName": "Тестово лице",
+      "contactEmail": "seeds@example.invalid",
+      "contactPhone": null,
+      "notes": null,
+      "promotionCount": 2
+    }
+  ]
+}
