@@ -9,6 +9,8 @@ struct ParcelMapView: View {
     @State private var importing = false
     /// «Времето» for this block is open (#551).
     @State private var showingWeather = false
+    /// «Вятър и налягане» over Bulgaria is open (owner, 2026-11-06).
+    @State private var showingWind = false
     @State private var store: ParcelsStore
 
     /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
@@ -133,9 +135,19 @@ struct ParcelMapView: View {
             if weatherCentre != nil {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingWeather = true } label: {
-                        Label("Времето", systemImage: "wind")
+                        Label("Времето", systemImage: "cloud.sun")
                     }
                     .accessibilityInputLabels(A11y.spokenNames("Времето", "Вятър", "Weather"))
+                }
+            }
+            // «Вятър» (owner, 2026-11-06): the wind and pressure systems over
+            // Bulgaria for 48 hours, with this block marked on it.
+            if weatherCentre != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showingWind = true } label: {
+                        Label("Вятър", systemImage: "wind")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames("Вятър", "Вятър и налягане", "Wind"))
                 }
             }
             ToolbarItem(placement: .primaryAction) {
@@ -150,6 +162,11 @@ struct ParcelMapView: View {
         .sheet(isPresented: $showingWeather) {
             if let centre = weatherCentre {
                 WeatherSheet(place: location.name, latitude: centre.latitude, longitude: centre.longitude)
+            }
+        }
+        .fullScreenCover(isPresented: $showingWind) {
+            if let centre = weatherCentre {
+                WindMapView(place: location.name, latitude: centre.latitude, longitude: centre.longitude)
             }
         }
         .sheet(item: $choosing) { choice in
@@ -350,6 +367,14 @@ struct ParcelMapView: View {
         camera = .init(tick: cameraTick, region: mapRegion(for: mode))
     }
 
+    /// The block's centre, for its weather: the middle of its drawn parcels,
+    /// or of its bounds; nil when it has neither.
+    private var weatherCentre: CLLocationCoordinate2D? {
+        let response = store.state.value
+        let drawable = response?.parcels.filter(\.isDrawable) ?? []
+        return (MKCoordinateRegion(fitting: drawable) ?? (response?.bounds ?? location.boundsJson)?.region)?.center
+    }
+
     /// Where each mode opens.
     ///
     /// PRECISE is unchanged: the server's bounds when it sent any, then the
@@ -363,14 +388,6 @@ struct ParcelMapView: View {
     /// number. Where a location has no server bounds the two are the same
     /// expression and the toggle will not appear to move the camera — that is
     /// honest rather than broken, since there is nothing else to frame.
-    /// The block's centre for its weather: the middle of its drawn parcels,
-    /// or of its bounds; nil when it has neither.
-    private var weatherCentre: CLLocationCoordinate2D? {
-        let response = store.state.value
-        let drawable = response?.parcels.filter(\.isDrawable) ?? []
-        return (MKCoordinateRegion(fitting: drawable) ?? (response?.bounds ?? location.boundsJson)?.region)?.center
-    }
-
     private func mapRegion(for mode: ParcelMapMode) -> MKCoordinateRegion {
         let response = store.state.value
         let drawable = response?.parcels.filter(\.isDrawable) ?? []

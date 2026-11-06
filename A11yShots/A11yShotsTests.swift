@@ -2204,6 +2204,34 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars["Времето"].buttons["Затвори"].tap()
     }
 
+    // MARK: - «Вятър и налягане» on a block's map
+
+    /// Блокове → the first block → «Вятър»: moving streaks, isobars and a
+    /// «Н» from the seam's synthetic low, then ▶ moves it. Nothing calls
+    /// Open-Meteo.
+    func testWindMap() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        app.tabBars.buttons["Блокове"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.cells.firstMatch.tap()
+        let wind = app.navigationBars.buttons["Вятър"]
+        XCTAssertTrue(wind.waitForExistence(timeout: 20), "no «Вятър» on the block's map\n\(app.debugDescription)")
+        wind.tap()
+        XCTAssertTrue(app.navigationBars["Вятър и налягане"].waitForExistence(timeout: 10), "«Вятър» opened nothing")
+        let play = app.buttons["Пусни"]
+        XCTAssertTrue(play.waitForExistence(timeout: 10), "no ▶\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 3)
+        capture("30a-wind-map", app: app)
+        play.tap()
+        Thread.sleep(forTimeInterval: 4)
+        capture("30b-wind-map-later", app: app)
+        app.buttons["Пауза"].tap()
+        app.navigationBars["Вятър и налягане"].buttons["Затвори"].tap()
+    }
+
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
 
     /// The owner tapped «История» on a risk row and nothing happened

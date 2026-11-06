@@ -62,7 +62,8 @@ enum NoURLCache {
     static let session = URLSession(configuration: configuration())
 
     /// For a THIRD-PARTY host: the account card's provider photo (an
-    /// absolute `avatarUrl`, e.g. a Google profile picture). Nothing else.
+    /// absolute `avatarUrl`, e.g. a Google profile picture), and Open-Meteo's
+    /// forecast for the «Вятър» map (owner, 2026-11-06). Nothing else.
     ///
     /// Not `session` above, and not `APIClient`'s: those carry this app's
     /// credentials one way or another — `APIClient` attaches the bearer to
