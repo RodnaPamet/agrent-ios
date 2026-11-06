@@ -456,7 +456,7 @@ RESOLVED task from `parcel-tasks.json`, which names no author.
 `parcel-history.json`: `GET /agro/parcels/par_holes/history`, SYNTH-1's
 archive, invented for the screen's sections and their «+» (owner,
 2026-11-06): two crop seasons (one with dates, one back-filled without), the
-spray from `field-operation-detail.json`'s product, and one walk with two
+spray from `field-operation-detail.json`'s product, a bare «Резитба» line with no product and the server's blank dose (`""`, agri-saas #2316), and one walk with two
 catalogue weeds. Shaped from the spec's `ParcelHistory`; every cursor null.
 
 ## A mechanisator's one screen

@@ -5,6 +5,7 @@
     {"id": "cs_synth_2025", "year": 2025, "cropType": "Sunflower", "sownAt": null, "harvestedAt": null, "notes": "Синтетичен запис"}
   ],
   "operations": [
+    {"id": "op_synth_2", "taskId": "tsk_synth_bare", "operationType": null, "title": "Резитба", "completedAt": "2026-10-28T09:00:00.000Z", "productName": "", "productCategory": null, "doseValue": "", "doseUnit": "", "targetNote": null},
     {"id": "op_synth_1", "taskId": "tsk_synth_op", "operationType": "SPRAY", "title": "Пръскане срещу плевели", "completedAt": "2026-04-12T08:30:00.000Z", "productName": "Тестов хербицид", "productCategory": "PESTICIDE", "doseValue": "0.25", "doseUnit": "л/дка", "targetNote": null}
   ],
   "weedObservations": [
