@@ -426,7 +426,9 @@ struct ParcelHistoryView: View {
                 section: { $0.seasons },
                 line: { $0.historyLine },
                 removal: removal,
-                target: { HistoryRemoval.Target($0) }
+                target: { HistoryRemoval.Target($0) },
+                parcelID: parcelID,
+                edit: { .season($0) }
             )
         case .operations:
             ParcelHistorySectionList(
@@ -446,7 +448,9 @@ struct ParcelHistoryView: View {
                 section: { $0.weeds },
                 line: { $0.historyLine },
                 removal: removal,
-                target: { HistoryRemoval.Target($0) }
+                target: { HistoryRemoval.Target($0) },
+                parcelID: parcelID,
+                edit: { .weeds($0) }
             )
         case .tasks:
             if let tasks {

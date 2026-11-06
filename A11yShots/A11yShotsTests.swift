@@ -396,6 +396,17 @@ final class A11yShotsTests: XCTestCase {
         capture("18k-parcel-season-undo", app: app)
         back.tap()
         XCTAssertTrue(season.waitForExistence(timeout: 5), "«Отмени» did not bring the season back")
+
+        // A row opens its correction (#542): the same form, filled in.
+        // Cancelled: a correction is a write.
+        let recorded = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '2026'")).firstMatch
+        XCTAssertTrue(recorded.waitForExistence(timeout: 5), "the 2026 season is not a button\n\(app.debugDescription)")
+        recorded.tap()
+        XCTAssertTrue(app.navigationBars["Промени културата"].waitForExistence(timeout: 10), "the row opened no form")
+        XCTAssertTrue(app.buttons.matching(identifier: "Пшеница").firstMatch.isSelected, "the season's crop is not chosen")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18l-parcel-season-edit", app: app)
+        app.navigationBars["Промени културата"].buttons["Отказ"].tap()
         app.navigationBars["Реколти"].buttons.firstMatch.tap()
 
         openSection("ПЛЕВЕЛИ", list: "Плевели", in: app)

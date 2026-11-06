@@ -545,6 +545,58 @@ struct NewWeedObservation: Encodable, Equatable, Sendable {
     }
 }
 
+// MARK: - The corrections (#542, owner 2026-11-06)
+
+/// A season corrected in place: `PATCH …/crop-seasons/{id}`.
+///
+/// PARTIAL, and only what changed: an omitted field is left alone, and a
+/// body that changes nothing is refused (`NO_FIELDS_TO_UPDATE`), so
+/// `isEmpty` is checked before anything is sent. `year` and `cropType`
+/// refuse `null`, so they are never sent as one. The edit is audited
+/// server-side (`changedFields`), which is why nothing unchanged is sent.
+struct CropSeasonChange: Encodable, Equatable, Sendable {
+    var year: Int?
+    var cropType: String?
+
+    var isEmpty: Bool { year == nil && cropType == nil }
+
+    /// What `year` and `crop` change on `season`; nil where they don't.
+    init(from season: CropSeason, year: Int, crop: String) {
+        self.year = year == season.year ? nil : year
+        self.cropType = crop == season.cropType ? nil : crop
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(year, forKey: .year)
+        try c.encodeIfPresent(cropType, forKey: .cropType)
+    }
+
+    private enum CodingKeys: String, CodingKey { case year, cropType }
+}
+
+/// An observation corrected in place: `PATCH …/weed-observations/{id}`.
+/// The weeds as ONE list, as on create; sent only when the set changed.
+struct WeedObservationChange: Encodable, Equatable, Sendable {
+    var weeds: [String]?
+
+    var isEmpty: Bool { weeds == nil }
+
+    /// `weeds` (already `NewWeedObservation.cleaned`) against what is
+    /// stored, compared as sets, case-insensitively: a reorder is no edit.
+    init(from observation: WeedObservation, weeds: [String]) {
+        let stored = Set((observation.weedKeys + observation.otherWeeds).map { $0.lowercased() })
+        self.weeds = Set(weeds.map { $0.lowercased() }) == stored ? nil : weeds
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(weeds, forKey: .weeds)
+    }
+
+    private enum CodingKeys: String, CodingKey { case weeds }
+}
+
 // MARK: - The whole archive, in one answer
 
 /// `GET /history` — three lists, three cursors, one request.

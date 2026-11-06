@@ -108,6 +108,21 @@ enum ParcelHistoryAPI {
         return try await APIClient.shared.decode(data, as: Created.self)
     }
 
+    // MARK: - Corrections (#542)
+
+    /// `PATCH`, partial. The body is the change alone; the answer is not
+    /// read, as the archive is read again after it.
+    static func updateCropSeason(parcelID: String, seasonID: String, _ change: CropSeasonChange) async throws {
+        _ = try await APIClient.shared.patchReturningData(
+            cropSeasonPath(parcelID: parcelID, seasonID: seasonID), body: change)
+    }
+
+    static func updateWeedObservation(parcelID: String, observationID: String,
+                                      _ change: WeedObservationChange) async throws {
+        _ = try await APIClient.shared.patchReturningData(
+            weedObservationPath(parcelID: parcelID, observationID: observationID), body: change)
+    }
+
     // MARK: - Deletes
 
     /// `200 { ok: true }`, NOT 204 — so the response has a body and a
