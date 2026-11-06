@@ -122,6 +122,7 @@ final class FixtureSeamTests: XCTestCase {
             // #462: SYNTH-1's tasks from Блокове.
             (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
             (ParcelCommentsAPI.path("par_holes"), "parcel-comments"),
+            (ParcelHistoryAPI.historyPath(parcelID: "par_holes", limit: 50), "parcel-history"),
             (CalculatorAPI.path, "calculator-sample"),
             (CostsAPI.defaultsPath, "costs-defaults"),
             // #245: the same route with the crop named is the crop's sheet.
@@ -241,6 +242,8 @@ final class FixtureSeamTests: XCTestCase {
             FieldOperationAPI.detailPath("tsk_fixture_1"),
             // #177: only the ONE plain task has parcels.
             WorkItemAPI.parcelsPath("tsk_fixture_1"),
+            // Only SYNTH-1 has an archive.
+            ParcelHistoryAPI.historyPath(parcelID: "par_nogeom"),
             FieldOperationAPI.linePath(taskID: FixtureCatalogue.fixtureFieldOperationTaskID,
                                        lineID: "opl_synthetic_1"),
         ] {
@@ -507,6 +510,7 @@ final class FixtureSeamTests: XCTestCase {
         ("documents-settings", { _ = try await APIClient.shared.decode($0, as: DocumentSettings.self) }),
         ("parcel-tasks", { _ = try await WorkItemAPI.decodeList(from: $0) }),
         ("parcel-comments", { _ = try await ParcelCommentsAPI.decode(from: $0) }),
+        ("parcel-history", { _ = try await ParcelHistoryAPI.decodeHistory(from: $0) }),
         ("calculator-sample", { _ = try await CalculatorAPI.decode(from: $0) }),
         ("costs-defaults", { _ = try await APIClient.shared.decode($0, as: OverheadDefaults.self) }),
         ("costs-defaults-crop", { _ = try await APIClient.shared.decode($0, as: CropCostDefaults.self) }),

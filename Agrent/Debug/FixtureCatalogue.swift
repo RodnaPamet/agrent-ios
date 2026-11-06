@@ -31,7 +31,7 @@ import Foundation
 /// ── What is deliberately absent ──
 ///
 /// Every write route, and every read this repo has no payload for: the agro
-/// tile routes, parcel history, the task detail of every task but the one
+/// tile routes, every parcel's history but SYNTH-1's, the task detail of every task but the one
 /// field operation (#138, below), the insurance catalogue, every Тенденции
 /// price other than Табло's wheat, and every news filter other than
 /// «Всички». They are answered `501 NO_FIXTURE` by `FixtureURLProtocol` and
@@ -216,6 +216,9 @@ enum FixtureCatalogue {
         (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
         // #465: SYNTH-1's comments, a comment and a closing note. Synthetic.
         (ParcelCommentsAPI.path("par_holes"), "parcel-comments"),
+        // SYNTH-1's archive (owner, 2026-11-06), for the history's sections
+        // and their «+»: two seasons, one spray, one walk. Synthetic.
+        (ParcelHistoryAPI.historyPath(parcelID: "par_holes"), "parcel-history"),
         (CalculatorAPI.path, "calculator-sample"),
         (CostsAPI.defaultsPath, "costs-defaults"),
         (CostsAPI.machineryPath, "costs-machinery"),

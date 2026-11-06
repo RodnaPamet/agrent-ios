@@ -51,21 +51,18 @@ struct ExchangeView: View {
                             .accessibilityLabel(showMap ? "Покажи списък" : "Покажи карта")
                         }
                     }
-                    // PARITY GAP 3. "Моите обяви" was read-only: you could
-                    // see your listings and not make one.
-                    if tab == .mine {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button { posting = true } label: {
-                                Label("Нова обява", systemImage: "plus")
-                            }
-                        }
-                    }
                     // «Съобщения» (owner, 2026-10-24), where «Ферми» was: on
                     // every section, since a conversation is about trading
                     // here rather than about one list. The farms moved into
                     // the board's search. Primary, not secondary: on a phone
                     // a secondary item folds into a «…» menu.
                     ToolbarItem(placement: .primaryAction) { messagesButton }
+                    // PARITY GAP 3. "Моите обяви" was read-only: you could
+                    // see your listings and not make one. LAST, so it is the
+                    // rightmost, after «Съобщения» (`ScreenAction`).
+                    if tab == .mine {
+                        ScreenAction(title: "Нова обява", spoken: A11y.Spoken.newListing) { posting = true }
+                    }
                 }
                 .sheet(isPresented: $posting) {
                     NewListingView { Task { await mine.load() } }

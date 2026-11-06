@@ -127,6 +127,15 @@ enum A11y {
         static let newTask = spokenNames("Нова задача", "Нова", "New task")
         /// A parcel's history → «Ново мероприятие» (#387).
         static let newOperation = spokenNames("Ново мероприятие", "Мероприятие", "New operation")
+        /// The other screens' create actions, top right since 2026-11-06
+        /// (`ScreenAction`).
+        static let newEntry = spokenNames("Нов запис", "Запис", "New entry")
+        static let newCost = spokenNames("Нов разход", "Разход", "New expense")
+        static let newListing = spokenNames("Нова обява", "Обява", "New listing")
+        static let insure = spokenNames("Застраховай", "Insure")
+        /// A parcel history's «+» (owner, 2026-11-06).
+        static let addCrop = spokenNames("Запиши култура", "Култура", "Add crop")
+        static let addWeeds = spokenNames("Запиши плевели", "Плевели", "Add weeds")
         static let publish = spokenNames("Публикувай", "Post")
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")

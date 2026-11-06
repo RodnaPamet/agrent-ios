@@ -310,4 +310,22 @@ final class RoutedStackTests: XCTestCase {
         }
         """), ["struct Screen: View"])
     }
+
+    /// Риск's rows open the history in the block Риск shows, so its «+» can
+    /// record an operation or a task (owner, 2026-11-06); without a block
+    /// chosen, still the history, with only the parcel's own «+».
+    func testRiskOpensTheHistoryInItsBlock() throws {
+        let parcel = try JSONDecoder().decode(Parcel.self, from: Data(#"{"id":"p1","name":"Синтетичен"}"#.utf8))
+        guard case .parcelHistory(let id, _, let recordIn, let outline, let fromRisk)
+                = RiskHistoryRoute.to(parcel, in: "loc1") else { return XCTFail("not the history") }
+        XCTAssertEqual(id, "p1")
+        XCTAssertEqual(recordIn, ParcelInBlock(locationID: "loc1", parcel: parcel))
+        XCTAssertEqual(outline, parcel)
+        XCTAssertTrue(fromRisk)
+        guard case .parcelHistory(_, _, let none, _, _) = RiskHistoryRoute.to(parcel, in: nil) else {
+            return XCTFail("not the history")
+        }
+        XCTAssertNil(none)
+    }
 }
+

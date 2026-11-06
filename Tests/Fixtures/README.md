@@ -451,6 +451,14 @@ Every status, `truncated: false`, `mayDelete` on each row.
 operation by the fixture operator, and the closing note of the invented
 RESOLVED task from `parcel-tasks.json`, which names no author.
 
+## A parcel's history
+
+`parcel-history.json`: `GET /agro/parcels/par_holes/history`, SYNTH-1's
+archive, invented for the screen's sections and their «+» (owner,
+2026-11-06): two crop seasons (one with dates, one back-filled without), the
+spray from `field-operation-detail.json`'s product, and one walk with two
+catalogue weeds. Shaped from the spec's `ParcelHistory`; every cursor null.
+
 ## A mechanisator's one screen
 
 `auth-me-operator.json` and `me-farms-operator.json`: the fixture person and

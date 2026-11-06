@@ -76,12 +76,12 @@ final class CommodityNameTests: XCTestCase {
         XCTAssertEqual(CommodityName.canonical("wheat"), "Пшеница")
     }
 
-    /// FREE TEXT PASSES THROUGH EXACTLY. This tenant grows "Grass", which
-    /// appears in no vocabulary in the server repo at all — seeding "Трева"
-    /// would have been right by luck, and the next farm to type "Люцерна"
+    /// FREE TEXT PASSES THROUGH EXACTLY. The next farm to type "Люцерна"
     /// or "Grass ley" needs a passthrough rather than a longer guess list.
+    /// "Grass" itself is the catalogue's now, named as the web names it.
     func testFreeTextPassesThroughUnchanged() {
-        XCTAssertEqual(CommodityName.freeText("Grass"), "Grass")
+        XCTAssertEqual(CommodityName.freeText("Grass"), "Тревна площ")
+        XCTAssertEqual(CommodityName.freeText("Grass ley"), "Grass ley")
         XCTAssertEqual(CommodityName.freeText("Люцерна"), "Люцерна")
         XCTAssertEqual(CommodityName.freeText("Sugar Beet Field 3"), "Sugar Beet Field 3")
     }
@@ -118,5 +118,15 @@ final class CommodityNameTests: XCTestCase {
                 "\(key) → \(value) is not Bulgarian"
             )
         }
+    }
+
+    /// The picker's crops are the web's `CROP_OPTIONS`, every one named.
+    func testTheCropCatalogueIsTheWebsAndEveryCropHasAName() {
+        let values = CommodityName.cropCatalogue.flatMap(\.values)
+        XCTAssertEqual(values, ["Wheat", "Barley", "Canola", "Maize", "Sunflower", "Peas", "Grass"])
+        for value in values {
+            XCTAssertNotEqual(CommodityName.freeText(value), value, "\(value) has no Bulgarian name")
+        }
+        XCTAssertEqual(Set(values.map { $0.lowercased() }), Set(CommodityName.cropTable.keys))
     }
 }

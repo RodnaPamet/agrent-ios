@@ -42,27 +42,33 @@ struct FarmRiskView: View {
                     }
                     .solidBar(hairline: .bottom)
                 }
-                // THE ACTION BUTTON, and the screen's only way to ask
-                // (owner, 2026-10-21, #386): «Застраховай» at the bottom
-                // right. The per-row asks are gone. It opens the enquiry form
-                // with nothing chosen; the form lists the parcels and says
-                // which were asked about already.
+                // «Застраховай», the screen's only way to ask (owner,
+                // 2026-10-21, #386), at the top right since 2026-11-06
+                // (`ScreenAction`); it floated at the bottom before. The
+                // per-row asks are gone. It opens the enquiry form with
+                // nothing chosen; the form lists the parcels and says which
+                // were asked about already. A shield, not a "+": it asks for
+                // an offer rather than making a new row. Not written out:
+                // «Затвори» and «Застраховай» in words left the title as
+                // «Риск по п…» (measured, 2026-11-06); the name is VoiceOver's
+                // and the long press's.
                 //
                 // Hidden rather than disabled when there is nothing to ask
                 // about: no parcels, no permission, or every parcel already
-                // asked about. A floating button that refuses is a promise
-                // the screen cannot keep.
-                .actionButton(
-                    "Застраховай",
-                    systemImage: "checkmark.shield",
-                    isEnabled: store.mayAsk && !allParcels.isEmpty
-                ) {
-                    requesting = RequestTarget(parcel: nil)
+                // asked about. A button that refuses is a promise the screen
+                // cannot keep.
+                .toolbar {
+                    if store.mayAsk && !allParcels.isEmpty {
+                        ScreenAction(title: "Застраховай", systemImage: "checkmark.shield", spoken: A11y.Spoken.insure) {
+                            requesting = RequestTarget(parcel: nil)
+                        }
+                    }
                 }
                 .inlineTitle("Риск по парцели")
                 // «Затвори» only when the app menu presented this — see
                 // `closeWhenPresentedFromMenu`. As a tab root it had one that did nothing.
-                .closeWhenPresentedFromMenu()
+                // Leading, as nothing is there, so «Застраховай» has the right.
+                .closeWhenPresentedFromMenuLeading()
                 .task {
                     await store.loadWho()
                     if store.locations.value == nil { await store.loadLocations() }
@@ -220,11 +226,11 @@ struct FarmRiskView: View {
             // "access a parcel history from risk by clicking the row"), the
             // whole reading being the target a thumb aims at; «История» stays
             // below it, as the visible promise.
-            RiskReadingButton(parcel: row.parcel, spoken: spoken(row)) {
+            RiskReadingButton(parcel: row.parcel, locationID: store.selected?.id, spoken: spoken(row)) {
                 parcelReading(row)
             }
 
-            RiskHistoryButton(parcel: row.parcel)
+            RiskHistoryButton(parcel: row.parcel, locationID: store.selected?.id)
 
             askStatus(row)
         }
@@ -384,13 +390,15 @@ struct FarmRiskView: View {
 /// opened underneath Риск (owner, 2026-11-06).
 private struct RiskReadingButton<Label: View>: View {
     let parcel: Parcel
+    /// The block Риск is showing, the parcel's.
+    let locationID: String?
     let spoken: String
     @ViewBuilder let label: () -> Label
     @Environment(\.pushRoute) private var pushRoute
 
     var body: some View {
         Button {
-            pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name, outline: parcel))
+            pushRoute(RiskHistoryRoute.to(parcel, in: locationID))
         } label: {
             label().contentShape(Rectangle())
         }
@@ -425,11 +433,13 @@ private struct RiskReadingButton<Label: View>: View {
 /// inside a named row, but not to someone swiping element by element.
 private struct RiskHistoryButton: View {
     let parcel: Parcel
+    /// The block Риск is showing, the parcel's.
+    let locationID: String?
     @Environment(\.pushRoute) private var pushRoute
 
     var body: some View {
         Button {
-            pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name, outline: parcel))
+            pushRoute(RiskHistoryRoute.to(parcel, in: locationID))
         } label: {
             HStack(spacing: 4) {
                 Text("История")
@@ -446,3 +456,16 @@ private struct RiskHistoryButton: View {
         .accessibilityHint("Отваря записаните реколти, дейности и плевели за този парцел")
     }
 }
+
+/// A Риск row's history: the parcel in the block Риск is showing, so its
+/// «+» can record an operation or a task there as from Блокове (owner,
+/// 2026-11-06, "in each section"); without the risk card, which Риск has
+/// just shown.
+enum RiskHistoryRoute {
+    static func to(_ parcel: Parcel, in locationID: String?) -> AppRoute {
+        .parcelHistory(parcelID: parcel.id, parcelName: parcel.name,
+                       recordIn: locationID.map { ParcelInBlock(locationID: $0, parcel: parcel) },
+                       outline: parcel, fromRisk: true)
+    }
+}
+

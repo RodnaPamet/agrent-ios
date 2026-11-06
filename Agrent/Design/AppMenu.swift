@@ -188,7 +188,15 @@ extension View {
     /// already applies it; the surfaces with no menu (Тенденции, Новини,
     /// Риск) call it directly.
     func closeWhenPresentedFromMenu() -> some View {
-        modifier(MenuSheetClose())
+        modifier(MenuSheetClose(placement: .topBarTrailing))
+    }
+
+    /// «Затвори» on the LEADING edge, for a surface with no menu glyph there
+    /// and its own action at the top right (Риск's «Застраховай», owner
+    /// 2026-11-06): both on the trailing edge left «Риск по парц…» as the
+    /// title.
+    func closeWhenPresentedFromMenuLeading() -> some View {
+        modifier(MenuSheetClose(placement: .topBarLeading))
     }
 }
 
@@ -212,6 +220,7 @@ extension EnvironmentValues {
 /// `dismiss` is read at the root the modifier is applied to, so it closes
 /// the sheet rather than popping a pushed screen.
 private struct MenuSheetClose: ViewModifier {
+    let placement: ToolbarItemPlacement
     @Environment(\.presentedFromMenu) private var presentedFromMenu
     @Environment(\.dismiss) private var dismiss
 
@@ -222,7 +231,7 @@ private struct MenuSheetClose: ViewModifier {
                 // puts a cancellation action on the LEADING edge — where the
                 // menu glyph now sits — and two controls stacked in one corner
                 // read as one. The opposite corner keeps them apart.
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: placement) {
                     Button("Затвори") { dismiss() }
                         .accessibilityInputLabels(A11y.Spoken.close)
                 }

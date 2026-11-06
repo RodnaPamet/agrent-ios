@@ -267,7 +267,7 @@ Ported in shape from inflect-compliance's assistant: a launcher in the app shell
 - **Every refusal is a code:** 404 off (agri-saas #2599; the first draft said 204, also read as off), `ASSISTANT_QUESTION_INVALID` / `ASSISTANT_CONTEXT_INVALID` before the stream, a spent budget as the shared `AI_BUDGET_EXCEEDED` (mid-stream it is the halt `ASSISTANT_SPEND_CEILING`, because the answer so far is real), and `refusal` / `halt` events carrying `code` and the server's localised `message` (agri-saas #2595's ten).
   - The phone shows the server's own `message` when it is Bulgarian; otherwise its copy of the server catalogue's sentence for the code, word for word, since the phone shows no English (owner, 2026-10-13).
   - The phone branches on the code, not the words. A halt keeps the answer above it; a refusal (an egress block included) removes it.
-- **The button** shows while `assistant.enabled` is on in `/auth/me`, which is re-read on each return to the foreground. Every bottom bar (`solidBar(hairline: .top)`) reports its height to its stack (`BottomChrome`), so the button sits above «Нов разход», «Ново мероприятие» and the «Отмени» bar. The sheet opens at half height.
+- **The button** shows while `assistant.enabled` is on in `/auth/me`, which is re-read on each return to the foreground. Every bottom bar (`solidBar(hairline: .top)`) reports its height to its stack (`BottomChrome`), so the button sits above the «Отмени» bars. «Нов запис», «Нов разход» and «Ново мероприятие» are in the navigation bar since 2026-11-06. The sheet opens at half height.
 - **Phase 2, a prepared entry** (agri-saas #2636): `answer.proposal` is `{kind, draft}`.
   - `treatment` carries the human-readable fields of `POST /journal/treatments`; `activity` those of `/journal/activities`. Never an id, a unit or parcels.
   - Under the answer, «Отвори в «Нов запис»» closes the sheet and opens the usual «Нов запис» filled, for a person who may write. They check it, pick the parcels and the unit, and send it as any record (owner, 2026-10-31). The assistant never posts.
@@ -1006,7 +1006,7 @@ before building the routes.
 **iOS:**
 - **«Изтрий»** sits behind a left swipe on a Дневник row that stands for a treatment. It isn't a full swipe: removing a record takes the tap. VoiceOver lists it among the row's actions.
 - **It's offered** where the row's `mayDelete` says the server would allow it. The server computes that from the same predicate its route asserts with: the creator or an administrator, and a single author across the treatment's tasks. That last part refuses administrators too, so no creator field could express it. A cached row from before the field offers it to anyone who may write, and the server's refusal is shown.
-- **The row leaves the list at once.** A bar above «Нов запис» says what went and how much of the register that was, «Изтрито: Препарат, 3 парцела в 2 блока», since one row can stand for a dozen parcels (the web's toast names the count too, agri-saas #2192). It offers «Отмени» for five seconds, as on the web, and twenty under VoiceOver or Switch Control. Nothing is sent until the window closes, so «Отмени» needs no signal and leaves no audit event. A second swipe sends the first at once, so «Отмени» only ever stands for the treatment the bar names.
+- **The row leaves the list at once.** A bar at the bottom of the list says what went and how much of the register that was, «Изтрито: Препарат, 3 парцела в 2 блока», since one row can stand for a dozen parcels (the web's toast names the count too, agri-saas #2192). It offers «Отмени» for five seconds, as on the web, and twenty under VoiceOver or Switch Control. Nothing is sent until the window closes, so «Отмени» needs no signal and leaves no audit event. A second swipe sends the first at once, so «Отмени» only ever stands for the treatment the bar names.
 - **Then** `DELETE /journal/treatments/{handle}` goes out. The phone's own copy in the outbox goes with it, because the server releases an unfinished treatment's key and a resend would record it again. A refusal brings the row back with the server's sentence. A 404 counts as done.
 - **No «Кошче»** (owner, 2026-10-24: "what's deleted is deleted", #411). The trash list and its restore are gone from the phone, and the 5-second «Отмени» is the only way back. On the server the owner chose to have the DELETE erase the treatment from the database, keeping only the audit line. That's agri-saas's to build, confirmed with the owner directly.
 - **Manual entries too** (owner, 2026-11-02: "add a swipe to delete for manual entries after all", over sample and test entries with no way out). An ordinary manual entry, `parcelCount` 0 (the server's own discriminator), goes by its id, `DELETE /journal/{id}`, which erases it for any writer. Its `mayDelete` is false by definition and is not read. Same question, same five seconds, and the outbox is left alone, since only treatments wait there. A row the list sends without its `treatment` object is offered nothing, as it may be one parcel's entry of a treatment.
@@ -1070,7 +1070,7 @@ priority, due date, assignee and links. **iOS** asks what a phone needs:
   - **Assignee:** from `/users/assignable`, «Без изпълнител» by default as on the web, kept in memory only.
   - **Due day:** sent as UTC midnight of the day, as the web's `ymdToInstant` sends it.
   - **Type and severity:** the web's defaults, `TASK` and `MEDIUM`, sent as the web sends them. No priority (owner, 2026-10-09).
-- **Opened from:** a **+ at the bottom left** of «Задачи» (bottom right until 2026-11-01, when the assistant's button took that corner; owner), offered only to someone who may write in the farm.
+- **Opened from:** a **+ at the top right** of «Задачи», the navigation bar's rightmost item (owner, 2026-11-06). It was bottom right until 2026-11-01, then bottom left when the assistant's button took that corner. Offered only to someone who may write in the farm. A parcel's «Задачи» (from Блокове) has its own +, which opens the form with that parcel chosen.
 - **After a save:** the list reloads and the new task opens.
 - **Not idempotent:** the route honours no key, so a lost answer is said as possibly created, never retried.
 - **A second step, «Парцели» (#388, owner 2026-10-21):** «Напред» opens the task's parcels, chosen by block, on a map and in a list, and «Създай» is there. They are optional. A choice in one block stays when another block is opened.
@@ -1623,8 +1623,9 @@ caller of `.sensoryFeedback`.
 
 ### Divergence — one «Застраховай», bottom right; «История» works (#386, owner 2026-10-21)
 
-- **One way to ask:** the screen's floating «Застраховай» at the bottom right. It opens the enquiry form with no parcel chosen, and the person picks it there. The per-row «Запитай за оферта» / «Запитай отново» is removed. A row still shows «Изпраща се…» while an ask is out, and «Заявено запитване» once one was made.
+- **One way to ask:** the screen's «Застраховай», the navigation bar's rightmost item since 2026-11-06 (floating at the bottom before). It opens the enquiry form with no parcel chosen, and the person picks it there. The per-row «Запитай за оферта» / «Запитай отново» is removed. A row still shows «Изпраща се…» while an ask is out, and «Заявено запитване» once one was made.
 - **The floating button moved** from bottom-left to bottom-right, where Задачи's + was. The risk page is its only user. **2026-11-01, owner: back to the bottom LEFT, with Задачи's +,** because the assistant's button (#483) holds the bottom right on every screen and the two overlapped.
+- **2026-11-06, owner: to the top right,** with every screen's create action (`ScreenAction`).
 - **«История» on a row opens the parcel's history.** It did nothing before, because the button read `pushRoute` from outside the stack it pushes onto.
 
 ### The enquiry form's words (owner 2026-10-26, the web too)
@@ -1880,3 +1881,26 @@ scrolls to a new message with an animation — the app's first — and reads
 Everything else on this list is closed. The order the original version
 suggested held up: the AX3 failures first, because a screen that cannot
 be read outdoors fails before any parity gap matters.
+
+### Decided — every create action is the bar's rightmost item (owner, 2026-11-06)
+
+"Move all '+' action buttons to the top right on the most right if other buttons are there as well."
+
+- **Moved:**
+  - Задачи's floating + («Нова задача»);
+  - Борса's «Нова обява», now after «Съобщения»;
+  - the wide bottom bars «Нов запис» (Дневник), «Нов разход» (Калкулатор) and «Ново мероприятие» (a parcel's history);
+  - Риск's «Застраховай», as a shield because it asks for an offer rather than making a row. In words it squeezed the title to «Риск по п…», so Риск's «Затвори» moved to the left, where Риск has no menu button.
+- **Rightmost** because each is the last item of its screen's `.toolbar` (`ScreenAction`). A11yShots `testCreateActionsAreTheBarsRightmost` checks it on four screens; `testRiskHistoryOpens` checks Риск.
+- **The bottom** now holds only the «Отмени» bars and the assistant's button.
+- **A parcel's history, per section** ("in each section there should be a '+'"):
+  - РЕКОЛТИ: «Запиши култура», the web's `AddCropSeasonModal`: «Стопанска година» (two ahead back to 1900, with the web's autumn-sowing hint) and «Култура» from the web's catalogue, grouped by its season captions.
+  - ДЕЙНОСТИ: «Ново мероприятие».
+  - ПЛЕВЕЛИ: «Запиши плевели», the web's `AddWeedObservationModal`: the thirteen weeds (grasses first, as the closing form groups them) and «Друго», comma-separated, sent as one list to the PARCEL's route, observed now.
+  - Задачи: «Нова задача» with the parcel chosen.
+  - A season or observation needs only the parcel, so any writer gets one wherever the history opens. An operation or task needs the parcel's block, so those show only when the history is opened from Блокове.
+  - **The history's own «+»** («Добави») is a menu of the same four. A section with no entries has no list to open, so the menu is how its first entry gets made.
+- **No edit, as on the web:** the server has no PATCH for a season or an observation (create and delete only). A wrong entry is deleted and recorded again, and the phone has no delete for these yet either.
+- **«Тревна площ»:** the web added `Grass` to its crop catalogue, so the phone names it too (`CommodityName.cropTable`).
+- **The web** keeps its own placements; this is the phone's convention.
+
