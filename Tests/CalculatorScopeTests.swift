@@ -137,7 +137,7 @@ final class CalculatorScopeTests: XCTestCase {
     private static let mixed =
         "Разходите за тази култура са в повече от една валута, затова маржът на декар не се изчислява — изваждането им би го изкривило."
     private static let mismatch =
-        "Разходите за тази култура са в различна валута от пазарната цена, затова маржът на декар не се изчислява — не се прилага обменен курс."
+        "Разходите за тази култура са в различна валута от пазарната цена, затова маржът на декар не се изчислява."
 
     /// agri-saas #2259's other half: the costs in ONE currency, not the
     /// price's. The cost rate stands, since 20 BGN a decare is a good figure;
