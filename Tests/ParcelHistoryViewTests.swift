@@ -171,16 +171,15 @@ final class ParcelHistoryViewTests: XCTestCase {
 
     // MARK: - Empty
 
-    /// An empty section is NOT tappable, and says so in words rather than in a
-    /// number. Pushing to an empty list is the same broken promise as a
-    /// disabled button, and « 0 записа » beside «Няма записи» would be the
-    /// same fact twice.
-    func testAnEmptySectionSaysNyamaZapisiAndIsNotTappable() {
+    /// An empty section says so in words rather than in a number, as
+    /// « 0 записа » beside «Няма записи» would be the same fact twice.
+    func testAnEmptySectionSaysNyamaZapisiAndStillOpens() {
         let empty = card(seasonSection([], cursor: nil))
 
         XCTAssertNil(empty.newest)
         XCTAssertNil(empty.count)
-        XCTAssertFalse(empty.isTappable)
+        // It opens onto its «+» (owner, 2026-11-06).
+        XCTAssertTrue(empty.isTappable)
 
         // What VoiceOver gets for it: the section's name and the fact, with
         // nothing implying there is anywhere to go.
@@ -189,11 +188,10 @@ final class ParcelHistoryViewTests: XCTestCase {
         XCTAssertEqual(spoken, "РЕКОЛТИ, Няма записи.")
     }
 
-    /// A parcel imported yesterday has an empty archive, and that is an
-    /// ordinary state rather than a failure. It collapses to ONE line — three
-    /// cards each saying nothing is three pieces of furniture to tell the
-    /// reader one thing.
-    func testAnEmptyArchiveIsOneLineRatherThanThreeCards() async throws {
+    /// A parcel imported yesterday has an empty archive. Each section's card
+    /// is still drawn and opens (owner, 2026-11-06), since its list's «+» is
+    /// how the first entry is made.
+    func testAnEmptyArchiveStillOpensEverySection() async throws {
         let archive = ParcelHistoryStore.Archive(try await decode(#"""
         {"parcel":{"id":"p1","name":"Долен блок","cropType":null},
          "cropSeasons":[],"operations":[],"weedObservations":[],
@@ -201,19 +199,13 @@ final class ParcelHistoryViewTests: XCTestCase {
         """#, as: ParcelHistory.self))
 
         XCTAssertTrue(archive.isEmpty)
-        XCTAssertEqual(ParcelHistoryCopy.emptyArchive,
-                       "Няма записана история за този парцел.")
-
-        // The three cards the screen does NOT draw in this state would each
-        // have been empty and unreachable, which is what makes the one line
-        // the right rendering rather than merely the shorter one.
-        XCTAssertFalse(card(archive.seasons).isTappable)
-        XCTAssertFalse(ParcelHistoryCard(title: ParcelHistoryCopy.operations,
-                                         section: archive.operations,
-                                         line: { $0.historyLine }).isTappable)
-        XCTAssertFalse(ParcelHistoryCard(title: ParcelHistoryCopy.weeds,
-                                         section: archive.weeds,
-                                         line: { $0.historyLine }).isTappable)
+        XCTAssertTrue(card(archive.seasons).isTappable)
+        XCTAssertTrue(ParcelHistoryCard(title: ParcelHistoryCopy.operations,
+                                        section: archive.operations,
+                                        line: { $0.historyLine }).isTappable)
+        XCTAssertTrue(ParcelHistoryCard(title: ParcelHistoryCopy.weeds,
+                                        section: archive.weeds,
+                                        line: { $0.historyLine }).isTappable)
     }
 
     // MARK: - Newest is the head of the list

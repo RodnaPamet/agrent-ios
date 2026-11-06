@@ -97,6 +97,15 @@ where Item.ID == String {
                 // for that exact reason: `groupedByYear()` would insert loaded
                 // seasons INTO groups already on screen. The year leads each
                 // row instead, which is the part grouping was for.
+                // Empty, since every card opens (owner, 2026-11-06): said, with
+                // the «+» above it as the way to the first entry.
+                if shown(current.items).isEmpty && current.failure == nil {
+                    Text(ParcelHistoryCopy.emptySectionList)
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.secondaryText)
+                        .pageRow()
+                }
+
                 ForEach(shown(current.items)) { item in
                     row(line(item))
                         .pageRow()

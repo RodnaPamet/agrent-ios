@@ -65,12 +65,12 @@ final class ParcelCommentsTests: XCTestCase {
         XCTAssertTrue(card.spoken.hasPrefix("Коментари, 2 коментара, Спряхме"), card.spoken)
     }
 
-    /// None: one calm line and nothing to push to.
-    func testNoCommentsIsNotTappable() {
+    /// None: one calm line, and it still opens (owner, 2026-11-06).
+    func testNoCommentsStillOpens() {
         let card = ParcelCommentsCard(ParcelComments(items: [], truncated: false), now: now)
         XCTAssertNil(card.count)
         XCTAssertEqual(card.line.details, ["Няма коментари"])
-        XCTAssertFalse(card.isTappable)
+        XCTAssertTrue(card.isTappable)
     }
 
     /// A capped list is not counted.

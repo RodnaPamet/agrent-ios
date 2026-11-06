@@ -287,11 +287,10 @@ struct ParcelHistoryView: View {
                     if let risk { riskSection(risk) }
                     if let tasks { tasksCard(tasks, inList: true) }
                     commentsCard(inList: true)
-                    if archive.isEmpty {
-                        emptyArchive
-                    } else {
-                        cards(archive)
-                    }
+                    // The three cards even for an empty archive (owner,
+                    // 2026-11-06): each opens onto its «+». It was one line,
+                    // «Няма записана история…», with nothing to tap.
+                    cards(archive)
                 }
                 .pageRow()
             }
@@ -328,26 +327,6 @@ struct ParcelHistoryView: View {
         Text(archive.parcel.name.recorded ?? parcelName)
             .font(.headline)
             .fixedSize(horizontal: false, vertical: true)
-            .listRowSeparator(.hidden)
-            .pageRow()
-    }
-
-    /// Nothing recorded at all: ONE calm line.
-    ///
-    /// Not three cards each saying «Няма записи», which is what a per-section
-    /// empty state produces for a parcel imported yesterday — three pieces of
-    /// furniture to tell the reader one thing. And not an error, either: an
-    /// empty archive is an ordinary state for a new parcel.
-    ///
-    /// It stays a row in the List so the refresh gesture still works on it —
-    /// a parcel whose first season is recorded elsewhere while this screen is
-    /// open should be one pull away from showing it.
-    private var emptyArchive: some View {
-        Text(ParcelHistoryCopy.emptyArchive)
-            .font(.body)
-            .foregroundStyle(Palette.secondaryText)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.vertical, 8)
             .listRowSeparator(.hidden)
             .pageRow()
     }
