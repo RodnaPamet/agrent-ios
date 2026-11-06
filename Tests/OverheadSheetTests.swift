@@ -189,7 +189,7 @@ final class OverheadSheetTests: XCTestCase {
             files += 1
             let text = try String(contentsOf: url, encoding: .utf8)
             for trace in ["1,95583", "1.95583", "Превалутира", "превалутира", "EuroChangeover", "фиксирания курс",
-                          "конвертиране"] {
+                          "конвертиране", "обменен курс"] {
                 XCTAssertFalse(text.contains(trace), "\(url.lastPathComponent) still has «\(trace)»")
             }
         }

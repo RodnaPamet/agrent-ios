@@ -634,7 +634,10 @@ enum UserMessage {
         "RENT_CURRENCY_UNRECORDED":
             "Договорът за аренда не записва валута за рентата, затова тя не може да се съчетае с активи, оценени по пазарна цена, без да се измисли такава.",
         "COST_PRICE_CURRENCY_MISMATCH":
-            "Разходите са в {costCurrency}, а пазарната цена е в {priceCurrency}.",
+            // agri-saas's text verbatim, which its `ios-mirrored-copy` guard
+            // pins (2026-11-06): still reachable, as price series keep their
+            // own currency (RON, USD), but naming no conversion.
+            "Разходите са в {costCurrency}, а пазарната цена е в {priceCurrency} — двете не са в една валута, затова резултатът не може да бъде изчислен.",
 
         // Authorisation. The code is deliberately CATEGORY-LEVEL:
         // `requirePermission` never echoes the permission key to the
