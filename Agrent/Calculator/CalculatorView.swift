@@ -16,6 +16,10 @@ struct CalculatorView: View {
     @State private var openTypes: Set<CostCategory> = []
     /// «Общо» unfolded to its types; folded when the screen opens.
     @State private var totalOpen = false
+    /// The crops unfolded under «Всички» (owner, 2026-11-06: "folded by
+    /// default and unfoldable on click"). Not remembered: the page opens
+    /// on one line per crop each time.
+    @State private var openCrops: Set<String> = []
     /// The month graph's month (owner, 2026-11-01): nil is «Всички месеци».
     @State private var chartMonth: Date?
 
@@ -147,7 +151,7 @@ struct CalculatorView: View {
                 case .all:
                     farmSection(payload).pageRow()
                     ForEach(payload.rows) { row in
-                        rowSection(row).pageRow()
+                        foldedCropSection(row).pageRow()
                     }
                     costsSection.pageRow()
                     footnotes(payload).pageRow()
@@ -522,7 +526,53 @@ struct CalculatorView: View {
     @ViewBuilder
     private func rowSection(_ row: CalculatorRow, named: Bool = true) -> some View {
         Section {
-            if let net = row.netWorth {
+            cropFacts(row)
+        } header: {
+            SectionHeader {
+                HStack {
+                    // Gold (owner, 2026-10-24): the crop's name is what the
+                    // eye looks for in a list of crops, and in the header grey
+                    // it read as one more label.
+                    if named {
+                        Text(CommodityName.canonical(row.commodity) ?? row.commodity)
+                            .foregroundStyle(Palette.accent)
+                    }
+                    Spacer()
+                    UncertaintyBadge(row.netUncertainty)
+                }
+            }
+        }
+    }
+
+    /// A crop under «Всички», folded (owner, 2026-11-06): one line, its
+    /// name in gold, its net value and how sure it is; a tap shows the rest.
+    /// One crop chosen in the dropdown is `rowSection`, open, as it is the
+    /// whole page.
+    private func foldedCropSection(_ row: CalculatorRow) -> some View {
+        Section {
+            DisclosureGroup(isExpanded: cropBinding(row.commodity)) {
+                cropFacts(row, includingNet: false)
+            } label: {
+                CropFoldRow(row: row)
+            }
+        }
+    }
+
+    private func cropBinding(_ commodity: String) -> Binding<Bool> {
+        Binding {
+            openCrops.contains(commodity)
+        } set: { open in
+            if open { openCrops.insert(commodity) } else { openCrops.remove(commodity) }
+        }
+    }
+
+    /// A crop's figures. `includingNet` false where its fold's line already
+    /// says the net value.
+    @ViewBuilder
+    private func cropFacts(_ row: CalculatorRow, includingNet: Bool = true) -> some View {
+            if !includingNet, row.netWorth != nil {
+                // Said on the fold's own line.
+            } else if let net = row.netWorth {
                 ValueRow("Нетна стойност") {
                     Text(Money.text(net, row.priceCurrency))
                         .font(.headline)
@@ -606,21 +656,6 @@ struct CalculatorView: View {
                 RefusalNote(text: "Валутата на рентата е неизвестна.",
                             icon: "questionmark.circle")
             }
-        } header: {
-            SectionHeader {
-                HStack {
-                    // Gold (owner, 2026-10-24): the crop's name is what the
-                    // eye looks for in a list of crops, and in the header grey
-                    // it read as one more label.
-                    if named {
-                        Text(CommodityName.canonical(row.commodity) ?? row.commodity)
-                            .foregroundStyle(Palette.accent)
-                    }
-                    Spacer()
-                    UncertaintyBadge(row.netUncertainty)
-                }
-            }
-        }
     }
 
     // MARK: - What the figures leave out
@@ -817,5 +852,32 @@ struct CostRow: View {
             BgDate.full(cost.incurredOn),
             cost.supplier,
         ]))
+    }
+}
+
+/// A crop's folded line under «Всички»: its name in gold (owner,
+/// 2026-10-24), its net value, and how sure that is. A crop the server
+/// declined to value says «—»; the reason is inside.
+struct CropFoldRow: View {
+    let row: CalculatorRow
+
+    private var name: String { CommodityName.canonical(row.commodity) ?? row.commodity }
+    private var value: String { row.netWorth.map { Money.text($0, row.priceCurrency) } ?? "—" }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(name)
+                .font(.headline)
+                .foregroundStyle(Palette.accent)
+            Spacer(minLength: 12)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(value)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .multilineTextAlignment(.trailing)
+                UncertaintyBadge(row.netUncertainty)
+            }
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
     }
 }
