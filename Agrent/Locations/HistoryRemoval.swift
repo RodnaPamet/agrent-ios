@@ -171,24 +171,24 @@ final class HistoryRemoval {
 
 extension HistoryRemoval.Target {
     /// A season as its row reads: «2026, Пшеница».
-    init(_ season: CropSeason) {
+    nonisolated init(_ season: CropSeason) {
         self.init(kind: .season, id: season.id, label: Self.clause(season.historyLine))
     }
 
     /// A parcel's own note (owner, 2026-11-06), by its first words.
-    init(_ note: ParcelComment) {
+    nonisolated init(_ note: ParcelComment) {
         let words = note.text.count > 60 ? String(note.text.prefix(60)) + "…" : note.text
         self.init(kind: .note, id: note.id, label: words)
     }
 
     /// An observation as its row reads: «2 април, Балур (Sorghum halepense)».
-    init(_ observation: WeedObservation) {
+    nonisolated init(_ observation: WeedObservation) {
         self.init(kind: .weeds, id: observation.id, label: Self.clause(observation.historyLine))
     }
 
     /// The row's spoken form without its full stop: it sits inside the
     /// question's sentence and after «Изтрита култура:».
-    private static func clause(_ line: ParcelHistoryLine) -> String {
+    nonisolated private static func clause(_ line: ParcelHistoryLine) -> String {
         var text = line.spoken
         while text.hasSuffix(".") { text.removeLast() }
         return text

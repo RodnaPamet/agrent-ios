@@ -20,7 +20,7 @@ struct ParcelCommentsView: View {
     /// Whether `comment` may be deleted by whoever is signed in: a parcel's
     /// own note, theirs, or any note for the farm's OWNER or ADMIN. The
     /// server's rule, so the swipe and its refusal agree.
-    static func mayDelete(_ comment: ParcelComment, me: CurrentUser?) -> Bool {
+    nonisolated static func mayDelete(_ comment: ParcelComment, me: CurrentUser?) -> Bool {
         guard comment.kind == .parcel, let me else { return false }
         if comment.createdBy?.id == me.id { return true }
         return ["OWNER", "ADMIN"].contains(me.role?.uppercased() ?? "")
