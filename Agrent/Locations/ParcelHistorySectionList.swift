@@ -46,6 +46,21 @@ where Item.ID == String {
     let section: (ParcelHistoryStore.Archive) -> ParcelHistoryStore.Section<Item>
     let line: (Item) -> ParcelHistoryLine
 
+    /// РЕКОЛТИ's and ПЛЕВЕЛИ's «Изтрий» (#541): the shared removal, and
+    /// what a row is to it. Nil for ДЕЙНОСТИ, which has no swipe.
+    var removal: HistoryRemoval? = nil
+    var target: ((Item) -> HistoryRemoval.Target)? = nil
+
+    @State private var people = CurrentUserStore.shared
+    @State private var asking: HistoryRemoval.Target?
+    @State private var confirming = false
+
+    /// The section's rows, less what was swiped away.
+    private func shown(_ items: [Item]) -> [Item] {
+        guard let removal else { return items }
+        return items.filter { !removal.isHidden($0.id) }
+    }
+
     var body: some View {
         List {
             // Reads the LIVE section off the store rather than taking a
@@ -82,9 +97,13 @@ where Item.ID == String {
                 // for that exact reason: `groupedByYear()` would insert loaded
                 // seasons INTO groups already on screen. The year leads each
                 // row instead, which is the part grouping was for.
-                ForEach(current.items) { item in
+                ForEach(shown(current.items)) { item in
                     row(line(item))
                         .pageRow()
+                        .historyRemovalSwipe(offered: target != nil && HistoryRemoval.offered(to: people.user)) {
+                            asking = target?(item)
+                            confirming = asking != nil
+                        }
                 }
 
                 // ONLY WHEN THERE IS SOMETHING TO SAY.
@@ -115,6 +134,7 @@ where Item.ID == String {
         .listStyle(.plain)
         .pageBackground()
         .inlineTitle(ParcelHistoryCopy.drillInTitle(part))
+        .modifier(RemovalIfAny(removal: removal, asking: $asking, confirming: $confirming, store: store))
     }
 
     // MARK: - A row
@@ -224,3 +244,21 @@ where Item.ID == String {
         .padding(.vertical, 4)
     }
 }
+
+/// The section's «Изтрий» chrome when it has a removal, nothing when not.
+/// Stateless: its state is the list's (`historyRemoval`'s note).
+private struct RemovalIfAny: ViewModifier {
+    let removal: HistoryRemoval?
+    @Binding var asking: HistoryRemoval.Target?
+    @Binding var confirming: Bool
+    let store: ParcelHistoryStore
+
+    func body(content: Content) -> some View {
+        if let removal {
+            content.historyRemoval(removal, asking: $asking, confirming: $confirming) { await store.refresh() }
+        } else {
+            content
+        }
+    }
+}
+
