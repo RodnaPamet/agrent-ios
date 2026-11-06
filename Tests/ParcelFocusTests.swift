@@ -196,8 +196,8 @@ final class CommodityFallbackTests: XCTestCase {
         XCTAssertEqual(CommodityName.freeText("Sunflower"), "Слънчоглед")
         XCTAssertEqual(CommodityName.freeText("Canola"), "Рапица")
         XCTAssertEqual(CommodityName.freeText("Peas"), "Грах")
-        XCTAssertEqual(CommodityName.freeText("Grass"), "Grass",
-                       "untranslated on purpose until the word is agreed")
+        // Agreed since: the web's catalogue names it «Тревна площ».
+        XCTAssertEqual(CommodityName.freeText("Grass"), "Тревна площ")
     }
 
     /// Somebody's own words are left exactly as they wrote them.

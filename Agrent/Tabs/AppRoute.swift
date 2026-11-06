@@ -45,7 +45,8 @@ enum AppRoute: Hashable, Sendable {
     /// Блокове's map (#387): the history then offers «Ново мероприятие» for
     /// it, which used to be what a tap on the map opened. Nil from Риск,
     /// which has never offered it.
-    case parcelHistory(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil)
+    case parcelHistory(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil,
+                       fromRisk: Bool = false)
     /// «Съобщения», from Борса's bar (owner, 2026-10-24). Carries nothing: it
     /// is the person's one inbox. «Ферми» had this place until the directory
     /// moved into the board's search.
@@ -63,7 +64,7 @@ enum AppRoute: Hashable, Sendable {
         case .location(let location): hasher.combine("location"); hasher.combine(location.id)
         case .locationID(let id): hasher.combine("locationID"); hasher.combine(id)
         case .listingID(let id): hasher.combine("listingID"); hasher.combine(id)
-        case .parcelHistory(let parcelID, _, _, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
+        case .parcelHistory(let parcelID, _, _, _, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
         case .exchangeInbox: hasher.combine("exchangeInbox")
         case .treatmentMap(let handle, _): hasher.combine("treatmentMap"); hasher.combine(handle)
         }
@@ -95,8 +96,9 @@ enum AppRoute: Hashable, Sendable {
         case .location(let location): ParcelMapView(location: location)
         case .locationID(let id): LocationLinkView(id: id)
         case .listingID(let id): ListingLinkView(id: id)
-        case .parcelHistory(let parcelID, let parcelName, let recordIn, let outline):
-            ParcelHistoryView(parcelID: parcelID, parcelName: parcelName, recordIn: recordIn, outline: outline)
+        case .parcelHistory(let parcelID, let parcelName, let recordIn, let outline, let fromRisk):
+            ParcelHistoryView(parcelID: parcelID, parcelName: parcelName, recordIn: recordIn, outline: outline,
+                              fromRisk: fromRisk)
         case .exchangeInbox: ExchangeInboxScreen()
         case .treatmentMap(let handle, let title): TreatmentMapView(handle: handle, title: title)
         }

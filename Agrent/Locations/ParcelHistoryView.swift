@@ -37,16 +37,19 @@ import SwiftUI
 /// their closing notes, from wherever the screen is opened, as they are its
 /// history (`ParcelCommentsView`).
 ///
-/// ── Read-only, this pass ──
+/// ── «+», per section (owner, 2026-11-06) ──
 ///
-/// `createCropSeason`, `createWeedObservation`, `deleteCropSeason` and
-/// `deleteWeedObservation` all exist and none of them is reachable from here
-/// yet. Reading the archive is the half that every role can use.
+/// Each section's list has a «+» at the top right that makes one of its
+/// own, and the screen has a menu of all four (`Create`). There's no edit:
+/// the server has no PATCH for a season or an observation, so a wrong one
+/// is deleted and recorded again, which the phone can't do yet either
+/// (`deleteCropSeason`, `deleteWeedObservation`).
 struct ParcelHistoryView: View {
     /// The name as the Риск row already knew it, so the header is not blank
     /// for the length of the first request. The archive's own name wins once
     /// it arrives — the server's is authoritative if the parcel was renamed.
     private let parcelName: String
+    private let parcelID: String
 
     /// ONE STORE, owned here and handed to every drill-in.
     ///
@@ -56,22 +59,22 @@ struct ParcelHistoryView: View {
     /// comes back.
     @State private var store: ParcelHistoryStore
 
-    /// The parcel in its block, when this was opened from Блокове's map
-    /// (#387). Then «Ново мероприятие» is here, where a tap on the map used
-    /// to open it (owner, 2026-10-21). Nil from Риск.
+    /// The parcel in its block, from Блокове's map (#387) and, since
+    /// 2026-11-06, from Риск's block (`RiskHistoryRoute`). Then «Ново
+    /// мероприятие» and «Нова задача» are here, and the parcel's tasks.
     private let recordIn: ParcelInBlock?
-    /// The parcel's outline, for the map at the top (owner, 2026-11-06):
-    /// from Риск's row, or the block's map via `recordIn`.
+    /// The parcel's outline, for the map at the top (owner, 2026-11-06).
     private let outline: Parcel?
-    @State private var recording = false
-    /// Who is signed in: whether to offer «Ново мероприятие».
+    /// The «+» that is open, and which screen it is on (`creatingSheets`).
+    @State private var creating: Creating?
+    /// Who is signed in: which «+» to offer.
     @State private var people = CurrentUserStore.shared
-    /// An operation saved from the sheet. Played here, because the sheet
-    /// closes on success (`WriteFeedback`).
+    /// A season, an operation or an observation saved from its sheet.
+    /// Played here, because the sheet closes on success (`WriteFeedback`).
     @State private var feedback = WriteFeedback()
 
     /// The parcel's risk reading, when opened from Блокове (owner,
-    /// 2026-10-29). Nil from Риск, which has just shown the same reading.
+    /// 2026-10-29). Nil from Риск (`fromRisk`), which has just shown it.
     @State private var risk: ParcelRiskStore?
     /// The parcel's tasks, from Блокове (#462). One store for the card and
     /// the list it opens.
@@ -80,12 +83,14 @@ struct ParcelHistoryView: View {
     /// part of its history, so from wherever the screen is opened.
     @State private var comments: ParcelCommentsStore
 
-    init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil) {
+    init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil,
+         fromRisk: Bool = false) {
         self.parcelName = parcelName
+        self.parcelID = parcelID
         self.recordIn = recordIn
         self.outline = outline ?? recordIn?.parcel
         _store = State(initialValue: ParcelHistoryStore(parcelID: parcelID))
-        _risk = State(initialValue: recordIn == nil ? nil : ParcelRiskStore(parcelID: parcelID))
+        _risk = State(initialValue: recordIn == nil || fromRisk ? nil : ParcelRiskStore(parcelID: parcelID))
         _tasks = State(initialValue: recordIn == nil ? nil : ParcelTasksStore(parcelID: parcelID))
         _comments = State(initialValue: ParcelCommentsStore(parcelID: parcelID))
     }
@@ -109,41 +114,123 @@ struct ParcelHistoryView: View {
             .task { await risk?.load() }
             .task { await tasks?.load() }
             .task { if comments.state.value == nil { await comments.load() } }
-            .safeAreaInset(edge: .bottom, spacing: 0) { recordButton }
-            .sheet(isPresented: $recording) {
-                if let recordIn {
-                    ParcelOperationSheet(locationID: recordIn.locationID, parcel: recordIn.parcel) {
-                        feedback.saved()
-                        Task { await store.refresh() }
-                    }
-                }
-            }
+            .toolbar { addMenu }
+            .modifier(creatingSheets(on: nil))
             .writeFeedback(feedback)
     }
 
-    /// «Ново мероприятие» for this parcel, the primary action at the bottom,
-    /// as the journal's «Нов запис» is: a gloved thumb reaches the bottom of
-    /// a phone. Only when opened from Блокове, and only for someone who may
-    /// create an operation (`mayCreateOperations`, failing open, as the map's
-    /// tap did). Not while the archive loads or fails: the sheet needs only
-    /// the parcel, which the route carries.
-    @ViewBuilder
-    private var recordButton: some View {
-        if recordIn != nil, people.user?.mayCreateOperations ?? true {
-            Button {
-                recording = true
-            } label: {
-                Text("Ново мероприятие").frame(maxWidth: .infinity, minHeight: 30)
+    // MARK: - Making a new one
+
+    /// What a «+» here makes (owner, 2026-11-06): "in each section there
+    /// should be a '+' action button on the top right to create a new
+    /// entry". РЕКОЛТИ a crop season, ДЕЙНОСТИ an operation, ПЛЕВЕЛИ a weed
+    /// observation, Задачи a task for this parcel. In the screen's order.
+    fileprivate enum Create: Hashable, CaseIterable {
+        case season, operation, weeds, task
+
+        var title: String {
+            switch self {
+            case .season: ParcelHistoryCopy.cropsAdd
+            case .operation: "Ново мероприятие"
+            case .weeds: ParcelHistoryCopy.weedsAdd
+            case .task: "Нова задача"
             }
-            .prominentButton()
-            .controlSize(.large)
-            .accessibilityInputLabels(A11y.Spoken.newOperation)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-            .solidBar(hairline: .top)
+        }
+
+        var spoken: [String] {
+            switch self {
+            case .season: A11y.Spoken.addCrop
+            case .operation: A11y.Spoken.newOperation
+            case .weeds: A11y.Spoken.addWeeds
+            case .task: A11y.Spoken.newTask
+            }
+        }
+
+        /// A section's own; nil for «Коментари», which are written on tasks.
+        init?(_ drillIn: DrillIn) {
+            switch drillIn {
+            case .seasons: self = .season
+            case .operations: self = .operation
+            case .weeds: self = .weeds
+            case .tasks: self = .task
+            case .comments: return nil
+            }
         }
     }
+
+    /// Who may, and from where.
+    ///
+    /// A season and an observation are the parcel's alone, so any writer
+    /// may, from wherever the history was opened (`assertCanWrite`). An
+    /// operation and a task need the parcel's block, which only Блокове's
+    /// map gives (`recordIn`): an operation is recorded IN a block, and a
+    /// task's parcels are chosen by block. An operation for someone who may
+    /// create one (`mayCreateOperations`, failing open, as the map's tap
+    /// did); the rest for someone who may write, as «Задачи»'s + is.
+    private func offers(_ kind: Create) -> Bool {
+        switch kind {
+        case .season, .weeds: people.user?.mayWrite ?? true
+        case .operation: recordIn != nil && (people.user?.mayCreateOperations ?? true)
+        case .task: recordIn != nil && (people.user?.mayWrite ?? true)
+        }
+    }
+
+    /// A section list's «+», the rightmost item in its bar (`ScreenAction`).
+    @ToolbarContentBuilder
+    private func createAction(_ kind: Create?, on drillIn: DrillIn) -> some ToolbarContent {
+        if let kind, offers(kind) {
+            ScreenAction(title: kind.title, spoken: kind.spoken) {
+                creating = Creating(kind: kind, on: drillIn)
+            }
+        }
+    }
+
+    /// The history's own «+», where «Ново мероприятие»'s wide bar was: a
+    /// menu of what the person may make, as the screen's sections run, since
+    /// one screen holds four sections. A section with nothing in it has no
+    /// list to open, so this is the way to its first entry.
+    @ToolbarContentBuilder
+    private var addMenu: some ToolbarContent {
+        let kinds = Create.allCases.filter(offers)
+        if !kinds.isEmpty {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ForEach(kinds, id: \.self) { kind in
+                        Button(kind.title) { creating = Creating(kind: kind, on: nil) }
+                            .accessibilityInputLabels(kind.spoken)
+                    }
+                } label: {
+                    Label("Добави", systemImage: "plus")
+                }
+                .accessibilityLabel("Добави")
+                .accessibilityInputLabels(A11y.Spoken.add)
+            }
+        }
+    }
+
+    /// One sheet's presence, on one screen.
+    private func shows(_ kind: Create, on drillIn: DrillIn?) -> Binding<Bool> {
+        Binding(get: { creating == Creating(kind: kind, on: drillIn) },
+                set: { if !$0 { creating = nil } })
+    }
+
+    /// The sheets, presented from the screen the «+» is on: the history, or
+    /// the section list pushed over it. One `creating`, read by each
+    /// presenter only when it names that presenter, so the screen under a
+    /// list never tries to present the same sheet as the list.
+    private func creatingSheets(on drillIn: DrillIn?) -> CreatingSheets {
+        CreatingSheets(
+            season: shows(.season, on: drillIn), operation: shows(.operation, on: drillIn),
+            weeds: shows(.weeds, on: drillIn), task: shows(.task, on: drillIn),
+            parcelID: parcelID,
+            recordIn: recordIn,
+            onRecorded: {
+                feedback.saved()
+                Task { await store.refresh() }
+            },
+            reloadTasks: { await tasks?.load() })
+    }
+
 
     @ViewBuilder
     private var content: some View {
@@ -300,7 +387,12 @@ struct ParcelHistoryView: View {
     /// `RoutedStack`. Its own type and destination, declared on this screen
     /// rather than as an `AppRoute`: the lists share this screen's store,
     /// which nothing outside the screen should hold.
-    private enum DrillIn: Hashable { case seasons, operations, weeds, tasks, comments }
+    fileprivate enum DrillIn: Hashable { case seasons, operations, weeds, tasks, comments }
+
+    fileprivate struct Creating: Equatable {
+        let kind: Create
+        let on: DrillIn?
+    }
 
     @ViewBuilder
     private func cards(_ archive: ParcelHistoryStore.Archive) -> some View {
@@ -332,9 +424,16 @@ struct ParcelHistoryView: View {
         )
     }
 
-    /// The list a card opens, over the same store the cards read.
-    @ViewBuilder
+    /// The list a card opens, over the same store the cards read, with its
+    /// section's «+».
     private func list(_ drillIn: DrillIn) -> some View {
+        sectionList(drillIn)
+            .toolbar { createAction(Create(drillIn), on: drillIn) }
+            .modifier(creatingSheets(on: drillIn))
+    }
+
+    @ViewBuilder
+    private func sectionList(_ drillIn: DrillIn) -> some View {
         switch drillIn {
         case .seasons:
             ParcelHistorySectionList(
@@ -536,5 +635,37 @@ struct ParcelHistoryView: View {
         .accessibilityLabel(A11y.sentence(
             [card.title, card.count] + (card.newest?.parts ?? [ParcelHistoryCopy.emptySection])
         ))
+    }
+}
+
+/// The history's «+» sheets, on whichever screen presents them: a crop
+/// season and a weed observation for the parcel, «Ново мероприятие» for the
+/// parcel in its block, and «Нова задача» with the parcel chosen
+/// (`NewTaskComposer`, which opens the task it makes on this stack).
+private struct CreatingSheets: ViewModifier {
+    @Binding var season: Bool
+    @Binding var operation: Bool
+    @Binding var weeds: Bool
+    @Binding var task: Bool
+    let parcelID: String
+    let recordIn: ParcelInBlock?
+    /// A season, an observation or an operation saved: the archive again.
+    let onRecorded: () -> Void
+    let reloadTasks: @MainActor () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(isPresented: $season) {
+                NewCropSeasonSheet(parcelID: parcelID, onSaved: onRecorded)
+            }
+            .sheet(isPresented: $operation) {
+                if let recordIn {
+                    ParcelOperationSheet(locationID: recordIn.locationID, parcel: recordIn.parcel, onSaved: onRecorded)
+                }
+            }
+            .sheet(isPresented: $weeds) {
+                NewWeedObservationSheet(parcelID: parcelID, onSaved: onRecorded)
+            }
+            .newTaskComposer(isPresented: $task, preset: recordIn, reload: reloadTasks)
     }
 }

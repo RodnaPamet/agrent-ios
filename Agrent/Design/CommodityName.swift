@@ -138,17 +138,16 @@ enum CommodityName {
     /// adopted verbatim from `crop-options.ts` rather than translated
     /// again here.
     ///
-    /// Six catalogue values, TitleCase on the wire, matched case-insensitively.
+    /// Seven catalogue values, TitleCase on the wire, matched case-insensitively.
     /// `Canola` is this vocabulary's word for what the price series calls
     /// `rapeseed`; both reach «Рапица» through their own table, which is
     /// how the phone and the web stay in agreement without either giving
     /// up its canonical slug.
     ///
-    /// NOT COMPLETE, knowingly. Production holds `Grass` on one parcel and
-    /// the catalogue has no such value, so the web renders it in English
-    /// too. Adding a word here alone would make the two clients disagree,
-    /// which is worse than one of them being in English — it is a
-    /// vocabulary decision, and it is the owner's.
+    /// `Grass` joined since: production held it on a parcel while the
+    /// catalogue lacked it, and the web added it as «Тревна площ», a
+    /// perennial (agri-saas `crop-options.ts`). Added here when the web had
+    /// it, not before, so the two clients never disagreed about its name.
     static let cropTable: [String: String] = [
         "wheat": "Пшеница",
         "barley": "Ечемик",
@@ -156,6 +155,16 @@ enum CommodityName {
         "maize": "Царевица",
         "sunflower": "Слънчоглед",
         "peas": "Грах",
+        "grass": "Тревна площ",
+    ]
+
+    /// The parcel catalogue as a picker shows it: the web's `CROP_OPTIONS`,
+    /// its values and order, grouped by its season captions (`crops.season*`).
+    /// The values are what is stored; `freeText` names them.
+    static let cropCatalogue: [(season: String, values: [String])] = [
+        ("Есенна култура", ["Wheat", "Barley", "Canola"]),
+        ("Пролетна култура", ["Maize", "Sunflower", "Peas"]),
+        ("Многогодишна култура", ["Grass"]),
     ]
 
     static let table: [String: String] = [

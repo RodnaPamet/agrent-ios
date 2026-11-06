@@ -43,6 +43,18 @@ enum ParcelHistoryCopy {
     /// disabled button.
     static let emptySection = "Няма записи"
 
+    // The «+» forms' words, the web's (`ag.parcelHistory`).
+    static let cropsAdd = "Запиши култура"
+    static let weedsAdd = "Запиши плевели"
+    static let fieldYear = "Стопанска година"
+    static let fieldYearHint = "Есенно засятата култура се отнася към реколтата на СЛЕДВАЩАТА година."
+    static let fieldWeedsHint = "Изберете от списъка или въведете вид, който не е включен."
+    static let otherWeed = "Друго"
+    /// Neither route takes a key, so a lost answer may have recorded it:
+    /// said, rather than a retry promised safe (as `NewTaskView`'s).
+    static let unsureNote = "Ако връзката е прекъснала, записът може вече да е направен. "
+        + "Проверете историята, преди да опитате отново."
+
     /// TITLE CASE, for a navigation bar. The ALL-CAPS forms above are SECTION
     /// HEADERS, where capitals are the platform idiom — reused as a navigation
     /// title they read as shouting, and all-caps Cyrillic is the shape VoiceOver

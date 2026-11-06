@@ -1,80 +1,50 @@
 import SwiftUI
 
-/// The app's floating action button — one per screen, bottom LEADING.
+/// A screen's create action: in the navigation bar's trailing corner, the
+/// RIGHTMOST item there (owner, 2026-11-06).
 ///
-/// ── Leading, because the assistant has the right (owner, 2026-11-01) ──
+/// ── Top right, everywhere (owner, 2026-11-06) ──
 ///
-/// It began bottom-leading, moved to the bottom right with Задачи's + on
-/// 2026-10-21 (#386), and came back left when the assistant's button (#483)
-/// took the bottom right on every screen: two floating controls in one
-/// corner, the owner said, "to the bottom left - new task and I[n]sure".
-/// Задачи's + (`NewTaskButton`) moved with it, so the app's floating actions
-/// still share one corner, and the assistant has the other.
+/// "Move all '+' action buttons to the top right on the most right if other
+/// buttons are there as well": Задачи's floating +, Борса's «Нова обява»,
+/// the wide bars «Нов запис», «Нов разход» and «Ново мероприятие», and Риск's
+/// «Застраховай». They had been where a gloved thumb reaches, the bottom of
+/// the screen, then a floating capsule bottom left once the assistant's
+/// button took the bottom right (2026-11-01). One place for "make a new
+/// one" on every screen is the owner's call over the reach, and it leaves
+/// the bottom of every screen to the list and the assistant.
 ///
-/// ── One per screen ──
+/// ── Rightmost by being LAST ──
 ///
-/// This is deliberately not a stack or a menu. A floating button that
-/// expands into more floating buttons is a menu that has escaped its bar,
-/// and the screens here already have a toolbar for secondary actions. If a
-/// screen needs two, it needs a toolbar.
-struct ActionButton: View {
-    let label: String
-    let systemImage: String
+/// A bar lays out its `.primaryAction` items in the order they are written,
+/// so this goes at the end of the screen's `.toolbar`, after «Филтри» or
+/// «Съобщения», in the same block: two `.toolbar` modifiers make no promise
+/// about the order of their items between them.
+///
+/// ── What it says ──
+///
+/// "+" in the bar, the action's name to VoiceOver and to the large content
+/// viewer (a bar button shows it on a long press at the large text sizes),
+/// and the name Voice Control answers to. A screen whose action isn't a
+/// "new one" passes its own image (Риск's shield), or none to be written out.
+struct ScreenAction: ToolbarContent {
+    let title: String
+    var systemImage: String? = "plus"
+    /// `A11y.Spoken`'s names for it, Cyrillic first.
+    let spoken: [String]
     let action: () -> Void
 
-    /// Nil hides the button entirely rather than disabling it — a disabled
-    /// floating button is a promise the screen cannot keep, the same rule
-    /// the index picker and the target button already follow.
-    var isEnabled = true
-
-    @Environment(\.colorSchemeContrast) private var contrast
-
-    var body: some View {
-        if isEnabled {
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
             Button(action: action) {
-                Label(label, systemImage: systemImage)
-                    .labelStyle(.titleAndIcon)
-                    .font(.callout.weight(.medium))
-                    .padding(.horizontal, 18)
-                    // 52, not 44. This floats over content rather than
-                    // sitting in a bar, so it is hit while walking, and the
-                    // minimum is a floor for controls that hold still.
-                    .frame(minHeight: 52)
-                    // `Palette.onAccent`, never `.white`: the dark accent is gold
-                    // and white on it measures 2.10:1. See the pair's header.
-                    .foregroundStyle(Palette.onAccent)
-                    .background(Palette.accent, in: Capsule())
-                    // The shadow is what separates it from whatever it
-                    // floats over — a satellite photograph, in this app,
-                    // which can be any colour at all.
-                    .shadow(color: .black.opacity(contrast == .increased ? 0.5 : 0.25),
-                            radius: 8, y: 3)
-                    .contentShape(Capsule())
+                if let systemImage {
+                    Label(title, systemImage: systemImage)
+                } else {
+                    Text(title)
+                }
             }
-            .buttonStyle(.plain)
-            .padding(.leading, 16)
-            .padding(.bottom, 16)
-            .accessibilityLabel(label)
-        }
-    }
-}
-
-extension View {
-    /// Floats an `ActionButton` over this view, bottom-leading.
-    ///
-    /// An overlay rather than a `safeAreaInset`, because the button covers
-    /// content by design — a list scrolls under it and the last row stays
-    /// reachable by scrolling. An inset would permanently shorten every
-    /// screen that has one.
-    func actionButton(
-        _ label: String,
-        systemImage: String,
-        isEnabled: Bool = true,
-        action: @escaping () -> Void
-    ) -> some View {
-        overlay(alignment: .bottomLeading) {
-            ActionButton(label: label, systemImage: systemImage,
-                         action: action, isEnabled: isEnabled)
+            .accessibilityLabel(title)
+            .accessibilityInputLabels(spoken)
         }
     }
 }

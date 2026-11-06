@@ -32,15 +32,32 @@ struct CalculatorView: View {
             VStack(spacing: 0) {
                 content
             }
-                // Inside «Нов разход»'s bar: the five seconds of «Отмени»
-                // sit above it, over the list they belong to.
+                // The five seconds of «Отмени», at the bottom, over the
+                // list they belong to.
                 .costRemoval(removal, asking: $askingCost, confirming: $confirmingCost) {
                     await costs.load()
                     await store.load()
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) { newCostButton }
             .navigationTitle("Калкулатор")
             .appMenu()
+            .toolbar {
+                // «Нов разход», top right (owner, 2026-11-06; `ScreenAction`).
+                // It was a wide bar at the bottom, as «Нов запис» was.
+                //
+                // Shown even when the report is EMPTY, which is the case this
+                // tenant is actually in: the calculator has nothing to
+                // compute until there is a season with sown area, and
+                // "nothing to show" is exactly the moment an operator wants
+                // to put something in.
+                //
+                // Not to a role that cannot write, though: a reader or an
+                // auditor would be refused after filling the sheet in
+                // (agrent-ios #312). Fails open while nobody has said, as
+                // every write control does.
+                if people.user?.mayWrite ?? true {
+                    ScreenAction(title: "Нов разход", spoken: A11y.Spoken.newCost) { addingCost = true }
+                }
+            }
             .sheet(isPresented: $addingCost) {
                 NewCostView(crops: CropChoice.from(store.state.value?.rows ?? [])) {
                     Task {
@@ -53,39 +70,6 @@ struct CalculatorView: View {
                 if store.state.value == nil { await store.load() }
                 if costs.state.value == nil { await costs.load() }
             }
-        }
-    }
-
-    /// A full-width target at the bottom, the same shape as the journal's
-    /// "Нов запис" — a gloved thumb reaches the bottom of a phone, and the
-    /// top-right corner is the hardest place on the device to hit
-    /// one-handed. DESIGN.md asks for one pass across all five tabs rather
-    /// than each screen inventing its own affordance.
-    ///
-    /// Shown even when the report is EMPTY, which is the case this tenant
-    /// is actually in: the calculator has nothing to compute until there is
-    /// a season with sown area, and "nothing to show" is exactly the
-    /// moment an operator wants to put something in. A screen that says
-    /// "няма какво да се изчисли" and offers no way to change that is a
-    /// dead end.
-    ///
-    /// Not to a role that cannot write, though: a reader or an auditor would
-    /// be refused after filling the sheet in (agrent-ios #312). Fails open
-    /// while nobody has said, as every write control does.
-    @ViewBuilder
-    private var newCostButton: some View {
-        if people.user?.mayWrite ?? true {
-            Button {
-                addingCost = true
-            } label: {
-                Text("Нов разход").frame(maxWidth: .infinity, minHeight: 30)
-            }
-            .prominentButton()
-            .controlSize(.large)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-            .solidBar(hairline: .top)
         }
     }
 

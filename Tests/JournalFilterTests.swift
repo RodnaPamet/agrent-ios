@@ -152,7 +152,7 @@ final class JournalFilterTests: XCTestCase {
     /// A crop no catalogue knows is offered as written, as everywhere a
     /// parcel's crop is shown (`CommodityName.freeText`).
     func testAnUncataloguedCropIsOfferedAsWritten() {
-        XCTAssertEqual(JournalFilter.Crop.options(from: ["Grass"]).map(\.label), ["Grass"])
+        XCTAssertEqual(JournalFilter.Crop.options(from: ["Люцерна"]).map(\.label), ["Люцерна"])
     }
 
     /// The route splits on commas and trims each part, so these could never

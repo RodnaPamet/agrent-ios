@@ -64,10 +64,7 @@ struct JournalListView: View {
             content
                 .background(Palette.Surface.page)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    VStack(spacing: 0) {
-                        if let undoable = removal.undoable { undoBar(undoable) }
-                        newEntryButton
-                    }
+                    if let undoable = removal.undoable { undoBar(undoable) }
                 }
             .navigationTitle("Земеделски дневник")
             .appMenu()
@@ -88,9 +85,7 @@ struct JournalListView: View {
                     .accessibilityInputLabels(A11y.Spoken.filters)
                 }
                 // The БАБХ ДНЕВНИК for a location and a period (#246) — the
-                // web's «Дневник (PDF)», from this page. Not the bottom bar:
-                // that is the action taken standing in a field; this one is
-                // taken for the inspector, once a season.
+                // web's «Дневник (PDF)», from this page, beside «Нов запис».
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         exportingRecord = true
@@ -99,6 +94,22 @@ struct JournalListView: View {
                     }
                     .accessibilityLabel("Дневник (PDF)")
                     .accessibilityInputLabels(A11y.Spoken.farmRecord)
+                }
+                // «Нов запис», the rightmost (owner, 2026-11-06; `ScreenAction`).
+                // It was a wide bar at the bottom.
+                //
+                // Not to a role that cannot write — a reader or an auditor
+                // would be refused after typing the entry (agrent-ios #312).
+                // Fails open while nobody has said, as every write control
+                // does (`CurrentUser.mayWrite`).
+                //
+                // Whatever the LIST is doing (#384). It used to wait for the
+                // entries, from when «Нов запис» could only post with signal.
+                // Since #324 it queues offline, so a list that couldn't load
+                // (no signal and nothing cached) is exactly when it must
+                // still be there.
+                if people.user?.mayWrite ?? true {
+                    ScreenAction(title: "Нов запис", spoken: A11y.Spoken.newEntry) { composing = true }
                 }
             }
             // «Нов запис» is the two-step treatment record (#293). The saved
@@ -150,35 +161,6 @@ struct JournalListView: View {
     }
 
 
-    /// The primary action is a full-width target at the bottom of the screen,
-    /// not a toolbar glyph. A gloved thumb reaches the bottom of a phone; the
-    /// top-right corner is the hardest place on the device to hit one-handed,
-    /// and this is the action an operator performs standing in a field.
-    @ViewBuilder
-    private var newEntryButton: some View {
-        // Not to a role that cannot write — a reader or an auditor would be
-        // refused after typing the entry (agrent-ios #312). Fails open while
-        // nobody has said, as every write control does (`CurrentUser.mayWrite`).
-        //
-        // Whatever the LIST is doing (#384). It used to wait for the entries,
-        // from when «Нов запис» could only post with signal. Since #324 it
-        // queues offline, so a list that couldn't load (no signal and nothing
-        // cached) is exactly when it must still be there.
-        if people.user?.mayWrite ?? true {
-            Button {
-                composing = true
-            } label: {
-                Text("Нов запис").frame(maxWidth: .infinity, minHeight: 30)
-            }
-            .prominentButton()
-            .controlSize(.large)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-            .solidBar(hairline: .top)
-        }
-    }
-
     /// The confirmed «Изтрий»: the row goes, the five seconds start, and it
     /// is said, with the way back.
     private func remove(_ entry: LogEntry) {
@@ -191,7 +173,7 @@ struct JournalListView: View {
     }
 
     /// What went, with «Отмени», for the five seconds before it is sent.
-    /// Above «Нов запис», where the thumb that swiped already is.
+    /// At the bottom, where the thumb that swiped already is.
     private func undoBar(_ undoable: TreatmentRemoval.Undoable) -> some View {
         // The sentence wraps rather than the button moving: at the largest
         // text sizes a product name runs to several lines, and «Отмени»

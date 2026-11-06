@@ -1,0 +1,16 @@
+{
+  "parcel": {"id": "par_holes", "name": "SYNTH-1", "cropType": "Wheat"},
+  "cropSeasons": [
+    {"id": "cs_synth_2026", "year": 2026, "cropType": "Wheat", "sownAt": "2025-10-20T00:00:00.000Z", "harvestedAt": "2026-07-05T00:00:00.000Z", "notes": null},
+    {"id": "cs_synth_2025", "year": 2025, "cropType": "Sunflower", "sownAt": null, "harvestedAt": null, "notes": "Синтетичен запис"}
+  ],
+  "operations": [
+    {"id": "op_synth_1", "taskId": "tsk_synth_op", "operationType": "SPRAY", "title": "Пръскане срещу плевели", "completedAt": "2026-04-12T08:30:00.000Z", "productName": "Тестов хербицид", "productCategory": "PESTICIDE", "doseValue": "0.25", "doseUnit": "л/дка", "targetNote": null}
+  ],
+  "weedObservations": [
+    {"id": "wo_synth_1", "observedAt": "2026-04-02T00:00:00.000Z", "weedKeys": ["Sorghum halepense", "Chenopodium album"], "otherWeeds": [], "notes": null}
+  ],
+  "cropSeasonsCursor": null,
+  "operationsCursor": null,
+  "weedObservationsCursor": null
+}

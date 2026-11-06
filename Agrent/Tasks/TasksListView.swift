@@ -17,6 +17,8 @@ struct TasksListView: View {
     /// The row whose «Изтрий» is being asked about (owner, 2026-10-26).
     @State private var confirmingRemoval: WorkItemSummary?
     @State private var confirming = false
+    /// «Нова задача» is open.
+    @State private var composing = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -26,24 +28,24 @@ struct TasksListView: View {
             // `JournalListView` for why this is no longer a
             // `safeAreaInset(edge: .top)`.
             // Борса's shape — see `JournalListView` for what it costs.
-            // «Нова задача», at the bottom LEFT (owner, 2026-11-01): the
-            // assistant's button has the bottom right on every screen, and
-            // the two sat on each other. It was bottom right from #372.
-            //
-            // A ZStack layer, NOT an `.overlay` (#388). The button presents
-            // «Нова задача» as a sheet, and a sheet presented from inside an
-            // overlay showed on screen but never reached the accessibility
-            // tree: VoiceOver, Voice Control and XCUITest saw the list under
-            // it, so the form couldn't be used with them. Found by A11yShots
-            // `testNewTaskParcelsStep`.
-            ZStack(alignment: .bottomLeading) {
-                content
-                    .background(Palette.Surface.page)
-                NewTaskButton { await store.load() }
-            }
+            content
+                .background(Palette.Surface.page)
+                .newTaskComposer(isPresented: $composing) { await store.load() }
             .navigationTitle("Задачи")
             .appMenu()
-            // Under the list and the +, as on Дневник: what went, and
+            // «Нова задача», top right (owner, 2026-11-06; `ScreenAction`).
+            // It floated bottom left from 2026-11-01, bottom right before.
+            //
+            // Only for a person who may write in this farm, as «Нов запис»
+            // and «Нов разход» are (`CurrentUser.mayWrite`, failing open
+            // while nobody has said). An operator's job is completing work,
+            // not creating it.
+            .toolbar {
+                if people.user?.mayWrite ?? true {
+                    ScreenAction(title: "Нова задача", spoken: A11y.Spoken.newTask) { composing = true }
+                }
+            }
+            // Under the list, as on Дневник: what went, and
             // «Отмени» for its five seconds (`taskRemoval`, shared with a
             // parcel's tasks).
             .taskRemoval(removal, asking: $confirmingRemoval, confirming: $confirming) {

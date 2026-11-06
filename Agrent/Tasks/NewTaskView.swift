@@ -2,8 +2,8 @@ import SwiftUI
 
 /// «Нова задача» (agrent-ios#372, owner 2026-10-20): the web's
 /// `NewTaskModal` fields that a phone needs. Title, description, a due day
-/// and who does it. Opened from the + at the bottom right of «Задачи»
-/// (`NewTaskButton`).
+/// and who does it. Opened from the + at the top right of «Задачи», and of
+/// a parcel's «Задачи» (`NewTaskComposer`).
 ///
 /// Two steps since #388 (owner, 2026-10-21): «Напред» opens «Парцели», where
 /// the task's parcels are chosen by block, optionally, and «Създай» is
@@ -12,6 +12,14 @@ struct NewTaskView: View {
     /// The created task's id, when the answer said; the list reloads and
     /// opens it.
     let onCreated: (String?) -> Void
+
+    /// A parcel's «Задачи» + (owner, 2026-11-06): its block and the parcel
+    /// chosen on «Парцели» from the start, which can still be changed.
+    init(preset: ParcelInBlock? = nil, onCreated: @escaping (String?) -> Void) {
+        self.onCreated = onCreated
+        _blockID = State(initialValue: preset?.locationID)
+        _chosen = State(initialValue: preset.map { [$0.parcel.id] } ?? [])
+    }
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft = NewTaskDraft()
@@ -133,49 +141,45 @@ struct NewTaskView: View {
     }
 }
 
-/// The + at the bottom right of «Задачи» (owner, 2026-10-20, #372).
+/// «Нова задача»'s sheet, opening the task it makes on the stack it was
+/// presented from: «Задачи»'s + (#372), top right since 2026-11-06
+/// (`ScreenAction`), and a parcel's «Задачи» (owner, same day), with that
+/// parcel chosen.
 ///
-/// Only for a person who may write in this farm, as «Нов запис» and «Нов
-/// разход» are (`CurrentUser.mayWrite`, failing open while nobody has said).
-/// An operator's job is completing work, not creating it.
-///
-/// Inside the tab's stack, so the task it creates opens on that stack.
-struct NewTaskButton: View {
+/// A modifier, applied INSIDE the stack, rather than state on the screen:
+/// the `pushRoute` it reads must be the stack's own, which the screen that
+/// builds the stack cannot read (`AppRouterTests`). And on the content, not
+/// in the bar's item: a sheet presented from inside an overlay once showed
+/// on screen and never reached the accessibility tree (#388); the content
+/// is where every other sheet here is presented from.
+struct NewTaskComposer: ViewModifier {
+    @Binding var isPresented: Bool
+    /// The parcel the task is for, chosen on «Парцели» from the start.
+    let preset: ParcelInBlock?
     /// The list's reload, before the new task opens over it.
     let reload: @MainActor () async -> Void
 
-    @State private var composing = false
-    @State private var people = CurrentUserStore.shared
     @Environment(\.pushRoute) private var pushRoute
-    @ScaledMetric(relativeTo: .title2) private var size: CGFloat = 56
 
-    var body: some View {
-        if people.user?.mayWrite ?? true {
-            Button { composing = true } label: {
-                Image(systemName: "plus")
-                    .font(.title2.weight(.semibold))
-                    // Grows with the text, to a cap: a bigger target helps,
-                    // a button that covers the list doesn't.
-                    .frame(width: min(size, 76), height: min(size, 76))
-            }
-            .prominentButton()
-            .buttonBorderShape(.circle)
-            .accessibilityLabel("Нова задача")
-            .accessibilityInputLabels(A11y.Spoken.newTask)
-            // A glyph alone: the large content viewer says what it is to
-            // someone who can't read the screen at its size.
-            .accessibilityShowsLargeContentViewer {
-                Label("Нова задача", systemImage: "plus")
-            }
-            .padding(20)
-            .sheet(isPresented: $composing) {
-                NewTaskView { id in
-                    Task {
-                        await reload()
-                        if let id { pushRoute(.taskID(id)) }
-                    }
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: $isPresented) {
+            NewTaskView(preset: preset) { id in
+                Task {
+                    await reload()
+                    if let id { pushRoute(.taskID(id)) }
                 }
             }
         }
+    }
+}
+
+extension View {
+    /// «Нова задача» as a sheet over this view; see `NewTaskComposer`.
+    func newTaskComposer(
+        isPresented: Binding<Bool>,
+        preset: ParcelInBlock? = nil,
+        reload: @escaping @MainActor () async -> Void
+    ) -> some View {
+        modifier(NewTaskComposer(isPresented: isPresented, preset: preset, reload: reload))
     }
 }

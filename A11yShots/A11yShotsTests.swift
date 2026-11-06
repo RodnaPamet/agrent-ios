@@ -303,6 +303,25 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("18c-parcel-tasks", app: app)
 
+        // Its «+» (owner, 2026-11-06): «Нова задача», top right, with this
+        // parcel already chosen on «Парцели». Cancelled there: nothing is
+        // written.
+        assertRightmostInBar("Нова задача", app: app)
+        app.navigationBars["Задачи"].buttons["Нова задача"].tap()
+        XCTAssertTrue(app.navigationBars["Нова задача"].waitForExistence(timeout: 10), "the + opened no «Нова задача»")
+        let taskTitle = app.textFields.firstMatch
+        XCTAssertTrue(taskTitle.waitForExistence(timeout: 10), "no «Заглавие»")
+        taskTitle.tap()
+        taskTitle.typeText("Синтетична задача")
+        app.buttons["Напред"].tap()
+        let chosen = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'SYNTH-1'")).firstMatch
+        XCTAssertTrue(chosen.waitForExistence(timeout: 15), "the parcel's block wasn't listed\n\(app.debugDescription)")
+        XCTAssertTrue(chosen.isSelected, "the parcel the + was on is not chosen")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18c2-parcel-new-task", app: app)
+        app.navigationBars["Парцели"].buttons["Отказ"].tap()
+        XCTAssertTrue(app.navigationBars["Задачи"].waitForExistence(timeout: 10), "«Отказ» did not close «Нова задача»")
+
         // «Изтрий» here too (owner, 2026-10-30), as on Задачи: the question,
         // then «Отмени» inside the window, so no delete is ever built.
         let deletable = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Заявка за анализ на почвата'")).firstMatch
@@ -344,8 +363,49 @@ final class A11yShotsTests: XCTestCase {
         capture("18e-parcel-comments", app: app)
         app.navigationBars["Коментари"].buttons.firstMatch.tap()
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
+        // Each section's «+», the bar's rightmost (owner, 2026-11-06).
+        // РЕКОЛТИ's and ПЛЕВЕЛИ's forms are opened, filled and cancelled:
+        // «Запази» would be a write, and the seam refuses it anyway.
+        openSection("РЕКОЛТИ", list: "Реколти", in: app)
+        assertRightmostInBar("Запиши култура", app: app)
+        app.navigationBars["Реколти"].buttons["Запиши култура"].tap()
+        XCTAssertTrue(app.navigationBars["Запиши култура"].waitForExistence(timeout: 10), "the + opened no form")
+        let sunflower = app.buttons.matching(identifier: "Слънчоглед").firstMatch
+        sunflower.tap()
+        XCTAssertTrue(sunflower.isSelected, "the crop was not chosen")
+        XCTAssertTrue(app.navigationBars["Запиши култура"].buttons["Запази"].isEnabled, "a chosen crop cannot be saved")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18h-parcel-new-season", app: app)
+        app.navigationBars["Запиши култура"].buttons["Отказ"].tap()
+        app.navigationBars["Реколти"].buttons.firstMatch.tap()
+
+        openSection("ПЛЕВЕЛИ", list: "Плевели", in: app)
+        assertRightmostInBar("Запиши плевели", app: app)
+        app.navigationBars["Плевели"].buttons["Запиши плевели"].tap()
+        XCTAssertTrue(app.navigationBars["Запиши плевели"].waitForExistence(timeout: 10), "the + opened no form")
+        XCTAssertFalse(app.navigationBars["Запиши плевели"].buttons["Запази"].isEnabled, "nothing ticked, yet «Запази»")
+        app.buttons.matching(identifier: "Балур").firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Запиши плевели"].buttons["Запази"].isEnabled, "a ticked weed cannot be saved")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18i-parcel-new-weeds", app: app)
+        app.navigationBars["Запиши плевели"].buttons["Отказ"].tap()
+        app.navigationBars["Плевели"].buttons.firstMatch.tap()
+
+        openSection("ДЕЙНОСТИ", list: "Дейности", in: app)
+        assertRightmostInBar("Ново мероприятие", app: app)
+        capture("18g-parcel-operations-plus", app: app)
+        app.navigationBars["Дейности"].buttons.firstMatch.tap()
+
+        // The screen's own «+»: a menu of all four, in the sections' order.
+        XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
+        assertRightmostInBar("Добави", app: app)
+        app.navigationBars["История"].buttons["Добави"].tap()
+        for item in ["Запиши култура", "Ново мероприятие", "Запиши плевели", "Нова задача"] {
+            XCTAssertTrue(app.buttons[item].waitForExistence(timeout: 5), "«Добави» has no «\(item)»\n\(app.debugDescription)")
+        }
+        Thread.sleep(forTimeInterval: 1)
+        capture("18j-parcel-add-menu", app: app)
         let record = app.buttons["Ново мероприятие"]
-        XCTAssertTrue(record.waitForExistence(timeout: 10), "the history has no «Ново мероприятие»")
         record.tap()
 
         let name = app.textFields["Търговско наименование"]
@@ -2109,6 +2169,12 @@ final class A11yShotsTests: XCTestCase {
         capture("05b-risk-history", app: app)
         XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
         XCTAssertFalse(app.navigationBars["Риск по парцели"].exists, "«История» opened behind Риск")
+        // Its «+», as from Блокове: Риск passes the block it shows (owner,
+        // 2026-11-06), but not the risk card, which Риск has just shown.
+        XCTAssertTrue(app.navigationBars["История"].buttons["Добави"].waitForExistence(timeout: 5),
+                      "no «+» on the history from Риск")
+        XCTAssertFalse(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Риск,'")).firstMatch.exists, "a risk card from Риск")
         // The parcel on the map at the top (owner, 2026-11-06).
         XCTAssertTrue(app.descendants(matching: .any)["\(parcelName) на картата"].waitForExistence(timeout: 5),
                       "no map of the parcel on its history\n\(app.debugDescription)")
@@ -2125,13 +2191,9 @@ final class A11yShotsTests: XCTestCase {
                        "the history opened behind Риск\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 2)
         capture("05b2-risk-row-history", app: app)
-        // The floating action: bottom LEFT since the assistant took the
-        // right (owner, 2026-11-01).
+        // «Застраховай», the bar's rightmost (owner, 2026-11-06).
         app.navigationBars["История"].buttons.firstMatch.tap()
-        let insure = app.buttons["Застраховай"]
-        XCTAssertTrue(insure.waitForExistence(timeout: 5), "no «Застраховай»")
-        XCTAssertLessThan(insure.frame.midX, app.windows.firstMatch.frame.midX,
-                          "«Застраховай» is not on the left")
+        assertRightmostInBar("Застраховай", app: app)
         capture("05c-risk-insure", app: app)
     }
 
@@ -2782,7 +2844,10 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(button.waitForExistence(timeout: 15), "no assistant button\n\(app.debugDescription)")
         let newCost = app.buttons["Нов разход"]
         XCTAssertTrue(newCost.waitForExistence(timeout: 10), "no «Нов разход»")
-        XCTAssertLessThan(button.frame.maxY, newCost.frame.minY, "the button sits on «Нов разход»")
+        // «Нов разход» is in the bar at the top since 2026-11-06; the
+        // assistant keeps the bottom right, clear of the tab bar.
+        XCTAssertFalse(button.frame.intersects(newCost.frame), "the button sits on «Нов разход»")
+        XCTAssertLessThanOrEqual(button.frame.maxY, app.tabBars.firstMatch.frame.minY, "the button sits on the tab bar")
         Thread.sleep(forTimeInterval: 1)
         capture("23a-assistant-button", app: app)
 
@@ -2968,40 +3033,73 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(conversation.waitForExistence(timeout: 5), "«Затвори» did not come back to the list")
     }
 
-    /// The assistant's button holds the bottom right on every screen; the
-    /// screens' own floating buttons must not sit under it (owner,
-    /// 2026-11-01: «Нова задача» and «Застраховай» to the bottom left). On a
-    /// block's map, the map's own two buttons must stay clear of it too.
-    func testFloatingButtonsKeepClearOfTheAssistant() {
+    /// Every screen's create action is in the navigation bar, its rightmost
+    /// button (owner, 2026-11-06: "move all '+' action buttons to the top
+    /// right on the most right if other buttons are there as well"):
+    /// «Нова задача», «Нов запис» (after «Филтри» and «Дневник (PDF)»),
+    /// «Нов разход», and «Нова обява» after «Съобщения». Риск's
+    /// «Застраховай» is checked in `testRiskHistoryOpens`.
+    func testCreateActionsAreTheBarsRightmost() {
         let app = XCUIApplication()
         app.launchArguments += [Self.seamArgument, "AGRENT_UITEST_ASSISTANT"]
         app.launch()
         assertSeamActive(app)
-        let assistant = app.buttons["Асистент"]
 
         let tasks = labelled("Задачи", in: app.tabBars.buttons)
         XCTAssertTrue(tasks.waitForExistence(timeout: 10), "no «Задачи» tab")
         tasks.tap()
-        let newTask = app.buttons["Нова задача"]
-        XCTAssertTrue(newTask.waitForExistence(timeout: 15), "no «Нова задача»\n\(app.debugDescription)")
-        XCTAssertTrue(assistant.waitForExistence(timeout: 10), "no assistant button on Задачи")
-        XCTAssertLessThan(newTask.frame.midX, app.windows.firstMatch.frame.midX, "«Нова задача» is not on the left")
-        XCTAssertFalse(newTask.frame.intersects(assistant.frame), "«Нова задача» sits under the assistant")
-        Thread.sleep(forTimeInterval: 1)
-        capture("24a-floating-tasks", app: app)
+        assertRightmostInBar("Нова задача", app: app)
+        capture("24a-create-tasks", app: app)
 
-        app.tabBars.buttons["Блокове"].tap()
-        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
-        app.cells.firstMatch.tap()
-        let target = app.buttons["Следващ парцел"]
-        XCTAssertTrue(target.waitForExistence(timeout: 20), "no target button on the map\n\(app.debugDescription)")
-        let locate = app.buttons["Моето местоположение"]
-        XCTAssertTrue(locate.waitForExistence(timeout: 5), "no location button on the map")
-        XCTAssertTrue(assistant.waitForExistence(timeout: 10), "no assistant button on the map")
-        XCTAssertFalse(target.frame.intersects(assistant.frame), "the target button sits under the assistant")
-        XCTAssertFalse(locate.frame.intersects(assistant.frame), "the location button sits under the assistant")
-        Thread.sleep(forTimeInterval: 3)
-        capture("24b-floating-map", app: app)
+        app.tabBars.buttons["Дневник"].tap()
+        assertRightmostInBar("Нов запис", app: app, besides: ["Филтри", "Дневник (PDF)"])
+        capture("24b-create-journal", app: app)
+
+        labelled("Калкулатор", in: app.tabBars.buttons).tap()
+        assertRightmostInBar("Нов разход", app: app)
+        capture("24c-create-calculator", app: app)
+
+        labelled("Борса", in: app.tabBars.buttons).tap()
+        let mine = app.buttons["Моите обяви"]
+        XCTAssertTrue(mine.waitForExistence(timeout: 10), "no «Моите обяви»")
+        mine.tap()
+        assertRightmostInBar("Нова обява", app: app, besides: ["Съобщения"])
+        capture("24d-create-exchange", app: app)
+    }
+
+    /// A parcel history's section card, opened onto its list.
+    private func openSection(_ card: String, list: String, in app: XCUIApplication,
+                             file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "not on the parcel's history",
+                      file: file, line: line)
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", card)).firstMatch
+        XCTAssertTrue(reveal(row, in: app, what: "«\(card)»"), "no «\(card)» card", file: file, line: line)
+        row.tap()
+        XCTAssertTrue(app.navigationBars[list].waitForExistence(timeout: 10), "«\(card)» opened no list",
+                      file: file, line: line)
+    }
+
+    /// `name` is a navigation bar's button, at the top right, with no button
+    /// of that bar to its right; `besides` are the bar's other buttons, there
+    /// as a positive control that the bar was the one read.
+    private func assertRightmostInBar(_ name: String, app: XCUIApplication, besides: [String] = [],
+                                      file: StaticString = #filePath, line: UInt = #line) {
+        let bar = app.navigationBars.containing(.button, identifier: name).firstMatch
+        XCTAssertTrue(bar.waitForExistence(timeout: 15), "«\(name)» is not in a navigation bar\n\(app.debugDescription)",
+                      file: file, line: line)
+        let button = bar.buttons[name]
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(button.frame.midX, window.midX, "«\(name)» is not on the right", file: file, line: line)
+        XCTAssertLessThan(button.frame.midY, window.height / 4, "«\(name)» is not at the top", file: file, line: line)
+        for other in besides {
+            let item = bar.buttons[other]
+            XCTAssertTrue(item.exists, "positive control: «\(other)» is in the same bar", file: file, line: line)
+            XCTAssertLessThan(item.frame.midX, button.frame.midX, "«\(other)» is right of «\(name)»",
+                              file: file, line: line)
+        }
+        let further = bar.buttons.allElementsBoundByIndex.filter { $0.frame.minX > button.frame.maxX - 1 }
+        XCTAssertEqual(further.map(\.label), [], "buttons right of «\(name)»", file: file, line: line)
+        Thread.sleep(forTimeInterval: 1)
     }
 
     private func capture(_ name: String, app: XCUIApplication) {

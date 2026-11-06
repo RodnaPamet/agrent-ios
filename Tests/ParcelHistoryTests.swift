@@ -686,4 +686,32 @@ final class ParcelHistoryTests: XCTestCase {
         XCTAssertFalse(seasons.contains("weedsBefore"), seasons)
     }
 
+
+    // MARK: - The «+» forms (owner, 2026-11-06)
+
+    /// The years the season form offers are the server's range: two ahead
+    /// (`YEARS_AHEAD`) back to `MIN_YEAR`, newest first, this year chosen.
+    func testTheSeasonFormOffersTheServersYears() {
+        let this = Calendar(identifier: .gregorian).component(.year, from: .now)
+        XCTAssertEqual(NewCropSeasonSheet.thisYear, this)
+        XCTAssertEqual(NewCropSeasonSheet.years.first, this + 2)
+        XCTAssertEqual(NewCropSeasonSheet.years.last, 1900)
+        XCTAssertEqual(NewCropSeasonSheet.years.count, this + 2 - 1900 + 1)
+    }
+
+    /// Both forms post to the PARCEL's routes. The task's weed route takes
+    /// the same body and would file the observation under a field
+    /// operation, with no error to say so.
+    func testTheFormsPostToTheParcelsRoutes() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let weeds = try String(contentsOf: root.appendingPathComponent("Agrent/Locations/NewWeedObservationSheet.swift"),
+                               encoding: .utf8)
+        XCTAssertTrue(weeds.contains("ParcelHistoryAPI.createWeedObservation("))
+        XCTAssertFalse(weeds.contains("WorkItemAPI"), "the task's weed route")
+        let seasons = try String(contentsOf: root.appendingPathComponent("Agrent/Locations/NewCropSeasonSheet.swift"),
+                                 encoding: .utf8)
+        XCTAssertTrue(seasons.contains("ParcelHistoryAPI.createCropSeason("))
+        XCTAssertTrue(ParcelHistoryAPI.weedObservationsPath("par_1").hasSuffix("/agro/parcels/par_1/weed-observations"))
+    }
 }
+
