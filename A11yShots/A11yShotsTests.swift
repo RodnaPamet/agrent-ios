@@ -366,8 +366,8 @@ final class A11yShotsTests: XCTestCase {
         // Each section's «+», the bar's rightmost (owner, 2026-11-06).
         // РЕКОЛТИ's and ПЛЕВЕЛИ's forms are opened, filled and cancelled:
         // «Запази» would be a write, and the seam refuses it anyway.
-        openSection("РЕКОЛТИ", list: "Реколти", in: app)
-        // Two choices behind РЕКОЛТИ's «+» (owner, 2026-11-06): crop and yield.
+        openSection("Реколти,", list: "Реколти", in: app)
+        // Two choices behind Реколти's «+» (owner, 2026-11-06): crop and yield.
         assertRightmostInBar("Добави", app: app)
         app.navigationBars["Реколти"].buttons["Добави"].tap()
         XCTAssertTrue(app.buttons["Запиши добив"].waitForExistence(timeout: 5), "no «Запиши добив» behind «+»")
@@ -428,7 +428,7 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars["Запиши добив"].buttons["Отказ"].tap()
         app.navigationBars["Реколти"].buttons.firstMatch.tap()
 
-        openSection("ПЛЕВЕЛИ", list: "Плевели", in: app)
+        openSection("Плевели,", list: "Плевели", in: app)
         assertRightmostInBar("Запиши плевели", app: app)
         app.navigationBars["Плевели"].buttons["Запиши плевели"].tap()
         XCTAssertTrue(app.navigationBars["Запиши плевели"].waitForExistence(timeout: 10), "the + opened no form")
@@ -440,7 +440,7 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars["Запиши плевели"].buttons["Отказ"].tap()
         app.navigationBars["Плевели"].buttons.firstMatch.tap()
 
-        openSection("ДЕЙНОСТИ", list: "Дейности", in: app)
+        openSection("Дейности,", list: "Дейности", in: app)
         assertRightmostInBar("Ново мероприятие", app: app)
         capture("18g-parcel-operations-plus", app: app)
         app.navigationBars["Дейности"].buttons.firstMatch.tap()

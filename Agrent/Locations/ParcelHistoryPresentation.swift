@@ -21,10 +21,13 @@ import Foundation
 /// Every literal these screens show, in one place — hard-coded Bulgarian, the
 /// same decision as everywhere else in this app (see `UserMessage`).
 enum ParcelHistoryCopy {
-    /// The three section names, exactly as the owner gave them.
-    static let seasons = "РЕКОЛТИ"
-    static let operations = "ДЕЙНОСТИ"
-    static let weeds = "ПЛЕВЕЛИ"
+    /// The three section names. Given in capitals first (#79); in sentence
+    /// case since 2026-11-06, when the owner asked why they shouted beside
+    /// «Задачи» and «Коментари» on the same screen. Their own lists were
+    /// already titled so (`drillInTitle`).
+    static let seasons = "Реколти"
+    static let operations = "Дейности"
+    static let weeds = "Плевели"
 
     static let screenTitle = "История"
 

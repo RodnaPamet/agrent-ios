@@ -93,14 +93,17 @@ final class ParcelHistoryViewTests: XCTestCase {
 
     // MARK: - The section names
 
-    /// Pinned character by character, because they are the owner's words and
+    /// Pinned character by character, because they are the owner's words
+    /// (sentence case since 2026-11-06, like «Задачи» beside them) and
     /// because Cyrillic has Latin lookalikes — a «Р» typed as a «P» would look
     /// identical on screen, sort differently, and be read out by VoiceOver as
     /// an English letter.
     func testTheThreeSectionNamesAreExactlyTheOnesTheOwnerGave() {
-        XCTAssertEqual(ParcelHistoryCopy.seasons, "РЕКОЛТИ")
-        XCTAssertEqual(ParcelHistoryCopy.operations, "ДЕЙНОСТИ")
-        XCTAssertEqual(ParcelHistoryCopy.weeds, "ПЛЕВЕЛИ")
+        XCTAssertEqual(ParcelHistoryCopy.seasons, "Реколти")
+        XCTAssertEqual(ParcelHistoryCopy.operations, "Дейности")
+        XCTAssertEqual(ParcelHistoryCopy.weeds, "Плевели")
+        // One case on the screen: the same as the cards beside them.
+        XCTAssertEqual(ParcelCommentsCard.title, "Коментари")
     }
 
     // MARK: - The count, and its absence
@@ -185,7 +188,7 @@ final class ParcelHistoryViewTests: XCTestCase {
         // nothing implying there is anywhere to go.
         let spoken = A11y.sentence(
             [empty.title, empty.count] + (empty.newest?.parts ?? [ParcelHistoryCopy.emptySection]))
-        XCTAssertEqual(spoken, "РЕКОЛТИ, Няма записи.")
+        XCTAssertEqual(spoken, "Реколти, Няма записи.")
     }
 
     /// A parcel imported yesterday has an empty archive. Each section's card
@@ -470,7 +473,7 @@ final class ParcelHistoryViewTests: XCTestCase {
             [season("a", year: 2026), season("b", year: 2025)], cursor: nil))
         let spoken = A11y.sentence([subject.title, subject.count] + (subject.newest?.parts ?? []))
 
-        XCTAssertEqual(spoken, "РЕКОЛТИ, 2 записа, 2026, Пшеница.")
+        XCTAssertEqual(spoken, "Реколти, 2 записа, 2026, Пшеница.")
         XCTAssertFalse(spoken.contains("·"), spoken)
     }
 
