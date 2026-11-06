@@ -30,9 +30,16 @@ final class WindFieldTests: XCTestCase {
     /// grid; a missing value takes the hour before's.
     func testTheAnswerBecomesTheGrid() throws {
         let places = WindGrid.latitudes.count * WindGrid.longitudes.count
-        let body = (0..<places).map { i -> String in
-            let p2 = i == 0 ? "null" : "1011"
-            return #"{"hourly":{"time":["2026-11-06T18:00","2026-11-06T19:00"],"wind_speed_10m":[\#(i % 7),3.5],"wind_direction_10m":[200,210],"pressure_msl":[1010,\#(p2)]}}"#
+        // Built in steps: as one interpolated literal in a closure it was
+        // more than CI's compiler would type-check in time.
+        var body: [String] = []
+        for i in 0..<places {
+            let wind: String = String(i % 7)
+            let pressure: String = i == 0 ? "null" : "1011"
+            var place: String = #"{"hourly":{"time":["2026-11-06T18:00","2026-11-06T19:00"],"#
+            place += #""wind_speed_10m":["# + wind + #",3.5],"wind_direction_10m":[200,210],"#
+            place += #""pressure_msl":[1010,"# + pressure + "]}}"
+            body.append(place)
         }
         let field = try OpenMeteoAPI.decode(Data("[\(body.joined(separator: ","))]".utf8))
         XCTAssertEqual(field.hours.count, 2)
@@ -52,9 +59,18 @@ final class WindFieldTests: XCTestCase {
     /// A bowl: pressure rising away from the middle. Its isobars are rings
     /// round the low, and the low is found where it is.
     func testABowlHasRingsAndALowInTheMiddle() {
-        let lats = (0..<9).map { 40 + Double($0) * 0.5 }
-        let lons = (0..<9).map { 22 + Double($0) * 0.5 }
-        let grid = lats.map { lat in lons.map { lon in 1000 + ((lat - 42) * (lat - 42) + (lon - 24) * (lon - 24)) * 2 } }
+        let lats: [Double] = (0..<9).map { 40 + Double($0) * 0.5 }
+        let lons: [Double] = (0..<9).map { 22 + Double($0) * 0.5 }
+        // In steps: as one nested closure, CI's compiler gave up on it.
+        var grid: [[Double]] = []
+        for lat in lats {
+            var row: [Double] = []
+            for lon in lons {
+                let dy: Double = lat - 42, dx: Double = lon - 24
+                row.append(1000 + (dy * dy + dx * dx) * 2)
+            }
+            grid.append(row)
+        }
         let centres = PressureAnalysis.centres(grid, latitudes: lats, longitudes: lons)
         XCTAssertEqual(centres.count, 1)
         XCTAssertEqual(centres.first?.kind, .low)
@@ -80,7 +96,7 @@ final class WindFieldTests: XCTestCase {
         let flat = lats.map { _ in lons.map { _ in 1013.0 } }
         XCTAssertEqual(PressureAnalysis.centres(flat, latitudes: lats, longitudes: lons), [])
         XCTAssertEqual(PressureAnalysis.isobars(flat, latitudes: lats, longitudes: lons).count, 0)
-        let slope = lats.map { lat in lons.map { lon in 1000 + lat + lon } }
+        let slope: [[Double]] = lats.map { lat in lons.map { lon in 1000 + lat + lon } }
         XCTAssertEqual(PressureAnalysis.centres(slope, latitudes: lats, longitudes: lons), [])
     }
 
