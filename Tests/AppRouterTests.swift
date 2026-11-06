@@ -269,4 +269,45 @@ final class RoutedStackTests: XCTestCase {
         let admin = SignOutHygieneTests.code(try source("Agrent/Admin/AdminView.swift"))
         XCTAssertNotNil(admin.range(of: pushesAView, options: .regularExpression))
     }
+
+    /// The view that builds a `RoutedStack` reads the `pushRoute` OUTSIDE
+    /// it: the default, or, in a menu sheet, the tab's behind the sheet.
+    /// Риск's row pushed its history under the sheet that way (owner,
+    /// 2026-11-06), as «История» had (#386). Only a view placed inside the
+    /// stack may read it. Checked per type, so a helper struct in the same
+    /// file stays free to.
+    func testNoViewReadsPushRouteOutsideTheStackItBuilds() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let files = FileManager.default
+            .enumerator(at: root.appendingPathComponent("Agrent"), includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" } ?? []
+        let declaration = #"(?m)^(?:private |fileprivate |public )?(?:struct|final class|class|enum|extension) "#
+        func offenders(_ code: String) -> [String] {
+            var starts = code.ranges(of: try! Regex(declaration)).map(\.lowerBound)
+            starts.append(code.endIndex)
+            return zip(starts, starts.dropFirst()).compactMap { start, end in
+                let type = code[start..<end]
+                guard type.contains(try! Regex(#"RoutedStack\s*[{(]"#)),
+                      type.contains(#"@Environment(\.pushRoute)"#) else { return nil }
+                return String(type.prefix { $0 != "{" }).trimmingCharacters(in: .whitespaces)
+            }
+        }
+        var found: [String] = []
+        var stacks = 0
+        for file in files {
+            let code = SignOutHygieneTests.code(try String(contentsOf: file, encoding: .utf8))
+            if code.contains(try Regex(#"RoutedStack\s*[{(]"#)) { stacks += 1 }
+            found += offenders(code).map { "\(file.lastPathComponent): \($0)" }
+        }
+        XCTAssertEqual(found, [], "read pushRoute in a view placed inside the stack, as RiskReadingButton does")
+        XCTAssertGreaterThan(stacks, 10, "positive control: the stacks were found")
+        // Positive control: the shape Риск had.
+        XCTAssertEqual(offenders("""
+        struct Screen: View {
+            @Environment(\\.pushRoute) private var pushRoute
+            var body: some View { RoutedStack { Button("x") { pushRoute(.home) } } }
+        }
+        """), ["struct Screen: View"])
+    }
 }

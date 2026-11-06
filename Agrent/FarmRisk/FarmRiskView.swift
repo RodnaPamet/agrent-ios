@@ -20,7 +20,6 @@ struct FarmRiskView: View {
     /// Read so the readings row can stop being a fixed-width column at the
     /// accessibility sizes — see `reading(_:_:value:index:)`.
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.pushRoute) private var pushRoute
     @State private var store = FarmRiskStore()
 
     /// The enquiry form's target — a parcel when a row opened it, or none
@@ -221,17 +220,9 @@ struct FarmRiskView: View {
             // "access a parcel history from risk by clicking the row"), the
             // whole reading being the target a thumb aims at; «История» stays
             // below it, as the visible promise.
-            Button {
-                pushRoute(.parcelHistory(parcelID: row.parcel.id, parcelName: row.parcel.name, outline: row.parcel))
-            } label: {
+            RiskReadingButton(parcel: row.parcel, spoken: spoken(row)) {
                 parcelReading(row)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(spoken(row))
-            .accessibilityHint("Отваря историята на парцела")
-            .accessibilityAddTraits(.isButton)
 
             RiskHistoryButton(parcel: row.parcel)
 
@@ -385,7 +376,33 @@ struct FarmRiskView: View {
 
 }
 
-/// THE ARCHIVE, as its own control on a risk row, never the whole row.
+/// A Риск row's reading, opening the parcel's history (owner, 2026-11-05).
+///
+/// Its own view for the same reason as `RiskHistoryButton` below: the
+/// `pushRoute` it reads must be the one INSIDE the stack. Read in
+/// `FarmRiskView`, it was the tab's behind the menu's sheet, and the history
+/// opened underneath Риск (owner, 2026-11-06).
+private struct RiskReadingButton<Label: View>: View {
+    let parcel: Parcel
+    let spoken: String
+    @ViewBuilder let label: () -> Label
+    @Environment(\.pushRoute) private var pushRoute
+
+    var body: some View {
+        Button {
+            pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name, outline: parcel))
+        } label: {
+            label().contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityHint("Отваря историята на парцела")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// THE ARCHIVE, as its own control on a risk row.
 ///
 /// This row is where the archive belongs: it is the one list of parcels every
 /// role can open. Shown for EVERY role: `GET /history` is a READ under

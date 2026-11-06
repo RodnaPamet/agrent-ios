@@ -2102,11 +2102,13 @@ final class A11yShotsTests: XCTestCase {
         let history = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'История на парцел'")).firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 20), "no «История» on a risk row\n\(app.debugDescription)")
         let parcelName = history.label.replacingOccurrences(of: "История на парцел ", with: "")
+        XCTAssertTrue(app.navigationBars["Риск по парцели"].exists, "positive control: Риск's bar is named so")
         history.tap()
         let opened = app.navigationBars["История"].waitForExistence(timeout: 10)
         Thread.sleep(forTimeInterval: 2)
         capture("05b-risk-history", app: app)
         XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
+        XCTAssertFalse(app.navigationBars["Риск по парцели"].exists, "«История» opened behind Риск")
         // The parcel on the map at the top (owner, 2026-11-06).
         XCTAssertTrue(app.descendants(matching: .any)["\(parcelName) на картата"].waitForExistence(timeout: 5),
                       "no map of the parcel on its history\n\(app.debugDescription)")
@@ -2117,6 +2119,10 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 10), "the risk row is not a button\n\(app.debugDescription)")
         row.tap()
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "the row did not open the history")
+        // ON TOP of Риск, in its sheet: a history pushed on the tab behind
+        // the sheet has a bar too, under Риск's (owner, 2026-11-06).
+        XCTAssertFalse(app.navigationBars["Риск по парцели"].exists,
+                       "the history opened behind Риск\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 2)
         capture("05b2-risk-row-history", app: app)
         // The floating action: bottom LEFT since the assistant took the
