@@ -42,6 +42,9 @@ enum ParcelHistoryCopy {
     // The «+» forms' words, the web's (`ag.parcelHistory`).
     static let cropsAdd = "Запиши култура"
     static let weedsAdd = "Запиши плевели"
+    /// A row opened to correct it (#542).
+    static let cropsEdit = "Промени културата"
+    static let weedsEdit = "Промени плевелите"
     static let fieldYear = "Стопанска година"
     static let fieldYearHint = "Есенно засятата култура се отнася към реколтата на СЛЕДВАЩАТА година."
     static let fieldWeedsHint = "Изберете от списъка или въведете вид, който не е включен."

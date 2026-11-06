@@ -24,13 +24,22 @@ import SwiftUI
 ///
 /// No `Idempotency-Key` is documented for it (`NewCropSeason`), so nothing
 /// retries, and a failure says it may have been recorded.
+///
+/// ── And a correction (#542, owner 2026-11-06) ──
+///
+/// Opened on a ПЛЕВЕЛИ row (`editing`), the same form, its weeds ticked and
+/// the rest in «Друго»; «Запази» sends the list only when it changed. The
+/// day it was seen is kept.
 struct NewWeedObservationSheet: View {
     let parcelID: String
-    /// After a 201: the history reads itself again.
+    /// The observation being corrected; nil for a new one.
+    var editing: WeedObservation? = nil
+    /// After the write: the history reads itself again.
     let onSaved: () -> Void
 
     @State private var picked: Set<String> = []
     @State private var other = ""
+    @State private var started = false
     @State private var saving = false
     @State private var failure: String?
     @Environment(\.dismiss) private var dismiss
@@ -61,7 +70,7 @@ struct NewWeedObservationSheet: View {
                     }
                 }
             }
-            .inlineTitle(ParcelHistoryCopy.weedsAdd)
+            .inlineTitle(editing == nil ? ParcelHistoryCopy.weedsAdd : ParcelHistoryCopy.weedsEdit)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
@@ -75,7 +84,15 @@ struct NewWeedObservationSheet: View {
                         .accessibilityInputLabels(A11y.Spoken.save)
                 }
             }
-            .interactiveDismissDisabled(saving || !weeds.isEmpty)
+            .interactiveDismissDisabled(saving || (editing == nil && !weeds.isEmpty))
+            .onAppear {
+                guard !started, let editing else { return }
+                started = true
+                let catalogue = Set(WeedCatalogue.binomials)
+                picked = Set(editing.weedKeys.filter(catalogue.contains))
+                other = (editing.weedKeys.filter { !catalogue.contains($0) } + editing.otherWeeds)
+                    .joined(separator: ", ")
+            }
         }
     }
 
@@ -98,8 +115,15 @@ struct NewWeedObservationSheet: View {
         failure = nil
         defer { saving = false }
         do {
-            _ = try await ParcelHistoryAPI.createWeedObservation(
-                parcelID: parcelID, NewWeedObservation(observedAt: .now, weeds: weeds))
+            if let editing {
+                let change = WeedObservationChange(from: editing, weeds: weeds)
+                guard !change.isEmpty else { return dismiss() }
+                try await ParcelHistoryAPI.updateWeedObservation(
+                    parcelID: parcelID, observationID: editing.id, change)
+            } else {
+                _ = try await ParcelHistoryAPI.createWeedObservation(
+                    parcelID: parcelID, NewWeedObservation(observedAt: .now, weeds: weeds))
+            }
             onSaved()
             dismiss()
         } catch {

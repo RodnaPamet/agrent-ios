@@ -751,5 +751,40 @@ final class ParcelHistoryTests: XCTestCase {
             XCTFail("«много» is not a dose")
         } catch {}
     }
+
+    // MARK: - Corrections (#542)
+
+    private func json(_ value: some Encodable) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return String(decoding: try encoder.encode(value), as: UTF8.self)
+    }
+
+    /// Only what changed goes, and nothing when nothing did: the server
+    /// refuses an empty correction and audits every field it is sent.
+    func testASeasonCorrectionSendsOnlyWhatChanged() async throws {
+        let history = try await ParcelHistoryAPI.decodeHistory(from: Data(#"""
+        {"parcel":{"id":"p1","name":"x","cropType":null},
+         "cropSeasons":[{"id":"s1","year":2025,"cropType":"Wheat","sownAt":null,"harvestedAt":null,"notes":null}],
+         "operations":[],"weedObservations":[
+           {"id":"w1","observedAt":"2026-04-02T00:00:00.000Z","weedKeys":["Sorghum halepense"],"otherWeeds":["Синтетичен"],"notes":null}],
+         "cropSeasonsCursor":null,"operationsCursor":null,"weedObservationsCursor":null}
+        """#.utf8))
+        let season = history.cropSeasons[0]
+        XCTAssertTrue(CropSeasonChange(from: season, year: 2025, crop: "Wheat").isEmpty)
+        XCTAssertEqual(try json(CropSeasonChange(from: season, year: 2024, crop: "Wheat")), #"{"year":2024}"#)
+        XCTAssertEqual(try json(CropSeasonChange(from: season, year: 2025, crop: "Barley")), #"{"cropType":"Barley"}"#)
+
+        let walk = history.weedObservations[0]
+        XCTAssertTrue(WeedObservationChange(from: walk, weeds: ["синтетичен", "Sorghum halepense"]).isEmpty,
+                      "a reorder or a case change is no edit")
+        XCTAssertEqual(try json(WeedObservationChange(from: walk, weeds: ["Sorghum halepense"])),
+                       #"{"weeds":["Sorghum halepense"]}"#)
+    }
+
+    func testCorrectionsGoToTheEntrysOwnPath() {
+        XCTAssertTrue(ParcelHistoryAPI.cropSeasonPath(parcelID: "p", seasonID: "s1")
+            .hasSuffix("/agro/parcels/p/crop-seasons/s1"))
+    }
 }
 

@@ -51,6 +51,12 @@ where Item.ID == String {
     var removal: HistoryRemoval? = nil
     var target: ((Item) -> HistoryRemoval.Target)? = nil
 
+    /// РЕКОЛТИ's and ПЛЕВЕЛИ's correction (#542): a row opens its form,
+    /// filled in. Nil for ДЕЙНОСТИ, whose lines are corrected on the task.
+    var parcelID: String? = nil
+    var edit: ((Item) -> HistoryEdit)? = nil
+    @State private var editing: HistoryEdit?
+
     @State private var people = CurrentUserStore.shared
     @State private var asking: HistoryRemoval.Target?
     @State private var confirming = false
@@ -107,7 +113,7 @@ where Item.ID == String {
                 }
 
                 ForEach(shown(current.items)) { item in
-                    row(line(item))
+                    editable(item, row(line(item)))
                         .pageRow()
                         .historyRemovalSwipe(offered: target != nil && HistoryRemoval.offered(to: people.user)) {
                             asking = target?(item)
@@ -144,6 +150,31 @@ where Item.ID == String {
         .pageBackground()
         .inlineTitle(ParcelHistoryCopy.drillInTitle(part))
         .modifier(RemovalIfAny(removal: removal, asking: $asking, confirming: $confirming, store: store))
+        .sheet(item: $editing) { edit in
+            if let parcelID {
+                switch edit {
+                case .season(let season):
+                    NewCropSeasonSheet(parcelID: parcelID, editing: season) { Task { await store.refresh() } }
+                case .weeds(let observation):
+                    NewWeedObservationSheet(parcelID: parcelID, editing: observation) { Task { await store.refresh() } }
+                }
+            }
+        }
+    }
+
+    /// A row that opens its correction, for someone who may write (the
+    /// routes' `assertCanWrite`); otherwise the row as it reads.
+    @ViewBuilder
+    private func editable(_ item: Item, _ content: some View) -> some View {
+        if let edit, parcelID != nil, people.user?.mayWrite ?? false {
+            Button { editing = edit(item) } label: {
+                content.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Отваря записа за промяна")
+        } else {
+            content
+        }
     }
 
     // MARK: - A row
@@ -271,3 +302,15 @@ private struct RemovalIfAny: ViewModifier {
     }
 }
 
+/// What a РЕКОЛТИ or ПЛЕВЕЛИ row opens to be corrected (#542).
+enum HistoryEdit: Identifiable {
+    case season(CropSeason)
+    case weeds(WeedObservation)
+
+    var id: String {
+        switch self {
+        case .season(let season): "season:\(season.id)"
+        case .weeds(let observation): "weeds:\(observation.id)"
+        }
+    }
+}

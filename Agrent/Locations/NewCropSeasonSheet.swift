@@ -22,13 +22,22 @@ import SwiftUI
 /// The route takes no `Idempotency-Key` (`NewCropSeason`), so nothing here
 /// retries, and a failure says the season may exist before it invites the
 /// second tap that would make it twice.
+///
+/// ── And a correction (#542, owner 2026-11-06) ──
+///
+/// Opened on a РЕКОЛТИ row (`editing`), the same form, filled in; «Запази»
+/// sends only what changed (`CropSeasonChange`), and nothing at all when
+/// nothing did.
 struct NewCropSeasonSheet: View {
     let parcelID: String
-    /// After a 201: the history reads itself again.
+    /// The season being corrected; nil for a new one.
+    var editing: CropSeason? = nil
+    /// After the write: the history reads itself again.
     let onSaved: () -> Void
 
     @State private var year = NewCropSeasonSheet.thisYear
     @State private var crop: String?
+    @State private var started = false
     @State private var saving = false
     @State private var failure: String?
     @Environment(\.dismiss) private var dismiss
@@ -56,6 +65,17 @@ struct NewCropSeasonSheet: View {
                 } footer: {
                     SectionFooter { Text(ParcelHistoryCopy.fieldYearHint) }
                 }
+                // A crop recorded outside the catalogue (free text, from the
+                // web or an import) stays choosable when it is corrected.
+                if let stored = editing?.cropType, !CommodityName.cropCatalogue.contains(where: { $0.values.contains(stored) }) {
+                    Section {
+                        ChoiceRow(title: CommodityName.freeText(stored) ?? stored, chosen: crop == stored) {
+                            crop = stored
+                        }
+                    } header: {
+                        SectionHeader("Записана")
+                    }
+                }
                 ForEach(CommodityName.cropCatalogue, id: \.season) { group in
                     Section {
                         ForEach(group.values, id: \.self) { value in
@@ -73,7 +93,7 @@ struct NewCropSeasonSheet: View {
                     }
                 }
             }
-            .inlineTitle(ParcelHistoryCopy.cropsAdd)
+            .inlineTitle(editing == nil ? ParcelHistoryCopy.cropsAdd : ParcelHistoryCopy.cropsEdit)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
@@ -87,7 +107,13 @@ struct NewCropSeasonSheet: View {
                         .accessibilityInputLabels(A11y.Spoken.save)
                 }
             }
-            .interactiveDismissDisabled(saving || crop != nil)
+            .interactiveDismissDisabled(saving || (editing == nil && crop != nil))
+            .onAppear {
+                guard !started, let editing else { return }
+                started = true
+                year = editing.year
+                crop = editing.cropType
+            }
         }
     }
 
@@ -97,8 +123,16 @@ struct NewCropSeasonSheet: View {
         failure = nil
         defer { saving = false }
         do {
-            _ = try await ParcelHistoryAPI.createCropSeason(
-                parcelID: parcelID, NewCropSeason(year: year, cropType: crop))
+            if let editing {
+                let change = CropSeasonChange(from: editing, year: year, crop: crop)
+                // Nothing changed: nothing sent (the server refuses an empty
+                // correction, and would audit one that happened).
+                guard !change.isEmpty else { return dismiss() }
+                try await ParcelHistoryAPI.updateCropSeason(parcelID: parcelID, seasonID: editing.id, change)
+            } else {
+                _ = try await ParcelHistoryAPI.createCropSeason(
+                    parcelID: parcelID, NewCropSeason(year: year, cropType: crop))
+            }
             onSaved()
             dismiss()
         } catch {
