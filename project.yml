@@ -145,6 +145,9 @@ targets:
         aps-environment: development
         com.apple.developer.associated-domains:
           - applinks:app.agrent.bg
+        # «Времето» (#551). Needs WeatherKit ticked under BOTH Capabilities
+        # and App Services for bg.agrent.app in the developer portal.
+        com.apple.developer.weatherkit: true
     info:
       path: Agrent/Info.plist
       properties:

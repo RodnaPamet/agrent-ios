@@ -1917,3 +1917,25 @@ be read outdoors fails before any parity gap matters.
 - **Fixtures** are EUR.
 - **What still shows another currency on the phone, and why:** data the server still holds in it. A cost total can read «… EUR и … BGN», and a Тенденции series can be quoted in leva. Neither is a conversion. Both go when the server holds nothing but EUR, which is backend 1's audit: every route, string, PDF and stored row, plus the invoice scan's original-in-leva note. Any rewrite of stored amounts needs the owner's direct OK.
 
+### Built — «Времето» on a block's map (owner, 2026-11-06, #551)
+
+"Add a weather button to the locations map - it needs to show the winds and the cyclones dynamics."
+
+- **Options compared:**
+  - Windy Map Forecast: €990/yr, a web map.
+  - Open-Meteo: ~$29/mo, a native field.
+  - MapTiler: free, 28 km.
+  - OpenWeather Maps 2.0: €545/mo.
+  - Apple WeatherKit: point forecasts, 500k calls/mo included.
+- **The owner chose WeatherKit only, no map.** WeatherKit has no map layers, no isobars and no storm tracks, so a passing low shows the way a barometer shows it: pressure falling over the coming hours.
+- **The sheet, for the block's centre:**
+  - wind m/s with an arrow and «от ЮЗ», and gusts;
+  - pressure, with what its trend usually means and the 24 h change, marked when it falls 6 hPa or more;
+  - temperature and humidity;
+  - Apple's alerts, in Bulgarian or with a Bulgarian title;
+  - 48 h wind and gust chart, and 48 h pressure chart;
+  - ten days.
+- **Required attribution:** Apple Weather's mark and its sources' link.
+- **What leaves the phone:** the block's coordinates go to Apple's weather service. The device's position never does.
+- **Owner step:** WeatherKit ticked under both Capabilities and App Services for `bg.agrent.app`. Until then, a TestFlight archive with the entitlement cannot be signed.
+
