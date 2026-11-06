@@ -16,10 +16,6 @@ struct OverheadSheet: Equatable {
     struct Line: Equatable {
         var amountText = ""
         var lastEnteredOn: Date?
-        /// The figure as the farm entered it, in leva, when the prefill
-        /// converted it to the sheet's euros at the fixed rate. Said beside
-        /// the field, since a converted figure is not one anybody typed.
-        var convertedFromLeva: Decimal?
     }
 
     enum PayrollMode: Equatable, Sendable { case total, perPerson }
@@ -94,36 +90,34 @@ struct OverheadSheet: Equatable {
     ///
     /// ── In the sheet's currency, or not at all ──
     ///
-    /// Costs default to EUR (owner, 2026-10-10), and the farm's last values
-    /// may be in leva. A leva figure is converted at the changeover's fixed
-    /// rate (`EuroChangeover`) and says so; one in any other currency is left
-    /// out. Under the wrong currency it would be a figure off by a factor,
-    /// prefilled as if it were right.
+    /// EUR only (owner, 2026-10-26), and NO CONVERSION anywhere (owner,
+    /// 2026-11-06: "any trace of conversion is uprooted - only EUR should
+    /// remain everywhere"). A last value in any other currency is not
+    /// prefilled and not mentioned: the field is empty, as for a farm with no
+    /// history. Shown as it stands it would be a figure off by a factor.
     mutating func prefill(from defaults: OverheadDefaults, currency: String) {
         if let last = defaults.line(.payroll), payroll.amountText.isEmpty,
-           headcountText.isEmpty, perPersonText.isEmpty,
-           let total = EuroChangeover.convert(last.amount.value, from: last.currency, to: currency) {
-            payroll = Line(amountText: Self.fieldText(total), lastEnteredOn: last.incurredOn,
-                           convertedFromLeva: Self.levaOrNil(last.amount.value, from: last.currency, to: currency))
-            if let people = last.payrollHeadcount, let each = last.payrollAnnualPerPerson,
-               let perPerson = EuroChangeover.convert(each.value, from: last.currency, to: currency) {
+           headcountText.isEmpty, perPersonText.isEmpty, Self.same(last.currency, currency) {
+            payroll = Line(amountText: Self.fieldText(last.amount.value), lastEnteredOn: last.incurredOn)
+            if let people = last.payrollHeadcount, let each = last.payrollAnnualPerPerson {
                 payrollMode = .perPerson
                 headcountText = String(people)
-                perPersonText = Self.fieldText(perPerson)
-                // Compared as entered: the cents a conversion rounds are not
-                // the farmer typing over the product.
+                perPersonText = Self.fieldText(each.value)
                 payrollTotalEdited = Decimal(people) * each.value != last.amount.value
             }
         }
         let others: [(CostCategory, WritableKeyPath<OverheadSheet, Line>)] =
             [(.credit, \.credit), (.depreciation, \.depreciation), (.other, \.other)]
         for (category, keyPath) in others where self[keyPath: keyPath].amountText.isEmpty {
-            if let last = defaults.line(category),
-               let amount = EuroChangeover.convert(last.amount.value, from: last.currency, to: currency) {
-                self[keyPath: keyPath] = Line(amountText: Self.fieldText(amount), lastEnteredOn: last.incurredOn,
-                                              convertedFromLeva: Self.levaOrNil(last.amount.value, from: last.currency, to: currency))
+            if let last = defaults.line(category), Self.same(last.currency, currency) {
+                self[keyPath: keyPath] = Line(amountText: Self.fieldText(last.amount.value), lastEnteredOn: last.incurredOn)
             }
         }
+    }
+
+    /// Whether a stored figure is in the sheet's currency.
+    nonisolated static func same(_ stored: String, _ sheet: String) -> Bool {
+        stored.uppercased() == sheet.uppercased()
     }
 
     /// The register's figure into «Амортизация» — the owner's «both»: the
@@ -133,12 +127,6 @@ struct OverheadSheet: Equatable {
     mutating func useRegister(_ figure: Decimal?, onlyIfEmpty: Bool) {
         guard let figure, figure > 0, !onlyIfEmpty || depreciation.amountText.isEmpty else { return }
         depreciation = Line(amountText: Self.fieldText(figure), lastEnteredOn: nil)
-    }
-
-    /// The leva figure behind a converted prefill, for the note; nil when
-    /// nothing was converted.
-    static func levaOrNil(_ amount: Decimal, from currency: String, to target: String) -> Decimal? {
-        currency.uppercased() == target.uppercased() ? nil : amount
     }
 
     // MARK: - What goes out

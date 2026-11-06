@@ -1905,3 +1905,15 @@ be read outdoors fails before any parity gap matters.
 - **«Тревна площ»:** the web added `Grass` to its crop catalogue, so the phone names it too (`CommodityName.cropTable`).
 - **The web** keeps its own placements; this is the phone's convention.
 
+### Decided — no conversion anywhere, EUR only (owner, 2026-11-06)
+
+"Text on conversion still there - make sure all server and iOS surfaces are audited and any trace of conversion is uprooted - only EUR should remain everywhere."
+
+- **Removed from the phone:**
+  - `EuroChangeover` (the 1,95583 rate);
+  - «Превалутирано от … лв. по фиксирания курс 1,95583 лв. за 1 €.» under «Нов разход»'s «Общи» and crop rows;
+  - «Последната стойност е в … и не е попълнена.».
+- **A last value not in EUR** is now neither prefilled nor mentioned. The field is empty, as for a farm with no history. `OverheadSheetTests.testNoConversionIsLeftInTheApp` fails on any rate or «Превалутира» in the sources.
+- **Fixtures** are EUR.
+- **What still shows another currency on the phone, and why:** data the server still holds in it. A cost total can read «… EUR и … BGN», and a Тенденции series can be quoted in leva. Neither is a conversion. Both go when the server holds nothing but EUR, which is backend 1's audit: every route, string, PDF and stored row, plus the invoice scan's original-in-leva note. Any rewrite of stored amounts needs the owner's direct OK.
+

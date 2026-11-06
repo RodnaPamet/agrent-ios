@@ -81,22 +81,16 @@ struct CropFields: View {
                        "\(CurrencyWords.name(currencyCode, afterNumber: false)) на декар"])
     }
 
-    /// What the prefill knew: when the figure was entered, whether it was
-    /// converted, and why a named row came back empty.
+    /// What the prefill knew: when the figure was entered, and why a named
+    /// row came back empty.
     @ViewBuilder
     private func notes(_ row: CropSheet.Row) -> some View {
         Group {
             if let last = row.lastEnteredOn {
                 Text("Последно въведено на \(BgDate.rowDayEndingSentence(last))")
             }
-            if let leva = row.convertedFromLeva {
-                Text(OverheadFields.convertedNote(leva))
-            }
             if row.lastWasTotal {
                 Text("Тогава е въведена обща сума, а не на декар — попълнете сумата на декар.")
-            }
-            if let code = row.unconvertedCurrency {
-                Text("Последната стойност е в \(code) и не е попълнена.")
             }
         }
         .font(.footnote)

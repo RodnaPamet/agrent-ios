@@ -146,19 +146,17 @@ final class CropSheetTests: XCTestCase {
         XCTAssertEqual(defaults.lines[2].description, "Хербицид")
     }
 
-    /// Row for row: leva converted and said so, a total kept by name and left
-    /// unfilled, plant protection as its two named rows.
+    /// Row for row: a total kept by name and left unfilled, plant protection
+    /// as its two named rows.
     func testThePrefillIsTheLastSheetRowForRow() async throws {
         let defaults = try await APIClient.shared.decode(fixture("costs-defaults-crop"), as: CropCostDefaults.self)
         var sheet = CropSheet()
         sheet.prefill(from: defaults, currency: "EUR")
 
         let rent = row(.rent, in: sheet)
-        XCTAssertEqual(rent.perDcaText, "25,56", "50 лв at 1.95583")
-        XCTAssertEqual(rent.convertedFromLeva, 50)
+        XCTAssertEqual(rent.perDcaText, "25,56")
         XCTAssertNotNil(rent.lastEnteredOn)
         XCTAssertEqual(row(.seed, in: sheet).perDcaText, "9,5")
-        XCTAssertNil(row(.seed, in: sheet).convertedFromLeva)
 
         let pesticides = sheet.groups.first { $0.category == .pesticide }!.rows
         XCTAssertEqual(pesticides.map(\.name), ["Хербицид", "Фунгицид"])
@@ -181,13 +179,15 @@ final class CropSheetTests: XCTestCase {
         XCTAssertEqual(row(.seed, in: sheet).perDcaText, "9,5", "positive control: the rest is filled")
     }
 
-    /// A currency the sheet does not convert keeps its row, unfilled and said;
+    /// A rate in another currency keeps its row, unfilled and unmentioned,
+    /// never converted (owner, 2026-11-06);
     /// a category the sheet does not list gets its own group; one this build
     /// has never heard of cannot be sent back.
     func testWhatTheSheetCannotTakeIsKeptOrSaid() throws {
         let defaults = try APIClientTestDecoder.decode(CropCostDefaults.self, from: """
             {"commodity":"wheat","lines":[
               {"category":"FUEL","amountPerDca":2,"currency":"USD","incurredOn":"2025-10-01T00:00:00.000Z","description":null},
+              {"category":"RENT","amountPerDca":50,"currency":"BGN","incurredOn":"2025-10-01T00:00:00.000Z","description":"Аренда"},
               {"category":"OTHER","amountPerDca":4,"currency":"EUR","incurredOn":"2025-10-01T00:00:00.000Z","description":"Застраховка"},
               {"category":"IRRIGATION","amountPerDca":5,"currency":"EUR","incurredOn":"2025-10-01T00:00:00.000Z","description":null}
             ]}
@@ -196,7 +196,10 @@ final class CropSheetTests: XCTestCase {
         sheet.prefill(from: defaults, currency: "EUR")
         let fuel = row(.fuel, in: sheet)
         XCTAssertEqual(fuel.perDcaText, "")
-        XCTAssertEqual(fuel.unconvertedCurrency, "USD")
+        XCTAssertNil(fuel.lastEnteredOn, "not «Последно въведено» for a rate not shown")
+        let rent = row(.rent, in: sheet)
+        XCTAssertEqual(rent.perDcaText, "", "leva are not converted")
+        XCTAssertEqual(rent.name, "Аренда", "the row keeps its name")
         XCTAssertEqual(sheet.groups.last?.category, .other)
         XCTAssertEqual(sheet.groups.last?.rows.first?.perDcaText, "4")
         XCTAssertEqual(sheet.groups.count, CropSheet.categories.count + 1, "IRRIGATION is not a group")

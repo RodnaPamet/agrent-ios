@@ -100,8 +100,9 @@ struct NewCostView: View {
     /// 1 January 2026. The field it replaces took any text, and a cost typed
     /// in as «EURO» was stored as a currency of its own, which the
     /// calculator then refused to add to the farm's EUR costs (measured on
-    /// the owner's farm, read-only, the same day). A farm's leva history is
-    /// still converted into it when prefilled (`EuroChangeover`).
+    /// the owner's farm, read-only, the same day). Nothing is converted into
+    /// it (owner, 2026-11-06): a last value in another currency is not
+    /// prefilled.
     private let currency = "EUR"
     @State private var incurredOn = Date()
 
@@ -447,9 +448,8 @@ struct NewCostView: View {
         guard !overheadPrefilled else { return }
         overheadPrefilled = true
         if let defaults = try? await CostsAPI.loadDefaults() {
-            // Into EUR: a leva figure converted at the fixed rate, and said
-            // so; one in any other currency left out (owner, 2026-10-10 and
-            // 2026-10-26: EUR only).
+            // EUR figures only; any other is left out, never converted
+            // (owner, 2026-10-26 and 2026-11-06).
             overhead.prefill(from: defaults, currency: currency)
         }
         machinery = try? await CostsAPI.loadMachinery()

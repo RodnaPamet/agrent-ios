@@ -196,7 +196,7 @@ final class CalculatorPayloadTests: XCTestCase {
         let row = try await decoded().rows[0]
         XCTAssertEqual(row.netWorth, 26554)
         XCTAssertEqual(row.costBreakdown.count, 3)
-        XCTAssertEqual(row.costCurrencyCodes, ["BGN"])
+        XCTAssertEqual(row.costCurrencyCodes, ["EUR"])
         XCTAssertEqual(row.expectedTonnes, 61.7, accuracy: 0.001)
     }
 
@@ -204,7 +204,7 @@ final class CalculatorPayloadTests: XCTestCase {
 
     func testFarmAndExclusions() async throws {
         let payload = try await decoded()
-        XCTAssertEqual(payload.farm.totals.first?.currency, "BGN")
+        XCTAssertEqual(payload.farm.totals.first?.currency, "EUR")
         XCTAssertEqual(payload.farm.totals.first?.refusedCommodities, ["SUNFLOWER"])
         XCTAssertEqual(payload.exclusions.commoditiesWithNoPrice.first?.id, "SUNFLOWER")
         XCTAssertEqual(payload.exclusions.all.count, 2)
