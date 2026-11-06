@@ -45,9 +45,9 @@ final class HistoryRemovalTests: XCTestCase {
         let history = try await archive()
         let season = HistoryRemoval.Target(try XCTUnwrap(history.cropSeasons.first))
         XCTAssertEqual(season.kind, .season)
-        XCTAssertEqual(season.label, "2026, Пшеница")
+        XCTAssertEqual(season.label, "2026, Пшеница, Добив 520 кг/дка")
         XCTAssertEqual(HistoryRemoval.confirmTitle(.season), "Сигурни ли сте, че искате да изтриете културата?")
-        XCTAssertEqual(HistoryRemoval.removedText(season), "Изтрита култура: 2026, Пшеница")
+        XCTAssertEqual(HistoryRemoval.removedText(season), "Изтрита култура: 2026, Пшеница, Добив 520 кг/дка")
         XCTAssertTrue(HistoryRemoval.confirmMessage(season).hasSuffix("Записът няма да се показва повече в архива."))
 
         let walk = HistoryRemoval.Target(try XCTUnwrap(history.weedObservations.first))

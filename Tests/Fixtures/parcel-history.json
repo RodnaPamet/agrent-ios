@@ -1,8 +1,8 @@
 {
   "parcel": {"id": "par_holes", "name": "SYNTH-1", "cropType": "Wheat"},
   "cropSeasons": [
-    {"id": "cs_synth_2026", "year": 2026, "cropType": "Wheat", "sownAt": "2025-10-20T00:00:00.000Z", "harvestedAt": "2026-07-05T00:00:00.000Z", "notes": null},
-    {"id": "cs_synth_2025", "year": 2025, "cropType": "Sunflower", "sownAt": null, "harvestedAt": null, "notes": "Синтетичен запис"}
+    {"id": "cs_synth_2026", "year": 2026, "cropType": "Wheat", "sownAt": "2025-10-20T00:00:00.000Z", "harvestedAt": "2026-07-05T00:00:00.000Z", "notes": null, "yieldKgPerDca": "520.00"},
+    {"id": "cs_synth_2025", "year": 2025, "cropType": "Sunflower", "sownAt": null, "harvestedAt": null, "notes": "Синтетичен запис", "yieldKgPerDca": null}
   ],
   "operations": [
     {"id": "op_synth_2", "taskId": "tsk_synth_bare", "operationType": null, "title": "Резитба", "completedAt": "2026-10-28T09:00:00.000Z", "productName": "", "productCategory": null, "doseValue": "", "doseUnit": "", "targetNote": null},

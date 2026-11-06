@@ -1901,7 +1901,8 @@ be read outdoors fails before any parity gap matters.
   - A season or observation needs only the parcel, so any writer gets one wherever the history opens. An operation or task needs the parcel's block, so those show only when the history is opened from Блокове.
   - **The history's own «+»** («Добави») is a menu of the same four. A section with no entries has no list to open, so the menu is how its first entry gets made.
 - **Delete (owner, 2026-11-06, #541: yes):** a swipe «Изтрий» on a РЕКОЛТИ or ПЛЕВЕЛИ row. It asks «Сигурни ли сте, че искате да изтриете културата?» (or «…наблюдението?»), with the web's «Записът няма да се показва повече в архива.» under it. Then five seconds of «Отмени», then the server's soft delete, and the archive reads again (`HistoryRemoval`). ДЕЙНОСТИ has none: an operation is a task's line.
-- **No edit, as on the web:** the server has no PATCH for a season or an observation (create and delete only). A wrong entry is deleted and recorded again, and the phone has no delete for these yet either.
+- **Edit (#542):** a РЕКОЛТИ or ПЛЕВЕЛИ row opens its form, filled in; «Запази» sends only what changed (`PATCH`, audited server-side).
+- **Yield (owner, 2026-11-06; agri-saas #2802):** on the crop row, «2026 · Пшеница» over «Добив 520 кг/дка». РЕКОЛТИ's «+» has two choices, «Запиши култура» and «Запиши добив». «Добив» opens on the year: that year's row is edited, or a new one is made with its crop. Typed as кг/дка or as the parcel's total in tonnes, the other worked out from its area; stored as kg/дка (a string on read, a number on write). Never summed with `YieldRecord` (a block's tonnage), by owner ruling.
 - **«Тревна площ»:** the web added `Grass` to its crop catalogue, so the phone names it too (`CommodityName.cropTable`).
 - **The web** keeps its own placements; this is the phone's convention.
 

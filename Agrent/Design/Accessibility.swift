@@ -136,6 +136,7 @@ enum A11y {
         /// A parcel history's «+» (owner, 2026-11-06).
         static let addCrop = spokenNames("Запиши култура", "Култура", "Add crop")
         static let addWeeds = spokenNames("Запиши плевели", "Плевели", "Add weeds")
+        static let addYield = spokenNames("Запиши добив", "Добив", "Add yield")
         static let publish = spokenNames("Публикувай", "Post")
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")

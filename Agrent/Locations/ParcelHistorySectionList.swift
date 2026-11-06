@@ -55,6 +55,8 @@ where Item.ID == String {
     /// filled in. Nil for ДЕЙНОСТИ, whose lines are corrected on the task.
     var parcelID: String? = nil
     var edit: ((Item) -> HistoryEdit)? = nil
+    /// The parcel's area in hectares, for a yield typed as a total.
+    var areaHa: Double? = nil
     @State private var editing: HistoryEdit?
 
     @State private var people = CurrentUserStore.shared
@@ -154,7 +156,9 @@ where Item.ID == String {
             if let parcelID {
                 switch edit {
                 case .season(let season):
-                    NewCropSeasonSheet(parcelID: parcelID, editing: season) { Task { await store.refresh() } }
+                    NewCropSeasonSheet(parcelID: parcelID, editing: season, areaHa: areaHa) {
+                        Task { await store.refresh() }
+                    }
                 case .weeds(let observation):
                     NewWeedObservationSheet(parcelID: parcelID, editing: observation) { Task { await store.refresh() } }
                 }

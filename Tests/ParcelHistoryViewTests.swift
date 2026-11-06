@@ -41,7 +41,7 @@ final class ParcelHistoryViewTests: XCTestCase {
     private func season(_ id: String, year: Int, crop: String = "Wheat",
                         sownAt: String? = nil) -> CropSeason {
         CropSeason(id: id, year: year, cropType: crop, notes: nil,
-                   sownAtRaw: sownAt, harvestedAtRaw: nil)
+                   sownAtRaw: sownAt, harvestedAtRaw: nil, yieldKgPerDca: nil)
     }
 
     /// Built by DECODING, not by an initialiser.

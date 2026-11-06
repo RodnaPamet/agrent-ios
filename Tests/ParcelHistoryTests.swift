@@ -635,7 +635,7 @@ final class ParcelHistoryTests: XCTestCase {
     /// what matters is which ids come back.
     private func row(_ id: String) -> CropSeason {
         CropSeason(id: id, year: 2026, cropType: "Wheat",
-                   notes: nil, sownAtRaw: nil, harvestedAtRaw: nil)
+                   notes: nil, sownAtRaw: nil, harvestedAtRaw: nil, yieldKgPerDca: nil)
     }
 
     // MARK: - The query
@@ -785,6 +785,39 @@ final class ParcelHistoryTests: XCTestCase {
     func testCorrectionsGoToTheEntrysOwnPath() {
         XCTAssertTrue(ParcelHistoryAPI.cropSeasonPath(parcelID: "p", seasonID: "s1")
             .hasSuffix("/agro/parcels/p/crop-seasons/s1"))
+    }
+
+    // MARK: - Yield (agri-saas #2802)
+
+    /// A string on the way out of the server, a number on the way in; per
+    /// DECARE; null not recorded.
+    func testTheYieldReadsAsAStringAndIsShownPerDecare() async throws {
+        let history = try await ParcelHistoryAPI.decodeHistory(from: Data(#"""
+        {"parcel":{"id":"p1","name":"x","cropType":null},
+         "cropSeasons":[
+           {"id":"s1","year":2025,"cropType":"Wheat","sownAt":null,"harvestedAt":null,"notes":null,"yieldKgPerDca":"520.50"},
+           {"id":"s2","year":2024,"cropType":"Maize","sownAt":null,"harvestedAt":null,"notes":null,"yieldKgPerDca":null}],
+         "operations":[],"weedObservations":[],
+         "cropSeasonsCursor":null,"operationsCursor":null,"weedObservationsCursor":null}
+        """#.utf8))
+        XCTAssertEqual(history.cropSeasons[0].yieldKgPerDca?.value, Decimal(string: "520.5"))
+        XCTAssertEqual(history.cropSeasons[0].historyLine.details, ["Добив 520,5 кг/дка"])
+        XCTAssertNil(history.cropSeasons[1].yieldKgPerDca)
+        XCTAssertEqual(history.cropSeasons[1].historyLine.details, [], "no yield, no line")
+
+        // Written as a number; only when it changed; cleared by an explicit null.
+        let season = history.cropSeasons[0]
+        XCTAssertEqual(try json(CropSeasonChange(from: season, year: 2025, crop: "Wheat", yield: 600, keepsYield: false)),
+                       #"{"yieldKgPerDca":600}"#)
+        XCTAssertTrue(CropSeasonChange(from: season, year: 2025, crop: "Wheat",
+                                       yield: Decimal(string: "520.50"), keepsYield: false).isEmpty)
+        XCTAssertEqual(try json(CropSeasonChange(from: season, year: 2025, crop: "Wheat", yield: nil, keepsYield: false)),
+                       #"{"yieldKgPerDca":null}"#)
+        XCTAssertTrue(CropSeasonChange(from: season, year: 2025, crop: "Wheat").isEmpty,
+                      "a form without the yield leaves it alone")
+        XCTAssertEqual(try json(NewCropSeason(year: 2026, cropType: "Wheat", yieldKgPerDca: 480)),
+                       #"{"cropType":"Wheat","year":2026,"yieldKgPerDca":480}"#)
+        XCTAssertEqual(try json(NewCropSeason(year: 2026, cropType: "Wheat")), #"{"cropType":"Wheat","year":2026}"#)
     }
 }
 
