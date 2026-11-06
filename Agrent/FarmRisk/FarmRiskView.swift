@@ -20,6 +20,7 @@ struct FarmRiskView: View {
     /// Read so the readings row can stop being a fixed-width column at the
     /// accessibility sizes — see `reading(_:_:value:index:)`.
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.pushRoute) private var pushRoute
     @State private var store = FarmRiskStore()
 
     /// The enquiry form's target — a parcel when a row opened it, or none
@@ -216,9 +217,21 @@ struct FarmRiskView: View {
     /// VoiceOver reads it as "middle dot".
     private func parcelRow(_ row: RiskRow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            parcelReading(row)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(spoken(row))
+            // The reading opens the parcel's history too (owner, 2026-11-06:
+            // "access a parcel history from risk by clicking the row"), the
+            // whole reading being the target a thumb aims at; «История» stays
+            // below it, as the visible promise.
+            Button {
+                pushRoute(.parcelHistory(parcelID: row.parcel.id, parcelName: row.parcel.name, outline: row.parcel))
+            } label: {
+                parcelReading(row)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(spoken(row))
+            .accessibilityHint("Отваря историята на парцела")
+            .accessibilityAddTraits(.isButton)
 
             RiskHistoryButton(parcel: row.parcel)
 
@@ -399,7 +412,7 @@ private struct RiskHistoryButton: View {
 
     var body: some View {
         Button {
-            pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name))
+            pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name, outline: parcel))
         } label: {
             HStack(spacing: 4) {
                 Text("История")

@@ -1,3 +1,4 @@
+import SwiftUI
 import Foundation
 
 /// What the parcel-history screens SAY, and what each row of them amounts to
@@ -26,6 +27,11 @@ enum ParcelHistoryCopy {
     static let weeds = "ПЛЕВЕЛИ"
 
     static let screenTitle = "История"
+
+    /// Every section's title on the page, one size (owner, 2026-11-06:
+    /// "some are smaller than others"): «Риск» was a headline, the cards
+    /// a subheadline.
+    static let sectionTitleFont: Font = .headline
 
     /// The whole archive, empty. ONE line — not three cards each saying
     /// nothing, which is what a per-section empty state would produce for a
