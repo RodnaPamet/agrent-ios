@@ -107,7 +107,8 @@ final class PrivacyManifestTests: XCTestCase {
         let core: Set = ["DeviceLocation.swift", "StandingIn.swift", "MapLocationButton.swift"]
         // The maps that draw it or name the parcel under it.
         let maps: Set = ["SatelliteParcelMap.swift", "ParcelMapView.swift", "MechanisatorHomeView.swift",
-                         "TaskParcelMap.swift", "TreatmentParcelMap.swift", "TreatmentPlaceView.swift"]
+                         "TaskParcelMap.swift", "TreatmentParcelMap.swift", "TreatmentPlaceView.swift",
+                         "ParcelOutlineMap.swift"]
         let ways = ["APIClient", "URLRequest", "URLSession", "ResponseCache", "UserDefaults", "Log.",
                     "FileManager", "PendingOperations", "Outbox", "print("]
 

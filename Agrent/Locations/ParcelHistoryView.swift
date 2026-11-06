@@ -60,6 +60,9 @@ struct ParcelHistoryView: View {
     /// (#387). Then «Ново мероприятие» is here, where a tap on the map used
     /// to open it (owner, 2026-10-21). Nil from Риск.
     private let recordIn: ParcelInBlock?
+    /// The parcel's outline, for the map at the top (owner, 2026-11-06):
+    /// from Риск's row, or the block's map via `recordIn`.
+    private let outline: Parcel?
     @State private var recording = false
     /// Who is signed in: whether to offer «Ново мероприятие».
     @State private var people = CurrentUserStore.shared
@@ -77,9 +80,10 @@ struct ParcelHistoryView: View {
     /// part of its history, so from wherever the screen is opened.
     @State private var comments: ParcelCommentsStore
 
-    init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil) {
+    init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil) {
         self.parcelName = parcelName
         self.recordIn = recordIn
+        self.outline = outline ?? recordIn?.parcel
         _store = State(initialValue: ParcelHistoryStore(parcelID: parcelID))
         _risk = State(initialValue: recordIn == nil ? nil : ParcelRiskStore(parcelID: parcelID))
         _tasks = State(initialValue: recordIn == nil ? nil : ParcelTasksStore(parcelID: parcelID))
@@ -154,6 +158,13 @@ struct ParcelHistoryView: View {
             // gets the error treatment and a way out. The risk is its own
             // read, so it stays above the failure rather than going with it.
             VStack(alignment: .leading, spacing: 0) {
+                // The outline comes with the route, not the archive: shown
+                // whether or not the archive could be read.
+                if let outline, outline.geometry?.hasDrawableRing == true {
+                    ParcelOutlineMap(parcel: outline)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                }
                 if let risk {
                     riskSection(risk)
                         .padding(.horizontal, 20)
@@ -178,6 +189,11 @@ struct ParcelHistoryView: View {
                 // check in `FormSurfaceTests` can see it from the list (#164).
                 Group {
                     header(archive)
+                    if let outline, outline.geometry?.hasDrawableRing == true {
+                        ParcelOutlineMap(parcel: outline)
+                            .padding(.vertical, 4)
+                            .listRowSeparator(.hidden)
+                    }
                     if let risk { riskSection(risk) }
                     if let tasks { tasksCard(tasks, inList: true) }
                     commentsCard(inList: true)
@@ -258,7 +274,7 @@ struct ParcelHistoryView: View {
             EmptyView()
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
-                SectionTitle("Риск", font: .headline)
+                SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
@@ -267,7 +283,7 @@ struct ParcelHistoryView: View {
             .padding(.vertical, 6)
         case .loaded(let reading, let freshness):
             VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Риск", font: .headline)
+                SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
                 ParcelRiskReadings(risk: reading, freshness: freshness)
             }
             .padding(.vertical, 6)
@@ -372,7 +388,7 @@ struct ParcelHistoryView: View {
             EmptyView()
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
-                SectionTitle(ParcelTasksCard.title, font: .subheadline.weight(.semibold))
+                SectionTitle(ParcelTasksCard.title, font: ParcelHistoryCopy.sectionTitleFont)
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
@@ -395,7 +411,7 @@ struct ParcelHistoryView: View {
             EmptyView()
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
-                SectionTitle(ParcelCommentsCard.title, font: .subheadline.weight(.semibold))
+                SectionTitle(ParcelCommentsCard.title, font: ParcelHistoryCopy.sectionTitleFont)
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
@@ -424,7 +440,7 @@ struct ParcelHistoryView: View {
     private func summaryCardBody(_ card: some ParcelSummaryCard, chevron: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                SectionTitle(card.title, font: .subheadline.weight(.semibold))
+                SectionTitle(card.title, font: ParcelHistoryCopy.sectionTitleFont)
                 Spacer(minLength: 8)
                 if let count = card.count {
                     Text(count)
@@ -475,7 +491,7 @@ struct ParcelHistoryView: View {
     private func cardBody(_ card: ParcelHistoryCard) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                SectionTitle(card.title, font: .subheadline.weight(.semibold))
+                SectionTitle(card.title, font: ParcelHistoryCopy.sectionTitleFont)
                 Spacer(minLength: 8)
                 // THE COUNT, OR NOTHING AT ALL.
                 //

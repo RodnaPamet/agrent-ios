@@ -2101,13 +2101,27 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(tapMenuRow("Риск", in: app), "«Риск» is not in the menu")
         let history = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'История на парцел'")).firstMatch
         XCTAssertTrue(history.waitForExistence(timeout: 20), "no «История» on a risk row\n\(app.debugDescription)")
+        let parcelName = history.label.replacingOccurrences(of: "История на парцел ", with: "")
         history.tap()
         let opened = app.navigationBars["История"].waitForExistence(timeout: 10)
+        Thread.sleep(forTimeInterval: 2)
         capture("05b-risk-history", app: app)
         XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
+        // The parcel on the map at the top (owner, 2026-11-06).
+        XCTAssertTrue(app.descendants(matching: .any)["\(parcelName) на картата"].waitForExistence(timeout: 5),
+                      "no map of the parcel on its history\n\(app.debugDescription)")
+        app.navigationBars["История"].buttons.firstMatch.tap()
+
+        // The row itself opens the history too (owner, 2026-11-06).
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", parcelName)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the risk row is not a button\n\(app.debugDescription)")
+        row.tap()
+        XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "the row did not open the history")
+        Thread.sleep(forTimeInterval: 2)
+        capture("05b2-risk-row-history", app: app)
         // The floating action: bottom LEFT since the assistant took the
         // right (owner, 2026-11-01).
-        app.navigationBars.buttons.firstMatch.tap()
+        app.navigationBars["История"].buttons.firstMatch.tap()
         let insure = app.buttons["Застраховай"]
         XCTAssertTrue(insure.waitForExistence(timeout: 5), "no «Застраховай»")
         XCTAssertLessThan(insure.frame.midX, app.windows.firstMatch.frame.midX,
