@@ -1955,3 +1955,14 @@ be read outdoors fails before any parity gap matters.
 - **VoiceOver** hears the hour, the strongest wind and each centre.
 - **Attribution:** «Данни: Open-Meteo.com (CC BY 4.0)».
 
+### Built — a note on the parcel itself, «Нов коментар» (owner, 2026-11-06)
+
+- The owner asked for a "Comment living only in the history page of a parcel".
+- **«Коментари» «+»** (for anyone but a READER, as on a task):
+  - free text up to 2000 characters, on no task;
+  - `POST …/agro/parcels/{id}/comments` with an `Idempotency-Key` minted per sheet;
+  - listed with the task comments as a plain row (it opens nothing), with its author.
+- **Delete** (owner ruling via backend 1: the author, or the farm's OWNER/ADMIN):
+  - a swipe «Изтрий», «Сигурни ли сте, че искате да изтриете коментара?», then five seconds of «Отмени»;
+  - then `DELETE …/comments/{id}`, which is soft and answers 200.
+

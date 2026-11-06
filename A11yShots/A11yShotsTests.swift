@@ -361,6 +361,18 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(note.waitForExistence(timeout: 10), "the closing note is not listed")
         Thread.sleep(forTimeInterval: 1)
         capture("18e-parcel-comments", app: app)
+        // Its «+» (owner, 2026-11-06): a note on the parcel itself.
+        // Typed and cancelled: a note is a write.
+        assertRightmostInBar("Нов коментар", app: app)
+        app.navigationBars["Коментари"].buttons["Нов коментар"].tap()
+        XCTAssertTrue(app.navigationBars["Нов коментар"].waitForExistence(timeout: 10), "the + opened no form")
+        let noteField = app.textViews.firstMatch.exists ? app.textViews.firstMatch : app.textFields.firstMatch
+        noteField.tap()
+        noteField.typeText("Синтетична бележка за парцела")
+        XCTAssertTrue(app.navigationBars["Нов коментар"].buttons["Запази"].isEnabled, "a typed note cannot be saved")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18e2-parcel-new-note", app: app)
+        app.navigationBars["Нов коментар"].buttons["Отказ"].tap()
         app.navigationBars["Коментари"].buttons.firstMatch.tap()
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
         // Each section's «+», the bar's rightmost (owner, 2026-11-06).

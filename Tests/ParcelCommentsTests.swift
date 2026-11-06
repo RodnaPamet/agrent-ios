@@ -103,4 +103,54 @@ final class ParcelCommentsTests: XCTestCase {
         XCTAssertNil(card.count)
         XCTAssertTrue(card.isTappable, "positive control: the comments are still there")
     }
+
+    /// A note goes to the parcel's own comments path, with the sheet's key:
+    /// a replay returns the original note rather than a second one.
+    func testANoteIsPostedOnceToTheParcelsPath() throws {
+        XCTAssertEqual(ParcelCommentsAPI.maxNote, 2000)
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let sheet = try String(contentsOf: root.appendingPathComponent("Agrent/Locations/NewParcelNoteSheet.swift"),
+                               encoding: .utf8)
+        XCTAssertTrue(sheet.contains("ParcelCommentsAPI.createNote(parcelID: parcelID, body: trimmed, idempotencyKey: key)"))
+        XCTAssertTrue(sheet.contains("@State private var key = UUID().uuidString"), "one key per sheet, reused on retry")
+    }
+
+    // MARK: - Deleting a note (owner, 2026-11-06)
+
+    private func note(by author: String?) async throws -> ParcelComment {
+        let who = author.map { #"{"id":"\#($0)","name":"Синтетичен","email":null}"# } ?? "null"
+        let body = #"{"rows":[{"id":"n1","kind":"PARCEL","taskId":null,"taskKey":null,"taskTitle":null,"body":"Синтетична бележка","createdAt":"2026-11-06T18:00:00.000Z","createdByUserId":null,"createdBy":"# + who + "}],\"truncated\":false}"
+        let comments = try await ParcelCommentsAPI.decode(from: Data(body.utf8))
+        return try XCTUnwrap(comments.items.first)
+    }
+
+    private func me(_ id: String, role: String) -> CurrentUser {
+        CurrentUser(id: id, name: nil, email: nil, role: role,
+                    permissions: CurrentUser.Permissions(canWrite: true, canAdmin: role == "OWNER"))
+    }
+
+    /// The server's rule: a note, by its author or by the farm's OWNER or
+    /// ADMIN. Never a task's comment or closing note.
+    func testWhoMayDeleteANote() async throws {
+        let mine = try await note(by: "u1")
+        XCTAssertTrue(ParcelCommentsView.mayDelete(mine, me: me("u1", role: "MECHANISATOR")), "its author")
+        XCTAssertFalse(ParcelCommentsView.mayDelete(mine, me: me("u2", role: "EDITOR")), "someone else's")
+        XCTAssertTrue(ParcelCommentsView.mayDelete(mine, me: me("u2", role: "ADMIN")), "a farm admin")
+        XCTAssertTrue(ParcelCommentsView.mayDelete(mine, me: me("u2", role: "owner")), "a farm owner, any case")
+        XCTAssertFalse(ParcelCommentsView.mayDelete(mine, me: nil))
+        let comments = try await fixture()
+        XCTAssertFalse(comments.items.contains { ParcelCommentsView.mayDelete($0, me: me("u2", role: "OWNER")) },
+                       "a task's comment or closing note is never offered")
+    }
+
+    func testANotesDeleteIsWordedAndPathed() async throws {
+        let target = HistoryRemoval.Target(try await note(by: "u1"))
+        XCTAssertEqual(target.kind, .note)
+        XCTAssertEqual(target.label, "Синтетична бележка")
+        XCTAssertEqual(HistoryRemoval.confirmTitle(.note), "Сигурни ли сте, че искате да изтриете коментара?")
+        XCTAssertEqual(HistoryRemoval.removedText(target), "Изтрит коментар: Синтетична бележка")
+        XCTAssertTrue(HistoryRemoval.confirmMessage(target).hasSuffix("Коментарът няма да се показва повече."))
+        XCTAssertTrue(ParcelCommentsAPI.notePath("p", "n 1").hasSuffix("/agro/parcels/p/comments/n%201"))
+    }
 }
+

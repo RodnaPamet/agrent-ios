@@ -490,7 +490,7 @@ struct ParcelHistoryView: View {
                 ParcelTasksView(parcelName: parcelName, store: tasks)
             }
         case .comments:
-            ParcelCommentsView(parcelName: parcelName, store: comments)
+            ParcelCommentsView(parcelName: parcelName, store: comments, parcelID: parcelID)
         }
     }
 
