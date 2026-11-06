@@ -188,7 +188,8 @@ final class OverheadSheetTests: XCTestCase {
         for case let url as URL in sources where url.pathExtension == "swift" {
             files += 1
             let text = try String(contentsOf: url, encoding: .utf8)
-            for trace in ["1,95583", "1.95583", "Превалутира", "превалутира", "EuroChangeover", "фиксирания курс"] {
+            for trace in ["1,95583", "1.95583", "Превалутира", "превалутира", "EuroChangeover", "фиксирания курс",
+                          "конвертиране"] {
                 XCTAssertFalse(text.contains(trace), "\(url.lastPathComponent) still has «\(trace)»")
             }
         }
