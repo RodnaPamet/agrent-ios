@@ -1709,6 +1709,10 @@ Owner, 2026-11-01: "Sentry, like the web". It is the app's only third-party code
 - **Owner steps** (in #494): an iOS project in the web's Sentry organisation, an organisation auth token with `project:releases`, and four `gh secret set` commands run in their own Terminal.
 - **Unverified:** a real crash reaching Sentry with readable stacks. That needs the secrets, then one TestFlight build.
 
+### Калкулатор «Всички»: each crop folded (owner, 2026-11-06)
+
+Under «Всички» each crop is one line, folded when the page opens: its name in gold, its net value («—» where the server declined to value it, the reason inside) and how sure that is. A tap opens its figures; nothing is remembered between visits. One crop chosen in the dropdown is the whole page and stays open.
+
 ## Калкулатор «Разходи» by type (#500)
 
 Owner, 2026-11-01: "expenses needs to be folded and clickable to unfold … a filter on types of expenses … graphs for all expenses and per expense". Each part was asked as a choice.

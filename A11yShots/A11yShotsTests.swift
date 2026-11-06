@@ -2169,6 +2169,20 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("09c-calculator-all", app: app)
 
+        // Each crop folded under «Всички» (owner, 2026-11-06): one line, a
+        // tap opens its figures.
+        let wheat = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Пшеница'")).firstMatch
+        XCTAssertTrue(reveal(wheat, in: app, what: "the folded «Пшеница»"), "no folded crop\n\(app.debugDescription)")
+        XCTAssertFalse(app.staticTexts["Очаквана реколта"].exists, "a crop is open before it is tapped")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09c2-calculator-crops-folded", app: app)
+        wheat.tap()
+        XCTAssertTrue(app.staticTexts["Очаквана реколта"].waitForExistence(timeout: 5), "the tap did not open the crop")
+        Thread.sleep(forTimeInterval: 1)
+        capture("09c3-calculator-crop-open", app: app)
+        wheat.tap()
+        app.swipeDown()
+
         choose("Пшеница", from: picker, in: app)
         XCTAssertTrue(app.buttons["Култура: Пшеница"].waitForExistence(timeout: 5),
                       "the dropdown does not say «Пшеница»\n\(app.debugDescription)")
