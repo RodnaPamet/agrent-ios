@@ -11,6 +11,17 @@ enum ParcelCommentsAPI {
         "\(FarmPath.root)/agro/parcels/\(URLEscape.segment(parcelID))/comments"
     }
 
+    /// The longest note the server takes (`PARCEL_COMMENT_TOO_LONG`).
+    static let maxNote = 2000
+
+    /// A note on the parcel itself (owner, 2026-11-06): `POST`, the same
+    /// path, `{ body }`. The key is the sheet's, minted when it opens and
+    /// reused on a retry: a replay returns the ORIGINAL note, never a second.
+    static func createNote(parcelID: String, body: String, idempotencyKey: String) async throws {
+        _ = try await APIClient.shared.postReturningData(
+            path(parcelID), body: ["body": body], idempotencyKey: idempotencyKey)
+    }
+
     /// `{rows, truncated}`, the task list's envelope, so a capped list says so.
     static func decode(from data: Data) async throws -> ParcelComments {
         let page = try await APIClient.shared.decode(data, as: PagedResponse<ParcelComment>.self)

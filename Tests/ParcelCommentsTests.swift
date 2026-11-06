@@ -103,4 +103,16 @@ final class ParcelCommentsTests: XCTestCase {
         XCTAssertNil(card.count)
         XCTAssertTrue(card.isTappable, "positive control: the comments are still there")
     }
+
+    /// A note goes to the parcel's own comments path, with the sheet's key:
+    /// a replay returns the original note rather than a second one.
+    func testANoteIsPostedOnceToTheParcelsPath() throws {
+        XCTAssertEqual(ParcelCommentsAPI.maxNote, 2000)
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let sheet = try String(contentsOf: root.appendingPathComponent("Agrent/Locations/NewParcelNoteSheet.swift"),
+                               encoding: .utf8)
+        XCTAssertTrue(sheet.contains("ParcelCommentsAPI.createNote(parcelID: parcelID, body: trimmed, idempotencyKey: key)"))
+        XCTAssertTrue(sheet.contains("@State private var key = UUID().uuidString"), "one key per sheet, reused on retry")
+    }
 }
+

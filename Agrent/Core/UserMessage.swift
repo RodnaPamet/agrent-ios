@@ -1188,6 +1188,9 @@ enum UserMessage {
         // Not read as an invoice: a better photo helps.
         "INVOICE_NOT_RECOGNISED": "Това не изглежда като фактура, която можем да разчетем. Опитайте с по-ясна снимка на цялата страница.",
         // Read, and nothing on it can be a cost: another photo does not help.
+        // A parcel's own note (owner, 2026-11-06).
+        "PARCEL_COMMENT_EMPTY": "Коментарът е празен.",
+        "PARCEL_COMMENT_TOO_LONG": "Коментарът е твърде дълъг — до 2000 знака.",
         "INVOICE_NO_USABLE_LINES": "Фактурата беше разчетена, но нито един от редовете ѝ не може да бъде записан като разход.",
         "INVOICE_SCAN_MEDIA_UNSUPPORTED": "Фактурата трябва да е снимка (JPEG, PNG, GIF или WebP) или PDF файл.",
         "INVOICE_SCAN_TOO_LARGE": "Тази фактура е прекалено голяма, за да бъде разчетена.",

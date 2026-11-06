@@ -137,6 +137,7 @@ enum A11y {
         static let addCrop = spokenNames("Запиши култура", "Култура", "Add crop")
         static let addWeeds = spokenNames("Запиши плевели", "Плевели", "Add weeds")
         static let addYield = spokenNames("Запиши добив", "Добив", "Add yield")
+        static let newNote = spokenNames("Нов коментар", "Коментар", "New comment")
         static let publish = spokenNames("Публикувай", "Post")
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")

@@ -6,10 +6,28 @@ import SwiftUI
 struct ParcelCommentsView: View {
     let parcelName: String
     let store: ParcelCommentsStore
+    /// The parcel, for «Нов коментар» (owner, 2026-11-06); nil offers none.
+    var parcelID: String? = nil
+
+    @State private var writing = false
+    @State private var people = CurrentUserStore.shared
 
     var body: some View {
         content
             .inlineTitle(ParcelCommentsCard.title)
+            // «+», top right, rightmost (`ScreenAction`): a note on the field.
+            // For anyone but a READER, as on a task (`assertCanCommentOnTasks`,
+            // which the route reuses), so a mechanisator in the field may.
+            .toolbar {
+                if parcelID != nil, TaskCommentRules.mayComment(people.user) {
+                    ScreenAction(title: "Нов коментар", spoken: A11y.Spoken.newNote) { writing = true }
+                }
+            }
+            .sheet(isPresented: $writing) {
+                if let parcelID {
+                    NewParcelNoteSheet(parcelID: parcelID) { Task { await store.load() } }
+                }
+            }
     }
 
     @ViewBuilder
