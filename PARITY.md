@@ -1938,4 +1938,19 @@ be read outdoors fails before any parity gap matters.
 - **Required attribution:** Apple Weather's mark and its sources' link.
 - **What leaves the phone:** the block's coordinates go to Apple's weather service. The device's position never does.
 - **Owner step:** WeatherKit ticked under both Capabilities and App Services for `bg.agrent.app`. Until then, a TestFlight archive with the entitlement cannot be signed.
+### Built — «Вятър и налягане», an Open-Meteo map (owner, 2026-11-06)
+
+"Let's implement open-meteo free version as well."
+
+- **Licence:** Open-Meteo's free tier is non-commercial and Agrent has subscriptions. The owner was told and chose the free tier anyway ("Free tier anyway"). The paid tier is the same request on `customer-api.open-meteo.com` with an `apikey` (`OpenMeteoAPI.url(apiKey:)`). A paid key would go through the server, never into this public repo.
+- **Where:** a «Вятър» button on a block's map opens it full screen.
+- **Data:** one request for a 0.5° grid over Bulgaria and its margin (170 places, the same for every farm, so nothing farm-specific leaves the phone): 48 h of 10 m wind and sea-level pressure. It's kept for 30 minutes, as the free limit is 10 000 calls a day per address and one opening is 170.
+- **On the map:**
+  - arrows where the wind blows, coloured by strength (до 4 м/с, 4–8, 8–12, над 12);
+  - isobars every 2 hPa, from marching squares;
+  - «Н»/«В» at lows and highs with their hPa;
+  - the block as a dot;
+  - a time slider and ▶, an hour every half second.
+- **VoiceOver** hears the hour, the strongest wind and each centre.
+- **Attribution:** «Данни: Open-Meteo.com (CC BY 4.0)».
 
