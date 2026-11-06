@@ -185,6 +185,9 @@ final class RouteContractTests: XCTestCase {
     /// Empty again from agri-saas main 071d614: «Промоции» (#528), built
     /// against backend 1's agreed contract, came off with the refresh once
     /// agri-saas #2744 was live (2026-11-05).
+    ///
+    /// And empty again from agri-saas main 59c2e98: a farm's public page as
+    /// JSON (#536) came off once agri-saas #2786 was merged (2026-11-06).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -260,6 +263,10 @@ final class RouteContractTests: XCTestCase {
                                           AdminPromotionsAPI.imagePath(id), AdminPromotionsAPI.leadsPath(id),
                                           AdminPromotionsAPI.leafletScanPath,
                                           AdminPromotionsAPI.companiesPath, AdminPromotionsAPI.companyPath(id)]),
+            // A farm's public page and its pictures (#536).
+            // The pictures are FOLLOWED, not built: a root-relative path the
+            // profile names, held here in the spec's shape (as the avatar's).
+            ("PublicFarmAPI.swift", [PublicFarmAPI.path("{handle}"), "/api/public/media/{hash}"]),
             ("PromotionsAPI.swift", [PromotionsAPI.listPath, PromotionsAPI.leadsPath,
                                      PromotionsAPI.imagePath(id)]),
             // «Какво помни асистентът» (#507): the person's points, across

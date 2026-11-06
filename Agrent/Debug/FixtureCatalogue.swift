@@ -190,6 +190,8 @@ enum FixtureCatalogue {
         // #528: «Промоции», three synthetic offers: one asked already, one of
         // a kind this build doesn't know. Asking is a write: refused.
         (PromotionsAPI.listPath, "promotions-list"),
+        // #536: a synthetic farm's public page, as Борса's directory names it.
+        (PublicFarmAPI.path("sintetichno-stopanstvo"), "public-farm"),
         // #529: the superuser's console, a draft, a live ПРЗ offer with
         // enquiries and an expired one, and two suppliers. Every write is
         // refused, as every write is.

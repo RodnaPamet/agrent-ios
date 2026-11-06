@@ -217,6 +217,13 @@ struct MainTabView: View {
             }
         }
         .environment(router)
+        // A link to a farm's page (`/f/{handle}`) opens its screen (#536).
+        // The app claims `/f/*` only once this has shipped (agri-saas, on
+        // the owner's word); a link this phone has no screen for is not
+        // handled here and stays the system's.
+        .onOpenURL { url in
+            if let handle = PublicProfileLink.handle(from: url) { router.open(.publicFarm(handle: handle)) }
+        }
         // The router keeps one stack for the operator's screen, so a link
         // opens on it whatever the route's own tab would have been.
         .onChange(of: tabs.isOperator, initial: true) { _, isOperator in

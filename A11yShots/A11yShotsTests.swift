@@ -2913,6 +2913,38 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars.buttons["Затвори"].firstMatch.tap()
     }
 
+    /// A farm's public page on the phone (#536): Борса's search finds
+    /// «Синтетично стопанство», and a tap opens its page here, not Safari's
+    /// view. A GET only.
+    func testPublicFarmScreen() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        let tab = labelled("Борса", in: app.tabBars.buttons)
+        XCTAssertTrue(tab.waitForExistence(timeout: 10), "no «Борса» tab")
+        tab.tap()
+        let fields = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ AND elementType != %d", "Търсене",
+                                  XCUIElement.ElementType.image.rawValue))
+        _ = fields.firstMatch.waitForExistence(timeout: 10)
+        guard let field = fields.allElementsBoundByIndex.first(where: { $0.isHittable }) else {
+            return XCTFail("no search field on Борса")
+        }
+        field.tap()
+        field.typeText("Синтетично\n")
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Синтетично стопанство")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the search showed no farms")
+        row.tap()
+        XCTAssertTrue(app.navigationBars["Стопанство"].waitForExistence(timeout: 10),
+                      "the farm did not open on the phone\n\(app.debugDescription)")
+        XCTAssertTrue(app.staticTexts["За нас"].waitForExistence(timeout: 5) || app.staticTexts["Култури"].exists,
+                      "the farm's page shows nothing of the farm\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("28a-public-farm", app: app)
+        app.navigationBars["Стопанство"].buttons.firstMatch.tap()
+    }
+
     /// «Промоции» (#528): from «Меню», three synthetic offers (one asked
     /// already, one of a kind this build does not know), and «Поискай
     /// оферта»'s sheet with its consent unticked. NOTHING IS SENT: the sheet

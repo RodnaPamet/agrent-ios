@@ -112,6 +112,7 @@ final class FixtureSeamTests: XCTestCase {
             (NotificationsAPI.listPath, "notifications-list"),
             (AssistantMemoryAPI.path, "assistant-memory"),
             (PromotionsAPI.listPath, "promotions-list"),
+            (PublicFarmAPI.path("sintetichno-stopanstvo"), "public-farm"),
             (AdminPromotionsAPI.listPath, "admin-promotions"),
             (AdminPromotionsAPI.companiesPath, "admin-companies"),
             (AdminPromotionsAPI.leadsPath("apromo_live"), "admin-promotion-leads"),
@@ -495,6 +496,7 @@ final class FixtureSeamTests: XCTestCase {
             struct Envelope: Decodable { let companies: [AdminPromotionsAPI.Company] }
             _ = try await APIClient.shared.decode($0, as: Envelope.self)
         }),
+        ("public-farm", { _ = try await PublicFarmAPI.decode(from: $0) }),
         ("promotions-list", {
             let rows = try await PromotionsAPI.decodeList(from: $0)
             if rows.count != 3 { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "promotions-list: \(rows)")) }

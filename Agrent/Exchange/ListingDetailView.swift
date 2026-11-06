@@ -21,7 +21,6 @@ struct ListingDetailView: View {
     @State private var user = CurrentUserStore.shared
     @State private var flags = FeatureFlags.shared
     /// The seller's farm page, while it's open.
-    @State private var farmPage: InAppPage?
     @Environment(\.dynamicTypeSize) private var typeSize
 
     init(listing: ExchangeListing) {
@@ -82,9 +81,10 @@ struct ListingDetailView: View {
                         // the farm's verified one, and its page opens here as
                         // «Ферми» opens it. Behind the same flag, because
                         // `/f/` answers only while the flag is on.
-                        if flags.isOn(FarmBrandAPI.flag), let page = InAppPage.farm(handle: shown.farmHandle) {
+                        if flags.isOn(FarmBrandAPI.flag), let handle = shown.farmHandle?.recorded {
                             Button {
-                                farmPage = page
+                                // On the phone now (#536), not Safari's view.
+                                pushRoute(.publicFarm(handle: handle))
                             } label: {
                                 // Without its icon and with soft hyphens at the
                                 // accessibility sizes: AX5 broke «Страница / та»
@@ -92,7 +92,7 @@ struct ListingDetailView: View {
                                 if typeSize.isAccessibilitySize {
                                     Text(SoftHyphens.display("Страницата на стопанството"))
                                 } else {
-                                    Label("Страницата на стопанството", systemImage: "arrow.up.right.square")
+                                    Label("Страницата на стопанството", systemImage: "chevron.right")
                                 }
                             }
                             .accessibilityLabel("Страницата на стопанството")
@@ -158,7 +158,6 @@ struct ListingDetailView: View {
         }
         .onAppear { isShown = true }
         .onDisappear { isShown = false }
-        .sheet(item: $farmPage) { InAppBrowser(url: $0.url).ignoresSafeArea() }
     }
 
     /// «Изпълнена» and «Оттегли» on your own listing (#478), each behind its

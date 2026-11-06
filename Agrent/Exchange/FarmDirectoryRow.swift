@@ -65,15 +65,14 @@ struct FarmDirectoryRow: View {
 /// public page in Safari's view inside the app, as the «Ферми» screen did.
 struct FarmLink: View {
     let hit: FarmDirectoryHit
-    let open: () -> Void
 
     var body: some View {
-        Button(action: open) {
+        // The farm's page on the phone (#536), pushed on Борса's stack,
+        // where it opened Safari's view until then.
+        NavigationLink(value: AppRoute.publicFarm(handle: hit.handle)) {
             FarmDirectoryRow(hit: hit)
         }
         .buttonStyle(.plain)
-        // A tap leaves Борса for a web page: said, because nothing in the
-        // row's words says it.
         .accessibilityHint("Отваря страницата на фермата.")
     }
 }
