@@ -47,7 +47,7 @@ final class CalculatorScopeTests: XCTestCase {
         let figures = FarmFigures(rows: try await payload().rows)
         XCTAssertEqual(figures.areaDca, 168.4, accuracy: 0.0001)
         XCTAssertEqual(figures.value.rates.map(\.perDca), [210])
-        XCTAssertEqual(figures.value.rates.first?.currency, "BGN")
+        XCTAssertEqual(figures.value.rates.first?.currency, "EUR")
         XCTAssertEqual(figures.value.without, ["SUNFLOWER"])
         XCTAssertEqual(figures.cost.rates.first?.perDca ?? 0, 10.13, accuracy: 0.0001)
         XCTAssertNil(figures.cost.rates.first?.currency, "no cost row recorded a currency: shown bare")

@@ -5,7 +5,7 @@
     {
       "commodity": "WHEAT",
       "pricePerTonne": 420,
-      "priceCurrency": "BGN",
+      "priceCurrency": "EUR",
       "priceObservedAt": "2026-09-18",
       "priceSource": "sofia-grain",
       "standingCropAreaHa": 12.34,
@@ -23,7 +23,7 @@
       "breakEven": {
         "breakEvenPricePerTonne": 20.26,
         "marketPricePerTonne": 420,
-        "currency": "BGN",
+        "currency": "EUR",
         "coverPercent": 2073.05,
         "covered": true,
         "uncertainty": "allocated",
@@ -44,7 +44,7 @@
       "netUncertainty": "exact",
       "costUncertainty": "allocated",
       "costCurrencyCodes": [
-        "BGN"
+        "EUR"
       ],
       "rentCurrencyUnknown": false,
       "showProduceRent": false,
@@ -114,7 +114,7 @@
       "netUncertainty": "refused",
       "costUncertainty": "atLeast",
       "costCurrencyCodes": [
-        "BGN"
+        "EUR"
       ],
       "rentCurrencyUnknown": true,
       "showProduceRent": true,
@@ -144,7 +144,7 @@
   "farm": {
     "totals": [
       {
-        "currency": "BGN",
+        "currency": "EUR",
         "netWorth": 26554,
         "refusedCommodities": [
           "SUNFLOWER"
@@ -180,7 +180,7 @@
   },
   "cashOut": [
     {
-      "currency": "BGN",
+      "currency": "EUR",
       "amount": 4120,
       "categories": [
         "SEED",
@@ -195,7 +195,7 @@
       "pa_7"
     ],
     "currencies": [
-      "BGN"
+      "EUR"
     ]
   },
   "imputedLandCharge": {

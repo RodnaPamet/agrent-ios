@@ -151,13 +151,13 @@ final class OverheadSheetTests: XCTestCase {
         XCTAssertEqual(sheet.other.amountText, "4200,5")
         XCTAssertEqual(sheet.credit.amountText, "", "no history is empty, not zero")
         XCTAssertEqual(sheet.depreciation.amountText, "")
-        XCTAssertNil(sheet.payroll.convertedFromLeva, "a figure already in the sheet's currency is as entered")
     }
 
-    /// Costs default to EUR (owner, 2026-10-10). A leva figure from the farm's
-    /// history comes in at the changeover's fixed rate and says so; one in a
-    /// currency with no fixed rate is left out, never prefilled as euros.
-    func testLevaArePrefilledAsEurosAtTheFixedRate() throws {
+    /// EUR only, and nothing converted (owner, 2026-11-06: "any trace of
+    /// conversion is uprooted"). A leva or dollar figure from the farm's
+    /// history is not prefilled and not mentioned: the field is as empty as
+    /// for a farm with no history.
+    func testOnlyEuroFiguresArePrefilledAndNothingIsConverted() throws {
         let last = try defaults(#"""
         {"overheads":[
           {"category":"PAYROLL","amount":36000,"currency":"BGN","incurredOn":"2025-12-15T00:00:00.000Z",
@@ -165,38 +165,45 @@ final class OverheadSheetTests: XCTestCase {
           {"category":"CREDIT","amount":24000,"currency":"BGN","incurredOn":"2025-11-01T00:00:00.000Z",
            "payrollHeadcount":null,"payrollAnnualPerPerson":null},
           {"category":"OTHER","amount":900,"currency":"USD","incurredOn":"2026-02-01T00:00:00.000Z",
+           "payrollHeadcount":null,"payrollAnnualPerPerson":null},
+          {"category":"DEPRECIATION","amount":1500,"currency":"eur","incurredOn":"2026-02-01T00:00:00.000Z",
            "payrollHeadcount":null,"payrollAnnualPerPerson":null}]}
         """#)
         var sheet = OverheadSheet()
         sheet.prefill(from: last, currency: "EUR")
-        XCTAssertEqual(sheet.payroll.amountText, "18406,51")
-        XCTAssertEqual(sheet.perPersonText, "6135,5")
-        XCTAssertEqual(sheet.payroll.convertedFromLeva, 36000)
-        // 3 × 6135,50 is not 18406,51 to the cent; that is rounding, not the
-        // farmer typing over the product, so the total still follows it.
-        XCTAssertFalse(sheet.payrollTotalEdited)
-        XCTAssertEqual(sheet.credit.amountText, "12271,01")
-        XCTAssertEqual(sheet.other.amountText, "", "no fixed rate for USD: left out, not prefilled as euros")
-        XCTAssertEqual(OverheadFields.convertedNote(24000),
-                       "Превалутирано от 24\u{00A0}000,00 лв. по фиксирания курс 1,95583 лв. за 1 €.")
+        XCTAssertEqual(sheet.payroll.amountText, "")
+        XCTAssertNil(sheet.payroll.lastEnteredOn, "not «Последно въведено» for a figure not shown")
+        XCTAssertEqual(sheet.headcountText, "")
+        XCTAssertEqual(sheet.credit.amountText, "")
+        XCTAssertEqual(sheet.other.amountText, "")
+        XCTAssertEqual(sheet.depreciation.amountText, "1500", "positive control: a euro figure is prefilled")
     }
 
-    func testTheFixedRateIsExactAndOnlyForLevaToEuro() {
-        XCTAssertEqual(EuroChangeover.convert(Decimal(string: "1.95583")!, from: "BGN", to: "EUR"), 1)
-        XCTAssertEqual(EuroChangeover.convert(100, from: "eur", to: "EUR"), 100)
-        XCTAssertNil(EuroChangeover.convert(100, from: "EUR", to: "BGN"), "the sheet never converts back into leva")
-        XCTAssertNil(EuroChangeover.convert(100, from: "USD", to: "EUR"))
+    /// No conversion is left in the app's source: no rate, no «Превалутирано».
+    func testNoConversionIsLeftInTheApp() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let sources = try XCTUnwrap(FileManager.default.enumerator(
+            at: root.appendingPathComponent("Agrent"), includingPropertiesForKeys: nil))
+        var files = 0
+        for case let url as URL in sources where url.pathExtension == "swift" {
+            files += 1
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for trace in ["1,95583", "1.95583", "Превалутира", "превалутира", "EuroChangeover", "фиксирания курс"] {
+                XCTAssertFalse(text.contains(trace), "\(url.lastPathComponent) still has «\(trace)»")
+            }
+        }
+        XCTAssertGreaterThan(files, 50, "positive control: the sources were found")
     }
 
     /// A total that did not match its people was the farmer's — prefilled as
     /// theirs, so editing the people does not overwrite it.
     func testAPrefilledMismatchStaysTheFarmers() throws {
         let last = try defaults(#"""
-        {"overheads":[{"category":"PAYROLL","amount":35500,"currency":"BGN",
+        {"overheads":[{"category":"PAYROLL","amount":35500,"currency":"EUR",
           "incurredOn":"2026-01-15T00:00:00.000Z","payrollHeadcount":3,"payrollAnnualPerPerson":12000}]}
         """#)
         var sheet = OverheadSheet()
-        sheet.prefill(from: last, currency: "BGN")
+        sheet.prefill(from: last, currency: "EUR")
         XCTAssertTrue(sheet.payrollTotalEdited)
     }
 
@@ -204,12 +211,12 @@ final class OverheadSheetTests: XCTestCase {
     /// is not overwritten.
     func testThePrefillLeavesWhatWasTyped() throws {
         let last = try defaults(#"""
-        {"overheads":[{"category":"OTHER","amount":4200,"currency":"BGN",
+        {"overheads":[{"category":"OTHER","amount":4200,"currency":"EUR",
           "incurredOn":"2026-02-01T00:00:00.000Z","payrollHeadcount":null,"payrollAnnualPerPerson":null}]}
         """#)
         var sheet = OverheadSheet()
         sheet.other.amountText = "999"
-        sheet.prefill(from: last, currency: "BGN")
+        sheet.prefill(from: last, currency: "EUR")
         XCTAssertEqual(sheet.other.amountText, "999")
     }
 

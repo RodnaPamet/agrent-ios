@@ -128,27 +128,14 @@ struct OverheadFields: View {
         }
     }
 
-    /// «Превалутирано от 24 000,00 лв. по фиксирания курс 1,95583 лв. за 1 €.»
-    nonisolated static func convertedNote(_ leva: Decimal) -> String {
-        let figure = leva.formatted(.number.precision(.fractionLength(2)).grouping(.automatic).locale(BgDate.locale))
-        return "Превалутирано от \(figure) лв. по фиксирания курс 1,95583 лв. за 1 €."
-    }
-
-    /// When the prefill was last entered, and whether it was converted from
-    /// leva. What became of the save is the sheet's, said once below it:
-    /// the lines land or fail together.
+    /// When the prefill was last entered. What became of the save is the
+    /// sheet's, said once below it: the lines land or fail together.
     @ViewBuilder
     private func notes(_ line: OverheadSheet.Line) -> some View {
         if let last = line.lastEnteredOn {
             Text("Последно въведено на \(BgDate.rowDayEndingSentence(last))")
                 .font(.footnote)
                 .foregroundStyle(Palette.secondaryText)
-        }
-        if let leva = line.convertedFromLeva {
-            Text(Self.convertedNote(leva))
-                .font(.footnote)
-                .foregroundStyle(Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

@@ -1,5 +1,7 @@
 # Fixtures
 
+**Currencies are EUR (2026-11-06).** The owner ruled that only EUR remains, with nothing converted. So `calculator-sample.json`, `costs-defaults.json` and `costs-defaults-crop.json` had their `BGN` codes replaced by `EUR`; the numbers are unchanged, except the crop sheet's rent, now 25.56 EUR per decare. The history below still says BGN: it describes the payload as it was generated.
+
 ## `calculator-sample.json`
 
 A calculator payload **with rows**, for building and testing the Phase 1 client.

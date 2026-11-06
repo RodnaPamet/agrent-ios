@@ -18,16 +18,9 @@ struct CropSheet: Equatable {
         var name = ""
         var perDcaText = ""
         var lastEnteredOn: Date?
-        /// The rate as the farm entered it, in leva, when the prefill converted
-        /// it to the sheet's euros at the fixed rate.
-        var convertedFromLeva: Decimal?
         /// The last sheet had this line as a TOTAL, not per decare: named,
         /// left unfilled, and said so (agri-saas #1611).
         var lastWasTotal = false
-        /// The last rate was in a currency the sheet does not convert, so it
-        /// was not put in the field: said, rather than shown in the wrong
-        /// currency.
-        var unconvertedCurrency: String?
 
         var isBlank: Bool {
             name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -86,9 +79,9 @@ struct CropSheet: Equatable {
     /// the defaults arrive after the crop is chosen, and a figure typed
     /// meanwhile is the farmer's.
     ///
-    /// In the sheet's currency or not at all, as «Общи» does: a leva rate is
-    /// converted at the changeover's fixed rate and says so; one in any other
-    /// currency keeps its row and name, unfilled, and says why. A category
+    /// In the sheet's currency or not at all, as «Общи» does (owner,
+    /// 2026-11-06: no conversion anywhere): a rate in any other currency
+    /// keeps its row and name, unfilled and unmentioned. A category
     /// this sheet does not list gets a group of its own after the others,
     /// rather than disappearing; one this build has never heard of cannot be
     /// sent back, so it is left out.
@@ -96,16 +89,12 @@ struct CropSheet: Equatable {
         var order: [CostCategory] = []
         var rows: [CostCategory: [Row]] = [:]
         for line in defaults.lines where line.category != .unknown {
+            let inCurrency = OverheadSheet.same(line.currency, currency)
             var row = Row(name: line.description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-                          lastEnteredOn: line.incurredOn)
+                          lastEnteredOn: inCurrency ? line.incurredOn : nil)
             if let rate = line.amountPerDca?.value {
-                if let converted = EuroChangeover.convert(rate, from: line.currency, to: currency) {
-                    row.perDcaText = OverheadSheet.fieldText(converted)
-                    row.convertedFromLeva = OverheadSheet.levaOrNil(rate, from: line.currency, to: currency)
-                } else {
-                    row.unconvertedCurrency = line.currency
-                }
-            } else {
+                if inCurrency { row.perDcaText = OverheadSheet.fieldText(rate) }
+            } else if inCurrency {
                 row.lastWasTotal = true
             }
             if rows[line.category] == nil { order.append(line.category) }

@@ -11,8 +11,8 @@ import Foundation
 /// Lines in the batch's own shape, so a line the person leaves as read posts
 /// as it came; the stored invoice's id on every one; at most 25 (the batch's
 /// bound), with a warning saying how many more there were rather than a
-/// silent cut. Lev is already euros at 1,95583, the original in the line's
-/// description.
+/// silent cut. Amounts are euros: the server answers in EUR only (owner,
+/// 2026-11-06: no currency but EUR, nothing converted on the phone).
 struct InvoiceScan: Decodable, Equatable, Sendable {
     let invoiceFileId: String
     let lines: [InvoiceLine]
