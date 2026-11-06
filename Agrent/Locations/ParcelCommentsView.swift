@@ -44,7 +44,13 @@ struct ParcelCommentsView: View {
                             .listRowSeparator(.hidden)
                     }
                     ForEach(comments.items) { comment in
-                        NavigationLink(value: AppRoute.taskID(comment.taskId)) {
+                        // A task's comment opens its task; a note on the
+                        // parcel has none to open.
+                        if let taskId = comment.taskId {
+                            NavigationLink(value: AppRoute.taskID(taskId)) {
+                                row(comment)
+                            }
+                        } else {
                             row(comment)
                         }
                     }
@@ -73,14 +79,16 @@ struct ParcelCommentsView: View {
             Text(comment.text)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(comment.task)
-                .font(.footnote)
-                .foregroundStyle(Palette.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            if let task = comment.task {
+                Text(task)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.vertical, 6)
         // One stop, from the values, as a task's own comment is.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(A11y.sentence([comment.who, day, comment.text, "задача \(comment.task)"]))
+        .accessibilityLabel(A11y.sentence([comment.who, day, comment.text, comment.task.map { "задача \($0)" }]))
     }
 }
