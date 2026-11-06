@@ -251,7 +251,8 @@ final class RouteContractTests: XCTestCase {
             ]),
             ("GoogleDriveConnect.swift", [GoogleDriveConnect.connectPath]),
             // A parcel's comments and closing notes (#465).
-            ("ParcelCommentsAPI.swift", [ParcelCommentsAPI.path(parcel)]),
+            ("ParcelCommentsAPI.swift", [ParcelCommentsAPI.path(parcel),
+                                         ParcelCommentsAPI.notePath(parcel, "{commentId}")]),
             // «Известия» (#471): the list and marking one read.
             ("NotificationsAPI.swift", [NotificationsAPI.listPath, NotificationsAPI.readPath(id)]),
             // The usage page's events (#493), to the farm they happened in.

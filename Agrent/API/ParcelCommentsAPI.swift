@@ -22,6 +22,23 @@ enum ParcelCommentsAPI {
             path(parcelID), body: ["body": body], idempotencyKey: idempotencyKey)
     }
 
+    /// A note's own path, for its delete.
+    static func notePath(_ parcelID: String, _ commentID: String) -> String {
+        "\(path(parcelID))/\(URLEscape.segment(commentID))"
+    }
+
+    /// Deletes a note (owner, 2026-11-06: deletable by its author or a farm
+    /// OWNER/ADMIN; a soft delete, `200 { ok: true }`). A 404 is done: the
+    /// phone offers it only to those the server allows, so a 404 is a note
+    /// already gone, and the list read after it shows the truth either way.
+    static func deleteNote(parcelID: String, commentID: String) async throws {
+        do {
+            _ = try await APIClient.shared.deleteReturningData(notePath(parcelID, commentID))
+        } catch let error where ParcelHistoryAPI.isAlreadyDeleted(error) {
+            return
+        }
+    }
+
     /// `{rows, truncated}`, the task list's envelope, so a capped list says so.
     static func decode(from data: Data) async throws -> ParcelComments {
         let page = try await APIClient.shared.decode(data, as: PagedResponse<ParcelComment>.self)

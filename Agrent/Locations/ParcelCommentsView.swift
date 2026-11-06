@@ -11,6 +11,20 @@ struct ParcelCommentsView: View {
 
     @State private var writing = false
     @State private var people = CurrentUserStore.shared
+    /// A note swiped away (owner, 2026-11-06: deletable by its author or a
+    /// farm OWNER/ADMIN), with the house's question and five seconds.
+    @State private var removal: HistoryRemoval?
+    @State private var asking: HistoryRemoval.Target?
+    @State private var confirming = false
+
+    /// Whether `comment` may be deleted by whoever is signed in: a parcel's
+    /// own note, theirs, or any note for the farm's OWNER or ADMIN. The
+    /// server's rule, so the swipe and its refusal agree.
+    static func mayDelete(_ comment: ParcelComment, me: CurrentUser?) -> Bool {
+        guard comment.kind == .parcel, let me else { return false }
+        if comment.createdBy?.id == me.id { return true }
+        return ["OWNER", "ADMIN"].contains(me.role?.uppercased() ?? "")
+    }
 
     var body: some View {
         content
@@ -23,6 +37,7 @@ struct ParcelCommentsView: View {
                     ScreenAction(title: "Нов коментар", spoken: A11y.Spoken.newNote) { writing = true }
                 }
             }
+            .task { if removal == nil, let parcelID { removal = HistoryRemoval(parcelID: parcelID) } }
             .sheet(isPresented: $writing) {
                 if let parcelID {
                     NewParcelNoteSheet(parcelID: parcelID) { Task { await store.load() } }
@@ -61,7 +76,7 @@ struct ParcelCommentsView: View {
                             .padding(.vertical, 8)
                             .listRowSeparator(.hidden)
                     }
-                    ForEach(comments.items) { comment in
+                    ForEach(comments.items.filter { !(removal?.isHidden($0.id) ?? false) }) { comment in
                         // A task's comment opens its task; a note on the
                         // parcel has none to open.
                         if let taskId = comment.taskId {
@@ -70,6 +85,10 @@ struct ParcelCommentsView: View {
                             }
                         } else {
                             row(comment)
+                                .historyRemovalSwipe(offered: removal != nil && Self.mayDelete(comment, me: people.user)) {
+                                    asking = HistoryRemoval.Target(comment)
+                                    confirming = true
+                                }
                         }
                     }
                 }
@@ -78,6 +97,7 @@ struct ParcelCommentsView: View {
             .listStyle(.plain)
             .pageBackground()
             .refreshable { await PullToRefresh.bounded { await store.load() } }
+            .modifier(NoteRemovalIfAny(removal: removal, asking: $asking, confirming: $confirming, store: store))
         }
     }
 
@@ -110,3 +130,21 @@ struct ParcelCommentsView: View {
         .accessibilityLabel(A11y.sentence([comment.who, day, comment.text, comment.task.map { "задача \($0)" }]))
     }
 }
+
+/// The notes' «Изтрий» chrome once the removal exists. Stateless: its
+/// state is the list's (`historyRemoval`'s note).
+private struct NoteRemovalIfAny: ViewModifier {
+    let removal: HistoryRemoval?
+    @Binding var asking: HistoryRemoval.Target?
+    @Binding var confirming: Bool
+    let store: ParcelCommentsStore
+
+    func body(content: Content) -> some View {
+        if let removal {
+            content.historyRemoval(removal, asking: $asking, confirming: $confirming) { await store.load() }
+        } else {
+            content
+        }
+    }
+}
+

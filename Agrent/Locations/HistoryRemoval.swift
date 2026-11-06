@@ -27,7 +27,7 @@ import Observation
 @MainActor
 @Observable
 final class HistoryRemoval {
-    enum Kind: Sendable, Equatable { case season, weeds }
+    enum Kind: Sendable, Equatable { case season, weeds, note }
 
     /// What a row stands for, and what the bar and the question name.
     struct Target: Equatable, Sendable, Identifiable {
@@ -60,6 +60,8 @@ final class HistoryRemoval {
                 try await ParcelHistoryAPI.deleteCropSeason(parcelID: parcelID, seasonID: target.id)
             case .weeds:
                 try await ParcelHistoryAPI.deleteWeedObservation(parcelID: parcelID, observationID: target.id)
+            case .note:
+                try await ParcelCommentsAPI.deleteNote(parcelID: parcelID, commentID: target.id)
             }
         }
     }
@@ -140,19 +142,23 @@ final class HistoryRemoval {
         switch kind {
         case .season: "Сигурни ли сте, че искате да изтриете културата?"
         case .weeds: "Сигурни ли сте, че искате да изтриете наблюдението?"
+        case .note: "Сигурни ли сте, че искате да изтриете коментара?"
         }
     }
 
     /// Under the question: what it is, and the web's sentence for what
     /// happens to it.
     nonisolated static func confirmMessage(_ target: Target) -> String {
-        "\(target.label). Записът няма да се показва повече в архива."
+        target.kind == .note
+            ? "\(target.label). Коментарът няма да се показва повече."
+            : "\(target.label). Записът няма да се показва повече в архива."
     }
 
     nonisolated static func removedText(_ target: Target) -> String {
         switch target.kind {
         case .season: "Изтрита култура: \(target.label)"
         case .weeds: "Изтрито наблюдение: \(target.label)"
+        case .note: "Изтрит коментар: \(target.label)"
         }
     }
 
@@ -167,6 +173,12 @@ extension HistoryRemoval.Target {
     /// A season as its row reads: «2026, Пшеница».
     init(_ season: CropSeason) {
         self.init(kind: .season, id: season.id, label: Self.clause(season.historyLine))
+    }
+
+    /// A parcel's own note (owner, 2026-11-06), by its first words.
+    init(_ note: ParcelComment) {
+        let words = note.text.count > 60 ? String(note.text.prefix(60)) + "…" : note.text
+        self.init(kind: .note, id: note.id, label: words)
     }
 
     /// An observation as its row reads: «2 април, Балур (Sorghum halepense)».
