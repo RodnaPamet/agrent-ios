@@ -47,7 +47,8 @@ struct ParcelCommentsCard: Equatable, ParcelSummaryCard {
                 newest.task,
             ])
         } else {
-            isTappable = false
+            // Opens anyway (owner, 2026-11-06), onto the «+» that adds one.
+            isTappable = true
             count = nil
             line = ParcelHistoryLine(details: ["Няма коментари"])
         }

@@ -99,12 +99,13 @@ final class ParcelTasksTests: XCTestCase {
         XCTAssertTrue(card.isTappable)
     }
 
-    /// Nothing at all: one calm line and nothing to push to.
-    func testNoTasksIsNotTappable() async throws {
+    /// Nothing at all: one calm line, and it still opens, onto the «+»
+    /// (owner, 2026-11-06).
+    func testNoTasksStillOpens() async throws {
         let card = ParcelTasksCard(try await tasks([]), now: now)
         XCTAssertNil(card.count)
         XCTAssertEqual(card.line.details, ["Няма задачи"])
-        XCTAssertFalse(card.isTappable)
+        XCTAssertTrue(card.isTappable)
         XCTAssertEqual(card.spoken, "Задачи, Няма задачи.")
     }
 

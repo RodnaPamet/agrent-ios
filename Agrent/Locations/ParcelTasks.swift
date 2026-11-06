@@ -76,12 +76,12 @@ struct ParcelTasksCard: Equatable {
     let count: String?
     /// The newest current task, or what there is instead.
     let line: ParcelHistoryLine
-    /// Opens the list when there is anything in it, either tab. Pushing to
-    /// two empty tabs would be a promise the screen cannot keep.
+    /// Opens the list, empty too (owner, 2026-11-06): its «+» makes the
+    /// parcel's first task.
     let isTappable: Bool
 
     init(_ tasks: ParcelTasks, now: Date = Date()) {
-        isTappable = !tasks.isEmpty
+        isTappable = true
         if let newest = tasks.current.first {
             count = tasks.truncated ? nil : Plural.bg(tasks.current.count, "текуща", "текущи")
             line = ParcelHistoryLine(headline: newest.title,

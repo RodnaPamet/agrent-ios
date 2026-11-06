@@ -33,15 +33,11 @@ enum ParcelHistoryCopy {
     /// a subheadline.
     static let sectionTitleFont: Font = .headline
 
-    /// The whole archive, empty. ONE line — not three cards each saying
-    /// nothing, which is what a per-section empty state would produce for a
-    /// parcel imported yesterday.
-    static let emptyArchive = "Няма записана история за този парцел."
-
-    /// One empty section, on its card. The card is NOT tappable in this
-    /// state: pushing to an empty list is the same broken promise as a
-    /// disabled button.
+    /// One empty section, on its card, which still opens onto its «+»
+    /// (owner, 2026-11-06).
     static let emptySection = "Няма записи"
+    /// An empty section's list, opened from its card to add the first one.
+    static let emptySectionList = "Няма записи. Добавете с «+» горе вдясно."
 
     // The «+» forms' words, the web's (`ag.parcelHistory`).
     static let cropsAdd = "Запиши култура"
@@ -378,10 +374,11 @@ struct ParcelHistoryCard: Equatable {
     /// pages already on screen.
     let newest: ParcelHistoryLine?
 
-    /// An empty section's card does not push. Pushing to an empty list is the
-    /// same broken promise as a disabled button, and the card already says
-    /// «Няма записи» in place of the entry it does not have.
-    var isTappable: Bool { newest != nil }
+    /// Every card pushes, an empty one too (owner, 2026-11-06: "make it so
+    /// that empty rows can be clicked as well"): the list it opens has the
+    /// section's «+», which is how its first entry is made. It used not to,
+    /// as a push to an empty list was a promise with nothing behind it.
+    var isTappable: Bool { true }
 
     init<Item: Identifiable & Equatable & Sendable>(
         title: String,
