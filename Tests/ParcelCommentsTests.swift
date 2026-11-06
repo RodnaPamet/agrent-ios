@@ -50,6 +50,29 @@ final class ParcelCommentsTests: XCTestCase {
         XCTAssertTrue(comments.truncated)
     }
 
+    /// A note on the parcel itself (agri-saas, owner 2026-11-06): no task,
+    /// so the three task fields are null. The list still reads, the note
+    /// names its author and no task, and the card shows it.
+    func testAParcelsOwnNoteReads() async throws {
+        let body = #"""
+        {"rows":[
+          {"id":"n1","kind":"PARCEL","taskId":null,"taskKey":null,"taskTitle":null,"body":"Синтетична бележка",
+           "createdAt":"2026-11-06T18:00:00.000Z","createdByUserId":"u1","createdBy":{"id":"u1","name":"Синтетичен Потребител","email":null}},
+          {"id":"c1","kind":"COMMENT","taskId":"t","taskKey":"TSK-1","taskTitle":"Оглед","body":"Добре.",
+           "createdAt":"2026-11-01T06:00:00.000Z","createdByUserId":null,"createdBy":null}],"truncated":false}
+        """#
+        let comments = try await ParcelCommentsAPI.decode(from: Data(body.utf8))
+        XCTAssertEqual(comments.items.count, 2)
+        let note = comments.items[0]
+        XCTAssertEqual(note.kind, .parcel)
+        XCTAssertNil(note.taskId)
+        XCTAssertNil(note.task, "a note names no task")
+        XCTAssertEqual(note.who, "Синтетичен Потребител")
+        XCTAssertEqual(comments.items[1].task, "TSK-1 Оглед", "positive control: a task's comment still names it")
+        let card = ParcelCommentsCard(comments, now: now)
+        XCTAssertEqual(card.line.headline, "Синтетична бележка")
+    }
+
     // MARK: - The card
 
     /// The newest comment: what it says, then who, the day and the task,

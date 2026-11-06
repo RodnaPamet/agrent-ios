@@ -23,11 +23,16 @@ struct ParcelComments: Equatable, Sendable {
     let truncated: Bool
 }
 
-/// One comment on one of the parcel's tasks, or the note its closing left.
+/// One comment on one of the parcel's tasks, the note its closing left, or
+/// a note on the parcel itself (owner, 2026-11-06: a comment "living only in
+/// the history page of a parcel"; agri-saas `kind: "PARCEL"`).
 struct ParcelComment: Decodable, Identifiable, Equatable, Sendable {
     enum Kind: String, LenientDecodable, Sendable {
         case comment = "COMMENT"
         case resolution = "RESOLUTION"
+        /// A note on the field, on no task: `taskId`, `taskKey` and
+        /// `taskTitle` are null.
+        case parcel = "PARCEL"
         case unknown = "UNKNOWN"
 
         static var unknownCase: Self { .unknown }
@@ -35,9 +40,12 @@ struct ParcelComment: Decodable, Identifiable, Equatable, Sendable {
 
     /// Stable across reads: the comment's own id, or `resolution:<taskId>`.
     let id: String
-    let taskId: String
+    /// NULL on a parcel's own note, which is on no task. Optional before
+    /// the server sent one: a required field here would have failed the
+    /// whole list the day a parcel had a note.
+    let taskId: String?
     let taskKey: String?
-    let taskTitle: String
+    let taskTitle: String?
     let kind: Kind
     let body: String
     /// The comment's own time, or when the task was closed.
@@ -55,10 +63,14 @@ struct ParcelComment: Decodable, Identifiable, Equatable, Sendable {
     var who: String? {
         switch kind {
         case .resolution: "При затваряне на задачата"
-        case .comment, .unknown: createdBy?.displayName
+        case .comment, .parcel, .unknown: createdBy?.displayName
         }
     }
 
-    /// The task it is on, as a row of Задачи names it.
-    var task: String { [taskKey?.recorded, taskTitle.recorded].compactMap { $0 }.joined(separator: " ") }
+    /// The task it is on, as a row of Задачи names it; nil for a parcel's
+    /// own note.
+    var task: String? {
+        let parts = [taskKey?.recorded, taskTitle?.recorded].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
 }
