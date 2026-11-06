@@ -367,8 +367,11 @@ final class A11yShotsTests: XCTestCase {
         // РЕКОЛТИ's and ПЛЕВЕЛИ's forms are opened, filled and cancelled:
         // «Запази» would be a write, and the seam refuses it anyway.
         openSection("РЕКОЛТИ", list: "Реколти", in: app)
-        assertRightmostInBar("Запиши култура", app: app)
-        app.navigationBars["Реколти"].buttons["Запиши култура"].tap()
+        // Two choices behind РЕКОЛТИ's «+» (owner, 2026-11-06): crop and yield.
+        assertRightmostInBar("Добави", app: app)
+        app.navigationBars["Реколти"].buttons["Добави"].tap()
+        XCTAssertTrue(app.buttons["Запиши добив"].waitForExistence(timeout: 5), "no «Запиши добив» behind «+»")
+        app.buttons["Запиши култура"].tap()
         XCTAssertTrue(app.navigationBars["Запиши култура"].waitForExistence(timeout: 10), "the + opened no form")
         let sunflower = app.buttons.matching(identifier: "Слънчоглед").firstMatch
         sunflower.tap()
@@ -405,8 +408,24 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Промени културата"].waitForExistence(timeout: 10), "the row opened no form")
         XCTAssertTrue(app.buttons.matching(identifier: "Пшеница").firstMatch.isSelected, "the season's crop is not chosen")
         Thread.sleep(forTimeInterval: 1)
+        // The season's yield, in the form (agri-saas #2802's fixture: 520).
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == '520'")).firstMatch.exists,
+                      "the season's yield is not in its form\n\(app.debugDescription)")
         capture("18l-parcel-season-edit", app: app)
         app.navigationBars["Промени културата"].buttons["Отказ"].tap()
+
+        // «Запиши добив»: the year's own row, its crop chosen and yield in.
+        // Cancelled: a yield is a write.
+        app.navigationBars["Реколти"].buttons["Добави"].tap()
+        let yieldItem = app.buttons["Запиши добив"]
+        XCTAssertTrue(yieldItem.waitForExistence(timeout: 5), "no «Запиши добив»")
+        yieldItem.tap()
+        XCTAssertTrue(app.navigationBars["Запиши добив"].waitForExistence(timeout: 10), "«Запиши добив» opened no form")
+        XCTAssertTrue(app.buttons.matching(identifier: "Пшеница").firstMatch.isSelected,
+                      "the year's crop row was not found")
+        Thread.sleep(forTimeInterval: 1)
+        capture("18m-parcel-yield", app: app)
+        app.navigationBars["Запиши добив"].buttons["Отказ"].tap()
         app.navigationBars["Реколти"].buttons.firstMatch.tap()
 
         openSection("ПЛЕВЕЛИ", list: "Плевели", in: app)

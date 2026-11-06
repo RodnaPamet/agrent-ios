@@ -44,6 +44,8 @@ enum ParcelHistoryCopy {
     static let weedsAdd = "Запиши плевели"
     /// A row opened to correct it (#542).
     static let cropsEdit = "Промени културата"
+    /// The РЕКОЛТИ «+»'s second choice (owner, 2026-11-06).
+    static let yieldAdd = "Запиши добив"
     static let weedsEdit = "Промени плевелите"
     static let fieldYear = "Стопанска година"
     static let fieldYearHint = "Есенно засятата култура се отнася към реколтата на СЛЕДВАЩАТА година."
@@ -170,7 +172,7 @@ extension CropSeason {
     /// `String(year)` and not a formatter: a year is a label, not a quantity,
     /// and a grouping separator would print « 2 026 ».
     var historyLine: ParcelHistoryLine {
-        ParcelHistoryLine(lead: String(year), headline: cropLabel)
+        ParcelHistoryLine(lead: String(year), headline: cropLabel, details: [yieldText])
     }
 
     /// The drill-in row, which carries what the card cannot fit.
@@ -188,6 +190,7 @@ extension CropSeason {
             lead: String(year),
             headline: cropLabel,
             details: [
+                yieldText,
                 sownAt.map { "сято \(BgDate.dayMonth($0))" },
                 harvestedAt.map { "прибрано \(BgDate.dayMonth($0))" },
                 notes,

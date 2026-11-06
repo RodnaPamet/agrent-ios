@@ -71,8 +71,18 @@ struct CropSeason: Decodable, Identifiable, Equatable, Sendable {
     let sownAtRaw: String?
     let harvestedAtRaw: String?
 
+    /// What the parcel yielded that year, in KILOGRAMS PER DECARE (owner,
+    /// 2026-11-06: "Реколти should include both the crop and the yield";
+    /// agri-saas #2802). A STRING on the wire (`Decimal(10,2)`), a number on
+    /// the way in; null is not recorded, and 0 is a reported failure.
+    ///
+    /// Not `YieldRecord`, and never summed into one: that is a block's
+    /// weighbridge tonnage, this a farmer's per-field recollection, and the
+    /// two are deliberately not reconciled (owner ruling, via backend 1).
+    let yieldKgPerDca: WireDecimal?
+
     enum CodingKeys: String, CodingKey {
-        case id, year, cropType, notes
+        case id, year, cropType, notes, yieldKgPerDca
         case sownAtRaw = "sownAt"
         case harvestedAtRaw = "harvestedAt"
     }
@@ -86,6 +96,11 @@ struct CropSeason: Decodable, Identifiable, Equatable, Sendable {
 
     /// «Пшеница», or the farm's own word for it.
     var cropLabel: String { CommodityName.freeText(cropType) ?? cropType }
+
+    /// «Добив 520,5 кг/дка», or nil when none was recorded.
+    var yieldText: String? {
+        yieldKgPerDca.map { "Добив \(Num.text(NSDecimalNumber(decimal: $0.value).doubleValue)) кг/дка" }
+    }
 }
 
 extension Array where Element == CropSeason {
@@ -514,6 +529,8 @@ struct NewCropSeason: Encodable, Equatable, Sendable {
     var sownAt: Date?
     var harvestedAt: Date?
     var notes: String?
+    /// kg per decare, a NUMBER on the way in (agri-saas #2802).
+    var yieldKgPerDca: Decimal?
 }
 
 /// Weeds seen on a walk. ONE list, mixing catalogue binomials and free text;
@@ -557,22 +574,34 @@ struct NewWeedObservation: Encodable, Equatable, Sendable {
 struct CropSeasonChange: Encodable, Equatable, Sendable {
     var year: Int?
     var cropType: String?
+    /// `.some(nil)` CLEARS the yield; nil leaves it alone.
+    var yieldKgPerDca: Decimal??
 
-    var isEmpty: Bool { year == nil && cropType == nil }
+    var isEmpty: Bool { year == nil && cropType == nil && yieldKgPerDca == nil }
 
-    /// What `year` and `crop` change on `season`; nil where they don't.
-    init(from season: CropSeason, year: Int, crop: String) {
+    /// What `year`, `crop` and `yield` change on `season`; nil where they
+    /// don't. A yield is compared by value: «520» and «520,00» are one.
+    init(from season: CropSeason, year: Int, crop: String, yield: Decimal? = nil, keepsYield: Bool = true) {
         self.year = year == season.year ? nil : year
         self.cropType = crop == season.cropType ? nil : crop
+        let stored = season.yieldKgPerDca?.value
+        if keepsYield || yield == stored {
+            self.yieldKgPerDca = nil
+        } else {
+            self.yieldKgPerDca = .some(yield)
+        }
     }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(year, forKey: .year)
         try c.encodeIfPresent(cropType, forKey: .cropType)
+        if case .some(let value) = yieldKgPerDca {
+            if let value { try c.encode(value, forKey: .yieldKgPerDca) } else { try c.encodeNil(forKey: .yieldKgPerDca) }
+        }
     }
 
-    private enum CodingKeys: String, CodingKey { case year, cropType }
+    private enum CodingKeys: String, CodingKey { case year, cropType, yieldKgPerDca }
 }
 
 /// An observation corrected in place: `PATCH …/weed-observations/{id}`.

@@ -129,11 +129,12 @@ struct ParcelHistoryView: View {
     /// entry". РЕКОЛТИ a crop season, ДЕЙНОСТИ an operation, ПЛЕВЕЛИ a weed
     /// observation, Задачи a task for this parcel. In the screen's order.
     fileprivate enum Create: Hashable, CaseIterable {
-        case season, operation, weeds, task
+        case season, yield, operation, weeds, task
 
         var title: String {
             switch self {
             case .season: ParcelHistoryCopy.cropsAdd
+            case .yield: ParcelHistoryCopy.yieldAdd
             case .operation: "Ново мероприятие"
             case .weeds: ParcelHistoryCopy.weedsAdd
             case .task: "Нова задача"
@@ -143,6 +144,7 @@ struct ParcelHistoryView: View {
         var spoken: [String] {
             switch self {
             case .season: A11y.Spoken.addCrop
+            case .yield: A11y.Spoken.addYield
             case .operation: A11y.Spoken.newOperation
             case .weeds: A11y.Spoken.addWeeds
             case .task: A11y.Spoken.newTask
@@ -172,7 +174,7 @@ struct ParcelHistoryView: View {
     /// did); the rest for someone who may write, as «Задачи»'s + is.
     private func offers(_ kind: Create) -> Bool {
         switch kind {
-        case .season, .weeds: people.user?.mayWrite ?? true
+        case .season, .yield, .weeds: people.user?.mayWrite ?? true
         case .operation: recordIn != nil && (people.user?.mayCreateOperations ?? true)
         case .task: recordIn != nil && (people.user?.mayWrite ?? true)
         }
@@ -211,6 +213,27 @@ struct ParcelHistoryView: View {
         }
     }
 
+    /// РЕКОЛТИ's «+»: two choices, «Култура» and «Добив» (owner,
+    /// 2026-11-06: "For Rekolti the '+' sign should have 2 options - yield
+    /// and crop").
+    @ToolbarContentBuilder
+    private var seasonsMenu: some ToolbarContent {
+        if offers(.season) {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    ForEach([Create.season, .yield], id: \.self) { kind in
+                        Button(kind.title) { creating = Creating(kind: kind, on: .seasons) }
+                            .accessibilityInputLabels(kind.spoken)
+                    }
+                } label: {
+                    Label("Добави", systemImage: "plus")
+                }
+                .accessibilityLabel("Добави")
+                .accessibilityInputLabels(A11y.Spoken.add)
+            }
+        }
+    }
+
     /// One sheet's presence, on one screen.
     private func shows(_ kind: Create, on drillIn: DrillIn?) -> Binding<Bool> {
         Binding(get: { creating == Creating(kind: kind, on: drillIn) },
@@ -223,10 +246,13 @@ struct ParcelHistoryView: View {
     /// list never tries to present the same sheet as the list.
     private func creatingSheets(on drillIn: DrillIn?) -> CreatingSheets {
         CreatingSheets(
-            season: shows(.season, on: drillIn), operation: shows(.operation, on: drillIn),
+            season: shows(.season, on: drillIn), yield: shows(.yield, on: drillIn),
+            operation: shows(.operation, on: drillIn),
             weeds: shows(.weeds, on: drillIn), task: shows(.task, on: drillIn),
             parcelID: parcelID,
             recordIn: recordIn,
+            seasons: store.state.value?.seasons.items ?? [],
+            areaHa: outline?.areaHa,
             onRecorded: {
                 feedback.saved()
                 Task { await store.refresh() }
@@ -410,7 +436,13 @@ struct ParcelHistoryView: View {
     /// section's «+».
     private func list(_ drillIn: DrillIn) -> some View {
         sectionList(drillIn)
-            .toolbar { createAction(Create(drillIn), on: drillIn) }
+            .toolbar {
+                if drillIn == .seasons {
+                    seasonsMenu
+                } else {
+                    createAction(Create(drillIn), on: drillIn)
+                }
+            }
             .modifier(creatingSheets(on: drillIn))
     }
 
@@ -428,7 +460,8 @@ struct ParcelHistoryView: View {
                 removal: removal,
                 target: { HistoryRemoval.Target($0) },
                 parcelID: parcelID,
-                edit: { .season($0) }
+                edit: { .season($0) },
+                areaHa: outline?.areaHa
             )
         case .operations:
             ParcelHistorySectionList(
@@ -634,11 +667,15 @@ struct ParcelHistoryView: View {
 /// (`NewTaskComposer`, which opens the task it makes on this stack).
 private struct CreatingSheets: ViewModifier {
     @Binding var season: Bool
+    @Binding var yield: Bool
     @Binding var operation: Bool
     @Binding var weeds: Bool
     @Binding var task: Bool
     let parcelID: String
     let recordIn: ParcelInBlock?
+    /// For «Добив»: the year's own row, and a total's area.
+    let seasons: [CropSeason]
+    let areaHa: Double?
     /// A season, an observation or an operation saved: the archive again.
     let onRecorded: () -> Void
     let reloadTasks: @MainActor () async -> Void
@@ -647,6 +684,10 @@ private struct CreatingSheets: ViewModifier {
         content
             .sheet(isPresented: $season) {
                 NewCropSeasonSheet(parcelID: parcelID, onSaved: onRecorded)
+            }
+            .sheet(isPresented: $yield) {
+                NewCropSeasonSheet(parcelID: parcelID, forYield: true, seasons: seasons, areaHa: areaHa,
+                                   onSaved: onRecorded)
             }
             .sheet(isPresented: $operation) {
                 if let recordIn {
