@@ -28,7 +28,6 @@ struct ExchangeMapView: View {
     var onClearRegions: () -> Void = {}
     /// The farms the board's search found (2026-10-24), under the map.
     var farms: [FarmDirectoryHit] = []
-    var onOpenFarm: (FarmDirectoryHit) -> Void = { _ in }
 
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -69,7 +68,7 @@ struct ExchangeMapView: View {
             if !farms.isEmpty {
                 Section {
                     ForEach(farms) { hit in
-                        FarmLink(hit: hit) { onOpenFarm(hit) }
+                        FarmLink(hit: hit)
                     }
                 } header: {
                     SectionHeader("Ферми")

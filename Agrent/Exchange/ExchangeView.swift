@@ -26,7 +26,6 @@ struct ExchangeView: View {
     @State private var unread = ExchangeUnreadStore.shared
     /// The farms the board's search found (owner, 2026-10-24).
     @State private var farms = BoardFarmsStore()
-    @State private var farmPage: InAppPage?
     @State private var posting = false
     @State private var flags = FeatureFlags.shared
 
@@ -66,9 +65,6 @@ struct ExchangeView: View {
                 }
                 .sheet(isPresented: $posting) {
                     NewListingView { Task { await mine.load() } }
-                }
-                .sheet(item: $farmPage) { page in
-                    InAppBrowser(url: page.url).ignoresSafeArea()
                 }
                 // The farm section asks the directory what the board just
                 // asked the server: on a search, a map tap or a clear.
@@ -219,8 +215,7 @@ struct ExchangeView: View {
             selectedRegions: listings.query.regions,
             onToggleRegion: { code in Task { await listings.toggleRegion(code) } },
             onClearRegions: { Task { await listings.clearRegions() } },
-            farms: farms.hits,
-            onOpenFarm: openFarm
+            farms: farms.hits
         )
         .refreshable { await PullToRefresh.bounded { await listings.load() } }
     }
@@ -235,7 +230,7 @@ struct ExchangeView: View {
         if !farms.hits.isEmpty {
             Section {
                 ForEach(farms.hits) { hit in
-                    FarmLink(hit: hit) { openFarm(hit) }
+                    FarmLink(hit: hit)
                 }
             } header: {
                 SectionHeader("Ферми")
@@ -248,9 +243,6 @@ struct ExchangeView: View {
         }
     }
 
-    private func openFarm(_ hit: FarmDirectoryHit) {
-        farmPage = InAppPage.farm(handle: hit.handle)
-    }
 
     /// «Съобщения» with the unread count on it — the count the section chip
     /// used to carry, so a waiting reply is as visible from «Моите обяви».

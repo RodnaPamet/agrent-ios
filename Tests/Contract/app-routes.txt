@@ -26,6 +26,8 @@
 /api/promotions/{id}/image
 /api/public/eik-check
 /api/public/farms
+/api/public/farms/{handle}
+/api/public/media/{hash}
 /api/t/{tenantSlug}/admin/companies
 /api/t/{tenantSlug}/admin/companies/{id}
 /api/t/{tenantSlug}/admin/farm-profile

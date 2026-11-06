@@ -42,13 +42,11 @@ final class PublishAsFarmTests: XCTestCase {
         XCTAssertEqual(try body(nil)["commodity"] as? String, "wheat", "positive control: the body encodes")
     }
 
-    /// The farm page a listing links to is `/f/{handle}`, the same as
-    /// «Ферми»'s; no handle is no page.
+    /// The farm page a listing links to is the public profile, `/f/{handle}`,
+    /// the same as «Ферми»'s, now the phone's own screen (#536).
     func testTheFarmPageIsThePublicProfile() throws {
-        let page = try XCTUnwrap(InAppPage.farm(handle: "primerna-kooperatsiya"))
-        XCTAssertEqual(page.url.path(), "/f/primerna-kooperatsiya")
-        XCTAssertEqual(page.url, PublicProfileLink.url(handle: "primerna-kooperatsiya"))
-        XCTAssertNil(InAppPage.farm(handle: nil))
+        XCTAssertEqual(PublicProfileLink.url(handle: "primerna-kooperatsiya")?.path(), "/f/primerna-kooperatsiya")
+        XCTAssertEqual(AppRoute.publicFarm(handle: "primerna-kooperatsiya").home, .exchange)
     }
 
     /// Both ends behind the flag every P6 surface is behind: `/f/` answers
@@ -70,7 +68,7 @@ final class PublishAsFarmTests: XCTestCase {
         let detail = try source("Agrent/Exchange/ListingDetailView.swift")
         XCTAssertTrue(detail.contains("struct ListingDetailView"), "positive control")
         XCTAssertTrue(detail.contains(
-            "if flags.isOn(FarmBrandAPI.flag), let page = InAppPage.farm(handle: shown.farmHandle) {"))
+            "if flags.isOn(FarmBrandAPI.flag), let handle = shown.farmHandle?.recorded {"))
     }
 
     @MainActor

@@ -53,6 +53,9 @@ enum AppRoute: Hashable, Sendable {
     case exchangeInbox
     /// A recorded treatment's parcels on a map (#399), read by its handle.
     case treatmentMap(handle: String, title: String)
+    /// A farm's public page, on the phone (#536): from Борса's farm search,
+    /// a listing's farm, or a `/f/{handle}` link.
+    case publicFarm(handle: String)
 
     func hash(into hasher: inout Hasher) {
         switch self {
@@ -67,6 +70,7 @@ enum AppRoute: Hashable, Sendable {
         case .parcelHistory(let parcelID, _, _, _, _): hasher.combine("parcelHistory"); hasher.combine(parcelID)
         case .exchangeInbox: hasher.combine("exchangeInbox")
         case .treatmentMap(let handle, _): hasher.combine("treatmentMap"); hasher.combine(handle)
+        case .publicFarm(let handle): hasher.combine("publicFarm"); hasher.combine(handle)
         }
     }
 
@@ -75,7 +79,7 @@ enum AppRoute: Hashable, Sendable {
     var home: AppSurface {
         switch self {
         case .journalEntry, .treatmentMap: .journal
-        case .listing, .listingID, .conversation, .exchangeInbox: .exchange
+        case .listing, .listingID, .conversation, .exchangeInbox, .publicFarm: .exchange
         case .task, .taskID: .tasks
         case .location, .locationID: .locations
         case .parcelHistory: .farmRisk
@@ -101,6 +105,7 @@ enum AppRoute: Hashable, Sendable {
                               fromRisk: fromRisk)
         case .exchangeInbox: ExchangeInboxScreen()
         case .treatmentMap(let handle, let title): TreatmentMapView(handle: handle, title: title)
+        case .publicFarm(let handle): PublicFarmView(handle: handle)
         }
     }
 }
