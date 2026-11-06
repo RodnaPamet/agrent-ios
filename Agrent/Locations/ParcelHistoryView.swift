@@ -40,10 +40,9 @@ import SwiftUI
 /// ── «+», per section (owner, 2026-11-06) ──
 ///
 /// Each section's list has a «+» at the top right that makes one of its
-/// own, and the screen has a menu of all four (`Create`). There's no edit:
-/// the server has no PATCH for a season or an observation, so a wrong one
-/// is deleted and recorded again, which the phone can't do yet either
-/// (`deleteCropSeason`, `deleteWeedObservation`).
+/// own, and the screen has a menu of all four (`Create`). A wrong season or
+/// observation is swiped away («Изтрий», #541, `HistoryRemoval`) and
+/// recorded again; edit waits for the server's PATCH (#542).
 struct ParcelHistoryView: View {
     /// The name as the Риск row already knew it, so the header is not blank
     /// for the length of the first request. The archive's own name wins once
@@ -65,6 +64,9 @@ struct ParcelHistoryView: View {
     private let recordIn: ParcelInBlock?
     /// The parcel's outline, for the map at the top (owner, 2026-11-06).
     private let outline: Parcel?
+    /// РЕКОЛТИ's and ПЛЕВЕЛИ's «Изтрий» (owner, 2026-11-06, #541), one for
+    /// both lists, so a delete waiting in one is still hidden on return.
+    @State private var removal: HistoryRemoval
     /// The «+» that is open, and which screen it is on (`creatingSheets`).
     @State private var creating: Creating?
     /// Who is signed in: which «+» to offer.
@@ -93,6 +95,7 @@ struct ParcelHistoryView: View {
         _risk = State(initialValue: recordIn == nil || fromRisk ? nil : ParcelRiskStore(parcelID: parcelID))
         _tasks = State(initialValue: recordIn == nil ? nil : ParcelTasksStore(parcelID: parcelID))
         _comments = State(initialValue: ParcelCommentsStore(parcelID: parcelID))
+        _removal = State(initialValue: HistoryRemoval(parcelID: parcelID))
     }
 
     var body: some View {
@@ -442,7 +445,9 @@ struct ParcelHistoryView: View {
                 part: .seasons,
                 store: store,
                 section: { $0.seasons },
-                line: { $0.historyLine }
+                line: { $0.historyLine },
+                removal: removal,
+                target: { HistoryRemoval.Target($0) }
             )
         case .operations:
             ParcelHistorySectionList(
@@ -460,7 +465,9 @@ struct ParcelHistoryView: View {
                 part: .weeds,
                 store: store,
                 section: { $0.weeds },
-                line: { $0.historyLine }
+                line: { $0.historyLine },
+                removal: removal,
+                target: { HistoryRemoval.Target($0) }
             )
         case .tasks:
             if let tasks {

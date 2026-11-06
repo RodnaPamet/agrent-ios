@@ -377,6 +377,25 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("18h-parcel-new-season", app: app)
         app.navigationBars["Запиши култура"].buttons["Отказ"].tap()
+
+        // «Изтрий» on a season (owner, 2026-11-06, #541): the question, then
+        // «Отмени» inside the window, so no delete is ever sent.
+        let season = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH '2025'")).firstMatch
+        XCTAssertTrue(season.waitForExistence(timeout: 10), "no 2025 season on «Реколти»\n\(app.debugDescription)")
+        season.swipeLeft()
+        let erase = app.buttons["Изтрий"]
+        XCTAssertTrue(erase.waitForExistence(timeout: 5), "the season offered no «Изтрий»\n\(app.debugDescription)")
+        erase.tap()
+        let ask = app.alerts["Сигурни ли сте, че искате да изтриете културата?"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 3), "«Изтрий» asked nothing")
+        ask.buttons["Изтрий"].tap()
+        let back = app.buttons["Отмени"]
+        XCTAssertTrue(back.waitForExistence(timeout: 3), "no «Отмени» after «Изтрий»")
+        XCTAssertFalse(season.exists, "the season stayed in the list")
+        capture("18k-parcel-season-undo", app: app)
+        back.tap()
+        XCTAssertTrue(season.waitForExistence(timeout: 5), "«Отмени» did not bring the season back")
         app.navigationBars["Реколти"].buttons.firstMatch.tap()
 
         openSection("ПЛЕВЕЛИ", list: "Плевели", in: app)
