@@ -284,6 +284,34 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
         case completedAtRaw = "completedAt"
     }
 
+    /// Synthesised but for ONE field: `doseValue`.
+    ///
+    /// A bare activity line (agri-saas #2316, since 2026-10-25) — pruning,
+    /// cultivation, a harvest — has no dose, and the server sends it as `""`
+    /// (`line.doseValue?.toString() ?? ''`), not as null and not as a number.
+    /// `WireDecimal` rightly refuses `""`, and a refused field failed the
+    /// WHOLE archive: «Сървърът върна отговор в неочакван формат» over a
+    /// parcel whose only fault was being pruned (owner, 2026-11-06). Blank is
+    /// no dose; anything else must still be a decimal.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        taskId = try c.decode(String.self, forKey: .taskId)
+        operationType = try c.decodeIfPresent(FieldOperationType.self, forKey: .operationType)
+        doseUnit = try c.decode(String.self, forKey: .doseUnit)
+        productCategory = try c.decodeIfPresent(ProductCategory.self, forKey: .productCategory)
+        targetNote = try c.decodeIfPresent(String.self, forKey: .targetNote)
+        titleRaw = try c.decode(String.self, forKey: .titleRaw)
+        productNameRaw = try c.decode(String.self, forKey: .productNameRaw)
+        completedAtRaw = try c.decodeIfPresent(String.self, forKey: .completedAtRaw)
+        if let text = try? c.decodeIfPresent(String.self, forKey: .doseValue),
+           text.trimmingCharacters(in: .whitespaces).isEmpty {
+            doseValue = nil
+        } else {
+            doseValue = try c.decodeIfPresent(WireDecimal.self, forKey: .doseValue)
+        }
+    }
+
     var completedAt: Date? { BgDate.parseInstantOrDay(completedAtRaw) }
 
     /// THE SERVER'S OWN DIGITS, localised — deliberately NOT padded.

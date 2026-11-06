@@ -713,5 +713,43 @@ final class ParcelHistoryTests: XCTestCase {
         XCTAssertTrue(seasons.contains("ParcelHistoryAPI.createCropSeason("))
         XCTAssertTrue(ParcelHistoryAPI.weedObservationsPath("par_1").hasSuffix("/agro/parcels/par_1/weed-observations"))
     }
+
+    // MARK: - Bare activity lines (agri-saas #2316)
+
+    /// Pruning, cultivation, a harvest: no product, no dose, and the server
+    /// sends the dose as `""`. The archive decodes and the line has no dose;
+    /// before, this one line failed the whole history (owner, 2026-11-06).
+    func testABareActivityLineDecodesWithNoDose() async throws {
+        let history = try await ParcelHistoryAPI.decodeHistory(from: Data(#"""
+        {"parcel":{"id":"p1","name":"Синтетичен","cropType":null},
+         "cropSeasons":[],
+         "operations":[
+           {"id":"l1","taskId":"t1","operationType":null,"title":"Резитба","completedAt":"2026-10-28T09:00:00.000Z",
+            "productName":"","productCategory":null,"doseValue":"","doseUnit":"","targetNote":null},
+           {"id":"l2","taskId":"t2","operationType":"SPRAY","title":"Пръскане","completedAt":"2026-10-21T09:00:00.000Z",
+            "productName":"Синтетичен хербицид","productCategory":"PESTICIDE","doseValue":"0.25","doseUnit":"л/дка",
+            "targetNote":null}],
+         "weedObservations":[],
+         "cropSeasonsCursor":null,"operationsCursor":null,"weedObservationsCursor":null}
+        """#.utf8))
+        XCTAssertEqual(history.operations.count, 2)
+        XCTAssertNil(history.operations[0].doseValue)
+        XCTAssertNil(history.operations[0].productName)
+        XCTAssertEqual(history.operations[0].title, "Резитба")
+        XCTAssertEqual(history.operations[1].doseValue?.value, Decimal(string: "0.25"), "positive control: a dose still reads")
+    }
+
+    /// Blank is no dose; anything else must still be a number.
+    func testANonDecimalDoseIsStillRefused() async {
+        do {
+            _ = try await ParcelHistoryAPI.decodeHistory(from: Data(#"""
+            {"parcel":{"id":"p1","name":"x","cropType":null},"cropSeasons":[],
+             "operations":[{"id":"l1","taskId":"t1","operationType":null,"title":"","completedAt":null,
+              "productName":"","productCategory":null,"doseValue":"много","doseUnit":"","targetNote":null}],
+             "weedObservations":[],"cropSeasonsCursor":null,"operationsCursor":null,"weedObservationsCursor":null}
+            """#.utf8))
+            XCTFail("«много» is not a dose")
+        } catch {}
+    }
 }
 
