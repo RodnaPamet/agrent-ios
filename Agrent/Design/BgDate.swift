@@ -68,6 +68,17 @@ enum BgDate {
         return text.prefix(1).uppercased() + text.dropFirst()
     }
 
+    /// «пн, 9 ноември» — a forecast day (#551), weekday first, as a farmer
+    /// plans by it.
+    static func weekdayDay(_ date: Date) -> String {
+        date.formatted(.dateTime.weekday(.abbreviated).day().month(.wide).locale(locale))
+    }
+
+    /// «14 ч» — an hour mark on a forecast chart's axis (#551).
+    static func hourMark(_ date: Date) -> String {
+        "\(Calendar.current.component(.hour, from: date)) ч"
+    }
+
     /// 21 септември — for rows, where the year is usually noise.
     static func dayMonth(_ date: Date) -> String {
         date.formatted(.dateTime.day().month(.wide).locale(locale))

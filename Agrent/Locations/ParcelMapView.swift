@@ -7,6 +7,8 @@ struct ParcelMapView: View {
     let location: Location
 
     @State private var importing = false
+    /// «Времето» for this block is open (#551).
+    @State private var showingWeather = false
     @State private var store: ParcelsStore
 
     /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
@@ -125,6 +127,17 @@ struct ParcelMapView: View {
             }
         }
         .toolbar {
+            // «Времето» (#551, owner 2026-11-06): wind and pressure for the
+            // block's centre, from WeatherKit. Only once there is a centre:
+            // a block with nothing drawable has no place to ask about.
+            if weatherCentre != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showingWeather = true } label: {
+                        Label("Времето", systemImage: "wind")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames("Времето", "Вятър", "Weather"))
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     cycleMode()
@@ -132,6 +145,11 @@ struct ParcelMapView: View {
                     Label(mode.next(in: modes).label, systemImage: mode.next(in: modes).icon)
                 }
                 .accessibilityHint(mode.next(in: modes).hint)
+            }
+        }
+        .sheet(isPresented: $showingWeather) {
+            if let centre = weatherCentre {
+                WeatherSheet(place: location.name, latitude: centre.latitude, longitude: centre.longitude)
             }
         }
         .sheet(item: $choosing) { choice in
@@ -345,6 +363,14 @@ struct ParcelMapView: View {
     /// number. Where a location has no server bounds the two are the same
     /// expression and the toggle will not appear to move the camera — that is
     /// honest rather than broken, since there is nothing else to frame.
+    /// The block's centre for its weather: the middle of its drawn parcels,
+    /// or of its bounds; nil when it has neither.
+    private var weatherCentre: CLLocationCoordinate2D? {
+        let response = store.state.value
+        let drawable = response?.parcels.filter(\.isDrawable) ?? []
+        return (MKCoordinateRegion(fitting: drawable) ?? (response?.bounds ?? location.boundsJson)?.region)?.center
+    }
+
     private func mapRegion(for mode: ParcelMapMode) -> MKCoordinateRegion {
         let response = store.state.value
         let drawable = response?.parcels.filter(\.isDrawable) ?? []

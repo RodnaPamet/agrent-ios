@@ -2175,6 +2175,35 @@ final class A11yShotsTests: XCTestCase {
         if cancel.exists { cancel.tap() }
     }
 
+    // MARK: - «Времето» on a block's map (#551)
+
+    /// Блокове → the first block → «Времето»: the wind and its gusts, the
+    /// pressure and where it is heading, an alert, the 48-hour charts and ten
+    /// days, from the seam's synthetic low. Nothing asks Apple.
+    func testWeatherSheet() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        app.tabBars.buttons["Блокове"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.cells.firstMatch.tap()
+        let weather = app.navigationBars.buttons["Времето"]
+        XCTAssertTrue(weather.waitForExistence(timeout: 20), "no «Времето» on the block's map\n\(app.debugDescription)")
+        weather.tap()
+        XCTAssertTrue(app.navigationBars["Времето"].waitForExistence(timeout: 10), "«Времето» opened no sheet")
+        let wind = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Вятър 3 м/с'")).firstMatch
+        XCTAssertTrue(wind.waitForExistence(timeout: 10), "no wind now\n\(app.debugDescription)")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Налягането пада'")).firstMatch.exists,
+                      "the falling pressure is not said")
+        Thread.sleep(forTimeInterval: 1)
+        capture("29a-weather-now", app: app)
+        app.swipeUp()
+        Thread.sleep(forTimeInterval: 1)
+        capture("29b-weather-charts", app: app)
+        app.navigationBars["Времето"].buttons["Затвори"].tap()
+    }
+
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
 
     /// The owner tapped «История» on a risk row and nothing happened
