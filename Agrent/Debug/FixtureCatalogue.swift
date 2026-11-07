@@ -152,6 +152,10 @@ enum FixtureCatalogue {
         // agrent-ios#384: «Ново мероприятие»'s step two, the one crop's
         // parcels, by the query that names the crop.
         (ParcelsByCropAPI.path(crop: "Wheat"), "parcels-by-crop-wheat"),
+        // #562: SYNTH-1's last 14 days, as the history opens. Another period
+        // is another question, and `NO_FIXTURE` is its true answer. One
+        // cloudy pass, so the screenshot shows the line's break.
+        (RiskTrendAPI.path("par_holes", days: 14), "risk-history-holes"),
     ]) { $0 }
 
     /// Routes matched on the path alone.

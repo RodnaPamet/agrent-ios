@@ -83,6 +83,8 @@ struct ParcelHistoryView: View {
     /// The parcel's risk reading, when opened from Блокове (owner,
     /// 2026-10-29), and from Риск since 2026-11-07: the same screen either way.
     @State private var risk: ParcelRiskStore?
+    /// Its readings over the last 14, 30 or 60 days (#562), with the risk.
+    @State private var trend: RiskTrendStore?
     /// The parcel's tasks, from Блокове (#462). One store for the card and
     /// the list it opens.
     @State private var tasks: ParcelTasksStore?
@@ -100,6 +102,7 @@ struct ParcelHistoryView: View {
         // risk section should open the same section as if entered through
         // history page"): the same screen whichever way it was reached.
         _risk = State(initialValue: recordIn == nil ? nil : ParcelRiskStore(parcelID: parcelID))
+        _trend = State(initialValue: recordIn == nil ? nil : RiskTrendStore(parcelID: parcelID))
         _tasks = State(initialValue: recordIn == nil ? nil : ParcelTasksStore(parcelID: parcelID))
         _comments = State(initialValue: ParcelCommentsStore(parcelID: parcelID))
         _removal = State(initialValue: HistoryRemoval(parcelID: parcelID))
@@ -389,30 +392,50 @@ struct ParcelHistoryView: View {
             }
             .padding(.vertical, 6)
         case .loaded(let reading, let freshness):
-            // A tap asks the assistant for a short analysis (owner,
-            // 2026-11-07), while the assistant is on; otherwise the readings
-            // alone, as before.
-            if flags.isOn(AssistantAPI.flag) {
-                Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
-                    riskBody(reading, freshness, offersAnalysis: true)
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
-                                                    + [explanation(reading, freshness)]))
-                .accessibilityHint("Отваря кратък анализ от асистента")
-                .accessibilityAddTraits(.isButton)
-            } else {
-                riskBody(reading, freshness, offersAnalysis: false)
-                    // One stop, said from the values, as a Риск row is.
+            // Three parts, each its own tap target in the list row (a row
+            // with several controls needs them `.borderless`, or the whole
+            // row is one button): the reading, which asks the assistant for
+            // a short analysis (owner, 2026-11-07) while it is on; the trend
+            // over the period chosen (#562), whose picker must take its own
+            // taps; and the analysis link, said in words.
+            VStack(alignment: .leading, spacing: 10) {
+                if flags.isOn(AssistantAPI.flag) {
+                    Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
+                        riskReading(reading, freshness)
+                    }
+                    // `.plain`: its own tap area in the row as `.borderless`
+                    // gives, without tinting the readings in the accent.
+                    .buttonStyle(.plain)
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
-                                                    + [explanation(reading, freshness)]))
+                    .accessibilityLabel(riskSpoken(reading, freshness))
+                    .accessibilityHint("Отваря кратък анализ от асистента")
+                    .accessibilityAddTraits(.isButton)
+                } else {
+                    riskReading(reading, freshness)
+                        // One stop, said from the values, as a Риск row is.
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(riskSpoken(reading, freshness))
+                }
+                if let trend { RiskTrendView(store: trend) }
+                if flags.isOn(AssistantAPI.flag) {
+                    Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                            Text("Кратък анализ от асистента")
+                            Image(systemName: "chevron.right").font(.caption2)
+                        }
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Palette.accent)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityInputLabels(A11y.spokenNames("Кратък анализ", "Анализ", "Analysis"))
+                }
             }
+            .padding(.vertical, 6)
         }
     }
 
-    private func riskBody(_ reading: ParcelRisk, _ freshness: Freshness?, offersAnalysis: Bool) -> some View {
+    private func riskReading(_ reading: ParcelRisk, _ freshness: Freshness?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
             ParcelRiskReadings(risk: reading, freshness: freshness)
@@ -421,20 +444,16 @@ struct ParcelHistoryView: View {
             if let words = explanation(reading, freshness) {
                 Text(words)
                     .font(.subheadline)
+                    .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if offersAnalysis {
-                HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
-                    Text("Кратък анализ от асистента")
-                    Image(systemName: "chevron.right").font(.caption2)
-                }
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(Palette.accent)
-            }
         }
-        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    private func riskSpoken(_ reading: ParcelRisk, _ freshness: Freshness?) -> String {
+        A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness) + [explanation(reading, freshness)])
     }
 
     private func explanation(_ reading: ParcelRisk, _ freshness: Freshness?) -> String? {
@@ -447,6 +466,7 @@ struct ParcelHistoryView: View {
         let archive = store.state.value
         return RiskAnalysisQuestion.text(
             parcel: archive?.parcel.name ?? parcelName, risk: reading, freshness: freshness,
+            trend: trend?.state.value.flatMap(RiskTrendWords.change),
             seasons: archive?.seasons.items ?? [], operations: archive?.operations.items ?? [],
             weeds: archive?.weeds.items ?? [])
     }

@@ -1996,3 +1996,14 @@ be read outdoors fails before any parity gap matters.
   - The history opened from Риск now has its «Риск» section too: one screen whichever way it was reached.
   - The `fromRisk` flag is gone.
 
+
+### Built — a parcel's readings over 14, 30 or 60 days (owner, 2026-11-07, #562)
+
+- "Can we store past data so the app and the assistant provide info based on a time period, like the past 14 days". Server side is agri-saas #2837 stage 1: `GET …/agro/parcels/{parcelId}/analysis/history?days=`, every pass in the window, oldest first.
+- Under the «Риск» reading on a parcel's history: a picker «14 дни / 30 дни / 60 дни» (14 by default), a chart of «Зеленина» (NDVI) and «Влага» (NDMI), and the change in one sentence, e.g. «За 14 дни зеленината спадна от 0,78 до 0,71 (−9 %)».
+  - A cloudy pass is a break in the line, never a drop to 0.
+  - «Сателитният анализ не е настроен» (`configured: false`) is said apart from «Няма ясна сателитна снимка за последните N дни».
+  - The days are the server's own, as it clamps 7–120.
+- The assistant's question carries the same sentence, so its analysis speaks to the days on screen.
+- The «Риск» row is now three tap targets: the reading (opens the analysis, as before), the picker, and the «Кратък анализ от асистента» link.
+- **Waiting on the server:** the route is in `pendingServerRoutes` until stage 1 is live. Later stages: stored readings (1b), the weakest part of the field (2), and the assistant's own trend tool (3).

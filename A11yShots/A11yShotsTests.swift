@@ -2299,6 +2299,19 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(risk.label.contains("Културата е зелена"), "no app explanation: \(risk.label)")
         Thread.sleep(forTimeInterval: 1)
         capture("32-risk-explanation", app: app)
+        // The last 14 days under it (#562): the period picker, the chart as
+        // one stop, and the change in words, from the fixture's passes.
+        XCTAssertTrue(app.buttons["14 дни"].waitForExistence(timeout: 10), "no period picker\n\(app.debugDescription)")
+        XCTAssertTrue(app.buttons["14 дни"].isSelected, "the trend did not open on 14 days")
+        let chart = app.descendants(matching: .any)["Зеленина и влага за 14 дни"]
+        XCTAssertTrue(chart.waitForExistence(timeout: 10), "no trend chart\n\(app.debugDescription)")
+        let change = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "За 14 дни зеленината спадна")).firstMatch
+        XCTAssertTrue(change.exists, "no change in words under the chart")
+        app.swipeUp()
+        Thread.sleep(forTimeInterval: 1)
+        capture("32b-risk-trend", app: app)
+        app.swipeDown()
+        Thread.sleep(forTimeInterval: 1)
         risk.tap()
         Thread.sleep(forTimeInterval: 4)
         capture("32a-risk-analysis", app: app)

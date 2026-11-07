@@ -188,6 +188,10 @@ final class RouteContractTests: XCTestCase {
     ///
     /// And empty again from agri-saas main 59c2e98: a farm's public page as
     /// JSON (#536) came off once agri-saas #2786 was merged (2026-11-06).
+    ///
+    /// Empty again from agri-saas main 257a5b3: a parcel's readings over a
+    /// period (#562) came off with the refresh once agri-saas #2839 was live
+    /// (2026-11-07).
     private static let pendingServerRoutes: [String: String] = [:]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -394,6 +398,8 @@ final class RouteContractTests: XCTestCase {
                 SpatialImportAPI.jobPath(locationID: loc, jobID: "{jobId}"),
             ]),
             ("FarmRiskModels.swift", [FarmRiskAPI.analysisPath(parcel), FarmRiskAPI.leadsPath]),
+            // #562: the same reading over a period (agri-saas #2837).
+            ("RiskTrend.swift", [RiskTrendAPI.path(parcel, days: 14)]),
             ("InsuranceCatalogue.swift", [InsuranceCatalogueAPI.path]),
             ("NewsModels.swift",
              PriceRange.allCases.map { TrendsAPI.pricesPath(.wheat, range: $0) }

@@ -1,0 +1,15 @@
+{
+  "parcelId": "par_holes",
+  "days": 14,
+  "configured": true,
+  "truncated": false,
+  "generatedAt": "2026-09-29T06:00:00.000Z",
+  "passes": [
+    { "date": "2026-09-14", "ndvi": 0.781, "ndmi": 0.332, "vegetation": "good", "moisture": "good", "overall": "good" },
+    { "date": "2026-09-16", "ndvi": 0.774, "ndmi": 0.318, "vegetation": "good", "moisture": "good", "overall": "good" },
+    { "date": "2026-09-19", "ndvi": null, "ndmi": null, "vegetation": "unknown", "moisture": "unknown", "overall": "unknown" },
+    { "date": "2026-09-21", "ndvi": 0.748, "ndmi": 0.301, "vegetation": "good", "moisture": "good", "overall": "good" },
+    { "date": "2026-09-24", "ndvi": 0.729, "ndmi": 0.291, "vegetation": "good", "moisture": "good", "overall": "good" },
+    { "date": "2026-09-26", "ndvi": 0.712, "ndmi": 0.284, "vegetation": "good", "moisture": "good", "overall": "good" }
+  ]
+}

@@ -74,6 +74,16 @@ enum BgDate {
         date.formatted(.dateTime.weekday(.abbreviated).day().month(.wide).locale(locale))
     }
 
+    /// «7 ное», a satellite pass on a parcel's trend axis (#562): a month in
+    /// full is too wide for four marks on a phone. «d LLL», stand-alone, for
+    /// `monthShort`'s reason; the device's zone, as `parseISODay` reads in.
+    static func dayMonthShort(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.dateFormat = "d LLL"
+        return formatter.string(from: date)
+    }
+
     /// «14 ч» — an hour mark on a forecast chart's axis (#551).
     static func hourMark(_ date: Date) -> String {
         "\(Calendar.current.component(.hour, from: date)) ч"

@@ -41,12 +41,14 @@ struct RiskAnalysisSheet: View {
 /// The question, from what the history screen holds. Pure, so tests pin it.
 @MainActor
 enum RiskAnalysisQuestion {
-    static func text(parcel: String, risk: ParcelRisk, freshness: Freshness?,
+    static func text(parcel: String, risk: ParcelRisk, freshness: Freshness?, trend: String? = nil,
                      seasons: [CropSeason], operations: [ParcelHistoryOperation],
                      weeds: [WeedObservation]) -> String {
         var facts: [String] = []
         let readings = ParcelRiskReadings.spoken(risk, freshness).compactMap { $0 }.joined(separator: "; ")
         facts.append("Сателитни показатели: \(readings).")
+        // The period on screen (#562), so the answer speaks to the same days.
+        if let trend { facts.append(trend) }
         let about = [CommodityName.freeText(risk.cropType), risk.areaHa.map { "\(Num.text($0 * 10)) дка" }]
             .compactMap { $0 }.joined(separator: ", ")
         if !seasons.isEmpty {

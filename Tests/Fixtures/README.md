@@ -461,6 +461,12 @@ archive, invented for the screen's sections and their «+» (owner,
 spray from `field-operation-detail.json`'s product, a bare «Резитба» line with no product and the server's blank dose (`""`, agri-saas #2316), and one walk with two
 catalogue weeds. Shaped from the spec's `ParcelHistory`; every cursor null.
 
+`risk-history-holes.json`: `GET /agro/parcels/par_holes/analysis/history?days=14`
+(#562, agri-saas #2837 stage 1), SYNTH-1's last 14 days, invented: five clear
+passes easing down to the reading in `risk-analysis-holes.json` and one cloudy
+pass (`ndvi`/`ndmi` null), so the chart shows its break. Shaped from backend
+1's `ParcelRiskHistory`.
+
 ## A mechanisator's one screen
 
 `auth-me-operator.json` and `me-farms-operator.json`: the fixture person and
