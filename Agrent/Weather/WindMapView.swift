@@ -24,11 +24,29 @@ struct WindMapView: View {
     let longitude: Double
     var source: any WindFieldSource = WindFieldSources.current
 
+    init(place: String, latitude: Double, longitude: Double,
+         source: any WindFieldSource = WindFieldSources.current) {
+        self.place = place
+        self.latitude = latitude
+        self.longitude = longitude
+        self.source = source
+        _region = State(initialValue: Self.opening(latitude: latitude, longitude: longitude))
+    }
+
+    /// Where it opens (owner, 2026-11-07: "needs to open a bit more zoomed
+    /// in"): on the block, about a degree across, the reach of a farm's own
+    /// weather (the Danube to the Balkan from a block near Pleven). The
+    /// whole country is a pinch away.
+    nonisolated static func opening(latitude: Double, longitude: Double) -> MKCoordinateRegion {
+        MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+                           span: MKCoordinateSpan(latitudeDelta: 1.1, longitudeDelta: 1.0))
+    }
+
     @State private var state: LoadState<WindField> = .loading
     @State private var hour = 0
     @State private var playing = false
     /// What the map shows, for the streaks' projection.
-    @State private var region = WindMapView.bulgaria
+    @State private var region: MKCoordinateRegion
     @State private var particles = WindParticles()
     @Environment(\.dismiss) private var dismiss
     /// Reduce Motion on: still arrows instead of moving streaks.
@@ -95,7 +113,8 @@ struct WindMapView: View {
                                                                   longitudes: field.longitudes)
         let centres = grid.isEmpty ? [] : PressureAnalysis.centres(grid, latitudes: field.latitudes,
                                                                    longitudes: field.longitudes)
-        return Map(initialPosition: .region(Self.bulgaria), interactionModes: [.pan, .zoom]) {
+        return Map(initialPosition: .region(Self.opening(latitude: latitude, longitude: longitude)),
+                   interactionModes: [.pan, .zoom]) {
             ForEach(isobars) { isobar in
                 MapPolyline(coordinates: isobar.path.map {
                     CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)

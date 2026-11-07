@@ -160,5 +160,30 @@ final class WindFieldTests: XCTestCase {
         XCTAssertEqual(projection.point(latitude: 42.75, longitude: 25.5 - 4.2).x, 0, accuracy: 0.001)
         XCTAssertLessThan(projection.point(latitude: 44, longitude: 25).y, projection.point(latitude: 42, longitude: 25).y)
     }
+
+    // MARK: - The opening zoom (owner, 2026-11-07)
+
+    /// It opens on the block, about a degree across, not on the country.
+    func testItOpensOnTheBlock() {
+        let opening = WindMapView.opening(latitude: 43.2, longitude: 24.4)
+        XCTAssertEqual(opening.center.latitude, 43.2)
+        XCTAssertEqual(opening.center.longitude, 24.4)
+        XCTAssertLessThan(opening.span.latitudeDelta, WindMapView.bulgaria.span.latitudeDelta / 3)
+    }
+
+    /// Streaks are born where the map looks, within the grid; the whole grid
+    /// when the view is off it.
+    func testStreaksAreBornInView() {
+        let grid: WindParticles.Box = (40.5, 45.0, 21.5, 29.5)
+        let view = WindParticles.area(WindMapView.opening(latitude: 43.2, longitude: 24.4), within: grid)
+        XCTAssertEqual(view.south, 43.2 - 0.55, accuracy: 1e-9)
+        XCTAssertEqual(view.east, 24.4 + 0.5, accuracy: 1e-9)
+        let edge = WindParticles.area(WindMapView.opening(latitude: 44.9, longitude: 29.4), within: grid)
+        XCTAssertEqual(edge.north, 45.0, "clipped to the grid")
+        XCTAssertEqual(edge.east, 29.5)
+        let away = WindParticles.area(WindMapView.opening(latitude: 50, longitude: 10), within: grid)
+        XCTAssertEqual(away.south, 40.5, "off the grid: the whole grid")
+        XCTAssertEqual(away.east, 29.5)
+    }
 }
 
