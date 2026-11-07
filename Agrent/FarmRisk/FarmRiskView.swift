@@ -360,20 +360,31 @@ struct FarmRiskView: View {
     /// age, so a stale reading shows that alone. The relative clause is
     /// dropped rather than guessed at: the cache knows when IT was written,
     /// not when the satellite passed.
+    ///
+    /// ── «Последна ясна снимка на парцела», not «Заснето на» (#565) ──
+    ///
+    /// The server judges cloud over the PARCEL for a reading, and over the
+    /// whole satellite tile for the block map's index overlay, so the two
+    /// can carry different dates (the map 28 октомври, the parcel
+    /// 2 ноември). Each says which picture it is, so two dates on two
+    /// screens read as two things rather than one contradiction (owner,
+    /// 2026-11-07). The map's own line is «Картата е заснета на …».
+    nonisolated static let lastClear = "Последна ясна снимка на парцела:"
+
     static func acquisition(_ risk: ParcelRisk, _ freshness: Freshness?) -> Acquisition? {
         guard let date = risk.acquired else { return nil }
         let days = risk.staleDays ?? 0
         let isCached = { if case .stale = freshness { return true } else { return false } }()
 
         if isCached {
-            return Acquisition(clauses: ["Заснето на \(BgDate.dayMonth(date))"], isStale: true)
+            return Acquisition(clauses: ["\(lastClear) \(BgDate.dayMonth(date))"], isStale: true)
         }
         if days <= 0 {
-            return Acquisition(clauses: ["Заснето днес"], isStale: false)
+            return Acquisition(clauses: ["\(lastClear) днес"], isStale: false)
         }
         return Acquisition(
             clauses: [
-                "Заснето на \(BgDate.dayMonth(date))",
+                "\(lastClear) \(BgDate.dayMonth(date))",
                 "преди \(Plural.bg(days, "ден", "дни"))",
             ],
             isStale: days > Staleness.satellitePass

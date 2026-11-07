@@ -806,9 +806,12 @@ struct ParcelMapView: View {
                 to: Calendar.current.startOfDay(for: Date())).day ?? 0
             HStack(spacing: 5) {
                 Image(systemName: "camera.badge.clock")
+                // «Картата», as a parcel's reading can be a newer pass: the
+                // server judges cloud over the parcel there and over the
+                // whole tile here (#565, owner 2026-11-07).
                 Text(days <= 0
-                    ? "Заснето днес"
-                    : "Заснето на \(BgDate.dayMonth(date)) · преди \(Plural.bg(days, "ден", "дни"))")
+                    ? "Картата е заснета днес"
+                    : "Картата е заснета на \(BgDate.dayMonth(date)) · преди \(Plural.bg(days, "ден", "дни"))")
                     .fixedSize(horizontal: false, vertical: true)
             }
             .font(.caption)

@@ -562,8 +562,16 @@ final class AcquisitionLineTests: XCTestCase {
         let today = try await risk(acquired: "2026-09-23", generated: "2026-09-23T13:41:07.221Z")
         let line = try XCTUnwrap(FarmRiskView.acquisition(today, .fresh))
         XCTAssertEqual(line.clauses.count, 1)
-        XCTAssertEqual(line.shown, "Заснето днес")
+        XCTAssertEqual(line.shown, "Последна ясна снимка на парцела: днес")
         XCTAssertFalse(line.isStale)
+    }
+
+    /// Says which picture it is (#565): the parcel's last clear pass, as the
+    /// block map's overlay can be an older one («Картата е заснета на …»).
+    func testTheDateSaysItIsTheParcelsLastClearPicture() async throws {
+        let nineDays = try await risk(acquired: "2026-09-14", generated: "2026-09-23T13:41:07.221Z")
+        let line = try XCTUnwrap(FarmRiskView.acquisition(nineDays, .fresh))
+        XCTAssertEqual(line.clauses, ["Последна ясна снимка на парцела: 14 септември", "преди 9 дни"])
     }
 
     /// The one that matters: the SAME two clauses, joined differently.

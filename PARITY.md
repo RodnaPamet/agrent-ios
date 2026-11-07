@@ -2007,3 +2007,9 @@ be read outdoors fails before any parity gap matters.
 - The assistant's question carries the same sentence, so its analysis speaks to the days on screen.
 - The «Риск» row is now three tap targets: the reading (opens the analysis, as before), the picker, and the «Кратък анализ от асистента» link.
 - **Waiting on the server:** the route is in `pendingServerRoutes` until stage 1 is live. Later stages: stored readings (1b), the weakest part of the field (2), and the assistant's own trend tool (3).
+### Decided — each «Заснето» date says which picture it is (owner, 2026-11-07, #565)
+
+- Context: agri-saas now judges cloud over the parcel for a parcel's reading (`/analysis`, its history). The block map's index overlay keeps the tile-wide rule, because its region is the whole block. So the two can carry different dates.
+- **A parcel's reading:** «Последна ясна снимка на парцела: 2 ноември · преди 5 дни». This covers Риск rows, «Риск» on the history, and the inquiry text.
+- **The block map's overlay:** «Картата е заснета на 28 октомври · преди 10 дни».
+- Phone only; no server change. The owner turned down making the map judge clouds over the block too.
