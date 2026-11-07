@@ -1985,3 +1985,14 @@ be read outdoors fails before any parity gap matters.
 - The disc on the block's own map, with streaks, clouds and «Вятър сега», replaces it.
 - Gone with the screen: the isobars, the «Н»/«В» pressure centres and the 48-hour playback. They are in git history, and the field still carries the pressure should any come back onto the block's map.
 
+### Built — the assistant's analysis of a parcel's risk; the same history from Риск (owner, 2026-11-07)
+
+- **5:** "Risk section in history should also include short analysis on click". The owner chose the assistant's analysis over fixed text.
+  - Tapping «Риск» on a parcel's history, while the assistant is on, opens its sheet with the question already asked. The page context is `/t/[tenantSlug]/parcels/[parcelId]` with the parcel's id.
+  - The question carries what the screen holds, as the assistant has no tool for a parcel's archive: the readings as Риск says them, the crop and area, the last seasons and yields, the last operations, and the weeds last seen.
+  - It asks for 3–5 sentences: the likely cause, and what to check in the field.
+  - A follow-up is the ordinary composer.
+- **5.5:** "Parcel risk accessed through the risk section should open the same section as if entered through history page".
+  - The history opened from Риск now has its «Риск» section too: one screen whichever way it was reached.
+  - The `fromRisk` flag is gone.
+

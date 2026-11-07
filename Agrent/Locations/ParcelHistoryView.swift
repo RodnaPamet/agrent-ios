@@ -26,8 +26,9 @@ import SwiftUI
 /// ── And the parcel's risk, from Блокове (owner, 2026-10-29) ──
 ///
 /// Opened from Блокове, the screen starts with «Риск»: the parcel's reading
-/// as Риск shows it (`ParcelRiskReadings`). Not when opened from Риск, which
-/// has just shown it.
+/// as Риск shows it (`ParcelRiskReadings`). From Риск too since 2026-11-07
+/// (it was left out there at first, as Риск had just shown it), and a tap
+/// on it asks the assistant for a short analysis (`RiskAnalysisSheet`).
 ///
 /// Then «Задачи» (#462, same day): a card with the newest current task,
 /// opening the parcel's tasks, «Текущи» and «Архив» (`ParcelTasksView`).
@@ -67,6 +68,10 @@ struct ParcelHistoryView: View {
     /// РЕКОЛТИ's and ПЛЕВЕЛИ's «Изтрий» (owner, 2026-11-06, #541), one for
     /// both lists, so a delete waiting in one is still hidden on return.
     @State private var removal: HistoryRemoval
+    /// The assistant's analysis of the risk, asked (owner, 2026-11-07).
+    @State private var analysing: RiskQuestion?
+    @State private var flags = FeatureFlags.shared
+
     /// The «+» that is open, and which screen it is on (`creatingSheets`).
     @State private var creating: Creating?
     /// Who is signed in: which «+» to offer.
@@ -76,7 +81,7 @@ struct ParcelHistoryView: View {
     @State private var feedback = WriteFeedback()
 
     /// The parcel's risk reading, when opened from Блокове (owner,
-    /// 2026-10-29). Nil from Риск (`fromRisk`), which has just shown it.
+    /// 2026-10-29), and from Риск since 2026-11-07: the same screen either way.
     @State private var risk: ParcelRiskStore?
     /// The parcel's tasks, from Блокове (#462). One store for the card and
     /// the list it opens.
@@ -85,14 +90,16 @@ struct ParcelHistoryView: View {
     /// part of its history, so from wherever the screen is opened.
     @State private var comments: ParcelCommentsStore
 
-    init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil,
-         fromRisk: Bool = false) {
+    init(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil) {
         self.parcelName = parcelName
         self.parcelID = parcelID
         self.recordIn = recordIn
         self.outline = outline ?? recordIn?.parcel
         _store = State(initialValue: ParcelHistoryStore(parcelID: parcelID))
-        _risk = State(initialValue: recordIn == nil || fromRisk ? nil : ParcelRiskStore(parcelID: parcelID))
+        // From Риск too (owner, 2026-11-07: "parcel risk accessed through the
+        // risk section should open the same section as if entered through
+        // history page"): the same screen whichever way it was reached.
+        _risk = State(initialValue: recordIn == nil ? nil : ParcelRiskStore(parcelID: parcelID))
         _tasks = State(initialValue: recordIn == nil ? nil : ParcelTasksStore(parcelID: parcelID))
         _comments = State(initialValue: ParcelCommentsStore(parcelID: parcelID))
         _removal = State(initialValue: HistoryRemoval(parcelID: parcelID))
@@ -118,6 +125,11 @@ struct ParcelHistoryView: View {
             .task { await tasks?.load() }
             .task { if comments.state.value == nil { await comments.load() } }
             .toolbar { addMenu }
+            // On the screen, not on the row: a sheet on a list row goes when
+            // the row scrolls away.
+            .sheet(item: $analysing) { asked in
+                RiskAnalysisSheet(parcelID: parcelID, question: asked.text)
+            }
             .modifier(creatingSheets(on: nil))
             .writeFeedback(feedback)
     }
@@ -377,15 +389,52 @@ struct ParcelHistoryView: View {
             }
             .padding(.vertical, 6)
         case .loaded(let reading, let freshness):
-            VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
-                ParcelRiskReadings(risk: reading, freshness: freshness)
+            // A tap asks the assistant for a short analysis (owner,
+            // 2026-11-07), while the assistant is on; otherwise the readings
+            // alone, as before.
+            if flags.isOn(AssistantAPI.flag) {
+                Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
+                    riskBody(reading, freshness, offersAnalysis: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)))
+                .accessibilityHint("Отваря кратък анализ от асистента")
+                .accessibilityAddTraits(.isButton)
+            } else {
+                riskBody(reading, freshness, offersAnalysis: false)
+                    // One stop, said from the values, as a Риск row is.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)))
             }
-            .padding(.vertical, 6)
-            // One stop, said from the values, as a Риск row is.
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)))
         }
+    }
+
+    private func riskBody(_ reading: ParcelRisk, _ freshness: Freshness?, offersAnalysis: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
+            ParcelRiskReadings(risk: reading, freshness: freshness)
+            if offersAnalysis {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                    Text("Кратък анализ от асистента")
+                    Image(systemName: "chevron.right").font(.caption2)
+                }
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Palette.accent)
+            }
+        }
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+    }
+
+    /// The question for the assistant, from what this screen holds.
+    private func question(_ reading: ParcelRisk, _ freshness: Freshness?) -> String {
+        let archive = store.state.value
+        return RiskAnalysisQuestion.text(
+            parcel: archive?.parcel.name ?? parcelName, risk: reading, freshness: freshness,
+            seasons: archive?.seasons.items ?? [], operations: archive?.operations.items ?? [],
+            weeds: archive?.weeds.items ?? [])
     }
 
     // MARK: - The three cards
@@ -700,3 +749,10 @@ private struct CreatingSheets: ViewModifier {
             .newTaskComposer(isPresented: $task, preset: recordIn, reload: reloadTasks)
     }
 }
+
+/// The assistant's question about a parcel's risk, as a sheet's item.
+struct RiskQuestion: Identifiable {
+    let id = UUID()
+    let text: String
+}
+

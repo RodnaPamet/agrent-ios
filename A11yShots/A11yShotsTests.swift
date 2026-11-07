@@ -2273,6 +2273,40 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertFalse(app.buttons["Пусни"].exists, "the hour bar stayed under the map")
     }
 
+    // MARK: - The assistant's analysis of a parcel's risk (owner, 2026-11-07)
+
+    /// Блокове → a block → SYNTH-1's history → its «Риск»: the assistant's
+    /// sheet opens with the question already asked, and the seam's synthetic
+    /// answer arrives. Nothing reaches the assistant.
+    func testRiskAnalysisFromTheHistory() {
+        let app = XCUIApplication()
+        app.launchArguments += [Self.seamArgument, "AGRENT_UITEST_ASSISTANT"]
+        app.launch()
+        assertSeamActive(app)
+        app.tabBars.buttons["Блокове"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.cells.firstMatch.tap()
+        let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "SYNTH-1")).firstMatch
+        for _ in 0..<4 where !(row.exists && row.isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
+        }
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "no SYNTH-1 row")
+        row.tap()
+        let risk = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Риск,'")).firstMatch
+        XCTAssertTrue(risk.waitForExistence(timeout: 15), "«Риск» is not a button\n\(app.debugDescription)")
+        risk.tap()
+        Thread.sleep(forTimeInterval: 4)
+        capture("32a-risk-analysis", app: app)
+        // The assistant's sheet, answering: the question has scrolled above
+        // the answer by now, so it is the sheet and its answer that are
+        // looked for, not the question's row.
+        XCTAssertTrue(app.navigationBars["Асистент"].waitForExistence(timeout: 10),
+                      "«Риск» opened no assistant\n\(app.debugDescription)")
+        XCTAssertTrue(app.textFields["Въпрос"].exists, "no composer to ask on")
+        app.navigationBars.buttons["Затвори"].firstMatch.tap()
+    }
+
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
 
     /// The owner tapped «История» on a risk row and nothing happened
@@ -2298,11 +2332,13 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
         XCTAssertFalse(app.navigationBars["Риск по парцели"].exists, "«История» opened behind Риск")
         // Its «+», as from Блокове: Риск passes the block it shows (owner,
-        // 2026-11-06), but not the risk card, which Риск has just shown.
+        // 2026-11-06), and the risk card too: the same screen either way
+        // (owner, 2026-11-07).
         XCTAssertTrue(app.navigationBars["История"].buttons["Добави"].waitForExistence(timeout: 5),
                       "no «+» on the history from Риск")
-        XCTAssertFalse(app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH 'Риск,'")).firstMatch.exists, "a risk card from Риск")
+        XCTAssertTrue(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Риск,'")).firstMatch.waitForExistence(timeout: 10),
+                      "no risk card on the history from Риск\n\(app.debugDescription)")
         // The parcel on the map at the top (owner, 2026-11-06).
         XCTAssertTrue(app.descendants(matching: .any)["\(parcelName) на картата"].waitForExistence(timeout: 5),
                       "no map of the parcel on its history\n\(app.debugDescription)")
