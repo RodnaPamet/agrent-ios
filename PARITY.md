@@ -1979,3 +1979,9 @@ be read outdoors fails before any parity gap matters.
   - Grey where cloudy, near-white over imagery, dark slate where it rains (from 0.1 mm in the hour). The amount sets the opacity.
   - Drawn on both maps; on «Вятър» they move with the hours and the legend says «облаци» and «дъжд».
 
+### Removed — the full-screen «Вятър» map (owner, 2026-11-07)
+
+- The owner's words: "Ok, this is better, remove the wind button from the top".
+- The disc on the block's own map, with streaks, clouds and «Вятър сега», replaces it.
+- Gone with the screen: the isobars, the «Н»/«В» pressure centres and the 48-hour playback. They are in git history, and the field still carries the pressure should any come back onto the block's map.
+

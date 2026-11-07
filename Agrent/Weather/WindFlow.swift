@@ -190,7 +190,7 @@ final class WindParticles {
         lastTick = now
         guard dt > 0 else { return }
         area = Self.area(region, within: grid)
-        let scale = Self.speedScale * region.span.latitudeDelta / WindMapView.bulgaria.span.latitudeDelta
+        let scale = Self.speedScale * region.span.latitudeDelta / WindGrid.bulgaria.span.latitudeDelta
         for i in particles.indices {
             var p = particles[i]
             p.age += dt
@@ -236,13 +236,13 @@ struct WindFlowLayer: View {
                 // Two paths per band: the older half of each trail faint, the
                 // newer half strong, so a streak fades behind its head. Eight
                 // strokes a frame rather than one per particle.
-                let bands = WindMapWords.bands.count
+                let bands = WindBands.bands.count
                 var tails = Array(repeating: Path(), count: bands)
                 var heads = Array(repeating: Path(), count: bands)
                 for particle in particles.particles where particle.trail.count > 2 {
                     guard let w = wind.at(latitude: particle.latitude, longitude: particle.longitude) else { continue }
                     let speed = (w.u * w.u + w.v * w.v).squareRoot()
-                    let band = WindMapWords.bands.firstIndex { speed < $0.upTo } ?? bands - 1
+                    let band = WindBands.bands.firstIndex { speed < $0.upTo } ?? bands - 1
                     let points = particle.trail.map { projection.point(latitude: $0.latitude, longitude: $0.longitude) }
                     let middle = points.count / 2
                     tails[band].addLines(Array(points[...middle]))
@@ -256,7 +256,7 @@ struct WindFlowLayer: View {
                     }
                 }
                 for band in 0..<bands {
-                    let color = WindMapWords.bands[band].color
+                    let color = WindBands.bands[band].color
                     context.stroke(tails[band], with: .color(color.opacity(0.3)), style: style)
                     context.stroke(heads[band], with: .color(color.opacity(0.95)), style: style)
                 }
@@ -274,5 +274,18 @@ struct WindFlowLayer: View {
 final class MapRegionBox {
     var region: MKCoordinateRegion
     init(_ region: MKCoordinateRegion) { self.region = region }
+}
+
+/// The streaks' colours by strength: calm enough to spray, a breeze,
+/// strong, and a gale.
+enum WindBands {
+    struct Band { let label: String; let color: Color; let upTo: Double }
+
+    static let bands: [Band] = [
+        Band(label: "до 4 м/с", color: Palette.ChartSeries.colors[0], upTo: 4),
+        Band(label: "4–8", color: Palette.ChartSeries.colors[2], upTo: 8),
+        Band(label: "8–12", color: Palette.warning, upTo: 12),
+        Band(label: "над 12", color: Palette.error, upTo: .infinity),
+    ]
 }
 
