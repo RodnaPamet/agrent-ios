@@ -2263,6 +2263,32 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars["Вятър и налягане"].buttons["Затвори"].tap()
     }
 
+    // MARK: - The wind and clouds on a block's own map (owner, 2026-11-07)
+
+    /// Блокове → the first block → the wind disc above «Моето
+    /// местоположение»: streaks and clouds over the parcels, and «Вятър
+    /// сега» with the sky at the block. Nothing calls Open-Meteo.
+    func testWindOnTheBlockMap() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        app.tabBars.buttons["Блокове"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.cells.firstMatch.tap()
+        let toggle = app.buttons["Вятър на картата"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "no wind disc on the block's map\n\(app.debugDescription)")
+        XCTAssertEqual(toggle.value as? String, "изключен")
+        toggle.tap()
+        let now = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Вятър сега'")).firstMatch
+        XCTAssertTrue(now.waitForExistence(timeout: 10), "no «Вятър сега»\n\(app.debugDescription)")
+        XCTAssertEqual(toggle.value as? String, "включен")
+        Thread.sleep(forTimeInterval: 3)
+        capture("31a-wind-on-block-map", app: app)
+        toggle.tap()
+        XCTAssertFalse(now.waitForExistence(timeout: 2), "the wind stayed on")
+    }
+
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
 
     /// The owner tapped «История» on a risk row and nothing happened

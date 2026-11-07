@@ -19,7 +19,7 @@ final class WindFieldTests: XCTestCase {
         XCTAssertEqual(places, 170)
         XCTAssertEqual(value("latitude")?.split(separator: ",").count, places)
         XCTAssertEqual(value("longitude")?.split(separator: ",").count, places)
-        XCTAssertEqual(value("hourly"), "wind_speed_10m,wind_direction_10m,pressure_msl")
+        XCTAssertEqual(value("hourly"), "wind_speed_10m,wind_direction_10m,pressure_msl,cloud_cover,precipitation")
         XCTAssertEqual(value("wind_speed_unit"), "ms")
         XCTAssertEqual(value("forecast_hours"), "48")
         XCTAssertNil(value("apikey"))
@@ -184,6 +184,62 @@ final class WindFieldTests: XCTestCase {
         let away = WindParticles.area(WindMapView.opening(latitude: 50, longitude: 10), within: grid)
         XCTAssertEqual(away.south, 40.5, "off the grid: the whole grid")
         XCTAssertEqual(away.east, 29.5)
+    }
+
+    // MARK: - Clouds and rain (owner, 2026-11-07)
+
+    /// Light for cloud, dark for rain, none for a clear sky; the amount is
+    /// the opacity.
+    func testHowASkyLooks() throws {
+        XCTAssertNil(CloudLook(cover: 10, rain: 0), "a clear sky draws nothing")
+        let thin = try XCTUnwrap(CloudLook(cover: 20, rain: 0))
+        let overcast = try XCTUnwrap(CloudLook(cover: 100, rain: 0))
+        XCTAssertFalse(overcast.isRain)
+        XCTAssertLessThan(thin.opacity, overcast.opacity)
+        let drizzle = try XCTUnwrap(CloudLook(cover: 100, rain: 0.1))
+        let downpour = try XCTUnwrap(CloudLook(cover: 100, rain: 6))
+        XCTAssertTrue(drizzle.isRain, "rain is dark whatever the cover")
+        XCTAssertLessThan(drizzle.opacity, downpour.opacity)
+        XCTAssertEqual(downpour.opacity, 0.8, accuracy: 1e-9, "capped")
+        XCTAssertEqual(CloudLook.words(cover: 80, rain: 0), "облачно 80 %")
+        XCTAssertEqual(CloudLook.words(cover: 90, rain: 1.25), "дъжд 1,2 мм/ч")
+        XCTAssertEqual(CloudLook.words(cover: 5, rain: 0), "ясно")
+        XCTAssertEqual("облачно".capitalizedFirst, "Облачно")
+    }
+
+    /// Cover and rain mixed between grid places, like the wind.
+    func testTheSkyIsMixedBetweenPlaces() throws {
+        let field = WindField(hours: [Date()], latitudes: [42, 43], longitudes: [24, 25],
+                              windMS: [[[0, 0], [0, 0]]], windFrom: [[[0, 0], [0, 0]]],
+                              pressure: [[[1013, 1013], [1013, 1013]]],
+                              cloudCover: [[[0, 100], [0, 100]]], precipitation: [[[0, 2], [0, 2]]])
+        let sky = try XCTUnwrap(CloudGrid(field, hour: 0)?.at(latitude: 42.5, longitude: 24.5))
+        XCTAssertEqual(sky.cover, 50, accuracy: 1e-9)
+        XCTAssertEqual(sky.rain, 1, accuracy: 1e-9)
+        XCTAssertNil(CloudGrid(field, hour: 1), "no such hour")
+        let old = WindField(hours: [Date()], latitudes: [42, 43], longitudes: [24, 25],
+                            windMS: [[[0, 0], [0, 0]]], windFrom: [[[0, 0], [0, 0]]],
+                            pressure: [[[1013, 1013], [1013, 1013]]])
+        XCTAssertNil(CloudGrid(old, hour: 0), "a field without clouds draws none")
+    }
+
+    /// The canvas point back to its place: the projection the other way.
+    func testThePlaceUnderAPointIsTheOneDrawnThere() {
+        let projection = WindProjection(region: WindMapView.opening(latitude: 43.2, longitude: 24.4),
+                                        size: CGSize(width: 390, height: 700))
+        for (lat, lon) in [(43.2, 24.4), (43.6, 24.1), (42.8, 24.85)] {
+            let back = projection.coordinate(of: projection.point(latitude: lat, longitude: lon))
+            XCTAssertEqual(back.latitude, lat, accuracy: 1e-9)
+            XCTAssertEqual(back.longitude, lon, accuracy: 1e-9)
+        }
+    }
+
+    /// The seam's low brings its rain: the screenshot shows dark cloud.
+    func testTheFixtureRainsAtTheLow() async throws {
+        let field = try await FixtureWindFieldSource().field()
+        let grid = try XCTUnwrap(CloudGrid(field, hour: 24))
+        XCTAssertTrue(grid.rain.joined().contains { $0 >= CloudLook.rainFrom })
+        XCTAssertTrue(grid.cover.joined().contains { $0 >= 90 })
     }
 }
 

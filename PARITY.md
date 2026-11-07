@@ -1966,3 +1966,16 @@ be read outdoors fails before any parity gap matters.
   - a swipe «Изтрий», «Сигурни ли сте, че искате да изтриете коментара?», then five seconds of «Отмени»;
   - then `DELETE …/comments/{id}`, which is soft and answers 200.
 
+### Built — the wind and clouds on the block's own map (owner, 2026-11-07)
+
+- **The ask:** "A button on top of the location button renders the wind directly on the map", then "include clouds as well - dark clouds for rain and light for cloudy weather".
+- **Where:** a wind disc above «Моето местоположение» on a block's satellite map. It toggles:
+  - Open-Meteo's field for the hour under way, as moving streaks over the parcels, with a dark edge so they read on imagery;
+  - soft clouds under them;
+  - «Вятър сега: 4,2 м/с от ЮЗ» with «Облачно 80 %» or «Дъжд 1,2 мм/ч» at the block, and the data's source.
+- **Following the map:** the streaks and clouds read the map's region every frame from a box its UIKit map writes as it pans, so they stay on the land without re-rendering the map.
+- **Clouds:**
+  - Open-Meteo's `cloud_cover` and `precipitation` joined the same request (five variables per place, still one call each).
+  - Grey where cloudy, near-white over imagery, dark slate where it rains (from 0.1 mm in the hour). The amount sets the opacity.
+  - Drawn on both maps; on «Вятър» they move with the hours and the legend says «облаци» and «дъжд».
+

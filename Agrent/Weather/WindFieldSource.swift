@@ -81,7 +81,8 @@ enum OpenMeteoAPI {
         var items = [
             URLQueryItem(name: "latitude", value: latitudes.joined(separator: ",")),
             URLQueryItem(name: "longitude", value: longitudes.joined(separator: ",")),
-            URLQueryItem(name: "hourly", value: "wind_speed_10m,wind_direction_10m,pressure_msl"),
+            // Five per place, under the ten that would count a place twice.
+            URLQueryItem(name: "hourly", value: "wind_speed_10m,wind_direction_10m,pressure_msl,cloud_cover,precipitation"),
             URLQueryItem(name: "wind_speed_unit", value: "ms"),
             URLQueryItem(name: "forecast_hours", value: String(WindGrid.hours)),
             URLQueryItem(name: "timezone", value: "GMT"),
@@ -97,6 +98,10 @@ enum OpenMeteoAPI {
             let wind_speed_10m: [Double?]
             let wind_direction_10m: [Double?]
             let pressure_msl: [Double?]
+            /// Optional: a field read before clouds were asked for, or a
+            /// fixture without them, still decodes.
+            let cloud_cover: [Double?]?
+            let precipitation: [Double?]?
         }
         let hourly: Hourly
     }
@@ -124,7 +129,8 @@ enum OpenMeteoAPI {
         }
         return WindField(hours: hours, latitudes: WindGrid.latitudes, longitudes: WindGrid.longitudes,
                          windMS: cube(\.wind_speed_10m), windFrom: cube(\.wind_direction_10m),
-                         pressure: cube(\.pressure_msl))
+                         pressure: cube(\.pressure_msl),
+                         cloudCover: cube { $0.cloud_cover ?? [] }, precipitation: cube { $0.precipitation ?? [] })
     }
 
     /// «2026-11-06T18:00», GMT as asked.
@@ -141,12 +147,15 @@ struct FixtureWindFieldSource: WindFieldSource {
         let start = Date(timeIntervalSince1970: (Date().timeIntervalSince1970 / 3600).rounded(.down) * 3600)
         let lats = WindGrid.latitudes, lons = WindGrid.longitudes
         var wind: [[[Double]]] = [], from: [[[Double]]] = [], pressure: [[[Double]]] = []
+        var clouds: [[[Double]]] = [], rain: [[[Double]]] = []
         for h in 0..<WindGrid.hours {
             let centreLon = 22.0 + Double(h) * 0.13
             let centreLat = 42.8
             var w: [[Double]] = [], f: [[Double]] = [], p: [[Double]] = []
+            var cl: [[Double]] = [], rn: [[Double]] = []
             for lat in lats {
                 var wr: [Double] = [], fr: [Double] = [], pr: [Double] = []
+                var cr: [Double] = [], rr: [Double] = []
                 for lon in lons {
                     let dy = lat - centreLat, dx = lon - centreLon
                     let distance = (dx * dx + dy * dy).squareRoot()
@@ -156,13 +165,19 @@ struct FixtureWindFieldSource: WindFieldSource {
                     // 90° to the right of the line to the centre.
                     let bearing = atan2(dx, dy) * 180 / .pi
                     fr.append((bearing + 270).truncatingRemainder(dividingBy: 360))
+                    // Overcast within three degrees of the low and thinning to
+                    // clear five out, raining within two, heaviest at its centre.
+                    let cover: Double = max(0, min(100, (5 - distance) * 50))
+                    let wet: Double = max(0, (2 - distance) * 2)
+                    cr.append(cover); rr.append(wet)
                 }
-                w.append(wr); f.append(fr); p.append(pr)
+                w.append(wr); f.append(fr); p.append(pr); cl.append(cr); rn.append(rr)
             }
-            wind.append(w); from.append(f); pressure.append(p)
+            wind.append(w); from.append(f); pressure.append(p); clouds.append(cl); rain.append(rn)
         }
         return WindField(hours: (0..<WindGrid.hours).map { start.addingTimeInterval(Double($0) * 3600) },
-                         latitudes: lats, longitudes: lons, windMS: wind, windFrom: from, pressure: pressure)
+                         latitudes: lats, longitudes: lons, windMS: wind, windFrom: from, pressure: pressure,
+                         cloudCover: clouds, precipitation: rain)
     }
 }
 #endif

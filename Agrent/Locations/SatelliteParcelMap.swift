@@ -60,6 +60,10 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// The visible area once a pan or a zoom settles: what the blocks are
     /// read for.
     var onRegionChange: ((MKCoordinateRegion) -> Void)?
+    /// Every frame of a pan or zoom, not only its end: for a layer drawn
+    /// over the map that must stay on the land it describes (the wind,
+    /// owner 2026-11-07). Nil costs nothing.
+    var onVisibleRegion: ((MKCoordinateRegion) -> Void)?
 
     /// The XYZ template, or nil for imagery alone.
     let tileTemplate: String?
@@ -178,6 +182,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         // it moves the map when, and only when, something asked it to.
         context.coordinator.onTap = onTap
         context.coordinator.onRegionChange = onRegionChange
+        context.coordinator.onVisibleRegion = onVisibleRegion
         // The gesture is removed rather than made a no-op, so the map does
         // not consume a touch it will do nothing with.
         context.coordinator.tap?.isEnabled = onTap != nil
@@ -231,6 +236,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         var contrast: ColorSchemeContrast = .standard
         var onTap: (([Parcel]) -> Void)?
         var onRegionChange: ((MKCoordinateRegion) -> Void)?
+        var onVisibleRegion: ((MKCoordinateRegion) -> Void)?
         weak var tap: UITapGestureRecognizer?
         private var mountedBase: Base?
         private var mountedBlocks: [OrthoBlock] = []
@@ -487,7 +493,12 @@ struct SatelliteParcelMap: UIViewRepresentable {
             }
         }
 
+        func mapViewDidChangeVisibleRegion(_ view: MKMapView) {
+            onVisibleRegion?(view.region)
+        }
+
         func mapView(_ view: MKMapView, regionDidChangeAnimated animated: Bool) {
+            onVisibleRegion?(view.region)
             onRegionChange?(view.region)
         }
 

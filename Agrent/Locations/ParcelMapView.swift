@@ -11,6 +11,15 @@ struct ParcelMapView: View {
     @State private var showingWeather = false
     /// «Вятър и налягане» over Bulgaria is open (owner, 2026-11-06).
     @State private var showingWind = false
+    /// The wind drawn ON this map (owner, 2026-11-07: "a button on top of the
+    /// location button renders the wind directly on the map"): Open-Meteo's
+    /// field for the hour under way, as moving streaks over the parcels.
+    @State private var windOnMap = false
+    @State private var windField: WindField?
+    @State private var windFailed = false
+    @State private var windParticles = WindParticles()
+    /// Written by the map as it pans, read by the streaks as they draw.
+    @State private var windRegion = MapRegionBox(WindMapView.bulgaria)
     @State private var store: ParcelsStore
 
     /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
@@ -289,6 +298,7 @@ struct ParcelMapView: View {
                 onRegionChange: { region in
                     if mode == .orthophoto { ortho.showBlocks(in: region) }
                 },
+                onVisibleRegion: { [windRegion] region in windRegion.region = region },
                 tileTemplate: mode == .precise ? indices.tiles?.tileUrl : nil,
                 shape: mode == .simplified ? .boundingBoxes : .outlines,
                 contrast: contrast,
@@ -296,8 +306,22 @@ struct ParcelMapView: View {
                 onTap: { tapped($0) },
                 showsDeviceLocation: deviceLocation.access == .allowed
             )
+            .overlay {
+                if windOnMap, let field = windField {
+                    // Clouds and rain under the wind (owner, 2026-11-07).
+                    ZStack {
+                        CloudLayer(field: field, hour: WindVectors.hourNow(field),
+                                   region: { [windRegion] in windRegion.region },
+                                   onImagery: true)
+                        WindFlowLayer(wind: WindVectors(field, hour: WindVectors.hourNow(field)),
+                                      region: { [windRegion] in windRegion.region }, particles: windParticles,
+                                      halo: true)
+                    }
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 VStack(spacing: 0) {
+                    windToggle
                     MapLocationButton { centre(on: $0) }
                     targetButton(drawable)
                 }
@@ -308,6 +332,7 @@ struct ParcelMapView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if mode == .orthophoto { orthophotoFooter }
                     StandingInLabel(parcels: drawable)
+                    if windOnMap { windNow }
                 }
             }
             .showsDeviceLocation()
@@ -365,6 +390,76 @@ struct ParcelMapView: View {
         storedMode = mode.next(in: modes)
         cameraTick += 1
         camera = .init(tick: cameraTick, region: mapRegion(for: mode))
+    }
+
+    // MARK: - The wind on the map (owner, 2026-11-07)
+
+    /// Above «Моето местоположение», in the same disc: the wind on, then off.
+    /// Shown once the block has a centre, as «Вятър» is.
+    @ViewBuilder
+    private var windToggle: some View {
+        if weatherCentre != nil {
+            Button {
+                windOnMap.toggle()
+                if windOnMap { Task { await loadWind() } }
+            } label: {
+                Image(systemName: windOnMap ? "wind.circle.fill" : "wind")
+                    .foregroundStyle(windOnMap ? Palette.accent : Palette.Field.text)
+                    .mapDisc()
+            }
+            .buttonStyle(.plain)
+            .padding([.horizontal, .top], 16)
+            .accessibilityLabel("Вятър на картата")
+            .accessibilityValue(windOnMap ? "включен" : "изключен")
+            .accessibilityInputLabels(A11y.spokenNames("Вятър на картата", "Вятър", "Wind"))
+        }
+    }
+
+    /// The field, once per opening (Open-Meteo's, kept half an hour), and
+    /// the streaks born over what the map shows.
+    private func loadWind() async {
+        guard windField == nil else { return }
+        do {
+            let field = try await WindFieldSources.current.field()
+            windParticles.reset(latitudes: field.latitudes, longitudes: field.longitudes)
+            windRegion.region = mapRegion(for: mode)
+            windField = field
+            windFailed = false
+        } catch {
+            windFailed = true
+        }
+    }
+
+    /// «Вятър сега: 4,2 м/с от ЮЗ», at the block's centre, under the
+    /// parcel the phone stands in; the data's source, which its licence asks
+    /// for; or, failing, one Bulgarian sentence.
+    @ViewBuilder
+    private var windNow: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if windFailed {
+                Text("Вятърът не може да се зареди в момента.")
+            } else if let field = windField, let centre = weatherCentre,
+                      let wind = WindVectors(field, hour: WindVectors.hourNow(field))
+                        .speedAndFrom(latitude: centre.latitude, longitude: centre.longitude) {
+                Text("Вятър сега: \(WeatherWords.speed(wind.speed)) от \(WeatherWords.compass(wind.from))")
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityLabel("Вятър сега: \(WeatherWords.speed(wind.speed)) от \(WeatherWords.compassSpoken(wind.from))")
+                if let sky = CloudGrid(field, hour: WindVectors.hourNow(field))?
+                    .at(latitude: centre.latitude, longitude: centre.longitude) {
+                    Text(CloudLook.words(cover: sky.cover, rain: sky.rain).capitalizedFirst)
+                        .font(.subheadline)
+                }
+                Text("Данни: Open-Meteo.com (CC BY 4.0)")
+                    .font(.caption2)
+                    .foregroundStyle(Palette.secondaryText)
+            } else {
+                ProgressView().accessibilityLabel("Зареждане на вятъра")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Palette.Surface.bar, in: RoundedRectangle(cornerRadius: 10))
+        .padding([.horizontal, .top], 12)
     }
 
     /// The block's centre, for its weather: the middle of its drawn parcels,
