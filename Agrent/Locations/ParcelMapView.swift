@@ -193,7 +193,6 @@ struct ParcelMapView: View {
             VStack(spacing: 0) {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
-                if windOnMap, let field = windField { windControls(field) }
                 if mode.showsSownFallow && !drawable.isEmpty { legend }
                 // The vegetation indices are the precise map's: the photo
                 // has no index tiles over it.
@@ -321,7 +320,6 @@ struct ParcelMapView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if mode == .orthophoto { orthophotoFooter }
                     StandingInLabel(parcels: drawable)
-                    if windOnMap { windNow }
                 }
             }
             .showsDeviceLocation()
@@ -445,22 +443,23 @@ struct ParcelMapView: View {
                 ProgressView().accessibilityLabel("Зареждане на вятъра")
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Palette.Surface.bar, in: RoundedRectangle(cornerRadius: 10))
-        .padding([.horizontal, .top], 12)
+        .padding(.vertical, 4)
     }
 
-    /// Under the map while the wind is on: ▶ and the hour's slider, the
+    /// Under the map, in the list, while the wind is on: ▶ and the hour's slider, the
     /// legend, and the data's source. The 48 hours a low takes to cross the
     /// country, an hour every half second.
     private func windControls(_ field: WindField) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
+                // BORDERLESS, each control its own target: in a list row the
+                // default style makes the whole row one button, and ▶ opened
+                // Open-Meteo's page in Safari (measured in A11yShots).
                 Button { windPlaying.toggle() } label: {
                     Image(systemName: windPlaying ? "pause.fill" : "play.fill")
                         .frame(width: 44, height: 44)
                 }
+                .buttonStyle(.borderless)
                 .accessibilityLabel(windPlaying ? "Пауза" : "Пусни")
                 .accessibilityInputLabels(windPlaying ? A11y.spokenNames("Пауза", "Pause")
                                                       : A11y.spokenNames("Пусни", "Play"))
@@ -485,11 +484,10 @@ struct ParcelMapView: View {
             WindLegend()
             Link("Данни: Open-Meteo.com (CC BY 4.0)", destination: URL(string: "https://open-meteo.com")!)
                 .font(.caption2)
+                .buttonStyle(.borderless)
                 .accessibilityInputLabels(A11y.spokenNames("Open-Meteo"))
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .solidBar(hairline: .top)
+        .padding(.vertical, 4)
         .task(id: windPlaying) { await playWind(field) }
     }
 
@@ -934,6 +932,23 @@ struct ParcelMapView: View {
         // because the system's header grey is not a token and was never
         // measured against a page that is not the system's.
         List {
+            // The wind's words and controls, BELOW the map and not on it
+            // (owner, 2026-11-07: "the map becomes too small. The additional
+            // info below should appear below the map, not inside of it"):
+            // the list's own first section, in its window, so the map keeps
+            // its whole height and carries only the wind itself.
+            if windOnMap {
+                Section {
+                    windNow
+                        .listRowBackground(Palette.Surface.card)
+                    if let field = windField {
+                        windControls(field)
+                            .listRowBackground(Palette.Surface.card)
+                    }
+                } header: {
+                    SectionHeader("Вятър")
+                }
+            }
             Section {
                 ForEach(response.parcels) { parcel in
                     parcelRow(parcel)
