@@ -2295,6 +2295,10 @@ final class A11yShotsTests: XCTestCase {
         row.tap()
         let risk = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Риск,'")).firstMatch
         XCTAssertTrue(risk.waitForExistence(timeout: 15), "«Риск» is not a button\n\(app.debugDescription)")
+        // The app's own words under the readings (owner, 2026-11-07).
+        XCTAssertTrue(risk.label.contains("Културата е зелена"), "no app explanation: \(risk.label)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("32-risk-explanation", app: app)
         risk.tap()
         Thread.sleep(forTimeInterval: 4)
         capture("32a-risk-analysis", app: app)

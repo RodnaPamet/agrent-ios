@@ -398,14 +398,16 @@ struct ParcelHistoryView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)))
+                .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
+                                                    + [explanation(reading, freshness)]))
                 .accessibilityHint("Отваря кратък анализ от асистента")
                 .accessibilityAddTraits(.isButton)
             } else {
                 riskBody(reading, freshness, offersAnalysis: false)
                     // One stop, said from the values, as a Риск row is.
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)))
+                    .accessibilityLabel(A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
+                                                    + [explanation(reading, freshness)]))
             }
         }
     }
@@ -414,6 +416,13 @@ struct ParcelHistoryView: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
             ParcelRiskReadings(risk: reading, freshness: freshness)
+            // The app's own reading of the pair (owner, 2026-11-07), above
+            // the assistant's longer one.
+            if let words = explanation(reading, freshness) {
+                Text(words)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if offersAnalysis {
                 HStack(spacing: 4) {
                     Image(systemName: "sparkles")
@@ -426,6 +435,11 @@ struct ParcelHistoryView: View {
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
+    }
+
+    private func explanation(_ reading: ParcelRisk, _ freshness: Freshness?) -> String? {
+        RiskExplanation.text(vegetation: reading.vegetation, moisture: reading.moisture,
+                             stale: FarmRiskView.acquisition(reading, freshness)?.isStale ?? false)
     }
 
     /// The question for the assistant, from what this screen holds.
