@@ -204,6 +204,9 @@ final class RouteContractTests: XCTestCase {
         // An assistant link (#483) read as a web page link, the way a
         // notification's is (`PushLink`). Never requested.
         "AssistantModels.swift": "a web page link for PushLink, not an API path",
+        // The assistant's page context for a parcel (owner, 2026-11-07):
+        // agri-saas's page TEMPLATE, never requested.
+        "RiskAnalysisSheet.swift": "the web page template /t/[tenantSlug]/parcels/[parcelId], not an API path",
         // Open-Meteo's own forecast path, on its host (owner, 2026-11-06).
         "WindFieldSource.swift": "Open-Meteo's /v1/forecast, a third-party host, not agri-saas",
     ]

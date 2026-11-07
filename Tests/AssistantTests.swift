@@ -119,6 +119,11 @@ final class AssistantTests: XCTestCase {
         for surface in AppSurface.allCases where !AssistantPageContext.unserved.contains(surface) {
             XCTAssertTrue(served.contains(AssistantPageContext.template(surface)), "\(surface)")
         }
+        // A parcel's history asks about its own page (the risk analysis,
+        // owner 2026-11-07): the parcel template, the id beside it.
+        let parcel = RiskAnalysisSheet.context("par_1")
+        XCTAssertEqual(parcel.route, "/t/[tenantSlug]/parcels/[parcelId]", "agri-saas page-routes.ts has it (line 132)")
+        XCTAssertEqual(parcel.selectedIds, ["par_1"])
         // A surface the web has no page for sends no context at all.
         XCTAssertNil(AssistantPageContext.surface(.documents))
         XCTAssertFalse(served.contains(AssistantPageContext.template(.documents)), "positive control")
