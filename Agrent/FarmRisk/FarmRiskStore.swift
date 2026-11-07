@@ -296,7 +296,7 @@ final class FarmRiskStore {
         if let risk = row?.risk, risk.overall.isReading {
             parts.append("Сателитна оценка: \(risk.overall.label).")
             if let date = risk.acquired {
-                parts.append("Заснето на \(BgDate.dayMonth(date)).")
+                parts.append("\(FarmRiskView.lastClear) \(BgDate.dayMonth(date)).")
             }
         }
         // The server caps this at 2000 characters and rejects a longer one,
