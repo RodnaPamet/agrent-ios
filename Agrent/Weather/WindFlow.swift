@@ -115,11 +115,13 @@ final class WindParticles {
         var sinceSample: Double = 0
     }
 
-    static let count = 1100
+    /// All in view now (`area`), so fewer than the country once needed:
+    /// 1100 in a degree read as a wall (measured, 2026-11-07).
+    static let count = 500
     /// How long a streak is: a point every `sampleEvery` seconds, so the
     /// length is the same at any frame rate (the first version counted
     /// frames, and on a slow frame rate the streaks were dots).
-    static let trailLength = 12
+    static let trailLength = 9
     static let sampleEvery = 0.05
     /// Degrees of latitude per second for 1 m/s: a 10 m/s wind moves half a
     /// degree (one grid cell, ~25 points on the whole-country view) a
@@ -128,37 +130,63 @@ final class WindParticles {
 
     private(set) var particles: [Particle] = []
     private var lastTick: Date?
-    private var bounds: (south: Double, north: Double, west: Double, east: Double) = (0, 0, 0, 0)
+    typealias Box = (south: Double, north: Double, west: Double, east: Double)
+    /// The grid's extent: no wind is known outside it.
+    private var grid: Box = (0, 0, 0, 0)
+    /// Where particles are born: what the map shows, within the grid. So a
+    /// block zoomed into keeps all its streaks rather than the few of the
+    /// whole country's that happen to fall in view (owner's screenshot,
+    /// 2026-11-07).
+    private var area: Box = (0, 0, 0, 0)
 
     func reset(latitudes: [Double], longitudes: [Double]) {
         guard let south = latitudes.first, let north = latitudes.last,
               let west = longitudes.first, let east = longitudes.last else { return }
-        bounds = (south, north, west, east)
+        grid = (south, north, west, east)
+        area = grid
         particles = (0..<Self.count).map { _ in spawn(age: Double.random(in: 0...4)) }
         lastTick = nil
     }
 
+    /// The visible region, within the grid; the whole grid when the two
+    /// do not meet.
+    nonisolated static func area(_ region: MKCoordinateRegion, within grid: Box) -> Box {
+        let south = max(grid.south, region.center.latitude - region.span.latitudeDelta / 2)
+        let north = min(grid.north, region.center.latitude + region.span.latitudeDelta / 2)
+        let west = max(grid.west, region.center.longitude - region.span.longitudeDelta / 2)
+        let east = min(grid.east, region.center.longitude + region.span.longitudeDelta / 2)
+        return south < north && west < east ? (south, north, west, east) : grid
+    }
+
     private func spawn(age: Double = 0) -> Particle {
-        let lat = Double.random(in: bounds.south...bounds.north)
-        let lon = Double.random(in: bounds.west...bounds.east)
+        let lat = Double.random(in: area.south...area.north)
+        let lon = Double.random(in: area.west...area.east)
         return Particle(latitude: lat, longitude: lon, age: age, life: Double.random(in: 3...7),
                         trail: [(lat, lon), (lat, lon)])
     }
 
-    /// One frame: move every particle by the wind where it is.
-    func step(_ wind: WindVectors, now: Date) {
+    private func outside(_ p: Particle) -> Bool {
+        p.latitude < area.south || p.latitude > area.north || p.longitude < area.west || p.longitude > area.east
+    }
+
+    /// One frame: move every particle by the wind where it is, at the same
+    /// speed ON SCREEN whatever the zoom (the scale is the whole country's,
+    /// adjusted by how much of it is in view).
+    func step(_ wind: WindVectors, now: Date, region: MKCoordinateRegion) {
         let dt = min(lastTick.map { now.timeIntervalSince($0) } ?? 0, 0.1)
         lastTick = now
         guard dt > 0 else { return }
+        area = Self.area(region, within: grid)
+        let scale = Self.speedScale * region.span.latitudeDelta / WindMapView.bulgaria.span.latitudeDelta
         for i in particles.indices {
             var p = particles[i]
             p.age += dt
-            guard p.age < p.life, let w = wind.at(latitude: p.latitude, longitude: p.longitude) else {
+            guard p.age < p.life, !outside(p), let w = wind.at(latitude: p.latitude, longitude: p.longitude) else {
                 particles[i] = spawn()
                 continue
             }
-            p.latitude += w.v * Self.speedScale * dt
-            p.longitude += w.u * Self.speedScale * dt / max(cos(p.latitude * .pi / 180), 0.2)
+            p.latitude += w.v * scale * dt
+            p.longitude += w.u * scale * dt / max(cos(p.latitude * .pi / 180), 0.2)
             p.sinceSample += dt
             if p.sinceSample >= Self.sampleEvery {
                 p.sinceSample = 0
@@ -183,7 +211,7 @@ struct WindFlowLayer: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                particles.step(wind, now: timeline.date)
+                particles.step(wind, now: timeline.date, region: region)
                 let projection = WindProjection(region: region, size: size)
                 // Two paths per band: the older half of each trail faint, the
                 // newer half strong, so a streak fades behind its head. Eight
@@ -200,7 +228,7 @@ struct WindFlowLayer: View {
                     tails[band].addLines(Array(points[...middle]))
                     heads[band].addLines(Array(points[middle...]))
                 }
-                let style = StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
+                let style = StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round)
                 for band in 0..<bands {
                     let color = WindMapWords.bands[band].color
                     context.stroke(tails[band], with: .color(color.opacity(0.3)), style: style)
