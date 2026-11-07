@@ -16,6 +16,10 @@ struct ParcelMapView: View {
     @State private var windField: WindField?
     @State private var windFailed = false
     @State private var windParticles = WindParticles()
+    /// The hour shown, and ▶ playing through them (owner, 2026-11-07: the
+    /// slider and the isobars on this map).
+    @State private var windHour = 0
+    @State private var windPlaying = false
     /// Written by the map as it pans, read by the streaks as they draw.
     @State private var windRegion = MapRegionBox(WindGrid.bulgaria)
     @State private var store: ParcelsStore
@@ -189,6 +193,7 @@ struct ParcelMapView: View {
             VStack(spacing: 0) {
                 map(response, drawable: drawable)
                     .frame(maxHeight: .infinity)
+                if windOnMap, let field = windField { windControls(field) }
                 if mode.showsSownFallow && !drawable.isEmpty { legend }
                 // The vegetation indices are the precise map's: the photo
                 // has no index tiles over it.
@@ -293,10 +298,11 @@ struct ParcelMapView: View {
                 if windOnMap, let field = windField {
                     // Clouds and rain under the wind (owner, 2026-11-07).
                     ZStack {
-                        CloudLayer(field: field, hour: WindVectors.hourNow(field),
+                        CloudLayer(field: field, hour: windHour,
                                    region: { [windRegion] in windRegion.region },
                                    onImagery: true)
-                        WindFlowLayer(wind: WindVectors(field, hour: WindVectors.hourNow(field)),
+                        PressureLayer(field: field, hour: windHour, region: { [windRegion] in windRegion.region })
+                        WindFlowLayer(wind: WindVectors(field, hour: windHour),
                                       region: { [windRegion] in windRegion.region }, particles: windParticles,
                                       halo: true)
                     }
@@ -384,6 +390,7 @@ struct ParcelMapView: View {
         if weatherCentre != nil {
             Button {
                 windOnMap.toggle()
+                windPlaying = false
                 if windOnMap { Task { await loadWind() } }
             } label: {
                 Image(systemName: windOnMap ? "wind.circle.fill" : "wind")
@@ -406,6 +413,7 @@ struct ParcelMapView: View {
             let field = try await WindFieldSources.current.field()
             windParticles.reset(latitudes: field.latitudes, longitudes: field.longitudes)
             windRegion.region = mapRegion(for: mode)
+            windHour = WindVectors.hourNow(field)
             windField = field
             windFailed = false
         } catch {
@@ -413,28 +421,26 @@ struct ParcelMapView: View {
         }
     }
 
-    /// «Вятър сега: 4,2 м/с от ЮЗ», at the block's centre, under the
-    /// parcel the phone stands in; the data's source, which its licence asks
-    /// for; or, failing, one Bulgarian sentence.
+    /// «Вятър сега: 4,2 м/с от ЮЗ» (or «Вятър в 14 ч» for a later hour) at
+    /// the block's centre, and its sky; or, failing, one Bulgarian sentence.
     @ViewBuilder
     private var windNow: some View {
         VStack(alignment: .leading, spacing: 2) {
             if windFailed {
                 Text("Вятърът не може да се зареди в момента.")
             } else if let field = windField, let centre = weatherCentre,
-                      let wind = WindVectors(field, hour: WindVectors.hourNow(field))
+                      let wind = WindVectors(field, hour: windHour)
                         .speedAndFrom(latitude: centre.latitude, longitude: centre.longitude) {
-                Text("Вятър сега: \(WeatherWords.speed(wind.speed)) от \(WeatherWords.compass(wind.from))")
+                let when = windHour == WindVectors.hourNow(field) || !field.hours.indices.contains(windHour)
+                    ? "Вятър сега" : "Вятър в \(BgDate.hourMark(field.hours[windHour]))"
+                Text("\(when): \(WeatherWords.speed(wind.speed)) от \(WeatherWords.compass(wind.from))")
                     .font(.subheadline.weight(.semibold))
-                    .accessibilityLabel("Вятър сега: \(WeatherWords.speed(wind.speed)) от \(WeatherWords.compassSpoken(wind.from))")
-                if let sky = CloudGrid(field, hour: WindVectors.hourNow(field))?
+                    .accessibilityLabel("\(when): \(WeatherWords.speed(wind.speed)) от \(WeatherWords.compassSpoken(wind.from))")
+                if let sky = CloudGrid(field, hour: windHour)?
                     .at(latitude: centre.latitude, longitude: centre.longitude) {
                     Text(CloudLook.words(cover: sky.cover, rain: sky.rain).capitalizedFirst)
                         .font(.subheadline)
                 }
-                Text("Данни: Open-Meteo.com (CC BY 4.0)")
-                    .font(.caption2)
-                    .foregroundStyle(Palette.secondaryText)
             } else {
                 ProgressView().accessibilityLabel("Зареждане на вятъра")
             }
@@ -443,6 +449,61 @@ struct ParcelMapView: View {
         .padding(.vertical, 8)
         .background(Palette.Surface.bar, in: RoundedRectangle(cornerRadius: 10))
         .padding([.horizontal, .top], 12)
+    }
+
+    /// Under the map while the wind is on: ▶ and the hour's slider, the
+    /// legend, and the data's source. The 48 hours a low takes to cross the
+    /// country, an hour every half second.
+    private func windControls(_ field: WindField) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Button { windPlaying.toggle() } label: {
+                    Image(systemName: windPlaying ? "pause.fill" : "play.fill")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(windPlaying ? "Пауза" : "Пусни")
+                .accessibilityInputLabels(windPlaying ? A11y.spokenNames("Пауза", "Pause")
+                                                      : A11y.spokenNames("Пусни", "Play"))
+                VStack(alignment: .leading, spacing: 2) {
+                    if field.hours.indices.contains(windHour) {
+                        Text(WindMapWords.hourText(field.hours[windHour]))
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    Slider(value: Binding(get: { Double(windHour) }, set: { windHour = Int($0.rounded()) }),
+                           in: 0...Double(max(field.hours.count - 1, 1)), step: 1)
+                        .tint(Palette.accent)
+                        .accessibilityLabel("Час")
+                        // The hour, and the centres VoiceOver cannot see.
+                        .accessibilityValue(A11y.sentence(
+                            [field.hours.indices.contains(windHour) ? WindMapWords.hourText(field.hours[windHour]) : nil]
+                            + (field.pressure.indices.contains(windHour)
+                               ? PressureAnalysis.centres(field.pressure[windHour], latitudes: field.latitudes,
+                                                          longitudes: field.longitudes).map(WindMapWords.centreSpoken)
+                               : [])))
+                }
+            }
+            WindLegend()
+            Link("Данни: Open-Meteo.com (CC BY 4.0)", destination: URL(string: "https://open-meteo.com")!)
+                .font(.caption2)
+                .accessibilityInputLabels(A11y.spokenNames("Open-Meteo"))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .solidBar(hairline: .top)
+        .task(id: windPlaying) { await playWind(field) }
+    }
+
+    /// ▶: an hour every half second from the slider's hour to the end, then
+    /// it stops; from the end, it starts over.
+    private func playWind(_ field: WindField) async {
+        guard windPlaying else { return }
+        if windHour >= field.hours.count - 1 { windHour = 0 }
+        while windPlaying, windHour < field.hours.count - 1 {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, windPlaying else { return }
+            windHour += 1
+        }
+        windPlaying = false
     }
 
     /// The block's centre, for its weather: the middle of its drawn parcels,
