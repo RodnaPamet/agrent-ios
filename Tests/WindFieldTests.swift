@@ -66,10 +66,63 @@ final class WindFieldTests: XCTestCase {
         XCTAssertTrue(WindFieldSources.current is OpenMeteoWindSource)
     }
 
+    func testTheCentresAreSaid() {
+        let centre = PressureAnalysis.Centre(kind: .low, latitude: 42, longitude: 24, hPa: 1002)
+        XCTAssertEqual(WindMapWords.centreSpoken(centre), "Ниско налягане, циклон 1002 hPa")
+        let high = PressureAnalysis.Centre(kind: .high, latitude: 42, longitude: 24, hPa: 1024.4)
+        XCTAssertEqual(WindMapWords.centreSpoken(high), "Високо налягане 1024 hPa")
+    }
+
     func testTheBandsAndTheWords() {
         XCTAssertEqual(WindBands.bands.map(\.label), ["до 4 м/с", "4–8", "8–12", "над 12"])
         XCTAssertEqual(WeatherWords.compass(225), "ЮЗ")
         XCTAssertEqual(WeatherWords.pressure(1013.4), "1013 hPa")
+    }
+
+    // MARK: - Isobars and centres
+
+    /// A bowl: pressure rising away from the middle. Its isobars are rings
+    /// round the low, and the low is found where it is.
+    func testABowlHasRingsAndALowInTheMiddle() {
+        let lats: [Double] = (0..<9).map { 40 + Double($0) * 0.5 }
+        let lons: [Double] = (0..<9).map { 22 + Double($0) * 0.5 }
+        // In steps: as one nested closure, CI's compiler gave up on it.
+        var grid: [[Double]] = []
+        for lat in lats {
+            var row: [Double] = []
+            for lon in lons {
+                let dy: Double = lat - 42, dx: Double = lon - 24
+                row.append(1000 + (dy * dy + dx * dx) * 2)
+            }
+            grid.append(row)
+        }
+        let centres = PressureAnalysis.centres(grid, latitudes: lats, longitudes: lons)
+        XCTAssertEqual(centres.count, 1)
+        XCTAssertEqual(centres.first?.kind, .low)
+        XCTAssertEqual(centres.first?.latitude, 42)
+        XCTAssertEqual(centres.first?.longitude, 24)
+        XCTAssertEqual(centres.first?.hPa, 1000)
+
+        let isobars = PressureAnalysis.isobars(grid, latitudes: lats, longitudes: lons)
+        let ring = isobars.first { $0.hPa == 1002 }
+        XCTAssertNotNil(ring, "a ring at 1002")
+        // Closed: the joined line ends where it starts.
+        if let ring, let first = ring.path.first, let last = ring.path.last {
+            XCTAssertEqual(first.latitude, last.latitude, accuracy: 1e-6)
+            XCTAssertEqual(first.longitude, last.longitude, accuracy: 1e-6)
+            XCTAssertGreaterThan(ring.path.count, 4)
+        }
+        XCTAssertTrue(isobars.allSatisfy { $0.hPa.truncatingRemainder(dividingBy: 2) == 0 }, "every 2 hPa")
+    }
+
+    /// A flat field, or a gentle slope, marks no centre: no false cyclones.
+    func testAFlatFieldMarksNothing() {
+        let lats = [40.0, 40.5, 41.0, 41.5], lons = [22.0, 22.5, 23.0, 23.5]
+        let flat = lats.map { _ in lons.map { _ in 1013.0 } }
+        XCTAssertEqual(PressureAnalysis.centres(flat, latitudes: lats, longitudes: lons), [])
+        XCTAssertEqual(PressureAnalysis.isobars(flat, latitudes: lats, longitudes: lons).count, 0)
+        let slope: [[Double]] = lats.map { lat in lons.map { lon in 1000 + lat + lon } }
+        XCTAssertEqual(PressureAnalysis.centres(slope, latitudes: lats, longitudes: lons), [])
     }
 
     // MARK: - The streaks

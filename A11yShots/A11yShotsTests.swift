@@ -2255,10 +2255,22 @@ final class A11yShotsTests: XCTestCase {
         let now = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Вятър сега'")).firstMatch
         XCTAssertTrue(now.waitForExistence(timeout: 10), "no «Вятър сега»\n\(app.debugDescription)")
         XCTAssertEqual(toggle.value as? String, "включен")
+        // The slider, ▶ and the legend under the map (owner, 2026-11-07).
+        let play = app.buttons["Пусни"]
+        XCTAssertTrue(play.waitForExistence(timeout: 5), "no ▶ under the map\n\(app.debugDescription)")
+        XCTAssertTrue(app.sliders["Час"].exists, "no hour slider")
         Thread.sleep(forTimeInterval: 3)
         capture("31a-wind-on-block-map", app: app)
+        play.tap()
+        Thread.sleep(forTimeInterval: 5)
+        capture("31b-wind-on-block-map-later", app: app)
+        app.buttons["Пауза"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Вятър в '")).firstMatch.exists,
+                      "▶ did not move the hour\n\(app.debugDescription)")
         toggle.tap()
-        XCTAssertFalse(now.waitForExistence(timeout: 2), "the wind stayed on")
+        let anyLine = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Вятър сега' OR label BEGINSWITH 'Вятър в '"))
+        XCTAssertFalse(anyLine.firstMatch.waitForExistence(timeout: 2), "the wind stayed on")
+        XCTAssertFalse(app.buttons["Пусни"].exists, "the hour bar stayed under the map")
     }
 
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
