@@ -9,8 +9,6 @@ struct ParcelMapView: View {
     @State private var importing = false
     /// «Времето» for this block is open (#551).
     @State private var showingWeather = false
-    /// «Вятър и налягане» over Bulgaria is open (owner, 2026-11-06).
-    @State private var showingWind = false
     /// The wind drawn ON this map (owner, 2026-11-07: "a button on top of the
     /// location button renders the wind directly on the map"): Open-Meteo's
     /// field for the hour under way, as moving streaks over the parcels.
@@ -19,7 +17,7 @@ struct ParcelMapView: View {
     @State private var windFailed = false
     @State private var windParticles = WindParticles()
     /// Written by the map as it pans, read by the streaks as they draw.
-    @State private var windRegion = MapRegionBox(WindMapView.bulgaria)
+    @State private var windRegion = MapRegionBox(WindGrid.bulgaria)
     @State private var store: ParcelsStore
 
     /// Remembered per user, and PRECISE BY DEFAULT — the owner's call.
@@ -149,16 +147,6 @@ struct ParcelMapView: View {
                     .accessibilityInputLabels(A11y.spokenNames("Времето", "Вятър", "Weather"))
                 }
             }
-            // «Вятър» (owner, 2026-11-06): the wind and pressure systems over
-            // Bulgaria for 48 hours, with this block marked on it.
-            if weatherCentre != nil {
-                ToolbarItem(placement: .primaryAction) {
-                    Button { showingWind = true } label: {
-                        Label("Вятър", systemImage: "wind")
-                    }
-                    .accessibilityInputLabels(A11y.spokenNames("Вятър", "Вятър и налягане", "Wind"))
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     cycleMode()
@@ -171,11 +159,6 @@ struct ParcelMapView: View {
         .sheet(isPresented: $showingWeather) {
             if let centre = weatherCentre {
                 WeatherSheet(place: location.name, latitude: centre.latitude, longitude: centre.longitude)
-            }
-        }
-        .fullScreenCover(isPresented: $showingWind) {
-            if let centre = weatherCentre {
-                WindMapView(place: location.name, latitude: centre.latitude, longitude: centre.longitude)
             }
         }
         .sheet(item: $choosing) { choice in
