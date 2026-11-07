@@ -149,8 +149,12 @@ struct WindMapView: View {
         .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
         .onMapCameraChange(frequency: .continuous) { context in region = context.region }
         .overlay {
-            if !reduceMotion {
-                WindFlowLayer(wind: WindVectors(field, hour: shown), region: region, particles: particles)
+            // Clouds and rain under the wind (owner, 2026-11-07).
+            ZStack {
+                CloudLayer(field: field, hour: shown, region: { region })
+                if !reduceMotion {
+                    WindFlowLayer(wind: WindVectors(field, hour: shown), region: { region }, particles: particles)
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -246,19 +250,34 @@ private struct CentreMark: View {
 /// The bands the arrows are coloured in.
 private struct WindLegend: View {
     var body: some View {
-        HStack(spacing: 12) {
-            ForEach(WindMapWords.bands, id: \.label) { band in
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up").foregroundStyle(band.color)
-                    Text(band.label)
+        // Two rows: on one, «облаци» broke as «облац / и» (measured).
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                ForEach(WindMapWords.bands, id: \.label) { band in
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up").foregroundStyle(band.color)
+                        Text(band.label)
+                    }
                 }
             }
-            Text("Н ниско, В високо налягане")
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Circle().fill(Palette.Weather.cloud).frame(width: 10, height: 10)
+                    Text("облаци")
+                }
+                HStack(spacing: 4) {
+                    Circle().fill(Palette.Weather.rain).frame(width: 10, height: 10)
+                    Text("дъжд")
+                }
+                Text("Н ниско, В високо налягане")
+            }
         }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
         .font(.caption2)
         .foregroundStyle(Palette.secondaryText)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Цветът на стрелката е силата на вятъра. Н е ниско налягане, циклон. В е високо налягане.")
+        .accessibilityLabel("Цветът на стрелката е силата на вятъра. Сивото е облачност, тъмното е дъжд. Н е ниско налягане, циклон. В е високо налягане.")
     }
 }
 

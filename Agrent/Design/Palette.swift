@@ -494,6 +494,22 @@ enum Palette {
     }
 
     /// The schematic map. Verified against the canvas value by value.
+    /// The weather map's clouds (owner, 2026-11-07: "dark clouds for rain
+    /// and light for cloudy weather"): drawn soft and translucent over the
+    /// map, so the colour is the kind and the opacity the amount.
+    enum Weather {
+        /// Cloud without rain: a mid grey. The first, lighter one (C9CED6)
+        /// vanished on Apple's pale map at the opacity a thin cloud gets
+        /// (measured in A11yShots, 2026-11-07); this reads on the map and on
+        /// a satellite photograph alike.
+        static let cloud = Color(hex: 0x9AA4B1)
+        /// Rain: a dark slate, darker with more rain (by opacity).
+        static let rain = Color(hex: 0x2B3440)
+        /// Cloud over a satellite photograph, which is dark where the map is
+        /// pale: near-white, as a cloud seen from above is.
+        static let cloudOnImagery = Color(hex: 0xE6EAF0)
+    }
+
     enum Map {
         static let ground = Color(hex: 0x6E6A52)
         static let pathMajor = Color(hex: 0x8C8770)

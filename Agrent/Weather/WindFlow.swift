@@ -64,6 +64,19 @@ struct WindVectors: Equatable, Sendable {
         return (mix(u), mix(v))
     }
 
+    /// The wind's speed (m/s) and where it comes FROM (degrees) at a place,
+    /// for saying it in words: the opposite of where (u, v) blows to.
+    func speedAndFrom(latitude: Double, longitude: Double) -> (speed: Double, from: Double)? {
+        guard let w = at(latitude: latitude, longitude: longitude) else { return nil }
+        let towards = atan2(w.u, w.v) * 180 / .pi
+        return ((w.u * w.u + w.v * w.v).squareRoot(), (towards + 180 + 360).truncatingRemainder(dividingBy: 360))
+    }
+
+    /// The hour of `field` to show now: the one under way, or the first.
+    static func hourNow(_ field: WindField, now: Date = Date()) -> Int {
+        field.hours.lastIndex { $0 <= now } ?? 0
+    }
+
     /// The lower index of the cell holding `value`, nil outside.
     private static func cell(_ value: Double, in axis: [Double]) -> Int? {
         guard axis.count > 1, let first = axis.first, let last = axis.last, value >= first, value <= last else {
@@ -205,12 +218,19 @@ final class WindParticles {
 /// VoiceOver: the map's summary says the wind in words.
 struct WindFlowLayer: View {
     let wind: WindVectors
-    let region: MKCoordinateRegion
+    /// The map's region AS IT IS NOW, read every frame: the block map hands
+    /// in a box its UIKit map writes to while it pans, so the streaks stay
+    /// on the land without the map re-rendering 60 times a second.
+    let region: () -> MKCoordinateRegion
     let particles: WindParticles
+    /// A dark edge under each streak, for a satellite photograph, which can
+    /// be any colour (`Palette.Map.labelHalo`, the map labels' own).
+    var halo = false
 
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
+                let region = region()
                 particles.step(wind, now: timeline.date, region: region)
                 let projection = WindProjection(region: region, size: size)
                 // Two paths per band: the older half of each trail faint, the
@@ -229,6 +249,12 @@ struct WindFlowLayer: View {
                     heads[band].addLines(Array(points[middle...]))
                 }
                 let style = StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round)
+                if halo {
+                    let edge = StrokeStyle(lineWidth: 3.6, lineCap: .round, lineJoin: .round)
+                    for band in 0..<bands {
+                        context.stroke(heads[band], with: .color(Palette.Map.labelHalo.opacity(0.55)), style: edge)
+                    }
+                }
                 for band in 0..<bands {
                     let color = WindMapWords.bands[band].color
                     context.stroke(tails[band], with: .color(color.opacity(0.3)), style: style)
@@ -240,3 +266,13 @@ struct WindFlowLayer: View {
         .accessibilityHidden(true)
     }
 }
+
+/// The map's region, written by a UIKit map as it moves and read by a layer
+/// as it draws. A reference type and not observed on purpose: a SwiftUI
+/// state written every frame of a pan would re-render the map it came from.
+@MainActor
+final class MapRegionBox {
+    var region: MKCoordinateRegion
+    init(_ region: MKCoordinateRegion) { self.region = region }
+}
+

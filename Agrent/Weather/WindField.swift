@@ -19,6 +19,10 @@ struct WindField: Equatable, Sendable {
     let windFrom: [[[Double]]]
     /// `[hour][row][column]`, hPa at sea level.
     let pressure: [[[Double]]]
+    /// `[hour][row][column]`, % of the sky (owner, 2026-11-07: clouds).
+    var cloudCover: [[[Double]]] = []
+    /// `[hour][row][column]`, mm of rain (or melted snow) in the hour.
+    var precipitation: [[[Double]]] = []
 
     struct Point: Equatable, Sendable, Identifiable {
         let latitude: Double
