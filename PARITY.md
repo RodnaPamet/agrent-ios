@@ -2024,3 +2024,16 @@ be read outdoors fails before any parity gap matters.
 - Coverage, when under 90 %: «Сателитът е видял само 60 % от парцела през периода; за останалото няма ясен изглед.» It is the composite's coverage (the share of the parcel seen clear at least once in the window), not one pass's clear share.
 - **No cause is named for what wasn't seen.** The server masks snow/ice (SCL 11) exactly like cloud, and a part of the parcel can have had no qualifying pass at all (backend 1, 2026-11-08). So the same change dropped «облачно» / «безоблачно» from the trend's empty line and from the no-reading reason; the unknown-reading explanation lists «облаци, сняг или без заснемане».
 - **Not yet:** the weakest zone (stage 2b).
+
+### Built — the rain since the picture, and what «Влага» measures (owner, 2026-11-08)
+
+- The owner read «Влага: Стрес» on a farmer's field after a week of non-stop rain. Two causes:
+  - the reading is from the last clear pass, before the rain;
+  - NDMI is water in the leaves, so a bare field reads low however wet the soil is.
+- **Under «Влага»** on a parcel's history: «Влагата (NDMI) е водата в растенията, не в почвата.» Not on Риск's rows, where it would repeat per parcel.
+- **Under the explanation:** «След 28 октомври е валяло 42 мм, а снимката е отпреди това.»
+  - Open-Meteo's free tier (the block map's choice), hourly rain at the parcel's middle.
+  - Counted from the day after the picture, up to now.
+  - Nothing under 1 mm, and nothing when it fails (it's context, not the reading).
+- The assistant's question carries both.
+- **Server, pending:** no moisture grade on bare land (NDVI below a floor, suggested 0,2). Sent to backend 1; the phone gets a «Няма култура за оценка» chip once the value is named. Shipped builds already show an unrecognised level as «Няма отчет».

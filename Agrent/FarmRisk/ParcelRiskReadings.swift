@@ -7,6 +7,9 @@ import SwiftUI
 struct ParcelRiskReadings: View {
     let risk: ParcelRisk
     let freshness: Freshness?
+    /// The line under «Влага» saying what it measures (owner, 2026-11-08),
+    /// on the parcel's own screen; Риск's rows would repeat it per parcel.
+    var explainsMoisture = false
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -18,6 +21,12 @@ struct ParcelRiskReadings: View {
             // fight, which is the failure JournalDetailView documents.
             reading("Зеленина", risk.vegetation, value: risk.ndvi, index: "NDVI")
             reading("Влага", risk.moisture, value: risk.ndmi, index: "NDMI")
+            if explainsMoisture {
+                Text(RiskExplanation.moistureNote)
+                    .font(.caption)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if let reason = risk.absenceReason {
                 Text(reason)

@@ -1,3 +1,4 @@
+import MapKit
 import SwiftUI
 
 /// A parcel's archive: what it grew, what was applied to it, and what was
@@ -85,6 +86,9 @@ struct ParcelHistoryView: View {
     @State private var risk: ParcelRiskStore?
     /// Its readings over the last 14, 30 or 60 days (#562), with the risk.
     @State private var trend: RiskTrendStore?
+    /// The rain since its satellite picture (owner, 2026-11-08), so a dry
+    /// reading from before a wet week is read as old, not as dry.
+    @State private var rain = RainSinceStore()
     /// The parcel's tasks, from Блокове (#462). One store for the card and
     /// the list it opens.
     @State private var tasks: ParcelTasksStore?
@@ -125,6 +129,8 @@ struct ParcelHistoryView: View {
             }
             .task { _ = await people.load() }
             .task { await risk?.load() }
+            // Once the reading's date is known, and again if it changes.
+            .task(id: risk?.state.value?.acquiredDate) { await loadRain() }
             .task { await tasks?.load() }
             .task { if comments.state.value == nil { await comments.load() } }
             .toolbar { addMenu }
@@ -438,11 +444,17 @@ struct ParcelHistoryView: View {
     private func riskReading(_ reading: ParcelRisk, _ freshness: Freshness?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
-            ParcelRiskReadings(risk: reading, freshness: freshness)
+            ParcelRiskReadings(risk: reading, freshness: freshness, explainsMoisture: true)
             // The app's own reading of the pair (owner, 2026-11-07), above
             // the assistant's longer one.
             if let words = explanation(reading, freshness) {
                 Text(words)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let words = rainWords(reading) {
+                Label(words, systemImage: "cloud.rain")
                     .font(.subheadline)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -461,7 +473,20 @@ struct ParcelHistoryView: View {
 
     private func riskSpoken(_ reading: ParcelRisk, _ freshness: Freshness?) -> String {
         A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
-                      + [explanation(reading, freshness), evenness(reading)])
+                      + [RiskExplanation.moistureNote, explanation(reading, freshness),
+                         rainWords(reading), evenness(reading)])
+    }
+
+    private func rainWords(_ reading: ParcelRisk) -> String? {
+        guard let mm = rain.millimetres, let day = reading.acquired else { return nil }
+        return RainSinceWords.text(mm, after: day)
+    }
+
+    /// The parcel's middle, from the outline the route carries.
+    private func loadRain() async {
+        guard let day = risk?.state.value?.acquired, let outline, outline.isDrawable,
+              let centre = MKCoordinateRegion(fitting: [outline])?.center else { return }
+        await rain.load(latitude: centre.latitude, longitude: centre.longitude, after: day)
     }
 
     private func evenness(_ reading: ParcelRisk) -> String? {
@@ -481,6 +506,7 @@ struct ParcelHistoryView: View {
         return RiskAnalysisQuestion.text(
             parcel: archive?.parcel.name ?? parcelName, risk: reading, freshness: freshness,
             trend: trend?.state.value.flatMap(RiskTrendWords.change),
+            rain: rainWords(reading),
             seasons: archive?.seasons.items ?? [], operations: archive?.operations.items ?? [],
             weeds: archive?.weeds.items ?? [])
     }
