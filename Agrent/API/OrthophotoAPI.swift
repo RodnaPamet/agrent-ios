@@ -135,19 +135,30 @@ struct OrthoBlocks: Decodable, Equatable, Sendable {
     let blocks: [OrthoBlock]
     /// The server stopped at its cap: there are more blocks than drawn.
     let truncated: Bool
+    /// Which year's ФБ these are (#569). The Ministry renumbers blocks
+    /// between years, so the footer says it: a parcel named by this
+    /// campaign's number over a block numbered as in 2023 read as a
+    /// mismatch to the owner (2026-11-08). Optional: an odd value costs the
+    /// line, never the blocks.
+    let year: Int?
 
-    private enum CodingKeys: String, CodingKey { case features, truncated }
+    private enum CodingKeys: String, CodingKey { case features, truncated, year }
 
-    init(blocks: [OrthoBlock], truncated: Bool = false) {
+    init(blocks: [OrthoBlock], truncated: Bool = false, year: Int? = nil) {
         self.blocks = blocks
         self.truncated = truncated
+        self.year = year
     }
+
+    /// «Физически блокове (ФБ): 2025», under the photo's own line.
+    static func footer(year: Int) -> String { "Физически блокове (ФБ): \(year)" }
 
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let features = (try? c.decode([Lenient].self, forKey: .features)) ?? []
         blocks = features.compactMap(\.block)
         truncated = (try? c.decodeIfPresent(Bool.self, forKey: .truncated)) ?? false
+        year = (try? c.decodeIfPresent(Int.self, forKey: .year)) ?? nil
     }
 
     private struct Lenient: Decodable {

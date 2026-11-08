@@ -49,8 +49,8 @@ final class OrthophotoTests: XCTestCase {
     // MARK: - The blocks
 
     private let blocksJSON = #"""
-        {"type":"FeatureCollection","truncated":false,"features":[
-          {"type":"Feature","properties":{"id":"00000-101","usage":"Обработваеми земи","year":2025},
+        {"type":"FeatureCollection","year":2025,"truncated":false,"features":[
+          {"type":"Feature","properties":{"id":"00000-101","usage":"Обработваеми земи"},
            "geometry":{"type":"MultiPolygon","coordinates":[[[[24.60,43.41],[24.61,43.41],[24.61,43.415],[24.60,43.415],[24.60,43.41]]]]}},
           {"type":"Feature","properties":{"id":"00000-102","usage":null},
            "geometry":{"type":"Polygon","coordinates":[[[24.611,43.41],[24.62,43.41],[24.62,43.42],[24.611,43.42],[24.611,43.41]],
@@ -76,6 +76,19 @@ final class OrthophotoTests: XCTestCase {
         let label = try XCTUnwrap(read.blocks[0].labelPoint)
         XCTAssertEqual(label.latitude, 43.4125, accuracy: 1e-9)
         XCTAssertEqual(label.longitude, 24.605, accuracy: 1e-9)
+    }
+
+    /// Which year's ФБ are drawn (#569): МЗХ renumbers blocks between years,
+    /// so the footer says it. An odd value costs the line, never the blocks.
+    func testTheBlocksSayTheirYear() async throws {
+        let read = try await APIClient.shared.decode(Data(blocksJSON.utf8), as: OrthoBlocks.self)
+        XCTAssertEqual(read.year, 2025)
+        XCTAssertEqual(OrthoBlocks.footer(year: 2025), "Физически блокове (ФБ): 2025")
+        let odd = try await APIClient.shared.decode(
+            Data(#"{"type":"FeatureCollection","year":"2025","features":[]}"#.utf8), as: OrthoBlocks.self)
+        XCTAssertNil(odd.year)
+        let none = try await APIClient.shared.decode(Data(#"{"features":[]}"#.utf8), as: OrthoBlocks.self)
+        XCTAssertNil(none.year)
     }
 
     // MARK: - The store

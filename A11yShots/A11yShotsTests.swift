@@ -547,6 +547,10 @@ final class A11yShotsTests: XCTestCase {
             .firstMatch
         XCTAssertTrue(footer.waitForExistence(timeout: 10), "the orthophoto has no footer\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 3)
+        // The blocks' own year (#569), once they are drawn.
+        let blockYear = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Физически блокове (ФБ): 2025")).firstMatch
+        XCTAssertTrue(blockYear.waitForExistence(timeout: 10), "the footer does not say the ФБ year\n\(footer.label)")
         capture("04-parcel-map-orthophoto", app: app)
 
         app.navigationBars.buttons[orthophotoIsOn].tap()

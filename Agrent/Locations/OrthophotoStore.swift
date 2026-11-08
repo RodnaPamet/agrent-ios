@@ -13,6 +13,8 @@ final class OrthophotoStore {
     private(set) var blocks: [OrthoBlock] = []
     /// The server stopped at its cap for the last area read.
     private(set) var truncated = false
+    /// Which year's ФБ are drawn (#569), for the footer.
+    private(set) var blocksYear: Int?
     /// Out beyond `blocksSpan`, where no blocks are read: the footer says to
     /// zoom in for them.
     private(set) var tooFarOut = false
@@ -62,6 +64,7 @@ final class OrthophotoStore {
             blocksFor = nil
             blocks = []
             truncated = false
+            blocksYear = nil
             return
         }
         guard box != blocksFor else { return }
@@ -71,6 +74,7 @@ final class OrthophotoStore {
             guard let read = try? await readBlocks(box), !Task.isCancelled else { return }
             self?.blocks = read.blocks
             self?.truncated = read.truncated
+            self?.blocksYear = read.year
         }
     }
 }

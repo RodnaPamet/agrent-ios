@@ -2037,3 +2037,9 @@ be read outdoors fails before any parity gap matters.
   - Nothing under 1 mm, and nothing when it fails (it's context, not the reading).
 - The assistant's question carries both.
 - **Server, pending:** no moisture grade on bare land (NDVI below a floor, suggested 0,2). Sent to backend 1; the phone gets a «Няма култура за оценка» chip once the value is named. Shipped builds already show an unrecognised level as «Няма отчет».
+
+### Decided — the Ортофотокарта's ФБ are the newest layer, and say their year (owner, 2026-11-08, #569)
+
+- The owner saw the farm's parcels and the Ministry's blocks numbered differently. The server drew ФБ from the PHOTO's year (`Agricultural_Land_<photo year>`). The newest photo of an area can be years old, and МЗХ renumbers ФБ between years (2023 vs 2025, measured).
+- 2021/2022 layers carry `ELGIDENT` (eligible-area elements), not `PHBIDENT`, so they drew no blocks at all. 2020 has no layer.
+- **Owner's decision:** always the newest ФБ layer, whatever the photo (server, backend 1). The footer says «Физически блокове (ФБ): 2025» (phone, from the reply's `year`). Accepted trade-off: an outline may not match an older photo where a block was redrawn.
