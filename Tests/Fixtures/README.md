@@ -508,5 +508,6 @@ synthetic; nothing leaves the process.
 
 `risk-analysis-holes.json` carries `withinField` (#562 stage 2, agri-saas #2856):
 invented NDVI P10/P50/P90 and a 7 % share under the 0,35 stress line, over the
-visible part, and 98 % coverage (quiet on screen). `risk-analysis-simple.json` and `risk-analysis-nogeom.json` keep the
+visible part, and 98 % coverage (quiet on screen), and a weakest zone `NW` with a
+placeholder cell box (`weakest`, agri-saas #2859; not real geometry). `risk-analysis-simple.json` and `risk-analysis-nogeom.json` keep the
 shape from before it, so a server without the field is still decoded.

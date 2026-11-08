@@ -490,8 +490,9 @@ struct ParcelHistoryView: View {
     }
 
     private func evenness(_ reading: ParcelRisk) -> String? {
-        guard let field = reading.withinField else { return nil }
-        let sentences = RiskWithinField.sentences(field, mean: reading.ndvi)
+        var sentences = reading.withinField.map { RiskWithinField.sentences($0, mean: reading.ndvi) } ?? []
+        // Where in the field (#562 stage 2b); nothing when it cannot say.
+        if let weakest = reading.weakest.flatMap(RiskWithinField.weakest) { sentences.append(weakest) }
         return sentences.isEmpty ? nil : sentences.joined(separator: " ")
     }
 

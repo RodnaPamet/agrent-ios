@@ -2049,3 +2049,10 @@ be read outdoors fails before any parity gap matters.
 - The phone's chip says «Няма култура за оценка», the web's wording, never `unknown`'s «Няма отчет».
 - The explanation: «Зеленината е много ниска: на парцела вероятно няма култура (след жътва, обработено или преди поникване). Затова влагата не се оценява.» No drought is named.
 - Shipped builds before this showed the value as «Няма отчет» (lenient decode).
+
+### Built — the weakest part of a parcel, in words (#562 stage 2b, agri-saas #2859)
+
+- «Най-слаба е северозападната част на парцела (NDVI 0,39, с 0,14 под медианата).» «…средата…» for the centre. Placed after the evenness sentences on a parcel's history; the assistant's question carries it too.
+- `weakest` sits at the top level of `/analysis`, beside `withinField`. The zone is geographic: one of nine cells cut from the parcel's lat/lon box.
+- **Null says nothing.** It means "cannot localise" (too small, too cloudy, or even), and these can't be told apart.
+- `bounds` is decoded but not drawn: the owner chose words first.

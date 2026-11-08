@@ -2303,6 +2303,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(risk.label.contains("Културата е зелена"), "no app explanation: \(risk.label)")
         // How even the field is (#562 stage 2), over the visible part only.
         XCTAssertTrue(risk.label.contains("от видимата част на парцела"), "no evenness: \(risk.label)")
+        XCTAssertTrue(risk.label.contains("Най-слаба е северозападната част"), "no weakest part: \(risk.label)")
         // What «Влага» measures, and the rain since the picture (owner, 2026-11-08).
         XCTAssertTrue(risk.label.contains("водата в растенията, не в почвата"), "no moisture note: \(risk.label)")
         let rained = NSPredicate(format: "label CONTAINS %@", "е валяло 42")

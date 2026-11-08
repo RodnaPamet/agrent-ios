@@ -50,6 +50,7 @@ enum RiskAnalysisQuestion {
         facts.append("Сателитни показатели: \(readings).")
         // How even the field is (#562 stage 2), said as over the visible part.
         if let field = risk.withinField, let spread = RiskWithinField.facts(field) { facts.append(spread) }
+        if let weakest = risk.weakest.flatMap(RiskWithinField.weakest) { facts.append(weakest) }
         // The rain since the picture (owner, 2026-11-08), and what «влага»
         // measures, so the answer does not call a soaked bare field dry.
         if let rain { facts.append(rain) }
