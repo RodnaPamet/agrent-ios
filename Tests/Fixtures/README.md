@@ -503,3 +503,10 @@ table and a list, then `done`. It is served only under `AGRENT_UITEST_ASSISTANT`
 one POST the seam answers, so the answer's drawing can be photographed
 (owner, 2026-11-01: tables reached the screen as rows of «|»). The text is
 synthetic; nothing leaves the process.
+
+## A parcel's evenness
+
+`risk-analysis-holes.json` carries `withinField` (#562 stage 2, agri-saas #2856):
+invented NDVI P10/P50/P90 and a 7 % share under the 0,35 stress line, over the
+visible part, and 98 % coverage (quiet on screen). `risk-analysis-simple.json` and `risk-analysis-nogeom.json` keep the
+shape from before it, so a server without the field is still decoded.

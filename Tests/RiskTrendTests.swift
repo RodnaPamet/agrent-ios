@@ -63,8 +63,8 @@ final class RiskTrendTests: XCTestCase {
         let off = history(configured: false, [])
         XCTAssertEqual(RiskTrendWords.empty(off), "Сателитният анализ не е настроен, затова няма история.")
         let cloudy = history([("2026-09-01", nil, nil)])
-        XCTAssertEqual(RiskTrendWords.empty(cloudy), "Няма ясна сателитна снимка за последните 14 дни (облачно).")
-        XCTAssertEqual(RiskTrendWords.empty(history([])), "Няма ясна сателитна снимка за последните 14 дни (облачно).")
+        XCTAssertEqual(RiskTrendWords.empty(cloudy), "Няма ясна сателитна снимка за последните 14 дни.")
+        XCTAssertEqual(RiskTrendWords.empty(history([])), "Няма ясна сателитна снимка за последните 14 дни.")
         XCTAssertNil(RiskTrendWords.empty(history([("2026-09-01", 0.7, nil)])))
     }
 

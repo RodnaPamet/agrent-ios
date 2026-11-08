@@ -104,7 +104,7 @@ enum RiskTrendWords {
     static func empty(_ history: ParcelRiskHistory) -> String? {
         if !history.configured { return "Сателитният анализ не е настроен, затова няма история." }
         if history.passes.allSatisfy({ $0.ndvi == nil && $0.ndmi == nil }) {
-            return "Няма ясна сателитна снимка за последните \(history.days) дни (облачно)."
+            return "Няма ясна сателитна снимка за последните \(history.days) дни."
         }
         return nil
     }

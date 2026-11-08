@@ -47,6 +47,8 @@ enum RiskAnalysisQuestion {
         var facts: [String] = []
         let readings = ParcelRiskReadings.spoken(risk, freshness).compactMap { $0 }.joined(separator: "; ")
         facts.append("Сателитни показатели: \(readings).")
+        // How even the field is (#562 stage 2), said as over the visible part.
+        if let field = risk.withinField, let spread = RiskWithinField.facts(field) { facts.append(spread) }
         // The period on screen (#562), so the answer speaks to the same days.
         if let trend { facts.append(trend) }
         let about = [CommodityName.freeText(risk.cropType), risk.areaHa.map { "\(Num.text($0 * 10)) дка" }]

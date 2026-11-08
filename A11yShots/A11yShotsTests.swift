@@ -2297,6 +2297,8 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(risk.waitForExistence(timeout: 15), "«Риск» is not a button\n\(app.debugDescription)")
         // The app's own words under the readings (owner, 2026-11-07).
         XCTAssertTrue(risk.label.contains("Културата е зелена"), "no app explanation: \(risk.label)")
+        // How even the field is (#562 stage 2), over the visible part only.
+        XCTAssertTrue(risk.label.contains("от видимата част на парцела"), "no evenness: \(risk.label)")
         Thread.sleep(forTimeInterval: 1)
         capture("32-risk-explanation", app: app)
         // The last 14 days under it (#562): the period picker, the chart as
