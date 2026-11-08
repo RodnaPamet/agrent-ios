@@ -345,6 +345,10 @@ struct ParcelMapView: View {
     private var orthophotoFooter: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(ortho.coverage?.footer ?? OrthoCoverage(year: nil, flightDate: nil, attribution: nil).footer)
+            // The blocks' own year (#569): it can differ from the photo's.
+            if !ortho.blocks.isEmpty, let year = ortho.blocksYear {
+                Text(OrthoBlocks.footer(year: year))
+            }
             if ortho.tooFarOut {
                 Text("Приближете, за да видите физическите блокове.")
             } else if ortho.truncated {
