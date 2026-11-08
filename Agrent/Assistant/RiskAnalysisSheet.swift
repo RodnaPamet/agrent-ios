@@ -42,6 +42,7 @@ struct RiskAnalysisSheet: View {
 @MainActor
 enum RiskAnalysisQuestion {
     static func text(parcel: String, risk: ParcelRisk, freshness: Freshness?, trend: String? = nil,
+                     rain: String? = nil,
                      seasons: [CropSeason], operations: [ParcelHistoryOperation],
                      weeds: [WeedObservation]) -> String {
         var facts: [String] = []
@@ -49,6 +50,10 @@ enum RiskAnalysisQuestion {
         facts.append("Сателитни показатели: \(readings).")
         // How even the field is (#562 stage 2), said as over the visible part.
         if let field = risk.withinField, let spread = RiskWithinField.facts(field) { facts.append(spread) }
+        // The rain since the picture (owner, 2026-11-08), and what «влага»
+        // measures, so the answer does not call a soaked bare field dry.
+        if let rain { facts.append(rain) }
+        facts.append(RiskExplanation.moistureNote)
         // The period on screen (#562), so the answer speaks to the same days.
         if let trend { facts.append(trend) }
         let about = [CommodityName.freeText(risk.cropType), risk.areaHa.map { "\(Num.text($0 * 10)) дка" }]

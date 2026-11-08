@@ -213,6 +213,8 @@ final class RouteContractTests: XCTestCase {
         "RiskAnalysisSheet.swift": "the web page template /t/[tenantSlug]/parcels/[parcelId], not an API path",
         // Open-Meteo's own forecast path, on its host (owner, 2026-11-06).
         "WindFieldSource.swift": "Open-Meteo's /v1/forecast, a third-party host, not agri-saas",
+        // The rain since a parcel's picture (owner, 2026-11-08), the same host.
+        "RainSince.swift": "Open-Meteo's /v1/forecast, a third-party host, not agri-saas",
     ]
 
     // MARK: - Every path the app builds

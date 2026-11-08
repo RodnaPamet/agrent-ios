@@ -24,6 +24,11 @@ import Foundation
 ///
 /// Pure, so `RiskExplanationTests` pins every case.
 enum RiskExplanation {
+    /// What «Влага» is (owner, 2026-11-08): NDMI is read from the leaves, so
+    /// on a bare or freshly sown field it is low however wet the soil is.
+    /// The owner read «Влага: Стрес» on a farmer's field after a week of rain.
+    static let moistureNote = "Влагата (NDMI) е водата в растенията, не в почвата."
+
     static func text(vegetation: RiskLevel, moisture: RiskLevel, stale: Bool) -> String? {
         var sentences: [String] = []
         switch (vegetation, moisture) {
