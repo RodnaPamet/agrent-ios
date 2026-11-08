@@ -447,13 +447,27 @@ struct ParcelHistoryView: View {
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // How even the field is (#562 stage 2), over the visible part.
+            if let words = evenness(reading) {
+                Text(words)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
     }
 
     private func riskSpoken(_ reading: ParcelRisk, _ freshness: Freshness?) -> String {
-        A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness) + [explanation(reading, freshness)])
+        A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
+                      + [explanation(reading, freshness), evenness(reading)])
+    }
+
+    private func evenness(_ reading: ParcelRisk) -> String? {
+        guard let field = reading.withinField else { return nil }
+        let sentences = RiskWithinField.sentences(field, mean: reading.ndvi)
+        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
     }
 
     private func explanation(_ reading: ParcelRisk, _ freshness: Freshness?) -> String? {

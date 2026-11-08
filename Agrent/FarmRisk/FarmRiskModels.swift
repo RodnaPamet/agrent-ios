@@ -53,6 +53,32 @@ struct ParcelRisk: Decodable, Identifiable, Equatable, Sendable {
     /// A full ISO timestamp — the other shape, in the same object.
     let generatedAt: Date
 
+    /// How NDVI spreads across the parcel (agri-saas #2856, stage 2 of #562).
+    /// Absent from a server before it, and null with no usable imagery, so
+    /// optional either way.
+    let withinField: WithinField?
+
+    /// ── Over the VISIBLE part, never the whole parcel ──
+    ///
+    /// Cloud, shadow and snow are masked out and not counted, so a share of
+    /// 0,07 is 7 % of what the satellite could see. «7 % от парцела» would be
+    /// wrong whenever part of it was under cloud, and the server's cloud
+    /// rule now keeps a pass with half the parcel clear.
+    struct WithinField: Decodable, Equatable, Sendable {
+        let ndviP10: Double?
+        let ndviP50: Double?
+        let ndviP90: Double?
+        /// Of the visible part, the share below `threshold`, 0…1.
+        let belowThresholdShare: Double?
+        /// The NDVI `vegetation` calls stress below, echoed so the share and
+        /// the level beside it cannot disagree.
+        let threshold: Double
+        /// Of the whole parcel, the share the satellite saw clear at least
+        /// once in the window the figures come from, 0…1: the composite's
+        /// coverage, not one pass's. Optional: absent before agri-saas #2856.
+        let coverage: Double?
+    }
+
     var id: String { parcelId }
 
     var acquired: Date? { acquiredDate.flatMap(BgDate.parseISODay) }
@@ -76,7 +102,7 @@ struct ParcelRisk: Decodable, Identifiable, Equatable, Sendable {
         if !configured {
             return "Сателитният анализ не е настроен за това стопанство."
         }
-        return "Няма безоблачно заснемане на този парцел в последните дни."
+        return "Няма ясно заснемане на този парцел в последните дни."
     }
 }
 

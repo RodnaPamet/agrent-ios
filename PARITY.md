@@ -2013,3 +2013,14 @@ be read outdoors fails before any parity gap matters.
 - **A parcel's reading:** «Последна ясна снимка на парцела: 2 ноември · преди 5 дни». This covers Риск rows, «Риск» on the history, and the inquiry text.
 - **The block map's overlay:** «Картата е заснета на 28 октомври · преди 10 дни».
 - Phone only; no server change. The owner turned down making the map judge clouds over the block too.
+
+### Built — how even a parcel is, in words (#562 stage 2a, agri-saas #2856)
+
+- Under the «Риск» explanation on a parcel's history:
+  - «7 % от видимата част на парцела е под прага на стрес (NDVI 0,35).»
+  - Then one of: «Средната стойност е свалена от малка, много слаба част: огледайте полето за петна.» (mean ≥ 0,05 below the median), or «Полето е неравномерно: …» (P90 − P10 ≥ 0,3).
+- **Over the visible part, never the whole parcel.** The server masks cloud out of every figure; the owner chose words first (2026-11-07).
+- The assistant's question carries P10/P50/P90 and the share, said as over the visible part.
+- Coverage, when under 90 %: «Сателитът е видял само 60 % от парцела през периода; за останалото няма ясен изглед.» It is the composite's coverage (the share of the parcel seen clear at least once in the window), not one pass's clear share.
+- **No cause is named for what wasn't seen.** The server masks snow/ice (SCL 11) exactly like cloud, and a part of the parcel can have had no qualifying pass at all (backend 1, 2026-11-08). So the same change dropped «облачно» / «безоблачно» from the trend's empty line and from the no-reading reason; the unknown-reading explanation lists «облаци, сняг или без заснемане».
+- **Not yet:** the weakest zone (stage 2b).
