@@ -60,6 +60,21 @@ final class RiskWithinFieldTests: XCTestCase {
         XCTAssertNil(RiskWithinField.facts(field(p10: nil, p50: nil, p90: nil, share: nil)))
     }
 
+    /// Where in the field (#562 stage 2b): the zone in words, geographic.
+    func testTheWeakestZoneIsSaidInWords() {
+        let nw = ParcelRisk.Weakest(zone: "NW", ndvi: 0.39, delta: -0.14, bounds: nil)
+        XCTAssertEqual(RiskWithinField.weakest(nw),
+                       "Най-слаба е северозападната част на парцела (NDVI 0,39, с 0,14 под медианата).")
+        let centre = ParcelRisk.Weakest(zone: "C", ndvi: 0.5, delta: -0.2, bounds: nil)
+        XCTAssertEqual(RiskWithinField.weakest(centre),
+                       "Най-слаба е средата на парцела (NDVI 0,50, с 0,20 под медианата).")
+        for zone in ["NW", "N", "NE", "W", "C", "E", "SW", "S", "SE"] {
+            XCTAssertNotNil(RiskWithinField.weakest(.init(zone: zone, ndvi: 0.4, delta: -0.12, bounds: nil)), zone)
+        }
+        XCTAssertNil(RiskWithinField.weakest(.init(zone: "NNE", ndvi: 0.4, delta: -0.12, bounds: nil)),
+                     "an unknown code costs the sentence")
+    }
+
     /// Decoded from the fixture; absent on a server before #2856.
     func testTheFixtureCarriesItAndOldPayloadsDoNot() async throws {
         func load(_ name: String) throws -> Data {
@@ -69,7 +84,10 @@ final class RiskWithinFieldTests: XCTestCase {
         XCTAssertEqual(holes.withinField?.belowThresholdShare, 0.07)
         XCTAssertEqual(holes.withinField?.threshold, 0.35)
         XCTAssertEqual(holes.withinField?.coverage, 0.98)
+        XCTAssertEqual(holes.weakest?.zone, "NW")
+        XCTAssertEqual(holes.weakest?.bounds?.count, 4)
         let simple = try await FarmRiskAPI.decodeAnalysis(from: load("risk-analysis-simple"))
         XCTAssertNil(simple.withinField)
+        XCTAssertNil(simple.weakest, "null or absent: nothing is said")
     }
 }

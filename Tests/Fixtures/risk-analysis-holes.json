@@ -11,5 +11,6 @@
   "overall": "good",
   "acquiredDate": "2026-09-26",
   "withinField": { "ndviP10": 0.41, "ndviP50": 0.74, "ndviP90": 0.88, "belowThresholdShare": 0.07, "threshold": 0.35, "coverage": 0.98 },
+  "weakest": { "zone": "NW", "ndvi": 0.6, "delta": -0.14, "bounds": [0.0, 0.0, 0.1, 0.1] },
   "generatedAt": "2026-09-29T06:00:00.000Z"
 }

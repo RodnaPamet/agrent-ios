@@ -46,6 +46,26 @@ enum RiskWithinField {
         return sentences
     }
 
+    /// «Най-слаба е северозападната част на парцела (NDVI 0,39, с 0,14 под
+    /// медианата).» Nil for an unknown zone code.
+    static func weakest(_ weakest: ParcelRisk.Weakest) -> String? {
+        let part: String
+        switch weakest.zone {
+        case "NW": part = "северозападната част"
+        case "N": part = "северната част"
+        case "NE": part = "североизточната част"
+        case "W": part = "западната част"
+        case "C": part = "средата"
+        case "E": part = "източната част"
+        case "SW": part = "югозападната част"
+        case "S": part = "южната част"
+        case "SE": part = "югоизточната част"
+        default: return nil
+        }
+        let below = RiskTrendWords.index(abs(weakest.delta))
+        return "Най-слаба е \(part) на парцела (NDVI \(RiskTrendWords.index(weakest.ndvi)), с \(below) под медианата)."
+    }
+
     /// For the assistant: the figures themselves, said as over the visible part.
     static func facts(_ field: ParcelRisk.WithinField) -> String? {
         var parts: [String] = []

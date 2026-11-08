@@ -58,6 +58,25 @@ struct ParcelRisk: Decodable, Identifiable, Equatable, Sendable {
     /// optional either way.
     let withinField: WithinField?
 
+    /// The weakest ninth of the parcel (agri-saas #2859, #562 stage 2b), at
+    /// the top level beside `withinField`. Null means "cannot localise":
+    /// too small, too cloudy, or even, and nothing tells those apart, so
+    /// null is said as nothing at all.
+    let weakest: Weakest?
+
+    struct Weakest: Decodable, Equatable, Sendable {
+        /// `NW N NE / W C E / SW S SE`: geographic, cut from the parcel's
+        /// lat/lon box, so it does not turn with the map. A String, so an
+        /// unknown code costs the sentence and not the parcel.
+        let zone: String
+        let ndvi: Double
+        /// The zone's mean minus the field's median: negative.
+        let delta: Double
+        /// `[west, south, east, north]`, the grid cell's box, not the
+        /// parcel's shape inside it. Read, not drawn yet (words first).
+        let bounds: [Double]?
+    }
+
     /// ── Over the VISIBLE part, never the whole parcel ──
     ///
     /// Cloud, shadow and snow are masked out and not counted, so a share of
