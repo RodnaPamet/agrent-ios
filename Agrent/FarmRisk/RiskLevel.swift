@@ -21,11 +21,18 @@ import SwiftUI
 /// grey pretending to be a middle value.
 enum RiskLevel: String, CaseIterable, LenientDecodable, Sendable {
     case good, watch, stress, unknown
+    /// MOISTURE only, on bare or sparse ground (NDVI below 0,2; agri-saas
+    /// #2866, owner 2026-11-08). NDMI is water in the leaves, so with no
+    /// crop it reads low however wet the soil: the owner saw «Влага: Стрес»
+    /// on a farmer's field after a week of rain. Not `unknown`: the imagery
+    /// was fine, there was nothing to measure, and waiting does not fix it
+    /// until the crop is up. A build before this showed it as «Няма отчет».
+    case notAssessed
 
     static var unknownCase: RiskLevel { .unknown }
 
     /// A reading, or the absence of one.
-    var isReading: Bool { self != .unknown }
+    var isReading: Bool { self != .unknown && self != .notAssessed }
 
     var label: String {
         switch self {
@@ -36,6 +43,8 @@ enum RiskLevel: String, CaseIterable, LenientDecodable, Sendable {
         // satellite that has nothing to say. The sentence beside the chip
         // names which kind of absence it is.
         case .unknown: "Няма отчет"
+        // The web's chip says the same, by agreement with backend 1.
+        case .notAssessed: "Няма култура за оценка"
         }
     }
 
@@ -51,7 +60,7 @@ enum RiskLevel: String, CaseIterable, LenientDecodable, Sendable {
         case .good:    (Color(hex: 0x1F6B3A), Color(hex: 0xE4F1E8))
         case .watch:   (Color(hex: 0x8A5B00), Color(hex: 0xFBF0DC))
         case .stress:  (Color(hex: 0x8E2A22), Color(hex: 0xF7E4E1))
-        case .unknown: (Palette.Chip.neutralText, Palette.Chip.neutralFill)
+        case .unknown, .notAssessed: (Palette.Chip.neutralText, Palette.Chip.neutralFill)
         }
     }
 
@@ -67,6 +76,9 @@ enum RiskLevel: String, CaseIterable, LenientDecodable, Sendable {
         case .watch: 1
         case .good: 2
         case .unknown: 3
+        // Never the parcel's order: only moisture takes it, and `overall`
+        // ignores it. Last, with the other absence, should it ever sort.
+        case .notAssessed: 4
         }
     }
 }

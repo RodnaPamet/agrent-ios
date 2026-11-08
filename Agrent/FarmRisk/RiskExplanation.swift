@@ -32,7 +32,16 @@ enum RiskExplanation {
     static func text(vegetation: RiskLevel, moisture: RiskLevel, stale: Bool) -> String? {
         var sentences: [String] = []
         switch (vegetation, moisture) {
-        case (.unknown, _), (_, .unknown):
+        case (_, .notAssessed):
+            // Bare or sparse ground (NDVI below 0,2): moisture is not graded,
+            // so say why, and nothing about drought.
+            sentences.append("Зеленината е много ниска: на парцела вероятно няма култура (след жътва, обработено или преди поникване). Затова влагата не се оценява.")
+            if stale {
+                sentences.append("Снимката е отпреди повече от \(Staleness.satellitePass) дни и може да не отразява днешното състояние.")
+            }
+            return sentences.joined(separator: " ")
+        // Vegetation never takes `notAssessed`; read as no reading if it did.
+        case (.unknown, _), (_, .unknown), (.notAssessed, _):
             return stale
                 ? nil
                 : "Сателитът няма ясна снимка на парцела (облаци, сняг или без заснемане), затова няма оценка. Проверете отново след следващото заснемане."
