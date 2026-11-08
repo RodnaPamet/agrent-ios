@@ -111,15 +111,25 @@ final class FarmRiskDecodeTests: XCTestCase {
 
 final class RiskLevelTests: XCTestCase {
 
-    private let serverValues = ["good", "watch", "stress", "unknown"]
+    /// `notAssessed` from agri-saas #2866: moisture on bare ground.
+    private let serverValues = ["good", "watch", "stress", "unknown", "notAssessed"]
 
-    func testTheFourValuesMatchTheServer() {
+    func testTheValuesMatchTheServer() {
         XCTAssertEqual(Set(RiskLevel.allCases.map(\.rawValue)), Set(serverValues))
     }
 
     /// A fifth value must not fail the decode of a parcel — the
     /// `LogEntryType` lesson, where strict decoding would have blanked a
     /// whole list on one unrecognised string.
+    /// Bare ground's moisture (owner, 2026-11-08): its own chip, worded as
+    /// the web's, and never the same words as `unknown`'s.
+    func testNotAssessedIsItsOwnAbsence() throws {
+        let decoded = try JSONDecoder().decode(RiskLevel.self, from: Data("\"notAssessed\"".utf8))
+        XCTAssertEqual(decoded, .notAssessed)
+        XCTAssertEqual(decoded.label, "Няма култура за оценка")
+        XCTAssertNotEqual(RiskLevel.notAssessed.label, RiskLevel.unknown.label)
+    }
+
     func testAnUnknownValueDegrades() throws {
         let decoded = try JSONDecoder().decode(RiskLevel.self, from: Data("\"severe\"".utf8))
         XCTAssertEqual(decoded, .unknown)
@@ -133,6 +143,9 @@ final class RiskLevelTests: XCTestCase {
                        "unknown borrowed a severity colour")
         XCTAssertFalse(RiskLevel.unknown.isReading)
         XCTAssertTrue(RiskLevel.good.isReading)
+        XCTAssertFalse(severities.contains(RiskLevel.notAssessed.colors.background),
+                       "notAssessed borrowed a severity colour")
+        XCTAssertFalse(RiskLevel.notAssessed.isReading)
     }
 
     /// Worst first — but a GAP sorts last, not first. Putting unread
@@ -140,7 +153,7 @@ final class RiskLevelTests: XCTestCase {
     /// under the fields a cloud happened to cover.
     func testWorstFirstAndGapsLast() {
         let sorted = RiskLevel.allCases.sorted { $0.severityOrder < $1.severityOrder }
-        XCTAssertEqual(sorted, [.stress, .watch, .good, .unknown])
+        XCTAssertEqual(sorted, [.stress, .watch, .good, .unknown, .notAssessed], "both absences last")
     }
 
     func testEveryLevelHasADistinctBulgarianLabel() {

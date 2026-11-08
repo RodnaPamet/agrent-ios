@@ -20,6 +20,17 @@ final class RiskExplanationTests: XCTestCase {
         }
     }
 
+    /// Bare ground (agri-saas #2866): moisture is not graded, so no drought
+    /// is named, whatever the soil after a week of rain.
+    func testBareGroundNamesNoDrought() throws {
+        let text = try XCTUnwrap(RiskExplanation.text(vegetation: .stress, moisture: .notAssessed, stale: false))
+        XCTAssertTrue(text.hasPrefix("Зеленината е много ниска: на парцела вероятно няма култура"), text)
+        XCTAssertTrue(text.contains("влагата не се оценява"), text)
+        for word in ["засушаване", "суша", "сухо"] { XCTAssertFalse(text.contains(word), word) }
+        let stale = try XCTUnwrap(RiskExplanation.text(vegetation: .stress, moisture: .notAssessed, stale: true))
+        XCTAssertTrue(stale.contains("отпреди повече от"), stale)
+    }
+
     /// The pair points at a cause: weak AND dry is drought, weak but not dry
     /// is something else, green but dry is drought on its way.
     func testThePairPointsAtACause() throws {
