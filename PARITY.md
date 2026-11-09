@@ -2056,3 +2056,9 @@ be read outdoors fails before any parity gap matters.
 - `weakest` sits at the top level of `/analysis`, beside `withinField`. The zone is geographic: one of nine cells cut from the parcel's lat/lon box.
 - **Null says nothing.** It means "cannot localise" (too small, too cloudy, or even), and these can't be told apart.
 - `bounds` is decoded but not drawn: the owner chose words first.
+
+### Built — the quiet-hours summary push opens «Известия» (agri-saas #2510 follow-up, 2026-11-09)
+
+- `push-summary` delivers what a held-back push would have said and leads to the bell. It sent a bare `/notifications`, which opened nothing on the phone and a 404 on the web. Backend 2 is changing it to `/t/{slug}/notifications`, like every other notification link.
+- The phone opens that farm's «Известия»: the tab at its root when it's on the bar, otherwise pushed onto the current screen. The bare form stays no link, because it names no farm.
+- «Известия» already lists every producer's rows (#471/#472), so owner decision #2510 (reach, not interruption) needed no other phone change.

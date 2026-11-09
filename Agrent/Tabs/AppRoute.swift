@@ -55,6 +55,9 @@ enum AppRoute: Hashable, Sendable {
     /// A farm's public page, on the phone (#536): from Борса's farm search,
     /// a listing's farm, or a `/f/{handle}` link.
     case publicFarm(handle: String)
+    /// «Известия», from the quiet-hours summary push. A surface of its own,
+    /// so on the bar it opens that tab at its root (`AppRouter.open`).
+    case notifications
 
     func hash(into hasher: inout Hasher) {
         switch self {
@@ -70,11 +73,19 @@ enum AppRoute: Hashable, Sendable {
         case .exchangeInbox: hasher.combine("exchangeInbox")
         case .treatmentMap(let handle, _): hasher.combine("treatmentMap"); hasher.combine(handle)
         case .publicFarm(let handle): hasher.combine("publicFarm"); hasher.combine(handle)
+        case .notifications: hasher.combine("notifications")
         }
     }
 
     /// The tab this screen belongs to: where `AppRouter.open(_:)` shows it
     /// when that tab is on the bar.
+    /// The route IS its home tab's root screen: on the bar, opening it
+    /// selects the tab rather than pushing a second copy onto it.
+    var isSurfaceRoot: Bool {
+        if case .notifications = self { return true }
+        return false
+    }
+
     var home: AppSurface {
         switch self {
         case .journalEntry, .treatmentMap: .journal
@@ -82,6 +93,7 @@ enum AppRoute: Hashable, Sendable {
         case .task, .taskID: .tasks
         case .location, .locationID: .locations
         case .parcelHistory: .farmRisk
+        case .notifications: .notifications
         }
     }
 
@@ -104,6 +116,7 @@ enum AppRoute: Hashable, Sendable {
         case .exchangeInbox: ExchangeInboxScreen()
         case .treatmentMap(let handle, let title): TreatmentMapView(handle: handle, title: title)
         case .publicFarm(let handle): PublicFarmView(handle: handle)
+        case .notifications: NotificationsView()
         }
     }
 }
@@ -117,6 +130,7 @@ extension AppRoute {
         case .thread(_, let id): self = .conversation(threadID: id, commodity: nil)
         case .location(_, let id): self = .locationID(id)
         case .listing(_, let id): self = .listingID(id)
+        case .notifications: self = .notifications
         }
     }
 }

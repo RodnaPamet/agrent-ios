@@ -38,11 +38,19 @@ import Foundation
 /// inquiry on a listing writes `/t/{slug}/exchange/my-interests#listing-{id}`
 /// or `my-listings#listing-{id}`, the listing named in the FRAGMENT (kept so
 /// web bookmarks keep working, backend 1 on #2510): that listing.
+///
+/// ── «Известия» itself ──
+///
+/// The quiet-hours summary (`push-summary.ts`) delivers what a held-back
+/// push would have said, and leads to the bell: `/t/{slug}/notifications`
+/// (backend 2, 2026-11-09; it sent a bare `/notifications` before, which
+/// led nowhere on either client). That farm's «Известия».
 enum PushLink: Equatable, Sendable {
     case task(farm: String, id: String)
     case thread(farm: String, id: String)
     case location(farm: String, id: String)
     case listing(farm: String, id: String)
+    case notifications(farm: String)
 
     /// nil for no link, an absolute URL (never followed: the server sends
     /// paths, so anything else did not come from it), or a path the app
@@ -58,6 +66,9 @@ enum PushLink: Equatable, Sendable {
             part.removingPercentEncoding.flatMap { $0.isEmpty ? nil : $0 }
         }
         guard parts.first?.isEmpty == true else { return nil }
+        if parts.count == 4, parts[1] == "t", parts[3] == "notifications", let farm = decoded(parts[2]) {
+            return .notifications(farm: farm)
+        }
         if parts.count == 5, parts[1] == "t", parts[3] == "farm-tasks",
            let farm = decoded(parts[2]), let id = decoded(parts[4]) {
             return .task(farm: farm, id: id)
@@ -86,7 +97,8 @@ enum PushLink: Equatable, Sendable {
     /// The farm the link is in.
     var farm: String {
         switch self {
-        case .task(let farm, _), .thread(let farm, _), .location(let farm, _), .listing(let farm, _): farm
+        case .task(let farm, _), .thread(let farm, _), .location(let farm, _), .listing(let farm, _),
+             .notifications(let farm): farm
         }
     }
 }

@@ -58,6 +58,18 @@ final class PushLinkTests: XCTestCase {
     }
 
     /// Only paths the server sends, and only ones the app can show.
+    /// The quiet-hours summary leads to that farm's «Известия». The bare
+    /// `/notifications` it sent before names no farm, and stays no link: on
+    /// a phone in two farms it would open the wrong farm's list.
+    func testTheSummaryOpensTheFarmsNotifications() {
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/notifications"), .notifications(farm: "ferma-1"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/notifications")?.farm, "ferma-1")
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/notifications").map(AppRoute.init), .notifications)
+        XCTAssertNil(PushLink.parse("/notifications"))
+        XCTAssertNil(PushLink.parse("/t//notifications"))
+        XCTAssertNil(PushLink.parse("/t/ferma-1/notifications/n1"))
+    }
+
     func testAnythingElseIsNoLink() {
         for link in [nil, "", "t/ferma-1/farm-tasks/1", "//elsewhere/t/ferma-1/farm-tasks/1",
                      "https://app.agrent.bg/t/ferma-1/farm-tasks/1", "/t/ferma-1/farm-tasks/",

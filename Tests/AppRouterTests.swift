@@ -132,6 +132,25 @@ final class AppRouterTests: XCTestCase {
         XCTAssertNil(router.paths[.exchange])
     }
 
+    /// «Известия» IS its tab's root: on the bar, the summary push selects the
+    /// tab with nothing pushed, never a second list on top of the first.
+    func testTheNotificationsLinkSelectsItsTabAtTheRoot() {
+        let router = AppRouter(bar: [.journal, .notifications, .tasks])
+        router.paths[.notifications] = path(thread("t0"))
+        router.open(.notifications)
+        XCTAssertEqual(router.tab, .notifications)
+        XCTAssertNil(router.paths[.notifications], "the list itself, at its root")
+    }
+
+    /// In the menu, as by default: pushed onto the tab in front of the person.
+    func testTheNotificationsLinkOffTheBarPushesTheList() {
+        let router = AppRouter(bar: [.journal, .calculator, .locations, .tasks])
+        router.tab = .locations
+        router.open(.notifications)
+        XCTAssertEqual(router.tab, .locations)
+        XCTAssertEqual(router.paths[.locations], path(.notifications))
+    }
+
     // MARK: - AppRoute
 
     func testEachRouteNamesTheTabItBelongsTo() throws {
