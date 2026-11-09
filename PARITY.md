@@ -2062,3 +2062,16 @@ be read outdoors fails before any parity gap matters.
 - `push-summary` delivers what a held-back push would have said and leads to the bell. It sent a bare `/notifications`, which opened nothing on the phone and a 404 on the web. Backend 2 is changing it to `/t/{slug}/notifications`, like every other notification link.
 - The phone opens that farm's «Известия»: the tab at its root when it's on the bar, otherwise pushed onto the current screen. The bare form stays no link, because it names no farm.
 - «Известия» already lists every producer's rows (#471/#472), so owner decision #2510 (reach, not interruption) needed no other phone change.
+
+### Built, held for the server — «Машини» (owner, 2026-11-09, #574; agri-saas #2948)
+
+- **The tracker:** a GPS unit with its own SIM wired to the machine (e.g. Teltonika FMB920/FMC130). Not AirTag: Apple has no Find My API for apps.
+- **«Машини», a menu row for OWNER and ADMIN only** (shown only when the server says `canAdmin`). It holds:
+  - a map of the machines that have reported;
+  - a row per machine with its state, from the server's `moving`, and when it was last heard from;
+  - the tracker register (swipe «Премахни»), with who confirmed the drivers were told;
+  - «+» «Нов тракер»: pick a machine or create one, the IMEI (15 digits with its check digit), the required «шофьорите са уведомени», and the device setup from the server (or why there's none).
+- **A machine's day:** the route for a date (the server keeps routes 30 days and says when one is gone), and the parcels it worked («вероятно» for a weak match). Today's parcels are worked out overnight. Never written into the ДНЕВНИК by itself.
+- **Positions are read live and never cached on disk:** where a machine is, is where its driver is.
+- **Not a bar surface yet:** the web has no `/machines` page, and the bottom bar holds the web's pages.
+- **Next stages:** a task's machines, the mechanisator's notice and own machine; worked parcels → «Нов запис»; the alert push link.

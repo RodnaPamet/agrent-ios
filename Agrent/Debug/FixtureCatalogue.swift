@@ -106,6 +106,9 @@ enum FixtureCatalogue {
     /// the parcels map every other kind of task has (agrent-ios#177).
     static let fixtureTaskID = "tsk_fixture_2"
 
+    /// The synthetic tractor in `machines-list.json` (#574).
+    static let fixtureTractorID = "ast_fixture_tractor"
+
     static let fixtureRiskParcels: [(parcelID: String, fixture: String)] = [
         ("par_holes", "risk-analysis-holes"),
         ("par_simple", "risk-analysis-simple"),
@@ -156,6 +159,9 @@ enum FixtureCatalogue {
         // is another question, and `NO_FIXTURE` is its true answer. One
         // cloudy pass, so the screenshot shows the line's break.
         (RiskTrendAPI.path("par_holes", days: 14), "risk-history-holes"),
+        // #574: the synthetic tractor's day, as «Машини» opens it: today.
+        (MachinesAPI.trackPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-track"),
+        (MachinesAPI.workedPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-worked"),
     ]) { $0 }
 
     /// Routes matched on the path alone.
@@ -277,6 +283,11 @@ enum FixtureCatalogue {
         // GET only — every write on it is answered 501, and the A6 card
         // (a GET below it) has no fixture: A11yShots never taps it.
         (FarmBrandAPI.draftPath, "farm-brand"),
+        // #574 «Машини»: three invented machines, two trackers, the register.
+        // GETs only — adding or removing a tracker is a write, answered 501.
+        (MachinesAPI.listPath, "machines-list"),
+        (MachinesAPI.trackersPath, "machine-trackers"),
+        (MachinesAPI.assetsPath, "assets-list"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 

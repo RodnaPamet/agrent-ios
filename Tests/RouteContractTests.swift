@@ -192,7 +192,18 @@ final class RouteContractTests: XCTestCase {
     /// Empty again from agri-saas main 257a5b3: a parcel's readings over a
     /// period (#562) came off with the refresh once agri-saas #2839 was live
     /// (2026-11-07).
-    private static let pendingServerRoutes: [String: String] = [:]
+    private static let pendingServerRoutes: [String: String] = [
+        // «Машини» (#574), built against agri-saas #2948's contract (owner,
+        // 2026-11-09) — off this list by the refresh that brings them in.
+        // `/machines`, `/track` and `/worked` came off with agri-saas main
+        // 0716a16, once stage 3a (4810e91) was live (2026-11-12).
+        "/api/t/{tenantSlug}/machines/trackers": "agri-saas #2948: the tracker register",
+        "/api/t/{tenantSlug}/machines/trackers/{id}": "agri-saas #2948: removing a tracker",
+        "/api/t/{tenantSlug}/farm-tasks/tracked-machines": "agri-saas #2948: the mechanisator's notice",
+        "/api/t/{tenantSlug}/farm-tasks/{taskId}/machine": "agri-saas #2948: a task's machine, for its mechanisator",
+        "/api/t/{tenantSlug}/farm-tasks/{taskId}/assets": "agri-saas #2948: a task's machines",
+        "/api/t/{tenantSlug}/farm-tasks/{taskId}/assets/{assetId}": "agri-saas #2948: unlinking a task's machine",
+    ]
 
     /// Files whose `/x` literals are not API paths at all.
     private static let notAPIPaths: [String: String] = [
@@ -400,6 +411,16 @@ final class RouteContractTests: XCTestCase {
                 SpatialImportAPI.jobPath(locationID: loc, jobID: "{jobId}"),
             ]),
             ("FarmRiskModels.swift", [FarmRiskAPI.analysisPath(parcel), FarmRiskAPI.leadsPath]),
+            // #574: «Машини», agri-saas #2948.
+            ("MachinesAPI.swift", [
+                MachinesAPI.listPath,
+                MachinesAPI.trackPath("{assetId}", day: "2026-11-09"),
+                MachinesAPI.workedPath("{assetId}", day: "2026-11-09"),
+                MachinesAPI.trackersPath, MachinesAPI.trackerPath(id),
+                MachinesAPI.assetsPath, MachinesAPI.trackedPath,
+                MachinesAPI.taskMachinePath("{taskId}"), MachinesAPI.taskAssetsPath("{taskId}"),
+                MachinesAPI.taskAssetPath("{taskId}", assetID: "{assetId}"),
+            ]),
             // #562: the same reading over a period (agri-saas #2837).
             ("RiskTrend.swift", [RiskTrendAPI.path(parcel, days: 14)]),
             ("InsuranceCatalogue.swift", [InsuranceCatalogueAPI.path]),

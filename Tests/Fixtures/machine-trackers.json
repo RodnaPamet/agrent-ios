@@ -1,0 +1,33 @@
+{
+  "ingest": {
+    "host": "gps.example.invalid",
+    "port": 5027,
+    "protocol": "codec8"
+  },
+  "trackers": [
+    {
+      "id": "trk_fixture_1",
+      "assetId": "ast_fixture_tractor",
+      "assetName": "Синтетичен трактор",
+      "assetType": "TRACTOR",
+      "imei": "350000000000006",
+      "label": "в кабината",
+      "installedAt": "2026-11-01T08:00:00+02:00",
+      "driversInformedAt": "2026-11-01T07:55:00+02:00",
+      "driversInformedByName": "Иван Фикстуров",
+      "lastSeenAt": "2026-11-09T14:31:02+02:00"
+    },
+    {
+      "id": "trk_fixture_2",
+      "assetId": "ast_fixture_harvester",
+      "assetName": "Синтетичен комбайн",
+      "assetType": "HARVESTER",
+      "imei": "860000000000017",
+      "label": null,
+      "installedAt": "2026-11-02T08:00:00+02:00",
+      "driversInformedAt": "2026-11-02T07:55:00+02:00",
+      "driversInformedByName": "Иван Фикстуров",
+      "lastSeenAt": "2026-11-09T11:02:40+02:00"
+    }
+  ]
+}
