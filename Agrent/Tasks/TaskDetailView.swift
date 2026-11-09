@@ -49,6 +49,9 @@ struct TaskDetailView: View {
     /// nil for a field operation, whose lines carry its map. Started beside
     /// the task, as the lines are, not after it.
     @State private var parcels: TaskParcelsStore?
+    /// The machines the task uses, and where its machine was last heard
+    /// from (#574).
+    @State private var machines: TaskMachinesStore
 
     init(summary: WorkItemSummary) {
         self.summary = summary
@@ -58,6 +61,7 @@ struct TaskDetailView: View {
             ? FieldOperationStore(taskID: summary.id, taskKey: summary.key)
             : nil)
         _parcels = State(initialValue: isFieldOperation ? nil : TaskParcelsStore(taskID: summary.id))
+        _machines = State(initialValue: TaskMachinesStore(taskID: summary.id))
     }
 
     var body: some View {
@@ -93,6 +97,7 @@ struct TaskDetailView: View {
         // Here and not in the section: the section draws nothing until its
         // parcels arrive, and a task on an empty view is not one to rely on.
         .task { if let parcels, parcels.state.value == nil { await parcels.load() } }
+        .task { if machines.linked == nil { await machines.load() } }
         // The last line marked moved the job to PENDING_REVIEW on the
         // server; the chip above should say so without a pull.
         .onChange(of: lines?.finishedJob) { _, _ in
@@ -225,6 +230,7 @@ struct TaskDetailView: View {
                     if let parcels {
                         TaskParcelsSection(store: parcels)
                     }
+                    TaskMachinesSection(store: machines, mayManage: people.user?.permissions?.canAdmin == true)
                     facts(item)
                     text("Описание", item.description)
                     text("Решение", item.resolution)
@@ -248,6 +254,7 @@ struct TaskDetailView: View {
                     await store.load()
                     await lines?.load(showCachedFirst: false)
                     await parcels?.load()
+                    await machines.load()
                 }
             }
             .pageBackground()

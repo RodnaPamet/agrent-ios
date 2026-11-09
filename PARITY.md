@@ -2075,3 +2075,8 @@ be read outdoors fails before any parity gap matters.
 - **Positions are read live and never cached on disk:** where a machine is, is where its driver is.
 - **Not a bar surface yet:** the web has no `/machines` page, and the bottom bar holds the web's pages.
 - **Next stages:** a task's machines, the mechanisator's notice and own machine; worked parcels → «Нов запис»; the alert push link.
+- **Stage 2, a task's machines:**
+  - «Машини» on a task shows the machines it uses, and where its machine was last heard from (a small map and «Движи се, 14:31»).
+  - OWNER and ADMIN «Добави машина» (machines only) and «Махни» (confirmed).
+  - The mechanisator sees their own task's machine. The server's `/farm-tasks/{taskId}/machine` answers 404 for anyone else's task, which reads as no machine.
+- **Stage 2, the mechanisator's notice:** «GPS проследяване» at the foot of «Моите задачи» says which machines are tracked (a GPS tracker or the maker's telematics), who sees them (the server's `visibleTo`), and that their own phone is not tracked. Shown only when the farm has tracked machines.

@@ -43,6 +43,17 @@ enum MachineWords {
     /// demo is never read as a real fleet.
     static let demoNotice = "Демо данни: машините и маршрутите тук са симулирани и не се записват в дневника."
 
+    /// «Синтетичен трактор: Движи се, 14:31», and how many more can be found
+    /// when the task has several, so one of two is not shown as the only one.
+    static func taskMachine(_ found: TaskMachine, _ position: Machine.Position, now: Date = Date()) -> String {
+        let status = status(position, now: now)
+        var line = found.name.map { "\($0): \(status)" } ?? status
+        if let count = found.locatableCount, count > 1 {
+            line += count == 2 ? ". Задачата има още една проследявана машина." : ". Задачата има още \(count - 1) проследявани машини."
+        }
+        return line
+    }
+
     /// «45 мин», «2 ч 05 мин».
     static func duration(minutes: Int) -> String {
         guard minutes >= 60 else { return "\(max(minutes, 0)) мин" }
@@ -85,12 +96,12 @@ enum MachineWords {
     /// sees them, from the server's own list.
     static func notice(_ tracked: TrackedMachines) -> String {
         guard !tracked.machines.isEmpty else {
-            return "Няма машини с GPS тракер в стопанството."
+            return "Няма проследявани машини в стопанството."
         }
         let names = tracked.machines.map(\.name).joined(separator: ", ")
         let who = tracked.visibleTo.compactMap(roleWord).joined(separator: " и ")
         let seen = who.isEmpty ? "" : " Местоположението им виждат \(who)."
-        return "С GPS тракер са: \(names).\(seen) Вашият телефон не се проследява."
+        return "Проследяват се (GPS тракер или телематика на производителя): \(names).\(seen) Вашият телефон не се проследява."
     }
 
     private static func roleWord(_ role: String) -> String? {

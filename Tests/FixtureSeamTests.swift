@@ -145,6 +145,9 @@ final class FixtureSeamTests: XCTestCase {
             (MachinesAPI.listPath, "machines-list"),
             (MachinesAPI.trackersPath, "machine-trackers"),
             (MachinesAPI.assetsPath, "assets-list"),
+            (MachinesAPI.trackedPath, "machines-tracked"),
+            (MachinesAPI.taskAssetsPath(FixtureCatalogue.fixtureTaskID), "task-machines"),
+            (MachinesAPI.taskMachinePath(FixtureCatalogue.fixtureTaskID), "task-machine"),
             (MachinesAPI.trackPath(FixtureCatalogue.fixtureTractorID, day: BgDate.isoDay(Date())), "machine-track"),
             (MachinesAPI.workedPath(FixtureCatalogue.fixtureTractorID, day: BgDate.isoDay(Date())), "machine-worked"),
             (DashboardAPI.agPath, "dashboard-ag"),
@@ -552,6 +555,17 @@ final class FixtureSeamTests: XCTestCase {
             }
         }),
         ("assets-list", { _ = try await MachinesAPI.decodeAssets($0) }),
+        ("machines-tracked", { _ = try await APIClient.shared.decode($0, as: TrackedMachines.self) }),
+        ("task-machines", {
+            let rows = try await MachinesAPI.decodeAssets($0)
+            if rows.first?.id != "ast_fixture_tractor" { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "assetId")) }
+        }),
+        ("task-machine", {
+            struct Probe: Decodable { let lastPosition: Machine.Position? }
+            if try await APIClient.shared.decode($0, as: Probe.self).lastPosition == nil {
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "no position"))
+            }
+        }),
         ("dashboard-ag", { _ = try await DashboardAPI.decodeAg(from: $0) }),
         ("dashboard-task-trend", { _ = try await DashboardAPI.decodeTaskTrend(from: $0) }),
         ("dashboard-field-briefing", { _ = try await DashboardAPI.decodeFieldBriefing(from: $0) }),

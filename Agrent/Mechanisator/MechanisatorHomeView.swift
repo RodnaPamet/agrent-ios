@@ -46,6 +46,9 @@ private struct MechanisatorHome: View {
     /// The phone's dot, and «Моето местоположение»'s camera moves (#492).
     @State private var location = DeviceLocation.shared
     @State private var cameraTick = 0
+    /// Which machines are GPS-tracked and who sees them (#574): the owner's
+    /// notice to drivers. Nil until read; nothing shown if none are.
+    @State private var tracked: TrackedMachines?
     @State private var camera: SatelliteParcelMap.CameraCommand?
     @Environment(\.pushRoute) private var pushRoute
     @Environment(\.colorSchemeContrast) private var contrast
@@ -70,6 +73,7 @@ private struct MechanisatorHome: View {
         }
         .task { if parcels.blocks.value == nil { await parcels.load() } }
         .task { if tasks.state.value == nil { await tasks.load() } }
+        .task { tracked = try? await MachinesAPI.tracked() }
         // The counts follow the current tasks: a task closed or newly given,
         // or a row now carrying its parcels, changes the numbers.
         .task(id: tasks.current ?? []) { await counts.load(tasks.current ?? []) }
@@ -165,6 +169,7 @@ private struct MechanisatorHome: View {
             Group {
                 taskRows
                 parcelRows
+                trackedNotice
             }
             .pageRow()
         }
@@ -174,6 +179,20 @@ private struct MechanisatorHome: View {
             await PullToRefresh.bounded {
                 await tasks.load()
                 await parcels.load()
+            }
+        }
+    }
+
+    /// «GPS проследяване» (owner, 2026-11-09): drivers are told, in the app,
+    /// which machines carry a tracker and who sees where they are, and that
+    /// their own phone is not tracked.
+    @ViewBuilder
+    private var trackedNotice: some View {
+        if let tracked, !tracked.machines.isEmpty {
+            Section(titled: "GPS проследяване") {
+                Label(MachineWords.notice(tracked), systemImage: "location.north.circle")
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
