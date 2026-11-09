@@ -511,3 +511,15 @@ invented NDVI P10/P50/P90 and a 7 % share under the 0,35 stress line, over the
 visible part, and 98 % coverage (quiet on screen), and a weakest zone `NW` with a
 placeholder cell box (`weakest`, agri-saas #2859; not real geometry). `risk-analysis-simple.json` and `risk-analysis-nogeom.json` keep the
 shape from before it, so a server without the field is still decoded.
+
+## «Машини» (#574)
+
+`machines-list.json`, `machine-trackers.json`, `machine-track.json`,
+`machine-worked.json` and `assets-list.json`, shaped from agri-saas #2948.
+All invented:
+- three machines: a moving tractor on John Deere telematics, a standing harvester on a SIM tracker, and a van with no position source;
+- two trackers with synthetic IMEIs (made to pass the check digit), and an ingest host on `example.invalid`;
+- a zigzag route on points near the fixture world's map;
+- two worked parcels, one a weak match.
+
+The route and the worked parcels answer today's date, which is what the day screen opens on.

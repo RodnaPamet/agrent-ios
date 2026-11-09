@@ -48,7 +48,9 @@ struct AppMenuButton<Extra: View>: View {
     /// «Известия»'s unread count, on its row when it is not on the bar (#471).
     @State private var notifications = NotificationsStore.shared
     @State private var showingAdmin = false
+    @State private var showingMachines = false
     @State private var farms = FarmStore.shared
+    @State private var people = CurrentUserStore.shared
 
     /// Which overflow screen is open, if any. One piece of state rather
     /// than a Bool per surface — the set is now derived from what is NOT
@@ -96,6 +98,17 @@ struct AppMenuButton<Extra: View>: View {
                         Label(menuLabel(surface), systemImage: surface.icon)
                     }
                 }
+                // «Машини» (#574): OWNER and ADMIN only (owner, 2026-11-09),
+                // and only on the server's word. An unknown role shows
+                // nothing, as the screen is where the drivers are.
+                if people.user?.permissions?.canAdmin == true {
+                    Button {
+                        showingMachines = true
+                    } label: {
+                        Label("Машини", systemImage: "location.north.circle")
+                    }
+                    .accessibilityInputLabels(A11y.Spoken.machines)
+                }
             }
 
             // ITS OWN SECTION, last — where «Профил» and «Изход» sat before
@@ -125,6 +138,7 @@ struct AppMenuButton<Extra: View>: View {
         // action; presenting it modally says the same thing — you came here
         // on purpose and you will go back.
         .sheet(isPresented: $showingAdmin) { AdminView() }
+        .sheet(isPresented: $showingMachines) { MachinesView() }
         // Each screen owns its own NavigationStack, the same shape AdminView
         // uses. The «Затвори» does NOT belong to the screen, though (#119):
         // every surface can be a tab root or a menu sheet depending on the

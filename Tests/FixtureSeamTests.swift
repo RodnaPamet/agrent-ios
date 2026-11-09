@@ -142,6 +142,11 @@ final class FixtureSeamTests: XCTestCase {
             (FarmRiskAPI.analysisPath("par_simple"), "risk-analysis-simple"),
             (FarmRiskAPI.analysisPath("par_nogeom"), "risk-analysis-nogeom"),
             (RiskTrendAPI.path("par_holes", days: 14), "risk-history-holes"),
+            (MachinesAPI.listPath, "machines-list"),
+            (MachinesAPI.trackersPath, "machine-trackers"),
+            (MachinesAPI.assetsPath, "assets-list"),
+            (MachinesAPI.trackPath(FixtureCatalogue.fixtureTractorID, day: BgDate.isoDay(Date())), "machine-track"),
+            (MachinesAPI.workedPath(FixtureCatalogue.fixtureTractorID, day: BgDate.isoDay(Date())), "machine-worked"),
             (DashboardAPI.agPath, "dashboard-ag"),
             (DashboardAPI.taskTrendPath(days: DashboardAPI.DefaultWindow.tasks),
              "dashboard-task-trend"),
@@ -533,6 +538,20 @@ final class FixtureSeamTests: XCTestCase {
         ("risk-analysis-simple", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
         ("risk-analysis-nogeom", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
         ("risk-history-holes", { _ = try await RiskTrendAPI.decode($0) }),
+        ("machines-list", {
+            struct Strict: Decodable { let machines: [Machine] }
+            let rows = try await APIClient.shared.decode($0, as: Strict.self).machines
+            if rows.count != 3 { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "machines: \(rows.count)")) }
+        }),
+        ("machine-track", { _ = try await APIClient.shared.decode($0, as: MachineTrack.self) }),
+        ("machine-worked", { _ = try await APIClient.shared.decode($0, as: WorkedDay.self) }),
+        ("machine-trackers", {
+            let register = try await APIClient.shared.decode($0, as: TrackerRegister.self)
+            if register.trackers.count != 2 || register.ingest == nil {
+                throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "trackers"))
+            }
+        }),
+        ("assets-list", { _ = try await MachinesAPI.decodeAssets($0) }),
         ("dashboard-ag", { _ = try await DashboardAPI.decodeAg(from: $0) }),
         ("dashboard-task-trend", { _ = try await DashboardAPI.decodeTaskTrend(from: $0) }),
         ("dashboard-field-briefing", { _ = try await DashboardAPI.decodeFieldBriefing(from: $0) }),

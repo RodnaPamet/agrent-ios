@@ -138,6 +138,10 @@ enum A11y {
         static let addWeeds = spokenNames("Запиши плевели", "Плевели", "Add weeds")
         static let addYield = spokenNames("Запиши добив", "Добив", "Add yield")
         static let newNote = spokenNames("Нов коментар", "Коментар", "New comment")
+        /// «Машини»'s «+» (#574): a GPS tracker on a machine.
+        static let newTracker = spokenNames("Нов тракер", "Тракер", "New tracker")
+        static let remove = spokenNames("Премахни", "Remove")
+        static let machines = spokenNames("Машини", "Machines")
         static let publish = spokenNames("Публикувай", "Post")
         static let send = spokenNames("Изпрати", "Send")
         static let done = spokenNames("Готово", "Done")
