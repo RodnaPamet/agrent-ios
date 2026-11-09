@@ -116,7 +116,7 @@ final class AppRouter {
     func open(_ route: AppRoute) {
         if bar.contains(route.home) {
             selected = route.home
-            paths[route.home] = NavigationPath([route])
+            paths[route.home] = route.isSurfaceRoot ? nil : NavigationPath([route])
         } else {
             self[path: selected].append(route)
         }
