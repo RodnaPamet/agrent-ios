@@ -46,5 +46,21 @@ final class PublicFarmTests: XCTestCase {
         XCTAssertNil(try handle("https://app.agrent.bg/f/a/b"))
         XCTAssertNil(try handle("https://app.agrent.bg/f/"))
         XCTAssertEqual(AppRoute.publicFarm(handle: "x").home, .exchange)
+        XCTAssertNil(try handle("https://app.agrent.bg/f/sintetichna/opengraph-image"),
+                     "the page's share image is never a farm (agri-saas #2979 excludes it from the AASA too)")
+    }
+
+    /// agri-saas #2979 claims `/f/*` for this app in the AASA, under a
+    /// declared exception that names THIS chain as its evidence: a tapped
+    /// `https://app.agrent.bg/f/{handle}` reaches `.onOpenURL`, goes through
+    /// `PublicProfileLink.handle(from:)` and opens `.publicFarm`. Nothing in
+    /// that repo can see this one, so if the chain moves, this test fails
+    /// here and the server's exception must be updated to match.
+    func testTheClaimedFarmLinkStillOpensTheNativeScreen() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let app = try String(contentsOf: root.appendingPathComponent("Agrent/AgrentApp.swift"), encoding: .utf8)
+        XCTAssertTrue(app.contains(".onOpenURL"), "positive control: the app's link entry point was not found")
+        XCTAssertTrue(app.contains("PublicProfileLink.handle(from: url)") && app.contains(".publicFarm(handle: handle)"),
+                      "the /f/{handle} chain moved: update agri-saas #2979's AASA exception, which cites it")
     }
 }
