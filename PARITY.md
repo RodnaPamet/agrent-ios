@@ -2080,3 +2080,10 @@ be read outdoors fails before any parity gap matters.
   - OWNER and ADMIN «Добави машина» (machines only) and «Махни» (confirmed).
   - The mechanisator sees their own task's machine. The server's `/farm-tasks/{taskId}/machine` answers 404 for anyone else's task, which reads as no machine.
 - **Stage 2, the mechanisator's notice:** «GPS проследяване» at the foot of «Моите задачи» says which machines are tracked (a GPS tracker or the maker's telematics), who sees them (the server's `visibleTo`), and that their own phone is not tracked. Shown only when the farm has tracked machines.
+
+### Fixed — a refused session goes to sign-in (2026-11-12)
+
+- A server session lasts 14 days, however much it's used. When it ends, the server refuses the token refresh with 401.
+- The phone cleared its tokens on that 401 but stayed in the app. The owner sat over the cache with every flag off and every request failing on the phone itself (the Ортофотокарта was missing).
+- Now the refusal ends the session locally and shows the sign-in screen with «Сесията Ви изтече или беше прекратена. Влезте отново.».
+- Only a session in the app is ended: a code, suspended or deletion screen stays.
