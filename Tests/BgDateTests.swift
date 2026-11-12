@@ -205,4 +205,19 @@ final class CipherEnvelopeTests: XCTestCase {
         XCTAssertEqual(BgDate.isoDay(back), BgDate.isoDay(picked))
     }
 
+
+    /// The farm's day is Sofia's whatever zone the phone is in (agri-saas
+    /// #3013's one definition of a farm day): 22:30 UTC on 14 July is already
+    /// the 15th in Sofia, and 21:30 UTC on 14 January is still the 14th.
+    func testAFarmDayIsSofiasDay() throws {
+        let farm = FarmRecordAPI.farmCalendar
+        let summer = try XCTUnwrap(BgDate.parseInstant("2026-07-14T22:30:00.000Z"))
+        XCTAssertEqual(BgDate.isoDay(summer, in: farm), "2026-07-15", "UTC+3 in summer")
+        let winter = try XCTUnwrap(BgDate.parseInstant("2026-01-14T21:30:00.000Z"))
+        XCTAssertEqual(BgDate.isoDay(winter, in: farm), "2026-01-14", "UTC+2 in winter")
+        // Positive control: the same instant in New York is still the 14th.
+        var newYork = Calendar(identifier: .gregorian)
+        newYork.timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        XCTAssertEqual(BgDate.isoDay(summer, in: newYork), "2026-07-14")
+    }
 }

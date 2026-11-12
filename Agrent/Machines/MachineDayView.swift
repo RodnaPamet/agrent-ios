@@ -8,7 +8,11 @@ struct MachineDayView: View {
     let day: MachineDay
 
     @State private var store: MachineDayStore
-    @State private var date = Calendar.current.startOfDay(for: Date())
+    /// The farm's day, not the phone's (agri-saas #3013: the server has one
+    /// definition of a farm day, Europe/Sofia, for the route and the worked
+    /// parcels alike).
+    private static let farm = FarmRecordAPI.farmCalendar
+    @State private var date = MachineDayView.farm.startOfDay(for: Date())
     @State private var camera: MapCameraPosition = .automatic
 
     init(day: MachineDay) {
@@ -16,14 +20,18 @@ struct MachineDayView: View {
         _store = State(initialValue: MachineDayStore(assetID: day.machine.assetId))
     }
 
-    private var dayText: String { BgDate.isoDay(date) }
-    private var isToday: Bool { Calendar.current.isDateInToday(date) }
+    private var dayText: String { BgDate.isoDay(date, in: Self.farm) }
+    private var isToday: Bool { Self.farm.isDateInToday(date) }
 
     var body: some View {
         List {
             Section {
                 DatePicker("Ден", selection: $date, in: ...Date(), displayedComponents: .date)
                     .tint(Palette.DatePill.tint)
+                    // Days as the farm counts them, so the picked day is the
+                    // one asked for.
+                    .environment(\.calendar, Self.farm)
+                    .environment(\.timeZone, Self.farm.timeZone)
                 Text(MachineWords.status(day.machine.lastPosition, source: day.machine.positionSource, hasSourceField: true))
                     .font(.subheadline)
                     .foregroundStyle(Palette.secondaryText)

@@ -229,6 +229,16 @@ enum BgDate {
         isoDayWriter.string(from: date)
     }
 
+    /// A day as `yyyy-MM-dd` in a given calendar's zone: the FARM's day
+    /// (`FarmRecordAPI.farmCalendar`, Europe/Sofia) for a read the server
+    /// bounds in the farm's zone, whatever zone the phone is set to. A
+    /// machine's route for "the 14th" is the 14th in Sofia, which a phone in
+    /// another zone would otherwise ask for as a different day near midnight.
+    static func isoDay(_ date: Date, in calendar: Calendar) -> String {
+        let day = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+    }
+
     /// A task's due DAY as the web sends it (#372): UTC midnight of the day
     /// chosen, `2026-10-21T00:00:00.000Z` (`ymdToInstant`, agri-saas
     /// `date-utils.ts`). The day is the one the person picked, in their own
