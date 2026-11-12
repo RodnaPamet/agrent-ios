@@ -65,6 +65,7 @@ final class AuthClient: NSObject {
 
     private var termsObserver: NSObjectProtocol?
     private var suspendedObserver: NSObjectProtocol?
+    private var refusedObserver: NSObjectProtocol?
     /// Opened on the Keychain's word alone — a launch on a suspended pair —
     /// so the suspended screen asks `/me` once as it appears. A sign-in has
     /// just asked, and does not need to again.
@@ -107,6 +108,30 @@ final class AuthClient: NSObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.suspensionSeen() }
         }
+        // And a refresh the server refused: the session is over.
+        refusedObserver = NotificationCenter.default.addObserver(
+            forName: APIClient.sessionRefusedNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sessionRefused() }
+        }
+    }
+
+    /// The server refused this session's refresh (`APIClient`): it expired —
+    /// a session lasts 14 days however much it is used — or was revoked
+    /// elsewhere. Its tokens are already gone, so the app goes to the sign-in
+    /// screen rather than carrying on over its cache with nothing it can
+    /// reach. A suspension also arrives as this refusal; the next sign-in's
+    /// `/me` says so. One signing in or out, or already suspended, stays.
+    func sessionRefused() {
+        guard Self.endsOnRefusal(state) else { return }
+        endSessionLocally(notice: SignInText.sessionRefused)
+        Log.auth.info("refresh refused; back to sign-in")
+    }
+
+    /// Only a session in the app ends: one signing in or out, waiting for a
+    /// code, suspended or pending deletion already shows what it should.
+    nonisolated static func endsOnRefusal(_ state: State) -> Bool {
+        state == .signedIn || state == .termsPending
     }
 
     /// Only a signed-in session moves; one signing in, out or already on the
@@ -521,7 +546,7 @@ final class AuthClient: NSObject {
             accountDeletionRequested(requested)
         } catch APIClient.APIError.notSignedIn {
             guard SessionEpoch.isCurrent(epoch) else { return }
-            endSessionAfterDeletion(notice: AccountDeletionText.sessionEnded)
+            endSessionLocally(notice: AccountDeletionText.sessionEnded)
             Log.auth.info("account deletion: session already revoked; signed out")
         }
     }
@@ -536,11 +561,11 @@ final class AuthClient: NSObject {
     /// the sign-in screen instead of an alert, which that refused refresh
     /// could tear down before it is read.
     private func accountDeletionRequested(_ requested: AccountDeletionAPI.Requested) {
-        endSessionAfterDeletion(notice: AccountDeletionText.requested(erasesAt: requested.erasesAt))
+        endSessionLocally(notice: AccountDeletionText.requested(erasesAt: requested.erasesAt))
         Log.auth.info("account deletion requested; signed out")
     }
 
-    private func endSessionAfterDeletion(notice: String) {
+    private func endSessionLocally(notice: String) {
         #if DEBUG
         // As `signOut`: under the seam the Keychain is the owner's, not ours.
         if UITestSeam.isActive {

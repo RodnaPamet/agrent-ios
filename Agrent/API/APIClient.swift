@@ -1325,6 +1325,11 @@ actor APIClient {
 
     // MARK: - The suspension (agrent-ios#283)
 
+    /// Posted when the server refused this session's refresh and its tokens
+    /// were cleared; `AuthClient` takes a signed-in session to the sign-in
+    /// screen.
+    static let sessionRefusedNotification = Notification.Name("bg.agrent.app.sessionRefused")
+
     /// Posted when a route answered `403 ACCOUNT_SUSPENDED`; `AuthClient`
     /// turns a signed-in session into the suspended screen.
     static let suspendedNotification = Notification.Name("bg.agrent.app.accountSuspended")
@@ -1566,7 +1571,14 @@ actor APIClient {
                 // meanwhile — Изход, or somebody else signed in — the dead token
                 // is not the one stored, and clearing would sign out the wrong
                 // session.
-                TokenStore.clear(ifRefreshToken: seen.refreshToken)
+                // And the app leaves the session it can no longer reach.
+                // Clearing alone left the owner inside the app for days over
+                // its cache, every flag off and every request failing before
+                // it left the phone (2026-11-12: a 14-day session had
+                // expired). Only when THIS pair was the one cleared.
+                if TokenStore.clear(ifRefreshToken: seen.refreshToken) {
+                    NotificationCenter.default.post(name: Self.sessionRefusedNotification, object: nil)
+                }
                 throw APIError.notSignedIn
             }
             struct R: Decodable { let accessToken: String; let refreshToken: String; let expiresIn: Int }

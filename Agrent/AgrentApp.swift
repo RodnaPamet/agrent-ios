@@ -491,4 +491,7 @@ enum SignInText {
     static let microsoft = "Вход с Microsoft"
     static let apple = "Вход с Apple"
     static let signingIn = "Влизане"
+    /// The server refused this session (`AuthClient.sessionRefused`): it
+    /// expired after its 14 days, or was ended elsewhere.
+    static let sessionRefused = "Сесията Ви изтече или беше прекратена. Влезте отново."
 }
