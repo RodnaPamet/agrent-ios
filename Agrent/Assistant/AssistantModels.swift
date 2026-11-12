@@ -69,6 +69,12 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
     case toolResult(name: String, ok: Bool, truncated: Bool)
     /// `promotions` (#508, agri-saas #2665): the catalogue's, beside the
     /// answer and never inside its text. Absent from the payload is none.
+    /// Part of the answer as it is written (#587; agri-saas #2670): only the
+    /// NEW text, whole sentences that cleared the server's egress scan.
+    /// Provisional: `answer` replaces it. `seq` counts from 0, and a gap
+    /// means a part was lost. `restarted`: the server began the answer again
+    /// (a retry), and this part's text replaces everything before it.
+    case answerDelta(text: String, seq: Int, restarted: Bool = false)
     case answer(text: String, links: [AssistantLink], proposal: AssistantProposal?,
                 promotions: [AssistantPromotion] = [])
     /// No answer, and not a fault: the reason is a CODE, and `message` the
@@ -88,6 +94,7 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
         case type, name, ok, truncated, text, links, proposal, code, reason, outcome, truncatedAny, partialAny, message
         case promotions
         case conversationId
+        case seq, restarted
     }
 
     init(from decoder: Decoder) throws {
@@ -110,6 +117,15 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
             self = .toolResult(name: (try? c.decode(String.self, forKey: .name)) ?? "",
                                ok: (try? c.decode(Bool.self, forKey: .ok)) ?? false,
                                truncated: (try? c.decode(Bool.self, forKey: .truncated)) ?? false)
+        case "answer_delta":
+            // A part with no text or no sequence is one this phone cannot
+            // place: skipped, and the whole `answer` still comes.
+            if let text = try? c.decode(String.self, forKey: .text), let seq = try? c.decode(Int.self, forKey: .seq) {
+                self = .answerDelta(text: text, seq: seq,
+                                    restarted: (try? c.decodeIfPresent(Bool.self, forKey: .restarted)) ?? false)
+            } else {
+                self = .unknown(type: type)
+            }
         case "answer":
             self = .answer(text: try c.decode(String.self, forKey: .text),
                            links: (try? c.decodeIfPresent([AssistantLink].self, forKey: .links)) ?? [],
