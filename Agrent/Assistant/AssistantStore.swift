@@ -15,6 +15,9 @@ final class AssistantStore {
         enum Phase: Equatable {
             /// Running: what it is doing, said.
             case working(String)
+            /// The answer so far, as it is written (#587): provisional
+            /// until the whole `answer` replaces it.
+            case streaming(String)
             /// The answer, the screens it points at, and what stopped it
             /// short, if anything did.
             case answered(String, links: [AssistantLink] = [], note: String?, proposal: AssistantProposal? = nil,
@@ -24,7 +27,10 @@ final class AssistantStore {
         }
 
         var isWorking: Bool {
-            if case .working = phase { true } else { false }
+            switch phase {
+            case .working, .streaming: true
+            default: false
+            }
         }
     }
 
@@ -143,6 +149,8 @@ final class AssistantStore {
         // The halt that was said, if any: `done` follows it (agri-saas: answer,
         // then halt, then done) and may add what the halt did not say.
         var halted: (code: String, note: String)?
+        // The answer as it arrives, before `answer` (#587).
+        var stream = AssistantStream()
         do {
             let events = try await asker(request)
             opened = true
@@ -157,6 +165,13 @@ final class AssistantStore {
                 case .toolResult:
                     // Read; the model writes next, unless it asks for more.
                     if answer == nil { turns[index].phase = .working(AssistantText.writing) }
+                case .answerDelta(let text, let seq, let restarted):
+                    guard answer == nil else { continue }
+                    stream.apply(text, seq: seq, restarted: restarted)
+                    let shown = stream.visible
+                    if !shown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        turns[index].phase = .streaming(shown)
+                    }
                 case .answer(let text, let links, let proposal, let promotions):
                     answer = text
                     answerLinks = links
@@ -172,6 +187,11 @@ final class AssistantStore {
                 case .halt(let outcome, let message):
                     let note = AssistantText.said(message, else: AssistantText.halt(outcome))
                     halted = (outcome, note)
+                    // A halt keeps what was released (backend 1): with no
+                    // whole answer, the part that streamed is the answer.
+                    if answer == nil, !stream.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        answer = stream.text
+                    }
                     turns[index].phase = answer.map {
                         .answered($0, links: answerLinks, note: note, proposal: answerProposal,
                                   promotions: answerPromotions)

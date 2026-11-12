@@ -155,6 +155,16 @@ private struct AssistantTurnView: View {
                 }
                 .font(.subheadline)
                 .accessibilityElement(children: .combine)
+            case .streaming(let text):
+                // Provisional (#587): drawn as it arrives, replaced by the
+                // whole answer. VoiceOver hears that it is being written and
+                // reads the answer once, when it is whole, not each sentence.
+                VStack(alignment: .leading, spacing: 8) {
+                    AssistantAnswerView(text: text)
+                    ProgressView()
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(AssistantText.writing)
             case .answered(let text, let links, let note, let proposal, let promotions):
                 // Paragraphs, lists and tables as blocks (owner, 2026-11-01:
                 // tables reached the screen as rows of «|»). VoiceOver hears
