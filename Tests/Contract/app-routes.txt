@@ -58,6 +58,7 @@
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/tasks
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations
 /api/t/{tenantSlug}/agro/parcels/{parcelId}/weed-observations/{observationId}
+/api/t/{tenantSlug}/assets
 /api/t/{tenantSlug}/assistant/stream
 /api/t/{tenantSlug}/costs/machinery
 /api/t/{tenantSlug}/dashboard/ag
@@ -85,6 +86,10 @@
 /api/t/{tenantSlug}/farm-brand/publication
 /api/t/{tenantSlug}/farm-brand/share-card
 /api/t/{tenantSlug}/farm-tasks
+/api/t/{tenantSlug}/farm-tasks/tracked-machines
+/api/t/{tenantSlug}/farm-tasks/{taskId}/assets
+/api/t/{tenantSlug}/farm-tasks/{taskId}/assets/{assetId}
+/api/t/{tenantSlug}/farm-tasks/{taskId}/machine
 /api/t/{tenantSlug}/field-operations/{taskId}
 /api/t/{tenantSlug}/field-operations/{taskId}/parcels/{lineId}
 /api/t/{tenantSlug}/grain/calculator
@@ -114,6 +119,11 @@
 /api/t/{tenantSlug}/locations/{locationId}/parcels/{parcelId}
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import
 /api/t/{tenantSlug}/locations/{locationId}/spatial-import/{jobId}
+/api/t/{tenantSlug}/machines
+/api/t/{tenantSlug}/machines/trackers
+/api/t/{tenantSlug}/machines/trackers/{id}
+/api/t/{tenantSlug}/machines/{assetId}/track
+/api/t/{tenantSlug}/machines/{assetId}/worked
 /api/t/{tenantSlug}/notifications
 /api/t/{tenantSlug}/notifications/{id}
 /api/t/{tenantSlug}/offers

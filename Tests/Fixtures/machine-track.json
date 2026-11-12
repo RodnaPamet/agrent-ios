@@ -1,0 +1,178 @@
+{
+  "date": "2026-11-09",
+  "points": [
+    {
+      "lat": "42.5240000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T08:00:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5240000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T08:10:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5252000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T08:20:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5252000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T08:30:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5264000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T08:40:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5264000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T08:50:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5276000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T09:00:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5276000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T09:10:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5288000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T09:20:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5288000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T09:30:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5300000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T09:40:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5300000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T09:50:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5312000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T10:00:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5312000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T10:10:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5324000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T10:20:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5324000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T10:30:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5336000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T10:40:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5336000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T10:50:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5348000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T11:00:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5348000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T11:10:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5360000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T11:20:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5360000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T11:30:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5372000",
+      "lon": "25.1280000",
+      "recordedAt": "2026-11-09T11:40:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    },
+    {
+      "lat": "42.5372000",
+      "lon": "25.1360000",
+      "recordedAt": "2026-11-09T11:50:00+02:00",
+      "speedKph": 9.0,
+      "ignition": true
+    }
+  ],
+  "truncated": false,
+  "retained": true,
+  "simplified": true,
+  "rawCount": 2880,
+  "toleranceM": 3
+}

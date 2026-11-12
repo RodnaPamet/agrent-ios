@@ -2336,6 +2336,48 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars.buttons["Затвори"].firstMatch.tap()
     }
 
+    // MARK: - «Машини» (#574)
+
+    /// The farm's machines, as an owner opens them from the menu: the map,
+    /// a row per machine, the tracker register, a machine's day, and the
+    /// «Нов тракер» form, opened and left without saving (a write).
+    func testMachines() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root")
+        XCTAssertTrue(tapMenuRow("Машини", in: app), "no «Машини» row for the owner\n\(app.debugDescription)")
+        let tractor = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Синтетичен трактор")).firstMatch
+        XCTAssertTrue(tractor.waitForExistence(timeout: 15), "no machine rows\n\(app.debugDescription)")
+        XCTAssertTrue(tractor.label.contains("Движи се"), "the moving state is not said: \(tractor.label)")
+        XCTAssertTrue(tractor.label.contains("John Deere (JDLink)"), "the position source is not named: \(tractor.label)")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Няма източник на местоположение"))
+            .firstMatch.exists, "a machine with no source is not said so")
+        Thread.sleep(forTimeInterval: 3)
+        capture("40-machines", app: app)
+
+        tractor.tap()
+        XCTAssertTrue(app.staticTexts["Обработени парцели"].waitForExistence(timeout: 10)
+                      || app.otherElements["Обработени парцели"].exists, "the day did not open\n\(app.debugDescription)")
+        let weak = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "вероятно")).firstMatch
+        XCTAssertTrue(weak.waitForExistence(timeout: 10), "a weak match is not offered as one")
+        Thread.sleep(forTimeInterval: 3)
+        capture("40a-machine-day", app: app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+
+        let add = app.navigationBars["Машини"].buttons["Нов тракер"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5), "no «Нов тракер» in the bar")
+        add.tap()
+        XCTAssertTrue(app.navigationBars["Нов тракер"].waitForExistence(timeout: 5), "the form did not open")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "gps.example.invalid"))
+            .firstMatch.waitForExistence(timeout: 5), "the device setup is not the server's")
+        XCTAssertFalse(app.navigationBars["Нов тракер"].buttons["Запази"].isEnabled,
+                       "saving is open before the drivers were confirmed informed")
+        capture("40b-new-tracker", app: app)
+        app.navigationBars["Нов тракер"].buttons["Отказ"].tap()
+    }
+
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
 
     /// The owner tapped «История» on a risk row and nothing happened

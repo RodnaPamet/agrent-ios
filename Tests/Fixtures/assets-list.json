@@ -1,0 +1,17 @@
+[
+  {
+    "id": "ast_fixture_tractor",
+    "name": "Синтетичен трактор",
+    "type": "TRACTOR"
+  },
+  {
+    "id": "ast_fixture_harvester",
+    "name": "Синтетичен комбайн",
+    "type": "HARVESTER"
+  },
+  {
+    "id": "ast_fixture_store",
+    "name": "Синтетичен склад",
+    "type": "STORAGE"
+  }
+]
