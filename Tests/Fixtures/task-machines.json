@@ -1,0 +1,6 @@
+{
+  "assets": [
+    { "assetId": "ast_fixture_tractor", "name": "Синтетичен трактор", "type": "TRACTOR",
+      "positionSource": { "kind": "TELEMATICS", "provider": "JOHN_DEERE" } }
+  ]
+}

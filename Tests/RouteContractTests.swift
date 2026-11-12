@@ -196,12 +196,12 @@ final class RouteContractTests: XCTestCase {
         // «Машини» (#574), built against agri-saas #2948's contract (owner,
         // 2026-11-09) — off this list by the refresh that brings them in.
         // `/machines`, `/track` and `/worked` came off with agri-saas main
-        // 0716a16, once stage 3a (4810e91) was live (2026-11-12).
+        // 0716a16, once stage 3a (4810e91) was live (2026-11-12); the three
+        // `farm-tasks` reads with main f529bd6, once stage 3b (bd13985) was
+        // live the same day. Unlinking stays here: that stage writes nothing
+        // yet (`MachinesAPI.taskWritesLive`).
         "/api/t/{tenantSlug}/machines/trackers": "agri-saas #2948: the tracker register",
         "/api/t/{tenantSlug}/machines/trackers/{id}": "agri-saas #2948: removing a tracker",
-        "/api/t/{tenantSlug}/farm-tasks/tracked-machines": "agri-saas #2948: the mechanisator's notice",
-        "/api/t/{tenantSlug}/farm-tasks/{taskId}/machine": "agri-saas #2948: a task's machine, for its mechanisator",
-        "/api/t/{tenantSlug}/farm-tasks/{taskId}/assets": "agri-saas #2948: a task's machines",
         "/api/t/{tenantSlug}/farm-tasks/{taskId}/assets/{assetId}": "agri-saas #2948: unlinking a task's machine",
     ]
 

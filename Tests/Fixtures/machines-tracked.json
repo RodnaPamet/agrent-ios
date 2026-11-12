@@ -1,0 +1,16 @@
+{
+  "machines": [
+    {
+      "name": "Синтетичен трактор",
+      "type": "TRACTOR"
+    },
+    {
+      "name": "Синтетичен комбайн",
+      "type": "HARVESTER"
+    }
+  ],
+  "visibleTo": [
+    "OWNER",
+    "ADMIN"
+  ]
+}

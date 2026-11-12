@@ -91,6 +91,17 @@ final class MachinesTests: XCTestCase {
         XCTAssertNil(MachineWords.workedNote(some, isToday: true))
     }
 
+    /// A task with several tracked machines says so, and names the one shown.
+    func testATasksMachineSaysWhichAndHowManyMore() {
+        let moving = position(moving: true, ignition: true, at: nil)
+        XCTAssertEqual(MachineWords.taskMachine(.init(name: "Трактор 1", lastPosition: moving, locatableCount: 1), moving),
+                       "Трактор 1: Движи се")
+        XCTAssertEqual(MachineWords.taskMachine(.init(name: "Трактор 1", lastPosition: moving, locatableCount: 2), moving),
+                       "Трактор 1: Движи се. Задачата има още една проследявана машина.")
+        XCTAssertEqual(MachineWords.taskMachine(.init(name: nil, lastPosition: moving, locatableCount: 3), moving),
+                       "Движи се. Задачата има още 2 проследявани машини.")
+    }
+
     /// The mechanisator's notice names the machines and who sees them, from
     /// the server's `visibleTo`, and says their phone is not tracked.
     func testTheNoticeSaysWhatIsTrackedAndWhoSees() {
@@ -98,9 +109,9 @@ final class MachinesTests: XCTestCase {
                                                  .init(name: "Комбайн", type: "HARVESTER")],
                                       visibleTo: ["OWNER", "ADMIN"])
         XCTAssertEqual(MachineWords.notice(tracked),
-                       "С GPS тракер са: Трактор 1, Комбайн. Местоположението им виждат собствениците и администраторите. Вашият телефон не се проследява.")
+                       "Проследяват се (GPS тракер или телематика на производителя): Трактор 1, Комбайн. Местоположението им виждат собствениците и администраторите. Вашият телефон не се проследява.")
         XCTAssertEqual(MachineWords.notice(TrackedMachines(machines: [], visibleTo: ["OWNER"])),
-                       "Няма машини с GPS тракер в стопанството.")
+                       "Няма проследявани машини в стопанството.")
     }
 
     func testTheDeviceSetupComesFromTheServer() {
@@ -196,6 +207,14 @@ final class MachinesTests: XCTestCase {
         XCTAssertEqual(assets.map(\.id), ["a1"])
         let wrapped = try await MachinesAPI.decodeAssets(Data(#"{"assets":[{"id":"a1","name":"Т","type":"TRACTOR"}]}"#.utf8))
         XCTAssertEqual(wrapped.map(\.id), ["a1"])
+        // A task names its machines by `assetId`, the register by `id`.
+        let onTask = try await MachinesAPI.decodeAssets(Data(#"{"machines":[{"assetId":"a2","assetName":"К","assetType":"HARVESTER"}]}"#.utf8))
+        XCTAssertEqual(onTask.map(\.id), ["a2"])
+        XCTAssertEqual(onTask.first?.type, "HARVESTER")
+        let enveloped = try await MachinesAPI.decodeAssets(Data(#"{"assets":[{"assetId":"a3","name":"Т","type":"TRACTOR","positionSource":null},{"assetId":"a4","name":"К","type":"HARVESTER","positionSource":{"kind":"TELEMATICS","provider":"CLAAS"}}]}"#.utf8))
+        XCTAssertNil(enveloped.first?.positionSource)
+        XCTAssertEqual(enveloped.first?.sourceKnown, true, "null said: no source")
+        XCTAssertEqual(enveloped.last?.positionSource?.provider, "CLAAS")
     }
 }
 

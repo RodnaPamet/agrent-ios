@@ -47,6 +47,12 @@ enum MachinesAPI {
         "\(taskAssetsPath(taskID))/\(URLEscape.segment(assetID))"
     }
 
+    /// Choosing a task's machines is a later agri-saas #2948 stage: the live
+    /// `/assets` route is GET only (stage 3b, live 2026-11-12), so a POST
+    /// there answers 405. «Добави машина» and «Махни» stay off until that
+    /// stage is live; reading a task's machines works for everyone now.
+    static let taskWritesLive = false
+
     static func machines() async throws -> [Machine] {
         let data = try await APIClient.shared.data(for: listPath)
         return try await APIClient.shared.decode(data, as: MachineList.self).machines
@@ -86,9 +92,9 @@ enum MachinesAPI {
         return try await APIClient.shared.decode(data, as: TrackedMachines.self)
     }
 
-    static func taskMachine(_ taskID: String) async throws -> Machine.Position? {
+    static func taskMachine(_ taskID: String) async throws -> TaskMachine {
         let data = try await APIClient.shared.data(for: taskMachinePath(taskID))
-        return try await APIClient.shared.decode(data, as: TaskMachine.self).lastPosition
+        return try await APIClient.shared.decode(data, as: TaskMachine.self)
     }
 
     // MARK: - Writes (admins; never sent from tests, CI or A11yShots)
@@ -217,12 +223,32 @@ private struct MachineList: Decodable {
     }
 }
 
-private struct TaskMachine: Decodable {
+/// A task's machine for the person on it (agri-saas #2948). With several
+/// tracked, the server picks one by a fixed rule (self-propelled before
+/// trailed, then the earliest tracker, then the id) and says how many there
+/// are, so the screen does not present one of two as the only one.
+struct TaskMachine: Decodable, Equatable, Sendable {
+    /// The machine shown, for the alert's own link (`/t/{slug}/machines/{assetId}`).
+    var assetId: String? = nil
+    var type: String? = nil
+    let name: String?
     let lastPosition: Machine.Position?
-    private enum CodingKeys: String, CodingKey { case lastPosition }
+    /// How many of the task's machines have a position source.
+    let locatableCount: Int?
+
+    private enum CodingKeys: String, CodingKey { case assetId, type, name, lastPosition, locatableCount }
+    init(name: String?, lastPosition: Machine.Position?, locatableCount: Int?) {
+        self.name = name
+        self.lastPosition = lastPosition
+        self.locatableCount = locatableCount
+    }
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        assetId = try? c.decodeIfPresent(String.self, forKey: .assetId)
+        type = try? c.decodeIfPresent(String.self, forKey: .type)
+        name = try? c.decodeIfPresent(String.self, forKey: .name)
         lastPosition = try? c.decodeIfPresent(Machine.Position.self, forKey: .lastPosition)
+        locatableCount = try? c.decodeIfPresent(Int.self, forKey: .locatableCount)
     }
 }
 
@@ -375,19 +401,46 @@ struct MachineAsset: Decodable, Equatable, Sendable, Identifiable {
     /// On a task's list (agri-saas #2948): where its position comes from, so
     /// the task says which of its machines can be found.
     var positionSource: PositionSource? = nil
+    /// Whether the server said either way: only then is no source «без
+    /// източник на местоположение» rather than unknown.
+    var sourceKnown = false
 
     /// Only machines can carry a tracker; the register also holds buildings,
     /// storage and tools.
     var isMachine: Bool { MachineKind(rawValue: type ?? "") != nil }
+
+    init(id: String, name: String, type: String?) {
+        self.id = id
+        self.name = name
+        self.type = type
+    }
+
+    /// `id` in the register, `assetId` where a task names its machines: the
+    /// task's list is not in the spec yet, so either is read.
+    private enum CodingKeys: String, CodingKey { case id, assetId, name, type, assetName, assetType, positionSource }
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let id = (try? c.decodeIfPresent(String.self, forKey: .id)) ?? (try? c.decodeIfPresent(String.self, forKey: .assetId)),
+              let name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? (try? c.decodeIfPresent(String.self, forKey: .assetName))
+        else {
+            throw DecodingError.dataCorrupted(.init(codingPath: c.codingPath, debugDescription: "an asset with no id or name"))
+        }
+        self.id = id
+        self.name = name
+        type = (try? c.decodeIfPresent(String.self, forKey: .type)) ?? (try? c.decodeIfPresent(String.self, forKey: .assetType))
+        positionSource = try? c.decodeIfPresent(PositionSource.self, forKey: .positionSource)
+        sourceKnown = c.contains(.positionSource)
+    }
 }
 
 private struct AssetList: Decodable {
     let assets: [MachineAsset]
-    private enum CodingKeys: String, CodingKey { case assets, items }
+    private enum CodingKeys: String, CodingKey { case assets, items, machines }
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let rows = (try? c.decode([Lossy<MachineAsset>].self, forKey: .assets))
-            ?? (try? c.decode([Lossy<MachineAsset>].self, forKey: .items)) ?? []
+            ?? (try? c.decode([Lossy<MachineAsset>].self, forKey: .items))
+            ?? (try? c.decode([Lossy<MachineAsset>].self, forKey: .machines)) ?? []
         assets = rows.compactMap(\.value)
     }
 }

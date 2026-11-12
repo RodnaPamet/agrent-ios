@@ -2816,6 +2816,46 @@ final class A11yShotsTests: XCTestCase {
     /// tasks under it (the queue fixture's closed row left out), the
     /// parcels list, and a parcel opened from it onto its risk and tasks.
     /// Then the menu: Риск and Админ, no Блокове or Задачи.
+    /// A mechanisator is told which machines are GPS-tracked and who sees
+    /// them, and finds the machine on their own task (#574). They can't add
+    /// or remove one.
+    func testMechanisatorSeesTrackingAndTheTaskMachine() {
+        let app = XCUIApplication()
+        app.launchArguments += [Self.seamArgument, Self.operatorArgument]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Моите задачи"].waitForExistence(timeout: 20),
+                      "a mechanisator did not open on «Моите задачи»")
+        let notice = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Проследяват се (GPS тракер или телематика на производителя): Синтетичен трактор")).firstMatch
+        for _ in 0..<6 where !(notice.exists && notice.isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55)))
+        }
+        XCTAssertTrue(notice.waitForExistence(timeout: 10), "no GPS notice for the mechanisator\n\(app.debugDescription)")
+        XCTAssertTrue(notice.label.contains("собствениците и администраторите"), "who sees is not said: \(notice.label)")
+        XCTAssertTrue(notice.label.contains("Вашият телефон не се проследява"), notice.label)
+        capture("41-mechanisator-tracking-notice", app: app)
+
+        // Back up on the LIST: a swipe from the middle could land on the map.
+        let task = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Заявка за анализ на почвата")).firstMatch
+        for _ in 0..<6 where !(task.exists && task.isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+        }
+        XCTAssertTrue(task.waitForExistence(timeout: 10), "the plain task is not in the queue")
+        task.tap()
+        let machine = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Синтетичен трактор")).firstMatch
+        for _ in 0..<6 where !(machine.exists && machine.isHittable) { app.swipeUp() }
+        XCTAssertTrue(machine.waitForExistence(timeout: 10), "the task shows no machine\n\(app.debugDescription)")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Движи се"))
+            .firstMatch.exists, "where the machine is is not said")
+        XCTAssertFalse(app.buttons["Добави машина"].exists, "a mechanisator may not choose the task's machines")
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Махни")).firstMatch.exists,
+                       "a mechanisator may not remove the task's machine")
+        Thread.sleep(forTimeInterval: 2)
+        capture("41a-mechanisator-task-machine", app: app)
+    }
+
     func testMechanisatorHome() {
         let app = XCUIApplication()
         app.launchArguments += [Self.seamArgument, Self.operatorArgument]

@@ -1,0 +1,14 @@
+{
+  "assetId": "ast_fixture_tractor",
+  "name": "Синтетичен трактор",
+  "type": "TRACTOR",
+  "locatableCount": 1,
+  "lastPosition": {
+    "lat": "42.5310000",
+    "lon": "25.1420000",
+    "recordedAt": "2026-11-09T14:31:02+02:00",
+    "speedKph": 9.5,
+    "ignition": true,
+    "moving": true
+  }
+}
