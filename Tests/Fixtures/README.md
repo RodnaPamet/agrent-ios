@@ -523,3 +523,5 @@ All invented:
 - two worked parcels, one a weak match.
 
 The route and the worked parcels answer today's date, which is what the day screen opens on.
+`task-machines.json` and `task-machine.json` put the invented tractor on `tsk_fixture_2`, which is current for both
+the owner and the mechanisator. `machines-tracked.json` is the mechanisator's notice: names and types only.

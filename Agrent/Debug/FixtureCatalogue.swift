@@ -288,6 +288,11 @@ enum FixtureCatalogue {
         (MachinesAPI.listPath, "machines-list"),
         (MachinesAPI.trackersPath, "machine-trackers"),
         (MachinesAPI.assetsPath, "assets-list"),
+        // A task's machine and where it was last heard from, and the
+        // mechanisator's notice of which machines are tracked.
+        (MachinesAPI.trackedPath, "machines-tracked"),
+        (MachinesAPI.taskAssetsPath(fixtureTaskID), "task-machines"),
+        (MachinesAPI.taskMachinePath(fixtureTaskID), "task-machine"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 
