@@ -102,4 +102,8 @@ enum ChannelWords {
         guard let ms = attachment.durationMs else { return VoiceNoteWords.voice }
         return "\(VoiceNoteWords.voice), \(VoiceNoteWords.clock(ms: ms))"
     }
+
+    /// After «Без известия» (#601): what it stops, and that it starts with the
+    /// next post — a push already on its way still arrives.
+    static let mutedNote = "Няма да получавате известия, когато ви споменат или ви отговорят в този канал. Важи от следващата публикация."
 }

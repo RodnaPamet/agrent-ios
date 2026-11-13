@@ -39,6 +39,10 @@ enum ChannelsAPI {
     /// server takes its own clock, so a phone with a wrong one cannot park
     /// the cursor in the future.
     static func readPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/read" }
+    /// Muting stops the mention and reply PUSH in this channel (#601,
+    /// agri-saas #3050). From the next post on: a push already on its way is
+    /// not withdrawn.
+    static func mutePath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/mute" }
     /// A photo or a voice note as a post (P9.6, agri-saas #3045).
     static func mediaPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/media" }
     /// The bytes, for MEMBERS only: a non-member reads the post and gets a
@@ -123,6 +127,16 @@ enum ChannelsAPI {
         _ = try await APIClient.shared.postReturningData(readPath(channelID), body: EmptyBody(), idempotencyKey: nil)
     }
 
+    /// The person's own act: never from tests, CI or A11yShots. Idempotent
+    /// both ways.
+    static func setMuted(_ channelID: String, _ muted: Bool) async throws {
+        if muted {
+            _ = try await APIClient.shared.postReturningData(mutePath(channelID), body: EmptyBody(), idempotencyKey: nil)
+        } else {
+            _ = try await APIClient.shared.deleteReturningData(mutePath(channelID))
+        }
+    }
+
     static func join(_ channelID: String) async throws {
         _ = try await APIClient.shared.postReturningData(joinPath(channelID), body: EmptyBody(), idempotencyKey: nil)
     }
@@ -165,10 +179,14 @@ struct Channel: Decodable, Identifiable, Equatable, Hashable, Sendable {
     let banned: Bool
     /// Joined channels only, once the server writes a read cursor.
     let unreadCount: Int?
+    /// Mention and reply pushes switched off (#601). Nil when not joined.
+    let muted: Bool?
 
-    private enum CodingKeys: String, CodingKey { case id, key, nameBg, memberCount, slowModeSeconds, joined, banned, unreadCount }
+    private enum CodingKeys: String, CodingKey {
+        case id, key, nameBg, memberCount, slowModeSeconds, joined, banned, unreadCount, muted
+    }
     init(id: String, key: String, nameBg: String, memberCount: Int?, slowModeSeconds: Int?, joined: Bool, banned: Bool,
-         unreadCount: Int? = nil) {
+         unreadCount: Int? = nil, muted: Bool? = nil) {
         self.id = id
         self.key = key
         self.nameBg = nameBg
@@ -177,6 +195,7 @@ struct Channel: Decodable, Identifiable, Equatable, Hashable, Sendable {
         self.joined = joined
         self.banned = banned
         self.unreadCount = unreadCount
+        self.muted = muted
     }
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -188,6 +207,7 @@ struct Channel: Decodable, Identifiable, Equatable, Hashable, Sendable {
         joined = (try? c.decodeIfPresent(Bool.self, forKey: .joined)) ?? false
         banned = (try? c.decodeIfPresent(Bool.self, forKey: .banned)) ?? false
         unreadCount = try? c.decodeIfPresent(Int.self, forKey: .unreadCount)
+        muted = try? c.decodeIfPresent(Bool.self, forKey: .muted)
     }
 }
 

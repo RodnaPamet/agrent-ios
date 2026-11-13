@@ -58,6 +58,11 @@ struct ChannelsView: View {
                 }
             }
             Spacer(minLength: 8)
+            if channel.muted == true {
+                Image(systemName: "bell.slash")
+                    .foregroundStyle(Palette.secondaryText)
+                    .accessibilityLabel("Без известия")
+            }
             if let unread = unread.count(for: channel), unread > 0 {
                 Text("\(unread)")
                     .font(.caption.weight(.bold))
@@ -100,6 +105,9 @@ struct ChannelFeedView: View {
     /// The newest post this feed has marked read, so a poll that brought
     /// nothing new does not write again.
     @State private var markedThrough: Date?
+    @State private var muted: Bool
+    /// Said once, right after muting: what it stops, and from when.
+    @State private var mutedNote: String?
 
     static let refresh: Duration = .seconds(30)
 
@@ -107,6 +115,7 @@ struct ChannelFeedView: View {
         self.channel = channel
         self.onMembershipChanged = onMembershipChanged
         _joined = State(initialValue: channel.joined)
+        _muted = State(initialValue: channel.muted ?? false)
     }
 
     var body: some View {
@@ -116,6 +125,13 @@ struct ChannelFeedView: View {
             }
             if let failure {
                 Section { Text(failure).font(.footnote).foregroundStyle(Palette.error) }.pageRow()
+            }
+            if let mutedNote {
+                Section {
+                    Text(mutedNote).font(.footnote).foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .pageRow()
             }
             if loaded, posts.isEmpty {
                 Section {
@@ -142,6 +158,19 @@ struct ChannelFeedView: View {
         .inlineTitle(channel.nameBg)
         .toolbar {
             if joined, !channel.banned {
+                ToolbarItem(placement: .secondaryAction) {
+                    // Pushes for mentions of me and replies to me (#601);
+                    // the feed itself is unchanged.
+                    Button {
+                        Task { await setMuted(!muted) }
+                    } label: {
+                        Label(muted ? "Включи известията" : "Без известия",
+                              systemImage: muted ? "bell" : "bell.slash")
+                    }
+                    .disabled(changing)
+                    .accessibilityInputLabels(muted ? A11y.spokenNames("Включи известията", "Известия", "Unmute")
+                                                    : A11y.spokenNames("Без известия", "Заглуши", "Mute"))
+                }
                 ToolbarItem(placement: .secondaryAction) {
                     Button("Напусни канала", role: .destructive) { confirmingLeave = true }
                         .accessibilityInputLabels(A11y.spokenNames("Напусни канала", "Напусни", "Leave"))
@@ -233,6 +262,20 @@ struct ChannelFeedView: View {
             let seen = Set(posts.map(\.id))
             posts += page.posts.filter { !seen.contains($0.id) }
             hasMore = page.hasMore
+        } catch {
+            failure = UserMessage.text(for: error)
+        }
+    }
+
+    private func setMuted(_ mute: Bool) async {
+        changing = true
+        defer { changing = false }
+        do {
+            try await ChannelsAPI.setMuted(channel.id, mute)
+            muted = mute
+            failure = nil
+            mutedNote = mute ? ChannelWords.mutedNote : nil
+            onMembershipChanged()
         } catch {
             failure = UserMessage.text(for: error)
         }
