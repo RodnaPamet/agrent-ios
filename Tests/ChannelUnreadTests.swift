@@ -57,4 +57,24 @@ final class ChannelUnreadTests: XCTestCase {
         XCTAssertEqual(MessagingPolicy.counted("Канали", unread: 3), "Канали (3)")
         XCTAssertEqual(MessagingPolicy.counted("Канали", unread: 0), "Канали")
     }
+
+    // MARK: - Mute (#601)
+
+    func testMuteIsReadAndItsPathIsTheChannels() async throws {
+        XCTAssertEqual(ChannelsAPI.mutePath("c1"), "/api/social/channels/c1/mute")
+        let data = Data("""
+        {"channels":[
+          {"id":"c1","key":"wheat","nameBg":"Пшеница","joined":true,"banned":false,"unreadCount":0,"muted":true},
+          {"id":"c2","key":"maize","nameBg":"Царевица","joined":false,"banned":false,"unreadCount":null,"muted":null}
+        ]}
+        """.utf8)
+        let list = try await APIClient.shared.decode(data, as: Probe.self).channels
+        XCTAssertEqual(list.map(\.muted), [true, nil])
+    }
+
+    func testTheMutedNoteSaysWhatItStopsAndFromWhen() {
+        XCTAssertTrue(ChannelWords.mutedNote.contains("споменат"))
+        XCTAssertTrue(ChannelWords.mutedNote.contains("следващата публикация"),
+                      "a push already on its way still arrives")
+    }
 }

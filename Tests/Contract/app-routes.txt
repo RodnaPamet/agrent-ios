@@ -37,6 +37,7 @@
 /api/social/channels/{channelId}
 /api/social/channels/{channelId}/join
 /api/social/channels/{channelId}/media
+/api/social/channels/{channelId}/mute
 /api/social/channels/{channelId}/posts
 /api/social/channels/{channelId}/read
 /api/social/conversations
