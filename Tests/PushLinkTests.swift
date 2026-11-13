@@ -47,12 +47,16 @@ final class PushLinkTests: XCTestCase {
         XCTAssertNil(PushLink.parse("/t/ferma-1/channels"), "the directory is a menu sheet")
     }
 
-    /// A direct message (backend 2, 2026-11-13) links to
-    /// `/t/{slug}/exchange/threads/dm/{conversationId}`. The phone has no DM
-    /// screen yet, so it opens the app, and it must never be read as a Борса
-    /// conversation whose id is "dm". A push with no link opens the app too.
-    func testADirectMessageLinkIsNotABorsaThread() {
-        XCTAssertNil(PushLink.parse("/t/ferma-1/exchange/threads/dm/conv-3"))
+    /// A personal message (backend 2, 2026-11-13; #593) links to
+    /// `/t/{slug}/exchange/threads/dm/{conversationId}`: that conversation,
+    /// never a Борса thread whose id is "dm". A push with no link opens the app.
+    func testADirectMessageLinkOpensItsConversation() {
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/threads/dm/conv-3"),
+                       .directMessage(farm: "ferma-1", id: "conv-3"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/threads/dm/conv-3")?.farm, "ferma-1")
+        XCTAssertEqual(AppRoute(.directMessage(farm: "ferma-1", id: "conv-3")),
+                       .directConversation(id: "conv-3", title: nil))
+        XCTAssertNil(PushLink.parse("/t/ferma-1/exchange/threads/dm"), "no conversation: not a thread called «dm»")
         XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/threads/thr-7"), .thread(farm: "ferma-1", id: "thr-7"),
                        "positive control")
         XCTAssertNil(PushLink.parse(nil), "no link: open the app")

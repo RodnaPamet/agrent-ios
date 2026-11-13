@@ -62,6 +62,9 @@ enum AppRoute: Hashable, Sendable {
     case channelID(String, post: String?)
     /// A machine's day, from its alert push (#574).
     case machineID(String)
+    /// A personal conversation (#593); `title` is the inbox row's name, for
+    /// the title before the first page lands.
+    case directConversation(id: String, title: String?)
 
     func hash(into hasher: inout Hasher) {
         switch self {
@@ -80,6 +83,7 @@ enum AppRoute: Hashable, Sendable {
         case .notifications: hasher.combine("notifications")
         case .channelID(let id, let post): hasher.combine("channelID"); hasher.combine(id); hasher.combine(post)
         case .machineID(let id): hasher.combine("machineID"); hasher.combine(id)
+        case .directConversation(let id, _): hasher.combine("directConversation"); hasher.combine(id)
         }
     }
 
@@ -95,7 +99,7 @@ enum AppRoute: Hashable, Sendable {
     var home: AppSurface {
         switch self {
         case .journalEntry, .treatmentMap: .journal
-        case .listing, .listingID, .conversation, .exchangeInbox, .publicFarm: .exchange
+        case .listing, .listingID, .conversation, .exchangeInbox, .publicFarm, .directConversation: .exchange
         case .task, .taskID: .tasks
         case .location, .locationID: .locations
         case .parcelHistory: .farmRisk
@@ -130,6 +134,7 @@ enum AppRoute: Hashable, Sendable {
         case .notifications: NotificationsView()
         case .channelID(let id, let post): ChannelLinkView(channelID: id, postID: post)
         case .machineID(let id): MachineLinkView(assetID: id)
+        case .directConversation(let id, let title): DirectConversationView(conversationID: id, title: title)
         }
     }
 }
@@ -146,6 +151,7 @@ extension AppRoute {
         case .notifications: self = .notifications
         case .channel(_, let id, let post): self = .channelID(id, post: post)
         case .machine(_, let id): self = .machineID(id)
+        case .directMessage(_, let id): self = .directConversation(id: id, title: nil)
         }
     }
 }

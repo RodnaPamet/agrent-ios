@@ -193,6 +193,7 @@ final class HapticSiteTests: XCTestCase {
             "Agrent/Locations/ParcelOperationSheet.swift": 1, // operation refused
             "Agrent/Tasks/TaskDetailView.swift": 1,           // status changed / refused
             "Agrent/Exchange/ConversationView.swift": 1,      // message sent / refused
+            "Agrent/DirectMessages/DirectConversationView.swift": 1, // personal message sent / refused (#593)
             "Agrent/Admin/FarmProfileView.swift": 2,          // page: saved; editor: refused
             "Agrent/Tasks/FieldOperationSection.swift": 1,    // parcel line marked / refused (#138)
             "Agrent/Journal/Treatment/TreatmentEntryFlow.swift": 1, // treatment recorded / refused (#293)

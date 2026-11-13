@@ -163,8 +163,11 @@ final class ExchangeUnreadStore {
     static let shared = ExchangeUnreadStore()
 
     private(set) var unreadThreadIDs: Set<String> = []
+    /// Personal conversations with something unread (#593). Person-scoped,
+    /// so not tied to the open farm the way Борса's threads are.
+    private(set) var unreadDirectIDs: Set<String> = []
 
-    var count: Int { unreadThreadIDs.count }
+    var count: Int { unreadThreadIDs.count + unreadDirectIDs.count }
 
     /// The farm a badge read is on its way for. ONE PER FARM rather than one
     /// at all: a read for the farm open a moment ago must not stop the open
@@ -193,6 +196,24 @@ final class ExchangeUnreadStore {
         } catch {
             // Kept. See above.
         }
+        await refreshDirect()
+    }
+
+    /// The personal half, once the server switches it on. Its own read, so a
+    /// failure on either side keeps that side's last count.
+    func refreshDirect() async {
+        guard FeatureFlags.shared.isOn(DirectMessagesAPI.flag) else { return }
+        let epoch = SessionEpoch.current
+        if let rows = try? await DirectMessagesAPI.inbox() { apply(direct: rows, asOf: epoch) }
+    }
+
+    func apply(direct rows: [DirectInboxItem], asOf epoch: Int) {
+        guard SessionEpoch.isCurrent(epoch) else { return }
+        unreadDirectIDs = Set(rows.filter(\.unread).map(\.id))
+    }
+
+    func markedRead(directID: String) {
+        unreadDirectIDs.remove(directID)
     }
 
     /// `asOf` and `farm` are REQUIRED, so no caller can apply a page without
@@ -213,6 +234,7 @@ final class ExchangeUnreadStore {
     /// may not be the next account.
     func reset() {
         unreadThreadIDs = []
+        unreadDirectIDs = []
     }
 }
 
@@ -229,6 +251,10 @@ final class ExchangeUnreadStore {
 @MainActor
 final class ExchangeInboxStore {
     private(set) var state: LoadState<[ExchangeThreadSummary]> = .loading
+    /// The person's own personal conversations (#593), merged into this list
+    /// by time (owner, 2026-11-13). Empty while the server keeps them off,
+    /// and kept as last read when a poll of them fails.
+    private(set) var direct: [DirectInboxItem] = []
 
     /// Poll every `inboxInterval` until cancelled — by the screen leaving or
     /// the app going inactive. The first pass is immediate, so returning to
@@ -255,11 +281,56 @@ final class ExchangeInboxStore {
             let page = try await ExchangeAPI.decodeThreads(from: data)
             state = .loaded(page.threads, .fresh)
             ExchangeUnreadStore.shared.apply(page.threads, asOf: epoch, farm: farm)
+            await loadDirect()
             return nil
         } catch {
             if Task.isCancelled { return nil }
             if state.value == nil { state = .failed(UserMessage.text(for: error)) }
             return error
+        }
+    }
+}
+
+extension ExchangeInboxStore {
+    /// Personal rows, when the server has them on. A failure here is not the
+    /// inbox failing: Борса's rows already loaded, and these keep their last
+    /// state.
+    func loadDirect() async {
+        guard FeatureFlags.shared.isOn(DirectMessagesAPI.flag) else {
+            direct = []
+            return
+        }
+        let epoch = SessionEpoch.current
+        guard let rows = try? await DirectMessagesAPI.inbox(), SessionEpoch.isCurrent(epoch) else { return }
+        direct = rows
+        ExchangeUnreadStore.shared.apply(direct: rows, asOf: epoch)
+    }
+}
+
+/// One row of «Съобщения»: a listing's conversation or a personal one,
+/// newest first across both (owner, 2026-11-13).
+enum InboxEntry: Identifiable, Equatable {
+    case exchange(ExchangeThreadSummary)
+    case direct(DirectInboxItem)
+
+    var id: String {
+        switch self {
+        case .exchange(let thread): "exchange:\(thread.id)"
+        case .direct(let item): "dm:\(item.id)"
+        }
+    }
+
+    var lastMessageAt: Date {
+        switch self {
+        case .exchange(let thread): thread.lastMessageAt
+        case .direct(let item): item.lastMessageAt
+        }
+    }
+
+    /// Newest first; a tie falls back to the id, so the order is stable.
+    static func merged(_ threads: [ExchangeThreadSummary], _ direct: [DirectInboxItem]) -> [InboxEntry] {
+        (threads.map(InboxEntry.exchange) + direct.map(InboxEntry.direct)).sorted {
+            $0.lastMessageAt != $1.lastMessageAt ? $0.lastMessageAt > $1.lastMessageAt : $0.id < $1.id
         }
     }
 }

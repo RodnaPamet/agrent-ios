@@ -40,7 +40,7 @@ struct ExchangeInboxView: View {
         case .failed(let message):
             ErrorState(message: message) { await store.load() }
 
-        case .loaded(let rows, _) where rows.isEmpty:
+        case .loaded(let rows, _) where rows.isEmpty && store.direct.isEmpty:
             EmptyState(
                 "Няма разговори",
                 icon: "bubble.left.and.bubble.right",
@@ -58,10 +58,18 @@ struct ExchangeInboxView: View {
             let siblings = ExchangeInbox.siblings(rows)
             List {
                 Section {
-                    ForEach(rows) { thread in
-                        NavigationLink(value: AppRoute.conversation(threadID: thread.id,
-                                                                    commodity: thread.commodity)) {
-                            InboxRow(thread: thread, siblings: siblings[thread.id])
+                    // Personal conversations among them by time (#593).
+                    ForEach(InboxEntry.merged(rows, store.direct)) { entry in
+                        switch entry {
+                        case .exchange(let thread):
+                            NavigationLink(value: AppRoute.conversation(threadID: thread.id,
+                                                                        commodity: thread.commodity)) {
+                                InboxRow(thread: thread, siblings: siblings[thread.id])
+                            }
+                        case .direct(let item):
+                            NavigationLink(value: AppRoute.directConversation(id: item.id, title: item.title)) {
+                                DirectInboxRow(item: item)
+                            }
                         }
                     }
                 }
