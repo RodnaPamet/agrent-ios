@@ -1,0 +1,49 @@
+{
+  "channels": [
+    {
+      "id": "ch_wheat",
+      "key": "crop:wheat",
+      "nameBg": "Пшеница",
+      "nameEn": "Wheat",
+      "kind": "CROP",
+      "memberCount": 34,
+      "slowModeSeconds": 0,
+      "joined": true,
+      "banned": false,
+      "unreadCount": 2
+    },
+    {
+      "id": "ch_pleven",
+      "key": "oblast:BG-15",
+      "nameBg": "Плевен",
+      "nameEn": "Pleven",
+      "kind": "OBLAST",
+      "memberCount": 12,
+      "slowModeSeconds": 0,
+      "joined": false,
+      "banned": false
+    },
+    {
+      "id": "ch_diesel",
+      "key": "input:diesel",
+      "nameBg": "Дизел",
+      "nameEn": "Diesel",
+      "kind": "TOPIC",
+      "memberCount": 51,
+      "slowModeSeconds": 0,
+      "joined": false,
+      "banned": false
+    },
+    {
+      "id": "ch_future",
+      "key": "event:fair",
+      "nameBg": "Изложения",
+      "nameEn": "Fairs",
+      "kind": "TOPIC",
+      "memberCount": 1,
+      "slowModeSeconds": 0,
+      "joined": false,
+      "banned": false
+    }
+  ]
+}

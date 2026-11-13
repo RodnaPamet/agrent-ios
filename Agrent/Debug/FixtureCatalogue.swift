@@ -155,6 +155,10 @@ enum FixtureCatalogue {
         // agrent-ios#384: «Ново мероприятие»'s step two, the one crop's
         // parcels, by the query that names the crop.
         (ParcelsByCropAPI.path(crop: "Wheat"), "parcels-by-crop-wheat"),
+        // P9.8 «Канали»: the wheat channel's first page and one question's
+        // thread, as the screens ask for them. Invented posts and people.
+        (ChannelsAPI.feedPath("ch_wheat"), "channel-feed"),
+        (ChannelsAPI.repliesPath("cp_q1"), "channel-replies"),
         // #562: SYNTH-1's last 14 days, as the history opens. Another period
         // is another question, and `NO_FIXTURE` is its true answer. One
         // cloudy pass, so the screenshot shows the line's break.
@@ -293,6 +297,12 @@ enum FixtureCatalogue {
         (MachinesAPI.trackedPath, "machines-tracked"),
         (MachinesAPI.taskAssetsPath(fixtureTaskID), "task-machines"),
         (MachinesAPI.taskMachinePath(fixtureTaskID), "task-machine"),
+        // P9.8: the channel directory. GETs only; posting, replying,
+        // resolving and joining are writes, answered 501.
+        (ChannelsAPI.listPath, "channels-list"),
+        // No name yet: the composer asks «Как да Ви наричаме?». Saving it is
+        // a write, answered 501.
+        (ChannelsAPI.profilePath, "channel-profile"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 

@@ -1,0 +1,263 @@
+import SwiftUI
+
+/// «Канали» (P9.8, #583): the public channels every farm shares, opened
+/// from the menu, in a stack of its own. Joined channels first, then the
+/// directory by crop, oblast and input.
+struct ChannelsView: View {
+    @State private var state: LoadState<[Channel]> = .loading
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            content
+                .inlineTitle("Канали")
+                .navigationDestination(for: Channel.self) { ChannelFeedView(channel: $0) { Task { await load() } } }
+                .navigationDestination(for: ChannelPost.self) { ChannelThreadView(parent: $0) }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Затвори") { dismiss() }
+                            .accessibilityInputLabels(A11y.Spoken.close)
+                    }
+                }
+                .task { if state.value == nil { await load() } }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch state {
+        case .loading:
+            ProgressView("Зареждане…").frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .failed(let message):
+            ErrorState(message: message) { await load() }
+        case .loaded(let channels, _):
+            List {
+                ForEach(ChannelWords.sections(channels), id: \.title) { section in
+                    Section {
+                        ForEach(section.channels) { channel in
+                            NavigationLink(value: channel) { row(channel) }
+                        }
+                    } header: {
+                        SectionHeader(section.title)
+                    }
+                    .pageRow()
+                }
+            }
+            .pageBackground()
+            .refreshable { await PullToRefresh.bounded { await load() } }
+        }
+    }
+
+    private func row(_ channel: Channel) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(channel.nameBg).font(.body)
+                if let members = ChannelWords.members(channel.memberCount) {
+                    Text(members).font(.caption).foregroundStyle(Palette.secondaryText)
+                }
+            }
+            Spacer(minLength: 8)
+            if let unread = channel.unreadCount, unread > 0 {
+                Text("\(unread)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.onAccent)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Palette.accent))
+                    .accessibilityLabel(Plural.bg(unread, "непрочетена", "непрочетени"))
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func load() async {
+        do { state = .loaded(try await ChannelsAPI.channels(), .fresh) } catch {
+            if state.value == nil { state = .failed(UserMessage.text(for: error)) }
+        }
+    }
+}
+
+/// One channel's feed, newest first, refreshed every 30 seconds while open
+/// (the server has no live stream for channels, #2986 §0).
+struct ChannelFeedView: View {
+    let channel: Channel
+    let onMembershipChanged: () -> Void
+
+    @State private var posts: [ChannelPost] = []
+    @State private var hasMore = false
+    @State private var loaded = false
+    @State private var failure: String?
+    @State private var joined: Bool
+    @State private var composing = false
+    @State private var confirmingLeave = false
+    @State private var changing = false
+
+    static let refresh: Duration = .seconds(30)
+
+    init(channel: Channel, onMembershipChanged: @escaping () -> Void) {
+        self.channel = channel
+        self.onMembershipChanged = onMembershipChanged
+        _joined = State(initialValue: channel.joined)
+    }
+
+    var body: some View {
+        List {
+            if !joined || channel.banned {
+                Section { membershipNote }.pageRow()
+            }
+            if let failure {
+                Section { Text(failure).font(.footnote).foregroundStyle(Palette.error) }.pageRow()
+            }
+            if loaded, posts.isEmpty {
+                Section {
+                    Text("Още няма публикации в този канал.")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.secondaryText)
+                }
+                .pageRow()
+            }
+            Section {
+                ForEach(posts) { post in
+                    NavigationLink(value: post) { ChannelPostRow(post: post) }
+                        .disabled(post.deleted && post.replyCount == 0)
+                }
+                if hasMore {
+                    Button("По-стари публикации") { Task { await loadOlder() } }
+                        .buttonStyle(.borderless)
+                        .accessibilityInputLabels(A11y.spokenNames("По-стари публикации", "По-стари", "Older posts"))
+                }
+            }
+            .pageRow()
+        }
+        .pageBackground()
+        .inlineTitle(channel.nameBg)
+        .toolbar {
+            if joined, !channel.banned {
+                ToolbarItem(placement: .secondaryAction) {
+                    Button("Напусни канала", role: .destructive) { confirmingLeave = true }
+                        .accessibilityInputLabels(A11y.spokenNames("Напусни канала", "Напусни", "Leave"))
+                }
+                ScreenAction(title: "Нова публикация", spoken: A11y.spokenNames("Нова публикация", "Публикация", "New post")) {
+                    composing = true
+                }
+            }
+        }
+        .refreshable { await PullToRefresh.bounded { await loadNewest() } }
+        .task { await loadNewest() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.refresh)
+                guard !Task.isCancelled else { return }
+                await loadNewest()
+            }
+        }
+        .sheet(isPresented: $composing) {
+            ChannelComposer(mode: .post(channelID: channel.id)) { Task { await loadNewest() } }
+        }
+        .confirmationDialog("Да напуснете ли канала?", isPresented: $confirmingLeave, titleVisibility: .visible) {
+            Button("Напусни", role: .destructive) { Task { await setJoined(false) } }
+                .accessibilityInputLabels(A11y.spokenNames("Напусни", "Leave"))
+            Button("Отказ", role: .cancel) {}
+                .accessibilityInputLabels(A11y.Spoken.cancel)
+        } message: {
+            Text("Публикациите ще останат видими. Ако се присъедините отново, ще започнете отначало.")
+        }
+    }
+
+    @ViewBuilder
+    private var membershipNote: some View {
+        if channel.banned {
+            Text("Нямате право да публикувате в този канал.")
+                .font(.subheadline)
+                .foregroundStyle(Palette.secondaryText)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Всеки може да чете канала. За да публикувате, се присъединете.")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Присъедини се") { Task { await setJoined(true) } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Palette.accent)
+                    .disabled(changing)
+                    .accessibilityInputLabels(A11y.spokenNames("Присъедини се", "Join"))
+            }
+        }
+    }
+
+    private func loadNewest() async {
+        do {
+            let page = try await ChannelsAPI.feed(channel.id)
+            // The newest page replaces its own range; older pages already
+            // read stay below it.
+            let fresh = Set(page.posts.map(\.id))
+            let oldest = page.posts.last?.createdAt ?? .distantFuture
+            posts = page.posts + posts.filter { !fresh.contains($0.id) && $0.createdAt < oldest }
+            if !loaded { hasMore = page.hasMore }
+            failure = nil
+        } catch {
+            failure = UserMessage.text(for: error)
+        }
+        loaded = true
+    }
+
+    private func loadOlder() async {
+        guard let oldest = posts.last?.createdAt else { return }
+        do {
+            let page = try await ChannelsAPI.feed(channel.id, before: oldest)
+            let seen = Set(posts.map(\.id))
+            posts += page.posts.filter { !seen.contains($0.id) }
+            hasMore = page.hasMore
+        } catch {
+            failure = UserMessage.text(for: error)
+        }
+    }
+
+    private func setJoined(_ join: Bool) async {
+        changing = true
+        defer { changing = false }
+        do {
+            if join { try await ChannelsAPI.join(channel.id) } else { try await ChannelsAPI.leave(channel.id) }
+            joined = join
+            onMembershipChanged()
+        } catch {
+            failure = UserMessage.text(for: error)
+        }
+    }
+}
+
+/// A post in a feed or a thread: who, when, its kind, the text, its replies.
+struct ChannelPostRow: View {
+    let post: ChannelPost
+    @State private var people = CurrentUserStore.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // A removed post names nobody (agri-saas #2989 §3): a name above
+            // a blank body would read as an accusation. Its time only.
+            MetaRow {
+                if !post.deleted, let author = ChannelWords.author(post, me: people.user?.id) {
+                    Text(author).font(.caption.weight(.semibold))
+                    MetaSeparator()
+                }
+                Text(BgDate.messageTime(post.createdAt)).font(.caption)
+            }
+            .foregroundStyle(Palette.secondaryText)
+            if let badge = ChannelWords.badge(post) {
+                Text(badge)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(post.resolvedAt == nil ? Palette.accent : Palette.success)
+            }
+            if post.deleted {
+                Text(ChannelWords.deleted).font(.subheadline).italic().foregroundStyle(Palette.secondaryText)
+            } else {
+                Text(post.body).font(.body).fixedSize(horizontal: false, vertical: true)
+            }
+            if let replies = ChannelWords.replies(post.replyCount) {
+                Text(replies).font(.caption).foregroundStyle(Palette.accent)
+            }
+        }
+        .padding(.vertical, 3)
+        .accessibilityElement(children: .combine)
+    }
+}

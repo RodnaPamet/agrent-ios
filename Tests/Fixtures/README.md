@@ -525,3 +525,13 @@ All invented:
 The route and the worked parcels answer today's date, which is what the day screen opens on.
 `task-machines.json` and `task-machine.json` put the invented tractor on `tsk_fixture_2`, which is current for both
 the owner and the mechanisator. `machines-tracked.json` is the mechanisator's notice: names and types only.
+
+## «Канали» (P9.8, #583)
+
+`channels-list.json`, `channel-feed.json` and `channel-replies.json`, shaped from agri-saas #2986, are all invented:
+- four channels: a joined crop channel with 2 unread, an oblast, an input, and an unknown `event:` prefix that must
+  land in «Други»;
+- a feed with an open question carrying an `author` (`displayName` + `farmName`, agri-saas #2989), a deleted post
+  with its empty body, and the fixture owner's own resolved question;
+- a two-reply thread, one reply without an author, which must not show its id.
+- `channel-profile.json`: no display name yet, so the composer asks «Как да Ви наричаме?».

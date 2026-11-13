@@ -139,6 +139,10 @@ final class FixtureSeamTests: XCTestCase {
             (AdminAPI.farmProfilePath, "admin-farm-profile"),
             (FarmRiskAPI.leadsPath, "insurance-leads"),
             (FarmRiskAPI.analysisPath("par_holes"), "risk-analysis-holes"),
+            (ChannelsAPI.listPath, "channels-list"),
+            (ChannelsAPI.feedPath("ch_wheat"), "channel-feed"),
+            (ChannelsAPI.repliesPath("cp_q1"), "channel-replies"),
+            (ChannelsAPI.profilePath, "channel-profile"),
             (FarmRiskAPI.analysisPath("par_simple"), "risk-analysis-simple"),
             (FarmRiskAPI.analysisPath("par_nogeom"), "risk-analysis-nogeom"),
             (RiskTrendAPI.path("par_holes", days: 14), "risk-history-holes"),
@@ -538,6 +542,10 @@ final class FixtureSeamTests: XCTestCase {
         ("admin-farm-profile", { _ = try await AdminAPI.decodeFarmProfile(from: $0) }),
         ("insurance-leads", { _ = try await FarmRiskAPI.decodeLeads(from: $0) }),
         ("risk-analysis-holes", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
+        ("channels-list", { _ = try await APIClient.shared.decode($0, as: ChannelsListProbe.self) }),
+        ("channel-feed", { _ = try await APIClient.shared.decode($0, as: ChannelPage.self) }),
+        ("channel-profile", { _ = try await APIClient.shared.decode($0, as: PersonName.self) }),
+        ("channel-replies", { _ = try await APIClient.shared.decode($0, as: ChannelPage.self) }),
         ("risk-analysis-simple", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
         ("risk-analysis-nogeom", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
         ("risk-history-holes", { _ = try await RiskTrendAPI.decode($0) }),
@@ -617,3 +625,6 @@ final class FixtureSeamTests: XCTestCase {
         return try Data(contentsOf: url)
     }
 }
+
+/// The directory's wrapper, for the decode check.
+private struct ChannelsListProbe: Decodable { let channels: [Channel] }

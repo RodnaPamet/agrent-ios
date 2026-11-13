@@ -58,6 +58,8 @@ enum AppRoute: Hashable, Sendable {
     /// «Известия», from the quiet-hours summary push. A surface of its own,
     /// so on the bar it opens that tab at its root (`AppRouter.open`).
     case notifications
+    /// A channel, or one post's thread in it, from a reply push (#584).
+    case channelID(String, post: String?)
 
     func hash(into hasher: inout Hasher) {
         switch self {
@@ -74,6 +76,7 @@ enum AppRoute: Hashable, Sendable {
         case .treatmentMap(let handle, _): hasher.combine("treatmentMap"); hasher.combine(handle)
         case .publicFarm(let handle): hasher.combine("publicFarm"); hasher.combine(handle)
         case .notifications: hasher.combine("notifications")
+        case .channelID(let id, let post): hasher.combine("channelID"); hasher.combine(id); hasher.combine(post)
         }
     }
 
@@ -94,6 +97,8 @@ enum AppRoute: Hashable, Sendable {
         case .location, .locationID: .locations
         case .parcelHistory: .farmRisk
         case .notifications: .notifications
+        // «Канали» is a menu sheet, not a tab; people talk on «Борса».
+        case .channelID: .exchange
         }
     }
 
@@ -117,6 +122,7 @@ enum AppRoute: Hashable, Sendable {
         case .treatmentMap(let handle, let title): TreatmentMapView(handle: handle, title: title)
         case .publicFarm(let handle): PublicFarmView(handle: handle)
         case .notifications: NotificationsView()
+        case .channelID(let id, let post): ChannelLinkView(channelID: id, postID: post)
         }
     }
 }
@@ -131,6 +137,7 @@ extension AppRoute {
         case .location(_, let id): self = .locationID(id)
         case .listing(_, let id): self = .listingID(id)
         case .notifications: self = .notifications
+        case .channel(_, let id, let post): self = .channelID(id, post: post)
         }
     }
 }
