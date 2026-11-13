@@ -73,6 +73,14 @@ enum MachineWords {
     /// Below this the server's match is a guess worth naming as one.
     static let weakMatch = 0.5
 
+    /// The parcels «Нов запис от тези парцели» ticks: the confident matches
+    /// only. A weak one («вероятно»: the route mostly along its edge, say a
+    /// road) is a suggestion, not a fact (backend 1, 2026-11-13), so the
+    /// person ticks it if it was worked. Nothing is filed unreviewed either way.
+    static func preselected(_ worked: WorkedDay) -> Set<String> {
+        Set(worked.parcels.filter { ($0.confidence ?? 1) >= weakMatch }.map(\.parcelId))
+    }
+
     /// Why a day shows no route, or a note on the one it shows.
     static func trackNote(_ track: MachineTrack) -> String? {
         if !track.retained {

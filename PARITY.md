@@ -2080,6 +2080,17 @@ be read outdoors fails before any parity gap matters.
   - OWNER and ADMIN «Добави машина» (machines only) and «Махни» (confirmed).
   - The mechanisator sees their own task's machine. The server's `/farm-tasks/{taskId}/machine` answers 404 for anyone else's task, which reads as no machine.
 - **Stage 2, the mechanisator's notice:** «GPS проследяване» at the foot of «Моите задачи» says which machines are tracked (a GPS tracker or the maker's telematics), who sees them (the server's `visibleTo`), and that their own phone is not tracked. Shown only when the farm has tracked machines.
+- **Stage 3, worked parcels → «Нов запис»:**
+  - «Нов запис от тези парцели» on a machine's day opens «Ново мероприятие» dated that day.
+  - The parcels the route crossed are ticked once a crop is chosen, if nothing is chosen yet. Only confident matches are ticked; a «вероятно» one (say, a road along the edge) is left for the person to tick (backend 1, 2026-11-13).
+  - No worked area: the server can't derive one (no implement width), so none is shown or filled in.
+  - The person picks the kind of work, checks, and adds it. Nothing is written by itself.
+- **Stage 4, the alert:** nothing sends it yet (agri-saas #2948 stage 5, not built as of 2026-11-13). The routing is ready and inert: the push link `/t/{slug}/machines/{assetId}` opens that machine's day (`MachineLinkView`), on the «Блокове» tab's stack, or on top of the current one.
+- **Position sources (owner, 2026-11-10):**
+  - the makers' own telematics first, as one adapter per maker (John Deere, CNH, CLAAS, AGCO), built against their published formats with no real account yet;
+  - the SIM tracker as one more adapter;
+  - a simulator on a demo farm only.
+  - Each machine says its source («John Deere (JDLink)», «GPS тракер», «Демо данни»). No source at all is «Няма източник на местоположение», apart from a source that hasn't reported. A demo screen says so at the top.
 
 ### Fixed — a refused session goes to sign-in (2026-11-12)
 

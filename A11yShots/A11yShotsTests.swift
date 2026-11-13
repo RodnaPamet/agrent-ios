@@ -2364,6 +2364,16 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(weak.waitForExistence(timeout: 10), "a weak match is not offered as one")
         Thread.sleep(forTimeInterval: 3)
         capture("40a-machine-day", app: app)
+
+        // The worked parcels offered as a «Нов запис»: the form opens, and is
+        // left with «Отказ» (saving would be a write to the ДНЕВНИК).
+        let record = app.buttons["Нов запис от тези парцели"]
+        for _ in 0..<4 where !(record.exists && record.isHittable) { app.swipeUp() }
+        XCTAssertTrue(record.waitForExistence(timeout: 5), "the worked parcels are not offered as a record")
+        record.tap()
+        XCTAssertTrue(app.navigationBars["Ново мероприятие"].waitForExistence(timeout: 10), "the entry form did not open")
+        app.navigationBars["Ново мероприятие"].buttons["Отказ"].tap()
+        XCTAssertTrue(app.navigationBars["Синтетичен трактор"].waitForExistence(timeout: 5), "the form did not close")
         app.navigationBars.buttons.element(boundBy: 0).tap()
 
         let add = app.navigationBars["Машини"].buttons["Нов тракер"]

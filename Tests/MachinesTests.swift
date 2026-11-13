@@ -65,6 +65,18 @@ final class MachinesTests: XCTestCase {
         XCTAssertEqual(MachineWords.worked(weak), "8 мин, вероятно", "a weak match is a suggestion")
     }
 
+    /// «Нов запис от тези парцели» ticks the confident matches only; a weak
+    /// one (a road along the edge) is left for the person (backend 1,
+    /// 2026-11-13). No area is ever computed: the server sends none.
+    func testTheDraftTicksOnlyConfidentParcels() {
+        let sure = WorkedDay.Parcel(parcelId: "p1", name: "SYNTH-1", minutesWorked: 45, areaHa: nil, confidence: 0.9)
+        let edge = WorkedDay.Parcel(parcelId: "p2", name: "SYNTH-2", minutesWorked: 8, areaHa: nil, confidence: 0.3)
+        let atBar = WorkedDay.Parcel(parcelId: "p3", name: "SYNTH-3", minutesWorked: 20, areaHa: nil, confidence: 0.5)
+        let day = WorkedDay(date: "2026-11-13", parcels: [sure, edge, atBar], derived: true)
+        XCTAssertEqual(MachineWords.preselected(day), ["p1", "p3"])
+        XCTAssertEqual(MachineWords.worked(sure), "45 мин", "no area when the server sends none")
+    }
+
     /// Past 30 days the route is gone, which is not "did not move".
     func testTheRoutesThreeSilences() {
         XCTAssertEqual(MachineWords.trackNote(MachineTrack(date: "2026-09-01", points: [], retained: false)),

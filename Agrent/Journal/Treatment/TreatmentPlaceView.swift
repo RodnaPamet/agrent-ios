@@ -29,6 +29,9 @@ struct TreatmentPlaceView: View {
     @Binding var chosen: Set<String>
     /// The treated area typed per chosen parcel, in decares (#363).
     @Binding var treatedText: [String: String]
+    /// Ticked when a crop's parcels arrive and nothing is chosen yet: the
+    /// parcels a machine worked (#574), offered for the person to check.
+    var preselected: Set<String> = []
     let failure: String?
     /// Reads the crop list again after it failed. The flow's, not the
     /// store's, because the flow also chooses a farm's only crop.
@@ -88,9 +91,12 @@ struct TreatmentPlaceView: View {
             // choice.
             chosen = []
         }
-        .onChange(of: fields.map(\.id), initial: true) { _, _ in
+        .onChange(of: fields.map(\.id), initial: true) { _, ids in
             if !fields.isEmpty {
                 camera = .region(MKCoordinateRegion(fitting: fields.map(\.parcel)) ?? .bulgaria)
+            }
+            if chosen.isEmpty, !preselected.isEmpty {
+                chosen = Set(ids).intersection(preselected)
             }
             pickWhereIStand()
         }

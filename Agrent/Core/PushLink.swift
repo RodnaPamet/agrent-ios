@@ -59,6 +59,8 @@ enum PushLink: Equatable, Sendable {
     case listing(farm: String, id: String)
     case notifications(farm: String)
     case channel(farm: String, id: String, post: String?)
+    /// A machine left the farm's area (#574; agri-saas #2948): that machine.
+    case machine(farm: String, id: String)
 
     /// nil for no link, an absolute URL (never followed: the server sends
     /// paths, so anything else did not come from it), or a path the app
@@ -81,6 +83,10 @@ enum PushLink: Equatable, Sendable {
            let farm = decoded(parts[2]), let id = decoded(parts[4]) {
             let post = components.queryItems?.first { $0.name == "post" }?.value.flatMap { $0.isEmpty ? nil : $0 }
             return .channel(farm: farm, id: id, post: post)
+        }
+        if parts.count == 5, parts[1] == "t", parts[3] == "machines",
+           let farm = decoded(parts[2]), let id = decoded(parts[4]) {
+            return .machine(farm: farm, id: id)
         }
         if parts.count == 5, parts[1] == "t", parts[3] == "farm-tasks",
            let farm = decoded(parts[2]), let id = decoded(parts[4]) {
@@ -111,7 +117,7 @@ enum PushLink: Equatable, Sendable {
     var farm: String {
         switch self {
         case .task(let farm, _), .thread(let farm, _), .location(let farm, _), .listing(let farm, _),
-             .notifications(let farm), .channel(let farm, _, _): farm
+             .notifications(let farm), .channel(let farm, _, _), .machine(let farm, _): farm
         }
     }
 }
