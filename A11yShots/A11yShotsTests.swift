@@ -2434,6 +2434,36 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars["Отговор"].buttons["Отказ"].tap()
     }
 
+    // MARK: - «Вдъхновение» (#580)
+
+    /// The library from the menu: a shelf, a book with its notes, a chapter,
+    /// and the way on to the next. An invented book only.
+    func testInspirationLibrary() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root")
+        XCTAssertTrue(tapMenuRow("Вдъхновение", in: app), "no «Вдъхновение» row\n\(app.debugDescription)")
+        let book = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Синтетична книга")).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 15), "the shelf shows no book\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("42-inspiration", app: app)
+        book.tap()
+        let first = app.buttons["Глава 1: Първа глава"]
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "the book shows no chapters in order\n\(app.debugDescription)")
+        capture("42a-book", app: app)
+        first.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Първият абзац на първата глава"))
+            .firstMatch.waitForExistence(timeout: 10), "the chapter's text is not shown")
+        let next = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Следваща глава")).firstMatch
+        XCTAssertTrue(next.waitForExistence(timeout: 5), "no way on to the next chapter")
+        capture("42b-chapter", app: app)
+        next.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Първият абзац на втората глава"))
+            .firstMatch.waitForExistence(timeout: 5), "«Следваща глава» did not move on")
+    }
+
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
 
     /// The owner tapped «История» on a risk row and nothing happened

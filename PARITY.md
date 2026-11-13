@@ -2112,3 +2112,12 @@ be read outdoors fails before any parity gap matters.
   - unread counts (a read cursor), later, after the library reads (#2990);
   - a push on a reply to my post or an answer to my question.
 - **Not built, because the server can't support them yet (#2987):** a mentions inbox, a mute, a members list.
+
+### Built, held for the server — «Вдъхновение» (owner, 2026-11-12, #580; agri-saas #2980)
+
+- A menu row for every role, mechanisators included, shown when the server's `library.enabled` is on.
+  - **The shelf:** books by use case («Стратегия», …; a book without one under «Други»).
+  - **A book:** its summary, chapters in order, and «За книгата» (translation, source, licence).
+  - **A chapter:** in the reader's own text size, with the original title and «Следваща глава».
+- **Offline:** the books are the same for everyone and name nobody. So the shelf and every book go through `ResponseCache`, are revalidated by ETag, and are warmed by `OfflinePrefetch`, giving a copy on every phone.
+- **Only texts we may give away:** the original AND the translation free in the EU. Sun Tzu is Agrent's own translation from the Chinese; Giles 1910 is protected in the EU to the end of 2028. Texts are uploaded to the server by the superuser, never committed, and published after the owner reads them.

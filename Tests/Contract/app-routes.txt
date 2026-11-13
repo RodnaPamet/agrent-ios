@@ -21,6 +21,8 @@
 /api/auth/native/start
 /api/auth/terms
 /api/auth/token/refresh
+/api/library/books
+/api/library/books/{slug}
 /api/me/farms
 /api/me/news-preferences
 /api/promotions/{id}/image

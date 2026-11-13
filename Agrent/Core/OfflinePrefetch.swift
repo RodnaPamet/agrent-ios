@@ -81,6 +81,7 @@ enum OfflinePrefetch {
         _ = await CachedResource.load(LocationsAPI.rateUnitsPath) {
             try await LocationsAPI.decodeUnits(from: $0)
         }
+        await warmLibrary()
         await warmTreatmentParcels(for: me)
     }
 
@@ -99,6 +100,18 @@ enum OfflinePrefetch {
     /// path lockdown (`CurrentUser.isOperator`), so every read would be a
     /// 403. Nor for someone who may not write (`mayWrite`, failing open),
     /// since the form records a treatment.
+    /// «Вдъхновение» (#580): the shelf and every book, so a book reads in a
+    /// field with no signal (owner: a copy on every phone). Only while the
+    /// server has the library on; an ETag makes an unchanged book a 304.
+    private static func warmLibrary() async {
+        guard await FeatureFlags.shared.isOn(LibraryAPI.flag) else { return }
+        guard let books = await CachedResource.load(LibraryAPI.listPath, decode: { try await LibraryAPI.decodeList($0) }).value
+        else { return }
+        for book in books {
+            _ = await CachedResource.load(LibraryAPI.bookPath(book.slug)) { try await LibraryAPI.decodeBook($0) }
+        }
+    }
+
     private static func warmTreatmentParcels(for me: CurrentUser?) async {
         guard !(me?.isOperator ?? false), me?.mayWrite ?? true else { return }
         await ParcelsByCropAPI.warm()

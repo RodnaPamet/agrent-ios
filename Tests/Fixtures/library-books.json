@@ -1,0 +1,25 @@
+{
+  "books": [
+    {
+      "id": "bk_fixture",
+      "slug": "sintetichna-kniga",
+      "title": "Синтетична книга",
+      "author": "Измислен автор",
+      "translator": "Agrent",
+      "language": "bg",
+      "useCases": [
+        "STRATEGY"
+      ],
+      "summary": "Кратка измислена книга за изпитване на екрана: две глави по два абзаца.",
+      "chapterCount": 2,
+      "version": 1,
+      "updatedAt": "2026-11-12T10:00:00+02:00"
+    },
+    {
+      "slug": "bez-rafiya",
+      "title": "Книга без рафт",
+      "useCases": [],
+      "version": 1
+    }
+  ]
+}

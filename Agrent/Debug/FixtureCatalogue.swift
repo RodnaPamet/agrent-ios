@@ -303,6 +303,9 @@ enum FixtureCatalogue {
         // No name yet: the composer asks «Как да Ви наричаме?». Saving it is
         // a write, answered 501.
         (ChannelsAPI.profilePath, "channel-profile"),
+        // #580 «Вдъхновение»: an invented two-chapter book, never a real text.
+        (LibraryAPI.listPath, "library-books"),
+        (LibraryAPI.bookPath("sintetichna-kniga"), "library-book"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 
