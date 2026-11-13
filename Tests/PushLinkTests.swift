@@ -39,8 +39,23 @@ final class PushLinkTests: XCTestCase {
         XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/ch-4?post=pst-8")?.farm, "ferma-1")
         XCTAssertEqual(AppRoute(.channel(farm: "ferma-1", id: "ch-4", post: "pst-8")), .channelID("ch-4", post: "pst-8"))
         XCTAssertEqual(AppRoute.channelID("ch-4", post: nil).home, .exchange)
-        XCTAssertNil(PushLink.parse("/t/ferma-1/channels/ch-4/posts/pst-8"), "no such page: not guessed")
+        // The post's own page (agri-saas #3030), once the server sends it.
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/ch-4/posts/pst-8"),
+                       .channel(farm: "ferma-1", id: "ch-4", post: "pst-8"))
+        XCTAssertNil(PushLink.parse("/t/ferma-1/channels/ch-4/posts"), "a post path with no post")
+        XCTAssertNil(PushLink.parse("/t/ferma-1/channels/ch-4/members/u-1"), "not a post")
         XCTAssertNil(PushLink.parse("/t/ferma-1/channels"), "the directory is a menu sheet")
+    }
+
+    /// A direct message (backend 2, 2026-11-13) links to
+    /// `/t/{slug}/exchange/threads/dm/{conversationId}`. The phone has no DM
+    /// screen yet, so it opens the app, and it must never be read as a Борса
+    /// conversation whose id is "dm". A push with no link opens the app too.
+    func testADirectMessageLinkIsNotABorsaThread() {
+        XCTAssertNil(PushLink.parse("/t/ferma-1/exchange/threads/dm/conv-3"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/exchange/threads/thr-7"), .thread(farm: "ferma-1", id: "thr-7"),
+                       "positive control")
+        XCTAssertNil(PushLink.parse(nil), "no link: open the app")
     }
 
     /// An agro warning opens its block; an interest or inquiry its listing,
