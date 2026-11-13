@@ -60,6 +60,8 @@ enum AppRoute: Hashable, Sendable {
     case notifications
     /// A channel, or one post's thread in it, from a reply push (#584).
     case channelID(String, post: String?)
+    /// A machine's day, from its alert push (#574).
+    case machineID(String)
 
     func hash(into hasher: inout Hasher) {
         switch self {
@@ -77,6 +79,7 @@ enum AppRoute: Hashable, Sendable {
         case .publicFarm(let handle): hasher.combine("publicFarm"); hasher.combine(handle)
         case .notifications: hasher.combine("notifications")
         case .channelID(let id, let post): hasher.combine("channelID"); hasher.combine(id); hasher.combine(post)
+        case .machineID(let id): hasher.combine("machineID"); hasher.combine(id)
         }
     }
 
@@ -99,6 +102,9 @@ enum AppRoute: Hashable, Sendable {
         case .notifications: .notifications
         // «Канали» is a menu sheet, not a tab; people talk on «Борса».
         case .channelID: .exchange
+        // The machines live on the farm's map; «Машини» itself is a menu
+        // sheet, not a tab.
+        case .machineID: .locations
         }
     }
 
@@ -123,6 +129,7 @@ enum AppRoute: Hashable, Sendable {
         case .publicFarm(let handle): PublicFarmView(handle: handle)
         case .notifications: NotificationsView()
         case .channelID(let id, let post): ChannelLinkView(channelID: id, postID: post)
+        case .machineID(let id): MachineLinkView(assetID: id)
         }
     }
 }
@@ -138,6 +145,7 @@ extension AppRoute {
         case .listing(_, let id): self = .listingID(id)
         case .notifications: self = .notifications
         case .channel(_, let id, let post): self = .channelID(id, post: post)
+        case .machine(_, let id): self = .machineID(id)
         }
     }
 }

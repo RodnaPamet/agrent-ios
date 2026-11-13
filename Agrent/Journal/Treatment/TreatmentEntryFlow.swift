@@ -26,11 +26,18 @@ struct TreatmentEntryFlow: View {
 
     /// `prefill`: a draft the assistant prepared (#483 phase 2), for the
     /// person to check, complete and send through this same form.
-    init(recorder: TreatmentRecorder, prefill: TreatmentDraft? = nil, onSaved: @escaping () -> Void) {
+    /// `preselect`: parcels to tick once the crop is chosen, those a
+    /// machine's GPS route crossed (#574). Offered, not saved: the person
+    /// checks them, and nothing is written until «Добави».
+    init(recorder: TreatmentRecorder, prefill: TreatmentDraft? = nil, preselect: Set<String> = [],
+         onSaved: @escaping () -> Void) {
         self.recorder = recorder
         self.onSaved = onSaved
+        self.preselect = preselect
         _draft = State(initialValue: prefill ?? TreatmentDraft())
     }
+
+    private let preselect: Set<String>
     @State private var reference = OperationReferenceStore()
     @State private var place = TreatmentPlaceStore()
     @State private var path: [Step] = []
@@ -86,7 +93,7 @@ struct TreatmentEntryFlow: View {
                 case .place:
                     TreatmentPlaceView(store: place, kind: draft.kind, activity: draft.activity,
                                        cropKey: $cropKey, chosen: $chosen,
-                                       treatedText: $draft.treatedText,
+                                       treatedText: $draft.treatedText, preselected: preselect,
                                        failure: failure, retryCrops: { await loadPlace() }) { fields in
                         proceed(fields)
                     }

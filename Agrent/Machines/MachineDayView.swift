@@ -14,6 +14,10 @@ struct MachineDayView: View {
     private static let farm = FarmRecordAPI.farmCalendar
     @State private var date = MachineDayView.farm.startOfDay(for: Date())
     @State private var camera: MapCameraPosition = .automatic
+    /// «Нов запис» from the worked parcels (owner, 2026-11-09): a draft for
+    /// the person to check, never a ДНЕВНИК entry by itself.
+    @State private var recording: WorkedRecord?
+    @State private var people = CurrentUserStore.shared
 
     init(day: MachineDay) {
         self.day = day
@@ -42,6 +46,10 @@ struct MachineDayView: View {
         }
         .pageBackground()
         .inlineTitle(day.machine.name)
+        .sheet(item: $recording) { record in
+            TreatmentEntryFlow(recorder: LiveTreatmentRecorder(), prefill: TreatmentDraft(date: record.day),
+                               preselect: record.parcels) {}
+        }
         .task(id: dayText) {
             camera = .automatic
             await store.load(day: dayText)
@@ -114,12 +122,27 @@ struct MachineDayView: View {
                 if let note = MachineWords.workedNote(worked, isToday: isToday) {
                     Text(note).font(.footnote).foregroundStyle(Palette.secondaryText)
                 }
+                if !worked.parcels.isEmpty, people.user?.mayWrite ?? true {
+                    Button {
+                        recording = WorkedRecord(day: date, parcels: MachineWords.preselected(worked))
+                    } label: {
+                        Label("Нов запис от тези парцели", systemImage: "square.and.pencil")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames("Нов запис от тези парцели", "Нов запис", "New entry"))
+                }
             }
         } header: {
             SectionHeader("Обработени парцели")
         } footer: {
-            SectionFooter("Изчислени от маршрута. Не се записват в дневника сами.")
+            SectionFooter("Изчислени от маршрута. Не се записват в дневника сами: «Нов запис» ги предлага, вие проверявате и добавяте.")
         }
         .pageRow()
     }
+}
+
+/// The day and parcels a «Нов запис» starts from.
+struct WorkedRecord: Identifiable {
+    let id = UUID()
+    let day: Date
+    let parcels: Set<String>
 }

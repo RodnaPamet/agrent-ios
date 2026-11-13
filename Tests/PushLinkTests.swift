@@ -45,6 +45,17 @@ final class PushLinkTests: XCTestCase {
 
     /// An agro warning opens its block; an interest or inquiry its listing,
     /// named in the fragment (#475).
+    /// A machine's alert (#574; agri-saas #2948): that machine's day, on the
+    /// farm's map tab.
+    func testAMachineAlertOpensTheMachine() {
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/machines/ast-7"), .machine(farm: "ferma-1", id: "ast-7"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/machines/ast-7")?.farm, "ferma-1")
+        XCTAssertEqual(AppRoute(.machine(farm: "ferma-1", id: "ast-7")), .machineID("ast-7"))
+        XCTAssertEqual(AppRoute.machineID("ast-7").home, .locations)
+        XCTAssertNil(PushLink.parse("/machines/ast-7"), "no farm, no link")
+        XCTAssertNil(PushLink.parse("/t/ferma-1/machines/ast-7/track"))
+    }
+
     func testABlockAndAListingOpen() {
         XCTAssertEqual(PushLink.parse("/t/ferma-1/locations/loc-3"), .location(farm: "ferma-1", id: "loc-3"))
         XCTAssertEqual(AppRoute(.location(farm: "ferma-1", id: "loc-3")), .locationID("loc-3"))
