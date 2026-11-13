@@ -1,0 +1,23 @@
+{
+  "id": "dmc_synthetic_1",
+  "state": "REQUEST",
+  "initiatedByUserId": "usr_fixture_other",
+  "lastMessageAt": "2026-11-13T09:30:00.000Z",
+  "olderCursor": null,
+  "hasOlder": false,
+  "lastReadAt": null,
+  "messages": [
+    {
+      "id": "dmm_synthetic_1",
+      "senderUserId": "usr_fixture_other",
+      "body": "Здравейте! Имате ли люцерна за продан?",
+      "createdAt": "2026-11-13T09:30:00.000Z",
+      "editedAt": null,
+      "deletedAt": null,
+      "reactions": [],
+      "attachment": null,
+      "linkCard": null,
+      "replyTo": null
+    }
+  ]
+}

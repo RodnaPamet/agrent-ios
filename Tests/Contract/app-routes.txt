@@ -36,6 +36,13 @@
 /api/social/channels/{channelId}
 /api/social/channels/{channelId}/join
 /api/social/channels/{channelId}/posts
+/api/social/conversations
+/api/social/conversations/{conversationId}
+/api/social/conversations/{conversationId}/messages
+/api/social/conversations/{conversationId}/read
+/api/social/conversations/{conversationId}/respond
+/api/social/inbox
+/api/social/messages/{messageId}
 /api/social/profile
 /api/t/{tenantSlug}/admin/companies
 /api/t/{tenantSlug}/admin/companies/{id}

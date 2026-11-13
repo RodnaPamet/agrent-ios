@@ -57,6 +57,12 @@ import Foundation
 ///     adds that page, and a server guard refuses it until then.
 /// The slug is the recipient's farm as a navigation shell, never "the farm
 /// the post belongs to": channels name no farm.
+///
+/// ── A personal message (#593; agri-saas #3035) ──
+///
+/// `/t/{slug}/exchange/threads/dm/{conversationId}`: that conversation. The
+/// slug is again only the recipient's farm, since a person-to-person message
+/// belongs to no farm.
 enum PushLink: Equatable, Sendable {
     case task(farm: String, id: String)
     case thread(farm: String, id: String)
@@ -66,6 +72,7 @@ enum PushLink: Equatable, Sendable {
     case channel(farm: String, id: String, post: String?)
     /// A machine left the farm's area (#574; agri-saas #2948): that machine.
     case machine(farm: String, id: String)
+    case directMessage(farm: String, id: String)
 
     /// nil for no link, an absolute URL (never followed: the server sends
     /// paths, so anything else did not come from it), or a path the app
@@ -112,7 +119,11 @@ enum PushLink: Equatable, Sendable {
            let id = decoded(String(fragment.dropFirst("listing-".count))) {
             return .listing(farm: farm, id: id)
         }
-        if parts.count == 6, parts[1] == "t", parts[3] == "exchange", parts[4] == "threads",
+        if parts.count == 7, parts[1] == "t", parts[3] == "exchange", parts[4] == "threads", parts[5] == "dm",
+           let farm = decoded(parts[2]), let id = decoded(parts[6]) {
+            return .directMessage(farm: farm, id: id)
+        }
+        if parts.count == 6, parts[1] == "t", parts[3] == "exchange", parts[4] == "threads", parts[5] != "dm",
            let farm = decoded(parts[2]), let id = decoded(parts[5]) {
             return .thread(farm: farm, id: id)
         }
@@ -126,7 +137,8 @@ enum PushLink: Equatable, Sendable {
     var farm: String {
         switch self {
         case .task(let farm, _), .thread(let farm, _), .location(let farm, _), .listing(let farm, _),
-             .notifications(let farm), .channel(let farm, _, _), .machine(let farm, _): farm
+             .notifications(let farm), .channel(let farm, _, _), .machine(let farm, _),
+             .directMessage(let farm, _): farm
         }
     }
 }

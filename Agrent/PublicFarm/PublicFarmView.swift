@@ -12,12 +12,20 @@ struct PublicFarmView: View {
 
     @State private var state: LoadState<PublicFarmAPI.Farm> = .loading
     @State private var notPublic = false
+    @State private var flags = FeatureFlags.shared
+    @State private var opener = DirectConversationOpener()
+    /// The conversation goes onto the stack once the server answers with its
+    /// id — but only if this page is still on screen then.
+    @Environment(\.pushRoute) private var pushRoute
+    @State private var isShown = false
 
     var body: some View {
         content
             .inlineTitle(PublicFarmText.title)
             .pageBackground()
             .task { if state.value == nil { await load() } }
+            .onAppear { isShown = true }
+            .onDisappear { isShown = false }
             .refreshable { await PullToRefresh.bounded { await load() } }
             .toolbar {
                 if let url = PublicProfileLink.url(handle: handle) {
@@ -44,6 +52,9 @@ struct PublicFarmView: View {
             List {
                 Group {
                     header(farm)
+                    if flags.isOn(DirectMessagesAPI.flag) {
+                        writeSection(farm)
+                    }
                     if !farm.crops.isEmpty {
                         Section {
                             CropChips(crops: farm.crops)
@@ -118,6 +129,42 @@ struct PublicFarmView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    /// «Пиши» (#593, owner 2026-11-13): a personal message to this farm. The
+    /// server resolves the handle to the farm's active owner.
+    ///
+    /// ── NOT FIRED ──
+    ///
+    /// The tap opens a conversation request the owner sees at once. Built,
+    /// wired, and never pressed against production.
+    private func writeSection(_ farm: PublicFarmAPI.Farm) -> some View {
+        Section {
+            Button {
+                Task {
+                    if let id = await opener.open(handle: farm.handle), isShown {
+                        pushRoute(.directConversation(id: id, title: farm.displayName))
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Label("Пиши", systemImage: "bubble.left")
+                    if opener.opening {
+                        Spacer()
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(opener.opening)
+            .accessibilityLabel("Пиши на \(farm.displayName)")
+            .accessibilityInputLabels(A11y.spokenNames("Пиши", "Съобщение", "Message"))
+            if let failure = opener.failure {
+                Text(failure)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.error)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

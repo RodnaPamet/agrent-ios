@@ -105,6 +105,8 @@ enum FixtureCatalogue {
     /// `tasks-list.json`'s row 1, a plain `TASK` with linked parcels — for
     /// the parcels map every other kind of task has (agrent-ios#177).
     static let fixtureTaskID = "tsk_fixture_2"
+    /// The personal conversation the fixtures answer (#593).
+    static let fixtureDirectID = "dmc_synthetic_1"
 
     /// The synthetic tractor in `machines-list.json` (#574).
     static let fixtureTractorID = "ast_fixture_tractor"
@@ -306,6 +308,11 @@ enum FixtureCatalogue {
         // #580 «Вдъхновение»: an invented two-chapter book, never a real text.
         (LibraryAPI.listPath, "library-books"),
         (LibraryAPI.bookPath("sintetichna-kniga"), "library-book"),
+        // #593 personal messages: an invented request from «Синтетична ферма»
+        // and an older conversation with no name. GETs only — sending,
+        // answering and marking read are writes, answered 501.
+        (DirectMessagesAPI.inboxPath, "dm-inbox"),
+        (DirectMessagesAPI.conversationPath(fixtureDirectID), "dm-conversation"),
     ] + fixtureRiskParcels.map { (FarmRiskAPI.analysisPath($0.parcelID), $0.fixture) }
     ) { decodedPath(split($0).path) }
 

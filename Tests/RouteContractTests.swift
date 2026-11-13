@@ -430,6 +430,13 @@ final class RouteContractTests: XCTestCase {
             ]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
+            // #593: personal messages, agri-saas P8.2.
+            ("DirectMessagesAPI.swift", [
+                DirectMessagesAPI.inboxPath, DirectMessagesAPI.openPath,
+                DirectMessagesAPI.conversationPath("{conversationId}"),
+                DirectMessagesAPI.messagesPath("{conversationId}"), DirectMessagesAPI.readPath("{conversationId}"),
+                DirectMessagesAPI.respondPath("{conversationId}"), DirectMessagesAPI.messagePath("{messageId}"),
+            ]),
             // #562: the same reading over a period (agri-saas #2837).
             ("RiskTrend.swift", [RiskTrendAPI.path(parcel, days: 14)]),
             ("InsuranceCatalogue.swift", [InsuranceCatalogueAPI.path]),

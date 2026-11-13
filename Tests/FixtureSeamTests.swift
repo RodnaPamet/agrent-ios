@@ -145,6 +145,8 @@ final class FixtureSeamTests: XCTestCase {
             (ChannelsAPI.profilePath, "channel-profile"),
             (LibraryAPI.listPath, "library-books"),
             (LibraryAPI.bookPath("sintetichna-kniga"), "library-book"),
+            (DirectMessagesAPI.inboxPath, "dm-inbox"),
+            (DirectMessagesAPI.conversationPath(FixtureCatalogue.fixtureDirectID), "dm-conversation"),
             (FarmRiskAPI.analysisPath("par_simple"), "risk-analysis-simple"),
             (FarmRiskAPI.analysisPath("par_nogeom"), "risk-analysis-nogeom"),
             (RiskTrendAPI.path("par_holes", days: 14), "risk-history-holes"),
@@ -550,6 +552,11 @@ final class FixtureSeamTests: XCTestCase {
         ("channel-replies", { _ = try await APIClient.shared.decode($0, as: ChannelPage.self) }),
         ("library-books", { _ = try await LibraryAPI.decodeList($0) }),
         ("library-book", { _ = try await LibraryAPI.decodeBook($0) }),
+        ("dm-inbox", {
+            let rows = try await DirectMessagesAPI.decodeInbox($0)
+            if rows.count != 2 { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "dm rows: \(rows.count)")) }
+        }),
+        ("dm-conversation", { _ = try await DirectMessagesAPI.decodeConversation($0, me: "usr_fixture_owner") }),
         ("risk-analysis-simple", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
         ("risk-analysis-nogeom", { _ = try await FarmRiskAPI.decodeAnalysis(from: $0) }),
         ("risk-history-holes", { _ = try await RiskTrendAPI.decode($0) }),
