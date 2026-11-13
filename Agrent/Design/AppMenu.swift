@@ -49,6 +49,8 @@ struct AppMenuButton<Extra: View>: View {
     @State private var notifications = NotificationsStore.shared
     @State private var showingAdmin = false
     @State private var showingMachines = false
+    @State private var showingChannels = false
+    @State private var flags = FeatureFlags.shared
     @State private var farms = FarmStore.shared
     @State private var people = CurrentUserStore.shared
 
@@ -109,6 +111,16 @@ struct AppMenuButton<Extra: View>: View {
                     }
                     .accessibilityInputLabels(A11y.Spoken.machines)
                 }
+                // «Канали» (P9.8, #583): every role, mechanisators included
+                // (#2986 §1), once the server switches channels on.
+                if flags.isOn(ChannelsAPI.flag) {
+                    Button {
+                        showingChannels = true
+                    } label: {
+                        Label("Канали", systemImage: "bubble.left.and.text.bubble.right")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames("Канали", "Channels"))
+                }
             }
 
             // ITS OWN SECTION, last — where «Профил» and «Изход» sat before
@@ -139,6 +151,7 @@ struct AppMenuButton<Extra: View>: View {
         // on purpose and you will go back.
         .sheet(isPresented: $showingAdmin) { AdminView() }
         .sheet(isPresented: $showingMachines) { MachinesView() }
+        .sheet(isPresented: $showingChannels) { ChannelsView() }
         // Each screen owns its own NavigationStack, the same shape AdminView
         // uses. The «Затвори» does NOT belong to the screen, though (#119):
         // every surface can be a tab root or a menu sheet depending on the

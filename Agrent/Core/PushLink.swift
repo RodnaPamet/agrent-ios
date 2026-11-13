@@ -45,12 +45,20 @@ import Foundation
 /// push would have said, and leads to the bell: `/t/{slug}/notifications`
 /// (backend 2, 2026-11-09; it sent a bare `/notifications` before, which
 /// led nowhere on either client). That farm's «Известия».
+///
+/// ── A channel post (#584; agri-saas #2987) ──
+///
+/// A reply to my post or an answer to my question links to its channel with
+/// the post in the QUERY: `/t/{slug}/channels/{channelId}?post={postId}`.
+/// The web has no page for one post, and the API names a post without its
+/// channel (agreed with backend 1, 2026-11-12). No `post` opens the channel.
 enum PushLink: Equatable, Sendable {
     case task(farm: String, id: String)
     case thread(farm: String, id: String)
     case location(farm: String, id: String)
     case listing(farm: String, id: String)
     case notifications(farm: String)
+    case channel(farm: String, id: String, post: String?)
 
     /// nil for no link, an absolute URL (never followed: the server sends
     /// paths, so anything else did not come from it), or a path the app
@@ -68,6 +76,11 @@ enum PushLink: Equatable, Sendable {
         guard parts.first?.isEmpty == true else { return nil }
         if parts.count == 4, parts[1] == "t", parts[3] == "notifications", let farm = decoded(parts[2]) {
             return .notifications(farm: farm)
+        }
+        if parts.count == 5, parts[1] == "t", parts[3] == "channels",
+           let farm = decoded(parts[2]), let id = decoded(parts[4]) {
+            let post = components.queryItems?.first { $0.name == "post" }?.value.flatMap { $0.isEmpty ? nil : $0 }
+            return .channel(farm: farm, id: id, post: post)
         }
         if parts.count == 5, parts[1] == "t", parts[3] == "farm-tasks",
            let farm = decoded(parts[2]), let id = decoded(parts[4]) {
@@ -98,7 +111,7 @@ enum PushLink: Equatable, Sendable {
     var farm: String {
         switch self {
         case .task(let farm, _), .thread(let farm, _), .location(let farm, _), .listing(let farm, _),
-             .notifications(let farm): farm
+             .notifications(let farm), .channel(let farm, _, _): farm
         }
     }
 }

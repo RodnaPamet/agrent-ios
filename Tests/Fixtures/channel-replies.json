@@ -1,0 +1,29 @@
+{
+  "replies": [
+    {
+      "id": "cr_1",
+      "authorUserId": "usr_fixture_owner",
+      "body": "При нас – след като температурите паднат под 15 градуса.",
+      "kind": "POST",
+      "createdAt": "2026-11-12T09:00:00.000Z",
+      "deleted": false,
+      "resolvedAt": null,
+      "replyCount": 0
+    },
+    {
+      "id": "cr_2",
+      "authorUserId": "usr_fixture_other",
+      "author": {
+        "displayName": "Синтетичен Земеделец",
+        "farmName": "Синтетична ферма"
+      },
+      "body": "Благодаря!",
+      "kind": "POST",
+      "createdAt": "2026-11-12T09:10:00.000Z",
+      "deleted": false,
+      "resolvedAt": null,
+      "replyCount": 0
+    }
+  ],
+  "hasMore": false
+}

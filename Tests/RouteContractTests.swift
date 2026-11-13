@@ -421,6 +421,13 @@ final class RouteContractTests: XCTestCase {
                 MachinesAPI.taskMachinePath("{taskId}"), MachinesAPI.taskAssetsPath("{taskId}"),
                 MachinesAPI.taskAssetPath("{taskId}", assetID: "{assetId}"),
             ]),
+            // P9.8: «Канали», agri-saas #2986.
+            ("ChannelsAPI.swift", [
+                ChannelsAPI.listPath, ChannelsAPI.feedPath("{channelId}"),
+                ChannelsAPI.repliesPath("{postId}"), ChannelsAPI.postPath("{channelId}"),
+                ChannelsAPI.replyPath("{postId}"), ChannelsAPI.resolvedPath("{postId}"),
+                ChannelsAPI.joinPath("{channelId}"), ChannelsAPI.profilePath,
+            ]),
             // #562: the same reading over a period (agri-saas #2837).
             ("RiskTrend.swift", [RiskTrendAPI.path(parcel, days: 14)]),
             ("InsuranceCatalogue.swift", [InsuranceCatalogueAPI.path]),

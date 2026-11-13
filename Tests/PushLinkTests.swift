@@ -28,6 +28,21 @@ final class PushLinkTests: XCTestCase {
         XCTAssertNil(PushLink.parse("/t/ferma-1/grain/contracts"), "contracts have no phone screen")
     }
 
+    /// A reply to my post (#584; agri-saas #2987): the channel, with the post
+    /// in the query, since the web has no page for one post.
+    func testAChannelReplyOpensItsThread() {
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/ch-4?post=pst-8"),
+                       .channel(farm: "ferma-1", id: "ch-4", post: "pst-8"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/ch-4"), .channel(farm: "ferma-1", id: "ch-4", post: nil))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/ch-4?post="), .channel(farm: "ferma-1", id: "ch-4", post: nil),
+                       "an empty post is the channel")
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/ch-4?post=pst-8")?.farm, "ferma-1")
+        XCTAssertEqual(AppRoute(.channel(farm: "ferma-1", id: "ch-4", post: "pst-8")), .channelID("ch-4", post: "pst-8"))
+        XCTAssertEqual(AppRoute.channelID("ch-4", post: nil).home, .exchange)
+        XCTAssertNil(PushLink.parse("/t/ferma-1/channels/ch-4/posts/pst-8"), "no such page: not guessed")
+        XCTAssertNil(PushLink.parse("/t/ferma-1/channels"), "the directory is a menu sheet")
+    }
+
     /// An agro warning opens its block; an interest or inquiry its listing,
     /// named in the fragment (#475).
     func testABlockAndAListingOpen() {

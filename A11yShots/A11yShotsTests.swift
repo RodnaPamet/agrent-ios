@@ -2378,6 +2378,52 @@ final class A11yShotsTests: XCTestCase {
         app.navigationBars["Нов тракер"].buttons["Отказ"].tap()
     }
 
+    // MARK: - «Канали» (P9.8, #583)
+
+    /// The channels from the menu: the directory by group, a feed with a
+    /// question, a deleted post and no ids, a thread, and the reply form,
+    /// opened and left without sending (a post is a write).
+    func testChannels() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        assertSeamActive(app)
+        XCTAssertTrue(openMenu(app), "no «Меню» button on the root")
+        XCTAssertTrue(tapMenuRow("Канали", in: app), "no «Канали» row\n\(app.debugDescription)")
+        let wheat = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Пшеница")).firstMatch
+        XCTAssertTrue(wheat.waitForExistence(timeout: 15), "the directory shows no channels\n\(app.debugDescription)")
+        XCTAssertTrue(app.staticTexts["Моите канали"].exists || app.otherElements["Моите канали"].exists,
+                      "joined channels are not first")
+        capture("43-channels", app: app)
+        wheat.tap()
+        let question = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "житна пиявица")).firstMatch
+        XCTAssertTrue(question.waitForExistence(timeout: 10), "the feed shows no posts\n\(app.debugDescription)")
+        XCTAssertTrue(question.label.contains("Синтетичен Земеделец, Синтетична ферма"), "no name + farm: \(question.label)")
+        XCTAssertTrue(app.staticTexts["Публикацията не е налична."].exists, "a deleted post is not shown as such")
+        let removed = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Публикацията не е налична.")).firstMatch
+        XCTAssertFalse(removed.label.contains("Член на канала"), "a removed post names its author: \(removed.label)")
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "usr_")).firstMatch.exists,
+                       "an internal user id is on screen")
+        capture("43a-channel-feed", app: app)
+        question.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Благодаря"))
+            .firstMatch.waitForExistence(timeout: 10), "the thread shows no replies")
+        capture("43b-channel-thread", app: app)
+        let reply = app.navigationBars.buttons["Отговори"]
+        XCTAssertTrue(reply.waitForExistence(timeout: 5), "no «Отговори» in the bar")
+        reply.tap()
+        XCTAssertTrue(app.navigationBars["Отговор"].waitForExistence(timeout: 5), "the reply form did not open")
+        XCTAssertFalse(app.navigationBars["Отговор"].buttons["Изпрати"].isEnabled, "«Изпрати» is open with nothing typed")
+        // No display name yet: asked first, optional, and «Запази» waits
+        // for one (agri-saas #2989). Nothing is saved: that is a write.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Как да Ви наричаме"))
+            .firstMatch.waitForExistence(timeout: 5), "the name prompt did not show")
+        XCTAssertTrue(app.buttons["Не сега"].exists, "the name is not optional")
+        XCTAssertFalse(app.buttons["Запази"].isEnabled, "«Запази» is open with no name")
+        capture("43c-channel-name-prompt", app: app)
+        app.navigationBars["Отговор"].buttons["Отказ"].tap()
+    }
+
     // MARK: - Риск: «История» opens the history (agrent-ios#386)
 
     /// The owner tapped «История» on a risk row and nothing happened

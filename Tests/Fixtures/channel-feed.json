@@ -1,0 +1,39 @@
+{
+  "posts": [
+    {
+      "id": "cp_q1",
+      "authorUserId": "usr_fixture_other",
+      "author": {
+        "displayName": "Синтетичен Земеделец",
+        "farmName": "Синтетична ферма"
+      },
+      "body": "Кога е най-добре да се пръска срещу житна пиявица тази година?",
+      "kind": "QUESTION",
+      "createdAt": "2026-11-12T08:30:00.000Z",
+      "deleted": false,
+      "resolvedAt": null,
+      "replyCount": 2
+    },
+    {
+      "id": "cp_gone",
+      "authorUserId": "usr_fixture_third",
+      "body": "",
+      "kind": "POST",
+      "createdAt": "2026-11-11T16:00:00.000Z",
+      "deleted": true,
+      "resolvedAt": null,
+      "replyCount": 0
+    },
+    {
+      "id": "cp_mine",
+      "authorUserId": "usr_fixture_owner",
+      "body": "Сеитбата при нас приключи; почвата е влажна след дъждовете.",
+      "kind": "QUESTION",
+      "createdAt": "2026-11-10T09:00:00.000Z",
+      "deleted": false,
+      "resolvedAt": "2026-11-11T10:00:00.000Z",
+      "replyCount": 0
+    }
+  ],
+  "hasMore": false
+}

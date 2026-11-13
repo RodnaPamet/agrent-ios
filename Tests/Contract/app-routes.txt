@@ -28,6 +28,13 @@
 /api/public/farms
 /api/public/farms/{handle}
 /api/public/media/{hash}
+/api/social/channel-posts/{postId}/replies
+/api/social/channel-posts/{postId}/resolved
+/api/social/channels
+/api/social/channels/{channelId}
+/api/social/channels/{channelId}/join
+/api/social/channels/{channelId}/posts
+/api/social/profile
 /api/t/{tenantSlug}/admin/companies
 /api/t/{tenantSlug}/admin/companies/{id}
 /api/t/{tenantSlug}/admin/farm-profile

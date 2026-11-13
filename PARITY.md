@@ -2087,3 +2087,17 @@ be read outdoors fails before any parity gap matters.
 - The phone cleared its tokens on that 401 but stayed in the app. The owner sat over the cache with every flag off and every request failing on the phone itself (the Ортофотокарта was missing).
 - Now the refusal ends the session locally and shows the sign-in screen with «Сесията Ви изтече или беше прекратена. Влезте отново.».
 - Only a session in the app is ended: a code, suspended or deletion screen stays.
+
+### Built, held for the server — «Канали» on the phone (P9.8, owner 2026-11-12, #583; agri-saas #2986)
+
+- A menu row for every role, mechanisators included (the server's confinement never engages on `/api/social/…`), when `social.channels` is on. It's off in production today.
+  - **The directory:** «Моите канали» first, then «Култури», «Области», «Торове, препарати и горива», «Други», grouped by key prefix, never `kind`. Member counts; unread counts once the server sends them.
+  - **A channel:** posts newest first, refreshed every 30 s while open (no live stream exists); older pages; «Присъедини се»/«Напусни канала»; «+» «Нова публикация» (optionally a question).
+  - **A thread:** replies oldest first; «Отговори» (optionally also to the channel); the asker's «Отбележи като решен»/«Отвори отново».
+- **Who wrote it:** «Име, Ферма» once the server sends it (owner's choice; agri-saas #2989). The name is the person's published profile name, often absent at first, so the farm stands alone. The farm is the one recorded when the post was written, absent on older posts. Otherwise «Вие» for one's own and «Член на канала» with neither. Never the internal id. A removed post names nobody, only its time.
+- **Removed, retracted and hidden posts:** one state by design, «Публикацията не е налична.»
+- **Owner chose, server pending:**
+  - name + farm on posts;
+  - unread counts (a read cursor), later, after the library reads (#2990);
+  - a push on a reply to my post or an answer to my question.
+- **Not built, because the server can't support them yet (#2987):** a mentions inbox, a mute, a members list.
