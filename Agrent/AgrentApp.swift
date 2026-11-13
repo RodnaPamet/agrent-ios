@@ -256,6 +256,7 @@ struct MainTabView: View {
                 // phone was in a pocket is exactly what it is for. No push
                 // exists to say so sooner.
                 Task { await unread.refresh() }
+                Task { await ChannelUnreadStore.shared.refresh() }
                 // And the notifications' count, on the same return.
                 Task { await notifications.refresh() }
             }
@@ -299,6 +300,7 @@ struct MainTabView: View {
                 // Борса — is not sent to collect a 403 for a badge.
                 await unread.refresh()
                 await notifications.refresh()
+                await ChannelUnreadStore.shared.refresh()
             }
             await outbox.flush()
             // DETACHED, not awaited.

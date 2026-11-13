@@ -5,6 +5,7 @@ import SwiftUI
 /// directory by crop, oblast and input.
 struct ChannelsView: View {
     @State private var state: LoadState<[Channel]> = .loading
+    @State private var unread = ChannelUnreadStore.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -57,7 +58,7 @@ struct ChannelsView: View {
                 }
             }
             Spacer(minLength: 8)
-            if let unread = channel.unreadCount, unread > 0 {
+            if let unread = unread.count(for: channel), unread > 0 {
                 Text("\(unread)")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Palette.onAccent)
@@ -71,7 +72,12 @@ struct ChannelsView: View {
     }
 
     private func load() async {
-        do { state = .loaded(try await ChannelsAPI.channels(), .fresh) } catch {
+        let epoch = SessionEpoch.current
+        do {
+            let channels = try await ChannelsAPI.channels()
+            state = .loaded(channels, .fresh)
+            unread.apply(channels, asOf: epoch)
+        } catch {
             if state.value == nil { state = .failed(UserMessage.text(for: error)) }
         }
     }
@@ -91,6 +97,9 @@ struct ChannelFeedView: View {
     @State private var composing = false
     @State private var confirmingLeave = false
     @State private var changing = false
+    /// The newest post this feed has marked read, so a poll that brought
+    /// nothing new does not write again.
+    @State private var markedThrough: Date?
 
     static let refresh: Duration = .seconds(30)
 
@@ -195,10 +204,26 @@ struct ChannelFeedView: View {
             posts = page.posts + posts.filter { !fresh.contains($0.id) && $0.createdAt < oldest }
             if !loaded { hasMore = page.hasMore }
             failure = nil
+            await markRead()
         } catch {
             failure = UserMessage.text(for: error)
         }
         loaded = true
+    }
+
+    /// Reading the feed reads the channel: the cursor moves when the feed
+    /// shows something newer than it last marked (#597). A member only; a
+    /// failure leaves the badge as it was, for the next open to clear.
+    private func markRead() async {
+        guard joined, !channel.banned, let newest = posts.first?.createdAt,
+              markedThrough.map({ newest > $0 }) ?? true else { return }
+        do {
+            try await ChannelsAPI.markRead(channel.id)
+            markedThrough = newest
+            ChannelUnreadStore.shared.markedRead(channel.id)
+        } catch {
+            // Kept for the next poll.
+        }
     }
 
     private func loadOlder() async {
