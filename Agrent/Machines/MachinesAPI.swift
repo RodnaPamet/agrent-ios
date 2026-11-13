@@ -47,12 +47,6 @@ enum MachinesAPI {
         "\(taskAssetsPath(taskID))/\(URLEscape.segment(assetID))"
     }
 
-    /// Choosing a task's machines is a later agri-saas #2948 stage: the live
-    /// `/assets` route is GET only (stage 3b, live 2026-11-12), so a POST
-    /// there answers 405. «Добави машина» and «Махни» stay off until that
-    /// stage is live; reading a task's machines works for everyone now.
-    static let taskWritesLive = false
-
     static func machines() async throws -> [Machine] {
         let data = try await APIClient.shared.data(for: listPath)
         return try await APIClient.shared.decode(data, as: MachineList.self).machines

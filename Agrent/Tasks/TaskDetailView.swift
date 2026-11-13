@@ -230,7 +230,7 @@ struct TaskDetailView: View {
                     if let parcels {
                         TaskParcelsSection(store: parcels)
                     }
-                    TaskMachinesSection(store: machines, mayManage: MachinesAPI.taskWritesLive && people.user?.permissions?.canAdmin == true)
+                    TaskMachinesSection(store: machines, mayManage: people.user?.permissions?.canAdmin == true)
                     facts(item)
                     text("Описание", item.description)
                     text("Решение", item.resolution)
