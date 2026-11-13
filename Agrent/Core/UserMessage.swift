@@ -1212,5 +1212,10 @@ enum UserMessage {
         // No AI budget for a self-registered farm until it is verified (OD11).
         "AI_BUDGET_REQUIRES_VERIFIED_FARM":
             "Функциите с изкуствен интелект са достъпни, след като стопанството бъде потвърдено.",
+        // Choosing a task's machines (#586, agri-saas #3038). The first is
+        // its own refusal on purpose: an EDITOR may change records, just not
+        // this register, so the generic role sentence would mislead.
+        "MACHINES_MANAGE_REQUIRED": "Само собственик или администратор може да избира машините на задачата.",
+        "ASSET_NOT_LOCATABLE": "Тази машина няма как да се проследи, затова не може да се добави към задача.",
     ]
 }

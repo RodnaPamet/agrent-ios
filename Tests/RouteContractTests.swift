@@ -198,11 +198,10 @@ final class RouteContractTests: XCTestCase {
         // `/machines`, `/track` and `/worked` came off with agri-saas main
         // 0716a16, once stage 3a (4810e91) was live (2026-11-12); the three
         // `farm-tasks` reads with main f529bd6, once stage 3b (bd13985) was
-        // live the same day. Unlinking stays here: that stage writes nothing
-        // yet (`MachinesAPI.taskWritesLive`).
+        // live the same day; unlinking with main c1d8a78, once agri-saas
+        // #3038 (0ee0eee) wrote a task's machines (#586, 2026-11-13).
         "/api/t/{tenantSlug}/machines/trackers": "agri-saas #2948: the tracker register",
         "/api/t/{tenantSlug}/machines/trackers/{id}": "agri-saas #2948: removing a tracker",
-        "/api/t/{tenantSlug}/farm-tasks/{taskId}/assets/{assetId}": "agri-saas #2948: unlinking a task's machine",
     ]
 
     /// Files whose `/x` literals are not API paths at all.
