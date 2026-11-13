@@ -50,6 +50,7 @@ struct AppMenuButton<Extra: View>: View {
     @State private var showingAdmin = false
     @State private var showingMachines = false
     @State private var showingChannels = false
+    @State private var showingLibrary = false
     @State private var flags = FeatureFlags.shared
     @State private var farms = FarmStore.shared
     @State private var people = CurrentUserStore.shared
@@ -121,6 +122,16 @@ struct AppMenuButton<Extra: View>: View {
                     }
                     .accessibilityInputLabels(A11y.spokenNames("Канали", "Channels"))
                 }
+                // «Вдъхновение» (#580): every role, mechanisators included
+                // (owner, 2026-11-12), once the server switches it on.
+                if flags.isOn(LibraryAPI.flag) {
+                    Button {
+                        showingLibrary = true
+                    } label: {
+                        Label("Вдъхновение", systemImage: "books.vertical")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames("Вдъхновение", "Книги", "Library"))
+                }
             }
 
             // ITS OWN SECTION, last — where «Профил» and «Изход» sat before
@@ -152,6 +163,7 @@ struct AppMenuButton<Extra: View>: View {
         .sheet(isPresented: $showingAdmin) { AdminView() }
         .sheet(isPresented: $showingMachines) { MachinesView() }
         .sheet(isPresented: $showingChannels) { ChannelsView() }
+        .sheet(isPresented: $showingLibrary) { InspirationView() }
         // Each screen owns its own NavigationStack, the same shape AdminView
         // uses. The «Затвори» does NOT belong to the screen, though (#119):
         // every surface can be a tab root or a menu sheet depending on the

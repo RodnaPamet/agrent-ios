@@ -428,6 +428,8 @@ final class RouteContractTests: XCTestCase {
                 ChannelsAPI.replyPath("{postId}"), ChannelsAPI.resolvedPath("{postId}"),
                 ChannelsAPI.joinPath("{channelId}"), ChannelsAPI.profilePath,
             ]),
+            // #580: «Вдъхновение», agri-saas #2980.
+            ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
             // #562: the same reading over a period (agri-saas #2837).
             ("RiskTrend.swift", [RiskTrendAPI.path(parcel, days: 14)]),
             ("InsuranceCatalogue.swift", [InsuranceCatalogueAPI.path]),

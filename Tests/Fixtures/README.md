@@ -535,3 +535,9 @@ the owner and the mechanisator. `machines-tracked.json` is the mechanisator's no
   with its empty body, and the fixture owner's own resolved question;
 - a two-reply thread, one reply without an author, which must not show its id.
 - `channel-profile.json`: no display name yet, so the composer asks «Как да Ви наричаме?».
+
+## «Вдъхновение» (#580)
+
+`library-books.json` and `library-book.json`, shaped from agri-saas #2980: an invented two-chapter book on the
+«Стратегия» shelf (its chapters deliberately out of order, to check the phone sorts them), and a second book with no
+use case, which lands under «Други». Never a real book's text: those are uploaded to the server, not committed.
