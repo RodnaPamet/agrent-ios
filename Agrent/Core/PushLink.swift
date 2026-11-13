@@ -48,10 +48,15 @@ import Foundation
 ///
 /// ── A channel post (#584; agri-saas #2987) ──
 ///
-/// A reply to my post or an answer to my question links to its channel with
-/// the post in the QUERY: `/t/{slug}/channels/{channelId}?post={postId}`.
-/// The web has no page for one post, and the API names a post without its
-/// channel (agreed with backend 1, 2026-11-12). No `post` opens the channel.
+/// A reply to my post or a mention links to its channel, and the post may
+/// ride in either of two forms, so whichever the server sends opens it:
+///   · `/t/{slug}/channels/{channelId}` — the channel, with the post in the
+///     query (`?post=`) or not at all: backend 2's first push sends this
+///     (2026-11-13), while no page for one post exists;
+///   · `/t/{slug}/channels/{channelId}/posts/{postId}` — once agri-saas #3030
+///     adds that page, and a server guard refuses it until then.
+/// The slug is the recipient's farm as a navigation shell, never "the farm
+/// the post belongs to": channels name no farm.
 enum PushLink: Equatable, Sendable {
     case task(farm: String, id: String)
     case thread(farm: String, id: String)
@@ -82,6 +87,10 @@ enum PushLink: Equatable, Sendable {
         if parts.count == 5, parts[1] == "t", parts[3] == "channels",
            let farm = decoded(parts[2]), let id = decoded(parts[4]) {
             let post = components.queryItems?.first { $0.name == "post" }?.value.flatMap { $0.isEmpty ? nil : $0 }
+            return .channel(farm: farm, id: id, post: post)
+        }
+        if parts.count == 7, parts[1] == "t", parts[3] == "channels", parts[5] == "posts",
+           let farm = decoded(parts[2]), let id = decoded(parts[4]), let post = decoded(parts[6]) {
             return .channel(farm: farm, id: id, post: post)
         }
         if parts.count == 5, parts[1] == "t", parts[3] == "machines",
