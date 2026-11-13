@@ -202,6 +202,10 @@ targets:
         # «Документи»'s scanner and its plain-camera fallback (#468): the
         # app's first use of the camera. Bulgarian, as every word in it.
         NSCameraUsageDescription: Камерата се използва за снимане и сканиране на документи.
+        # Voice notes in «Канали» (#598): asked on the first «Запиши», not at
+        # launch. App Privacy must list Audio Data before the next App Store
+        # submission (#350).
+        NSMicrophoneUsageDescription: Микрофонът се използва за гласови съобщения в каналите.
         # The «you are here» dot on the farm's maps (#492): When In Use only,
         # asked from a map's location button. Says that it stays on the
         # phone, which is the owner's choice and why App Privacy has no

@@ -35,6 +35,13 @@ enum ChannelsAPI {
     static func replyPath(_ postID: String) -> String { "/api/social/channel-posts/\(URLEscape.segment(postID))/replies" }
     static func resolvedPath(_ postID: String) -> String { "/api/social/channel-posts/\(URLEscape.segment(postID))/resolved" }
     static func joinPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/join" }
+    /// A photo or a voice note as a post (P9.6, agri-saas #3045).
+    static func mediaPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/media" }
+    /// The bytes, for MEMBERS only: a non-member reads the post and gets a
+    /// 404 here, by design (a recording carries the speaker's voice).
+    static func attachmentPath(_ postID: String) -> String {
+        "/api/social/channel-posts/\(URLEscape.segment(postID))/attachment"
+    }
 
     /// The page cursor: the server's own ISO instant, percent-escaped (`+`
     /// and `:` in a query).
@@ -88,6 +95,22 @@ enum ChannelsAPI {
 
     static func setResolved(_ postID: String, _ resolved: Bool) async throws {
         _ = try await APIClient.shared.putReturningData(resolvedPath(postID), body: ["resolved": resolved])
+    }
+
+    /// One post carrying a photo or a voice note, with an optional caption.
+    /// The field name says which; the server checks the type by its bytes.
+    /// NOT FIRED from tests, CI or A11yShots.
+    static func postMedia(_ channelID: String, _ media: ChannelMedia, caption: String) async throws {
+        var fields: [String: String] = [:]
+        if !caption.isEmpty { fields["body"] = caption }
+        if let durationMs = media.durationMs { fields["durationMs"] = String(durationMs) }
+        _ = try await APIClient.shared.postMultipart(
+            mediaPath(channelID), file: media.data, fileName: media.fileName, mimeType: media.mimeType,
+            fields: fields, fileField: media.field)
+    }
+
+    static func attachment(_ postID: String) async throws -> Data {
+        try await APIClient.shared.data(for: attachmentPath(postID))
     }
 
     static func join(_ channelID: String) async throws {
@@ -181,11 +204,26 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
         let farmName: String?
     }
 
+    /// A photo or a voice note (P9.6). The post's body may then be empty
+    /// with `deleted: false` — the attachment IS the content; an empty body
+    /// with `deleted: true` is a removed post.
+    let attachment: Attachment?
+
+    struct Attachment: Decodable, Equatable, Hashable, Sendable {
+        let mime: String?
+        let bytes: Int?
+        let durationMs: Int?
+
+        var isVoice: Bool { mime?.hasPrefix("audio/") == true || durationMs != nil }
+    }
+
     var isQuestion: Bool { kind == "QUESTION" }
 
-    private enum CodingKeys: String, CodingKey { case id, authorUserId, body, kind, createdAt, deleted, resolvedAt, replyCount, author }
+    private enum CodingKeys: String, CodingKey {
+        case id, authorUserId, body, kind, createdAt, deleted, resolvedAt, replyCount, author, attachment
+    }
     init(id: String, authorUserId: String, body: String, kind: String, createdAt: Date, deleted: Bool,
-         resolvedAt: Date?, replyCount: Int, author: Author? = nil) {
+         resolvedAt: Date?, replyCount: Int, author: Author? = nil, attachment: Attachment? = nil) {
         self.id = id
         self.authorUserId = authorUserId
         self.body = body
@@ -195,6 +233,7 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
         self.resolvedAt = resolvedAt
         self.replyCount = replyCount
         self.author = author
+        self.attachment = attachment
     }
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -207,6 +246,62 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
         resolvedAt = try? c.decodeIfPresent(Date.self, forKey: .resolvedAt)
         replyCount = (try? c.decodeIfPresent(Int.self, forKey: .replyCount)) ?? 0
         author = try? c.decodeIfPresent(Author.self, forKey: .author)
+        // A removed post serves no bytes, so it carries no attachment here.
+        attachment = deleted ? nil : (try? c.decodeIfPresent(Attachment.self, forKey: .attachment)) ?? nil
+    }
+}
+
+/// What a composer sends as a post's media (P9.6).
+struct ChannelMedia: Equatable, Sendable {
+    enum Kind: Equatable, Sendable { case photo, voice(durationMs: Int) }
+    let kind: Kind
+    let data: Data
+
+    var field: String { if case .voice = kind { "voice" } else { "photo" } }
+    var durationMs: Int? { if case .voice(let ms) = kind { ms } else { nil } }
+    var fileName: String { if case .voice = kind { "glas.m4a" } else { "snimka.jpg" } }
+    var mimeType: String { if case .voice = kind { "audio/mp4" } else { "image/jpeg" } }
+
+    /// The server's ceiling for a voice note (1.5 MB) — the real bound on
+    /// «до 2:00», since it measures bytes, not seconds.
+    static let maxVoiceBytes = 1_500_000
+    static let maxVoiceMs = 120_000
+
+    /// A LOCATION atom in an audio file: `©xyz` (Apple's) or `loci` (3GPP).
+    /// The server refuses one (agri-saas #3044); this says so before upload.
+    /// Encoder tags (`©too`) are not location and are left alone.
+    ///
+    /// Walks the BOX TREE rather than searching the bytes: four bytes that
+    /// spell `loci` occur by chance inside a megabyte of audio often enough
+    /// to refuse an honest recording, and a box header cannot.
+    static func carriesLocation(_ data: Data) -> Bool {
+        let bytes = [UInt8](data)
+        let containers: Set<String> = ["moov", "trak", "mdia", "minf", "udta", "meta", "ilst"]
+        func walk(_ start: Int, _ end: Int, depth: Int) -> Bool {
+            var offset = start
+            while depth < 8, offset + 8 <= end {
+                var size = Int(bytes[offset]) << 24 | Int(bytes[offset + 1]) << 16
+                    | Int(bytes[offset + 2]) << 8 | Int(bytes[offset + 3])
+                let type = String(decoding: bytes[(offset + 4)..<(offset + 8)].map { $0 == 0xA9 ? 0x40 : $0 }, as: UTF8.self)
+                var header = 8
+                if size == 1, offset + 16 <= end {
+                    size = Int(bytes[(offset + 8)..<(offset + 16)].reduce(UInt64(0)) { $0 << 8 | UInt64($1) })
+                    header = 16
+                } else if size == 0 {
+                    size = end - offset
+                }
+                guard size >= header, offset + size <= end else { return false }
+                if type == "@xyz" || type == "loci" { return true }
+                if containers.contains(type) {
+                    // `meta` is a full box: a version and flags first.
+                    let inner = offset + header + (type == "meta" ? 4 : 0)
+                    if walk(inner, offset + size, depth: depth + 1) { return true }
+                }
+                offset += size
+            }
+            return false
+        }
+        return walk(0, bytes.count, depth: 0)
     }
 }
 
