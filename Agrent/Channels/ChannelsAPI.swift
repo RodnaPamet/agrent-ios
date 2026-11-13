@@ -35,6 +35,10 @@ enum ChannelsAPI {
     static func replyPath(_ postID: String) -> String { "/api/social/channel-posts/\(URLEscape.segment(postID))/replies" }
     static func resolvedPath(_ postID: String) -> String { "/api/social/channel-posts/\(URLEscape.segment(postID))/resolved" }
     static func joinPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/join" }
+    /// Moves the person's read cursor to NOW (agri-saas #2990). No body: the
+    /// server takes its own clock, so a phone with a wrong one cannot park
+    /// the cursor in the future.
+    static func readPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/read" }
     /// A photo or a voice note as a post (P9.6, agri-saas #3045).
     static func mediaPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/media" }
     /// The bytes, for MEMBERS only: a non-member reads the post and gets a
@@ -111,6 +115,12 @@ enum ChannelsAPI {
 
     static func attachment(_ postID: String) async throws -> Data {
         try await APIClient.shared.data(for: attachmentPath(postID))
+    }
+
+    /// The person's own act, from an open feed only: never from tests, CI or
+    /// A11yShots.
+    static func markRead(_ channelID: String) async throws {
+        _ = try await APIClient.shared.postReturningData(readPath(channelID), body: EmptyBody(), idempotencyKey: nil)
     }
 
     static func join(_ channelID: String) async throws {

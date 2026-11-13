@@ -45,6 +45,7 @@ struct AppMenuButton<Extra: View>: View {
 
     @State private var tabs = BottomTabsStore.shared
     @State private var unread = ExchangeUnreadStore.shared
+    @State private var channelUnread = ChannelUnreadStore.shared
     /// «Известия»'s unread count, on its row when it is not on the bar (#471).
     @State private var notifications = NotificationsStore.shared
     @State private var showingAdmin = false
@@ -118,7 +119,8 @@ struct AppMenuButton<Extra: View>: View {
                     Button {
                         showingChannels = true
                     } label: {
-                        Label("Канали", systemImage: "bubble.left.and.text.bubble.right")
+                        Label(MessagingPolicy.counted("Канали", unread: channelUnread.total),
+                              systemImage: "bubble.left.and.text.bubble.right")
                     }
                     .accessibilityInputLabels(A11y.spokenNames("Канали", "Channels"))
                 }
