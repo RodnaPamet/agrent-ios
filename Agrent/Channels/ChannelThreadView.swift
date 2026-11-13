@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 
 /// One post and its replies, oldest first (#2986: a thread reads in the
@@ -25,7 +26,7 @@ struct ChannelThreadView: View {
 
     var body: some View {
         List {
-            Section { ChannelPostRow(post: post) }.pageRow()
+            Section { ChannelPostRow(post: post, showsMedia: true) }.pageRow()
             if mayResolve {
                 Section {
                     Button(post.resolvedAt == nil ? "Отбележи като решен" : "Отвори отново") {
@@ -45,7 +46,7 @@ struct ChannelThreadView: View {
                 if loaded, replies.isEmpty {
                     Text("Още няма отговори.").font(.subheadline).foregroundStyle(Palette.secondaryText)
                 }
-                ForEach(replies) { ChannelPostRow(post: $0) }
+                ForEach(replies) { ChannelPostRow(post: $0, showsMedia: true) }
                 if hasMore {
                     Button("Още отговори") { Task { await loadMore() } }
                         .buttonStyle(.borderless)
@@ -101,7 +102,8 @@ struct ChannelThreadView: View {
             try await ChannelsAPI.setResolved(post.id, resolve)
             post = ChannelPost(id: post.id, authorUserId: post.authorUserId, body: post.body, kind: post.kind,
                                createdAt: post.createdAt, deleted: post.deleted,
-                               resolvedAt: resolve ? Date() : nil, replyCount: post.replyCount, author: post.author)
+                               resolvedAt: resolve ? Date() : nil, replyCount: post.replyCount, author: post.author,
+                               attachment: post.attachment)
             failure = nil
         } catch {
             failure = UserMessage.text(for: error)
@@ -133,6 +135,11 @@ struct ChannelComposer: View {
     /// What became of the prompt in this composer: saved, or skipped.
     @State private var nameOutcome: String?
     @State private var people = CurrentUserStore.shared
+    // A photo or a voice note on a NEW post (P9.6, #598); replies carry text.
+    @State private var photoItem: PhotosPickerItem?
+    @State private var photo: Data?
+    @State private var recorder = VoiceNoteRecorder()
+    @State private var preview = VoiceNotePlayer()
 
     private var nameReady: Bool {
         let name = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -140,7 +147,16 @@ struct ChannelComposer: View {
     }
 
     private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var ready: Bool { !trimmed.isEmpty && trimmed.count <= ChannelsAPI.maxBody }
+    private var hasMedia: Bool {
+        if photo != nil { return true }
+        if case .recorded = recorder.state { return true }
+        return false
+    }
+    /// With a photo or a voice note the text is a caption and may be empty.
+    private var ready: Bool {
+        guard trimmed.count <= ChannelsAPI.maxBody, recorder.state != .recording else { return false }
+        return hasMedia || !trimmed.isEmpty
+    }
     private var isReply: Bool { if case .reply = mode { return true } else { return false } }
 
     var body: some View {
@@ -162,11 +178,15 @@ struct ChannelComposer: View {
                         }
                     }
                 }
+                if !isReply {
+                    attachSection
+                }
                 Section {
                     if isReply {
                         Toggle("Изпрати и в канала", isOn: $alsoToChannel)
                     } else {
                         Toggle("Това е въпрос", isOn: $asQuestion)
+                            .disabled(hasMedia)
                     }
                 } footer: {
                     SectionFooter(isReply
@@ -187,12 +207,111 @@ struct ChannelComposer: View {
                         .accessibilityInputLabels(A11y.spokenNames("Изпрати", "Send"))
                 }
             }
-            .interactiveDismissDisabled(sending || !trimmed.isEmpty)
+            .interactiveDismissDisabled(sending || !trimmed.isEmpty || hasMedia || recorder.state == .recording)
+            .onChange(of: photoItem) { _, item in
+                guard let item else { return }
+                photoItem = nil
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                        // Re-encoded, so the original's EXIF — a farm photo's
+                        // GPS above all — never leaves the phone.
+                        photo = ScanPDF.compressed(image).jpegData(compressionQuality: ScanPDF.quality)
+                        recorder.discard()
+                    }
+                }
+            }
+            .onDisappear {
+                preview.stop()
+                if !sending { recorder.discard() }
+            }
             .task {
                 guard !ChannelNamePrompt.isSkipped(by: people.user?.id) else { return }
                 // A failed read asks nothing: the post goes out either way.
                 person = try? await ChannelsAPI.profile()
             }
+        }
+    }
+
+    /// One attachment: a photo, or a voice note up to 2:00 (P9.6). Choosing
+    /// one replaces the other — a post carries one.
+    @ViewBuilder
+    private var attachSection: some View {
+        Section {
+            if let photo, let image = UIImage(data: photo) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .accessibilityLabel(VoiceNoteWords.photo)
+                Button("Махни снимката", role: .destructive) { self.photo = nil }
+                    .buttonStyle(.borderless)
+                    .accessibilityInputLabels(A11y.spokenNames("Махни снимката", "Махни", "Remove photo"))
+            } else {
+                voiceControls
+                if recorder.state != .recording, !hasMedia {
+                    PhotosPicker(selection: $photoItem, matching: .images) {
+                        Label("Добави снимка", systemImage: "photo")
+                    }
+                    .accessibilityInputLabels(A11y.spokenNames("Добави снимка", "Снимка", "Photo"))
+                }
+            }
+        } header: {
+            SectionHeader("Прикачи")
+        } footer: {
+            SectionFooter {
+                switch recorder.state {
+                case .denied: Text(VoiceNoteWords.denied)
+                case .failed(let reason): Text(reason).foregroundStyle(Palette.error)
+                default: Text("Гласово съобщение до 2 минути или една снимка.")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var voiceControls: some View {
+        switch recorder.state {
+        case .recording:
+            HStack {
+                Label("Записва се… \(VoiceNoteWords.clock(recorder.elapsed)) / \(VoiceNoteWords.clock(VoiceNoteRecorder.limit))",
+                      systemImage: "record.circle")
+                    .foregroundStyle(Palette.error)
+                    .monospacedDigit()
+                Spacer(minLength: 12)
+                Button("Спри") { recorder.stop() }
+                    .buttonStyle(.borderless)
+                    .accessibilityInputLabels(A11y.spokenNames("Спри", "Stop"))
+            }
+        case .recorded(let ms):
+            HStack {
+                Button {
+                    preview.toggle(recorder.recordingURL.flatMap { try? Data(contentsOf: $0) })
+                } label: {
+                    Label(preview.playing ? "Пауза" : "Чуй записа", systemImage: preview.playing ? "pause.fill" : "play.fill")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityInputLabels(preview.playing ? A11y.spokenNames("Пауза", "Pause")
+                                                          : A11y.spokenNames("Чуй записа", "Чуй", "Play"))
+                Spacer(minLength: 12)
+                Text(VoiceNoteWords.clock(ms: ms))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.secondaryText)
+                    .accessibilityLabel(VoiceNoteWords.spoken(ms: ms))
+            }
+            Button("Изтрий записа", role: .destructive) {
+                preview.stop()
+                recorder.discard()
+            }
+            .buttonStyle(.borderless)
+            .accessibilityInputLabels(A11y.spokenNames("Изтрий записа", "Изтрий", "Delete recording"))
+        default:
+            Button {
+                Task { await recorder.start() }
+            } label: {
+                Label("Запиши гласово съобщение", systemImage: "mic")
+            }
+            .accessibilityInputLabels(A11y.spokenNames("Запиши гласово съобщение", "Запиши", "Record"))
         }
     }
 
@@ -264,6 +383,18 @@ struct ChannelComposer: View {
         defer { sending = false }
         do {
             switch mode {
+            case .post(let channelID) where hasMedia:
+                let media: ChannelMedia
+                if let photo {
+                    media = ChannelMedia(kind: .photo, data: photo)
+                } else if let voice = recorder.media() {
+                    media = voice
+                } else {
+                    return
+                }
+                try await ChannelsAPI.postMedia(channelID, media, caption: trimmed)
+                preview.stop()
+                recorder.discard()
             case .post(let channelID):
                 try await ChannelsAPI.post(channelID, .init(body: trimmed, kind: asQuestion ? "QUESTION" : "POST",
                                                             tenantSlug: FarmPath.openSlug))

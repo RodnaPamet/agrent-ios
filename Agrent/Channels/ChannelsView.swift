@@ -229,6 +229,10 @@ struct ChannelFeedView: View {
 /// A post in a feed or a thread: who, when, its kind, the text, its replies.
 struct ChannelPostRow: View {
     let post: ChannelPost
+    /// The photo or the player itself — on the post's own screen. A feed row
+    /// says only that there is one, since a control inside a row that opens
+    /// the thread would fight the row's own tap.
+    var showsMedia = false
     @State private var people = CurrentUserStore.shared
 
     var body: some View {
@@ -251,7 +255,20 @@ struct ChannelPostRow: View {
             if post.deleted {
                 Text(ChannelWords.deleted).font(.subheadline).italic().foregroundStyle(Palette.secondaryText)
             } else {
-                Text(post.body).font(.body).fixedSize(horizontal: false, vertical: true)
+                // An attachment post may have no text (P9.6).
+                if !post.body.isEmpty {
+                    Text(post.body).font(.body).fixedSize(horizontal: false, vertical: true)
+                }
+                if let attachment = post.attachment {
+                    if showsMedia {
+                        ChannelAttachmentView(postID: post.id, attachment: attachment)
+                    } else {
+                        Label(ChannelWords.attachment(attachment),
+                              systemImage: attachment.isVoice ? "waveform" : "photo")
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.accent)
+                    }
+                }
             }
             if let replies = ChannelWords.replies(post.replyCount) {
                 Text(replies).font(.caption).foregroundStyle(Palette.accent)

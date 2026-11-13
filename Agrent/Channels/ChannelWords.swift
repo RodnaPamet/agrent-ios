@@ -95,4 +95,11 @@ enum ChannelWords {
     static func counter(_ text: String) -> String? {
         text.count > ChannelsAPI.maxBody - 400 ? "\(text.count) / \(ChannelsAPI.maxBody)" : nil
     }
+
+    /// A feed row's line for a photo or a voice note: «Гласово съобщение, 0:45».
+    static func attachment(_ attachment: ChannelPost.Attachment) -> String {
+        guard attachment.isVoice else { return VoiceNoteWords.photo }
+        guard let ms = attachment.durationMs else { return VoiceNoteWords.voice }
+        return "\(VoiceNoteWords.voice), \(VoiceNoteWords.clock(ms: ms))"
+    }
 }

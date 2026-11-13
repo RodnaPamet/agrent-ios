@@ -876,12 +876,13 @@ actor APIClient {
         fileName: String,
         mimeType: String,
         fields: [String: String] = [:],
+        fileField: String = "file",
         idempotencyKey: String? = nil
     ) async throws -> Data {
         let boundary = "Boundary-\(UUID().uuidString)"
         let body = Self.multipartBody(
             boundary: boundary, file: file, fileName: fileName,
-            mimeType: mimeType, fields: fields)
+            mimeType: mimeType, fields: fields, fileField: fileField)
 
         // A key only where the route dedupes on it: «Документи»'s upload
         // (agri-saas #2495) does, so a retry of the same bytes after a lost
@@ -932,7 +933,8 @@ actor APIClient {
         file: Data,
         fileName: String,
         mimeType: String,
-        fields: [String: String]
+        fields: [String: String],
+        fileField: String = "file"
     ) -> Data {
         var body = Data()
         func append(_ text: String) { body.append(Data(text.utf8)) }
@@ -944,7 +946,9 @@ actor APIClient {
         }
 
         append("--\(boundary)\r\n")
-        append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n")
+        // `file` everywhere but a channel post's media, where the FIELD NAME
+        // says which kind it is — `photo` or `voice` (agri-saas #3045).
+        append("Content-Disposition: form-data; name=\"\(fileField)\"; filename=\"\(fileName)\"\r\n")
         append("Content-Type: \(mimeType)\r\n\r\n")
         body.append(file)
         append("\r\n--\(boundary)--\r\n")

@@ -1217,5 +1217,9 @@ enum UserMessage {
         // this register, so the generic role sentence would mislead.
         "MACHINES_MANAGE_REQUIRED": "Само собственик или администратор може да избира машините на задачата.",
         "ASSET_NOT_LOCATABLE": "Тази машина няма как да се проследи, затова не може да се добави към задача.",
+        // Voice notes on channel posts (#598, agri-saas #3045). Too long and
+        // too large are told apart: the remedy here is to record less.
+        "VOICE_NOTE_TOO_LONG": "Гласовото съобщение е твърде дълго. Запишете до 2 минути.",
+        "VOICE_NOTE_DURATION_REQUIRED": "Записът не беше приет. Запишете го отново.",
     ]
 }
