@@ -433,6 +433,8 @@ final class RouteContractTests: XCTestCase {
             ]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
+            // #605: the person's live updates (agri-saas P7.6).
+            ("LiveUpdates.swift", [LiveUpdates.path]),
             // #593: personal messages, agri-saas P8.2.
             ("DirectMessagesAPI.swift", [
                 DirectMessagesAPI.inboxPath, DirectMessagesAPI.openPath,

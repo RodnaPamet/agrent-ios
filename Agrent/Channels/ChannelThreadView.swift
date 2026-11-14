@@ -86,6 +86,12 @@ struct ChannelThreadView: View {
         }
         .refreshable { await PullToRefresh.bounded { await loadFirst() } }
         .task { await loadFirst() }
+        // A frame names the channel, not the post, so any channel frame reads
+        // this thread's replies again (#605).
+        .onReceive(NotificationCenter.default.publisher(for: LiveUpdates.frameNotification)) { note in
+            guard let frame = note.object as? LiveUpdates.Frame, frame.kind == .channel else { return }
+            Task { await loadFirst() }
+        }
         .sheet(isPresented: $replying) {
             ChannelComposer(mode: .reply(postID: post.id)) { Task { await loadFirst() } }
         }

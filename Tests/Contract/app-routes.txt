@@ -25,6 +25,7 @@
 /api/library/books/{slug}
 /api/me/farms
 /api/me/news-preferences
+/api/me/stream
 /api/promotions/{id}/image
 /api/public/eik-check
 /api/public/farms
