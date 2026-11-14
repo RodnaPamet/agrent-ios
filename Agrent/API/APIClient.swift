@@ -1122,7 +1122,15 @@ actor APIClient {
     /// a subscription it never made.
     func eventStream<B: Encodable>(_ path: String, body: B) async throws -> AsyncThrowingStream<Data, Error> {
         guard !FarmPath.isUnscoped(path) else { throw APIError.noFarmOpen }
-        let payload = try encoder.encode(body)
+        return try await eventStream(path, payload: try encoder.encode(body))
+    }
+
+    /// A GET stream — the person's live updates (`/api/me/stream`, #605).
+    func eventStream(_ path: String) async throws -> AsyncThrowingStream<Data, Error> {
+        try await eventStream(path, payload: nil)
+    }
+
+    private func eventStream(_ path: String, payload: Data?) async throws -> AsyncThrowingStream<Data, Error> {
         var tokens = try currentTokens()
         if tokens.isExpired { tokens = try await refresh(tokens) }
         var (bytes, http) = try await openEventStream(path, payload, tokens)
@@ -1168,17 +1176,20 @@ actor APIClient {
     }
 
     private func openEventStream(
-        _ path: String, _ body: Data, _ tokens: Tokens
+        _ path: String, _ body: Data?, _ tokens: Tokens
     ) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
-        var req = try Self.request(for: path, method: "POST", accessToken: tokens.accessToken)
-        req.httpBody = body
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let method = body == nil ? "GET" : "POST"
+        var req = try Self.request(for: path, method: method, accessToken: tokens.accessToken)
+        if let body {
+            req.httpBody = body
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         let loggable = LoggablePath(path)
-        Log.request("POST", loggable)
+        Log.request(method, loggable)
         let (bytes, response) = try await streamSession.bytes(for: req)
         guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        Log.response("POST", loggable, status: http.statusCode, bytes: 0, ms: 0)
+        Log.response(method, loggable, status: http.statusCode, bytes: 0, ms: 0)
         return (bytes, http)
     }
 
