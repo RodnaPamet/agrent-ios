@@ -13,6 +13,10 @@ struct ChannelThreadView: View {
     @State private var failure: String?
     @State private var replying = false
     @State private var people = CurrentUserStore.shared
+    @State private var flags = FeatureFlags.shared
+    @State private var opener = DirectConversationOpener()
+    /// The conversation «Пиши» opens goes onto «Канали»'s stack as a value.
+    @Environment(\.pushRoute) private var pushRoute
 
     init(parent: ChannelPost) {
         self.parent = parent
@@ -26,7 +30,13 @@ struct ChannelThreadView: View {
 
     var body: some View {
         List {
-            Section { ChannelPostRow(post: post, showsMedia: true) }.pageRow()
+            Section {
+                ChannelPostRow(post: post, showsMedia: true)
+                if let target = writeTarget(post) {
+                    writeButton(target)
+                }
+            }
+            .pageRow()
             if mayResolve {
                 Section {
                     Button(post.resolvedAt == nil ? "Отбележи като решен" : "Отвори отново") {
@@ -46,7 +56,16 @@ struct ChannelThreadView: View {
                 if loaded, replies.isEmpty {
                     Text("Още няма отговори.").font(.subheadline).foregroundStyle(Palette.secondaryText)
                 }
-                ForEach(replies) { ChannelPostRow(post: $0, showsMedia: true) }
+                ForEach(replies) { reply in
+                    ChannelPostRow(post: reply, showsMedia: true)
+                        .contextMenu {
+                            if let target = writeTarget(reply) {
+                                Button { Task { await open(target) } } label: {
+                                    Label(ChannelWords.write(target.farm), systemImage: "bubble.left")
+                                }
+                            }
+                        }
+                }
                 if hasMore {
                     Button("Още отговори") { Task { await loadMore() } }
                         .buttonStyle(.borderless)
@@ -69,6 +88,41 @@ struct ChannelThreadView: View {
         .task { await loadFirst() }
         .sheet(isPresented: $replying) {
             ChannelComposer(mode: .reply(postID: post.id)) { Task { await loadFirst() } }
+        }
+    }
+
+    /// «Пиши» on a post: personal messages on, a published farm page behind
+    /// the post, and not my own. The words name the FARM — the message
+    /// reaches its owner, who may not be the author (agri-saas #3043).
+    private func writeTarget(_ post: ChannelPost) -> (handle: String, farm: String?)? {
+        guard flags.isOn(DirectMessagesAPI.flag), !post.deleted,
+              let handle = post.author?.farmHandle, !handle.isEmpty,
+              post.authorUserId != people.user?.id else { return nil }
+        return (handle, post.author?.farmName)
+    }
+
+    private func writeButton(_ target: (handle: String, farm: String?)) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button { Task { await open(target) } } label: {
+                HStack(spacing: 8) {
+                    Label(ChannelWords.write(target.farm), systemImage: "bubble.left")
+                    if opener.opening { Spacer(); ProgressView() }
+                }
+            }
+            .buttonStyle(.borderless)
+            .disabled(opener.opening)
+            .accessibilityInputLabels(A11y.spokenNames("Пиши", "Съобщение", "Message"))
+            if let failure = opener.failure {
+                Text(failure).font(.footnote).foregroundStyle(Palette.error)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// NOT FIRED — opening creates a request the farm's owner sees.
+    private func open(_ target: (handle: String, farm: String?)) async {
+        if let id = await opener.open(handle: target.handle) {
+            pushRoute(.directConversation(id: id, title: target.farm))
         }
     }
 

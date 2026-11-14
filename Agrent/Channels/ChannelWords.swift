@@ -106,4 +106,13 @@ enum ChannelWords {
     /// After «Без известия» (#601): what it stops, and that it starts with the
     /// next post — a push already on its way still arrives.
     static let mutedNote = "Няма да получавате известия, когато ви споменат или ви отговорят в този канал. Важи от следващата публикация."
+
+    /// «Пиши на ЗК Победа»: the FARM, since a message reaches its owner, not
+    /// necessarily the person who posted (#596).
+    static func write(_ farm: String?) -> String {
+        guard let farm = farm?.trimmingCharacters(in: .whitespacesAndNewlines), !farm.isEmpty else {
+            return "Пиши на стопанството"
+        }
+        return "Пиши на \(farm)"
+    }
 }

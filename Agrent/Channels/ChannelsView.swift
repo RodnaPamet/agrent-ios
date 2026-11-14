@@ -9,7 +9,10 @@ struct ChannelsView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        // The house stack (`RoutedStack`): as a menu sheet it keeps its own
+        // path, and a screen inside can push an `AppRoute` — the conversation
+        // «Пиши» opens (#596).
+        RoutedStack {
             content
                 .inlineTitle("Канали")
                 .navigationDestination(for: Channel.self) { ChannelFeedView(channel: $0) { Task { await load() } } }
