@@ -1,9 +1,12 @@
 import SwiftUI
 
 /// A channel by its id, from a reply push (#584; agri-saas #2987): that
-/// post's thread when the link names one and it is among the newest posts,
-/// otherwise the channel. A channel gone since the push, or channels switched
-/// off, is said in words.
+/// post's thread when the link names one, otherwise the channel. A channel
+/// gone since the push is said in words.
+///
+/// The post is read by its id (agri-saas #3030); a reply opens its parent's
+/// thread, since threads are one level deep. A server without that read falls
+/// back to looking among the newest posts.
 struct ChannelLinkView: View {
     let channelID: String
     let postID: String?
@@ -48,8 +51,11 @@ struct ChannelLinkView: View {
             var post: ChannelPost?
             if let postID {
                 // Not finding the post still opens its channel.
-                let id = channel.id
-                post = try? await Self.find(postID) { try await ChannelsAPI.feed(id, before: $0) }
+                post = try? await Self.thread(for: postID)
+                if post == nil {
+                    let id = channel.id
+                    post = try? await Self.find(postID) { try await ChannelsAPI.feed(id, before: $0) }
+                }
             }
             state = .loaded(Opened(channel: channel, post: post), .fresh)
         } catch {
@@ -57,9 +63,17 @@ struct ChannelLinkView: View {
         }
     }
 
+    /// The thread a permalink opens: the post itself, or its parent when the
+    /// link names a reply.
+    static func thread(for postID: String) async throws -> ChannelPost {
+        let found = try await ChannelsAPI.post(postID)
+        guard let parent = found.parentPostId else { return found.post }
+        return try await ChannelsAPI.post(parent).post
+    }
+
     /// The post among the newest `pages` pages, paging back as the feed does.
-    /// The server has no read of one post (#2986), and a reply push is about a
-    /// recent one, so a few pages bound the search.
+    /// The fallback for a server older than agri-saas #3030; a reply push is
+    /// about a recent post, so a few pages bound the search.
     nonisolated static func find(_ postID: String, pages: Int = 4,
                                  page: @Sendable (Date?) async throws -> ChannelPage) async throws -> ChannelPost? {
         var before: Date?

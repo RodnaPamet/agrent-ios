@@ -145,4 +145,24 @@ final class ChannelsTests: XCTestCase {
         XCTAssertEqual(ChannelWords.write(nil), "Пиши на стопанството")
         XCTAssertEqual(ChannelWords.write("  "), "Пиши на стопанството")
     }
+
+    // MARK: - A permalink by post id (agri-saas #3030)
+
+    func testAPermalinkReadsThePostAndItsParent() async throws {
+        XCTAssertEqual(ChannelsAPI.onePostPath("p1"), "/api/social/channel-posts/p1")
+        let reply = Data("""
+        {"post":{"id":"r1","authorUserId":"u1","body":"Да","kind":"POST","createdAt":"2026-11-14T09:00:00.000Z","deleted":false,
+                 "resolvedAt":null,"replyCount":0},"channelId":"c1","parentPostId":"p1"}
+        """.utf8)
+        let found = try await APIClient.shared.decode(reply, as: ChannelsAPI.PostLookup.self)
+        XCTAssertEqual(found.channelId, "c1")
+        XCTAssertEqual(found.parentPostId, "p1", "a reply opens its parent's thread")
+        let removed = Data("""
+        {"post":{"id":"p2","authorUserId":"u1","body":"","kind":"POST","createdAt":"2026-11-14T09:00:00.000Z","deleted":true,
+                 "resolvedAt":null,"replyCount":2,"author":null},"channelId":"c1","parentPostId":null}
+        """.utf8)
+        let gone = try await APIClient.shared.decode(removed, as: ChannelsAPI.PostLookup.self)
+        XCTAssertTrue(gone.post.deleted, "a removed post comes back collapsed, not as a 404")
+        XCTAssertNil(gone.parentPostId)
+    }
 }

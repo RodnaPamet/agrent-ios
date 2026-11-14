@@ -429,6 +429,7 @@ final class RouteContractTests: XCTestCase {
                 ChannelsAPI.mediaPath("{channelId}"), ChannelsAPI.attachmentPath("{postId}"),
                 ChannelsAPI.readPath("{channelId}"),
                 ChannelsAPI.mutePath("{channelId}"),
+                ChannelsAPI.onePostPath("{postId}"),
             ]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),

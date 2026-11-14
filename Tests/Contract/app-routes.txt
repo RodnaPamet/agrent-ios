@@ -30,6 +30,7 @@
 /api/public/farms
 /api/public/farms/{handle}
 /api/public/media/{hash}
+/api/social/channel-posts/{postId}
 /api/social/channel-posts/{postId}/attachment
 /api/social/channel-posts/{postId}/replies
 /api/social/channel-posts/{postId}/resolved
