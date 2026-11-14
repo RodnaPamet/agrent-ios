@@ -38,6 +38,7 @@ final class PrivacyManifestTests: XCTestCase {
     func testEveryKindOfDataThatLeavesThePhoneIsDeclared() throws {
         let declared = try collectedTypes()
         XCTAssertEqual(declared.sorted(), [
+            "NSPrivacyCollectedDataTypeAudioData",
             "NSPrivacyCollectedDataTypeCrashData",
             "NSPrivacyCollectedDataTypeEmailAddress",
             "NSPrivacyCollectedDataTypeOtherDiagnosticData",
@@ -91,6 +92,12 @@ final class PrivacyManifestTests: XCTestCase {
         let picture = try read("Agrent/Account/AccountPicture.swift")
         XCTAssertTrue(picture.contains("postMultipart"), "positive control: the picture upload moved")
         XCTAssertTrue(declared.contains("NSPrivacyCollectedDataTypePhotosorVideos"))
+
+        // A voice note on a channel post (#598): the person's own recording,
+        // sent only when they post it.
+        let channels = try read("Agrent/Channels/ChannelsAPI.swift")
+        XCTAssertTrue(channels.contains("static func postMedia"), "positive control: the media upload moved")
+        XCTAssertTrue(declared.contains("NSPrivacyCollectedDataTypeAudioData"))
     }
 
     /// The device location is read for the farm's maps and NEVER leaves the
