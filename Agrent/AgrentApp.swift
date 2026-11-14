@@ -246,6 +246,8 @@ struct MainTabView: View {
             // screen (#493): the last chance before a pocket or a kill.
             if phase == .background {
                 Task { await UsageEvents.shared.flush() }
+                // No live connection from a phone in a pocket (#605).
+                LiveUpdates.shared.stop()
             }
             if phase == .active {
                 Task {
@@ -257,6 +259,7 @@ struct MainTabView: View {
                 // exists to say so sooner.
                 Task { await unread.refresh() }
                 Task { await ChannelUnreadStore.shared.refresh() }
+                if auth.state == .signedIn { LiveUpdates.shared.start() }
                 // And the notifications' count, on the same return.
                 Task { await notifications.refresh() }
             }
@@ -301,6 +304,7 @@ struct MainTabView: View {
                 await unread.refresh()
                 await notifications.refresh()
                 await ChannelUnreadStore.shared.refresh()
+                LiveUpdates.shared.start()
             }
             await outbox.flush()
             // DETACHED, not awaited.

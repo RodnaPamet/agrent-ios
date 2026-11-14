@@ -37,6 +37,12 @@ struct DirectConversationView: View {
             guard scenePhase == .active else { return }
             await store.run()
         }
+        // A message in THIS conversation, said by the live stream (#605).
+        .onReceive(NotificationCenter.default.publisher(for: LiveUpdates.frameNotification)) { note in
+            guard let frame = note.object as? LiveUpdates.Frame, frame.kind == .dm,
+                  frame.id == store.conversationID else { return }
+            Task { await store.refresh() }
+        }
         .onChange(of: store.unavailable) { _, unavailable in
             guard unavailable else { return }
             AccessibilityNotification.Announcement(ConversationAvailability.title).post()

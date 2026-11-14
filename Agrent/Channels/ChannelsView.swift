@@ -185,6 +185,11 @@ struct ChannelFeedView: View {
         }
         .refreshable { await PullToRefresh.bounded { await loadNewest() } }
         .task { await loadNewest() }
+        // A mention or reply here, said by the live stream (#605).
+        .onReceive(NotificationCenter.default.publisher(for: LiveUpdates.frameNotification)) { note in
+            guard let frame = note.object as? LiveUpdates.Frame, frame.kind == .channel, frame.id == channel.id else { return }
+            Task { await loadNewest() }
+        }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.refresh)

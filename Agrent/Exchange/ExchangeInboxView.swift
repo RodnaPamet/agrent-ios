@@ -29,6 +29,11 @@ struct ExchangeInboxView: View {
             guard scenePhase == .active else { return }
             await store.run()
         }
+        // A personal message, said by the live stream (#605).
+        .onReceive(NotificationCenter.default.publisher(for: LiveUpdates.frameNotification)) { note in
+            guard let frame = note.object as? LiveUpdates.Frame, frame.kind == .dm else { return }
+            Task { await store.loadDirect() }
+        }
     }
 
     @ViewBuilder

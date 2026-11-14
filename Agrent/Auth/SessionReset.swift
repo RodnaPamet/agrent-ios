@@ -31,6 +31,7 @@ import Foundation
 ///                                      device, so it is user data.
 ///     · `ExchangeUnreadStore.shared`— which of A's farm's threads are unread.
 ///     · `ChannelUnreadStore.shared` — how many new posts wait in A's channels.
+///     · `LiveUpdates.shared` — A's live stream, closed so B opens their own.
 ///     · `NotificationsStore.shared` — A's notifications on the open farm and the count (#471).
 ///     · `OutboxStore.shared`        — its in-memory list and its pause. The
 ///                                      QUEUE ON DISK IS NOT TOUCHED; see below.
@@ -166,6 +167,7 @@ enum SessionReset {
         BottomTabsStore.shared.reset()
         ExchangeUnreadStore.shared.reset()
         ChannelUnreadStore.shared.reset()
+        LiveUpdates.shared.reset()
         NotificationsStore.shared.reset()
         OutboxStore.shared.reset()
         RateLimitPause.messages.reset()
