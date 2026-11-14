@@ -121,4 +121,28 @@ final class ChannelsTests: XCTestCase {
         let reply = try JSONEncoder().encode(ChannelsAPI.NewReply(body: "т", alsoToChannel: false, tenantSlug: "ferma-1"))
         XCTAssertEqual((try JSONSerialization.jsonObject(with: reply) as? [String: Any])?["tenantSlug"] as? String, "ferma-1")
     }
+
+    // MARK: - «Пиши» from a post (#596, agri-saas #3043)
+
+    func testAPostsAuthorCarriesItsFarmsHandleOnlyWhenThereIsOne() async throws {
+        let data = Data("""
+        {"posts":[
+          {"id":"p1","authorUserId":"u1","body":"Здравейте","kind":"POST","createdAt":"2026-11-14T09:00:00.000Z","deleted":false,
+           "resolvedAt":null,"replyCount":0,"author":{"displayName":"Синтетичен","farmName":"Синтетична ферма","farmHandle":"sintetichna"}},
+          {"id":"p2","authorUserId":"u2","body":"Как сте","kind":"POST","createdAt":"2026-11-14T08:00:00.000Z","deleted":false,
+           "resolvedAt":null,"replyCount":0,"author":{"displayName":null,"farmName":"Без страница","farmHandle":null}},
+          {"id":"p3","authorUserId":"u3","body":"","kind":"POST","createdAt":"2026-11-14T07:00:00.000Z","deleted":true,
+           "resolvedAt":null,"replyCount":0,"author":null}
+        ],"hasMore":false}
+        """.utf8)
+        let posts = try await APIClient.shared.decode(data, as: ChannelPage.self).posts
+        XCTAssertEqual(posts.map(\.author?.farmHandle), ["sintetichna", nil, nil],
+                       "no published page, or a hidden post: no handle, so no «Пиши»")
+    }
+
+    func testPishiNamesTheFarmNotThePerson() {
+        XCTAssertEqual(ChannelWords.write("ЗК Победа"), "Пиши на ЗК Победа")
+        XCTAssertEqual(ChannelWords.write(nil), "Пиши на стопанството")
+        XCTAssertEqual(ChannelWords.write("  "), "Пиши на стопанството")
+    }
 }

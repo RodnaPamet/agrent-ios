@@ -232,6 +232,11 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
     struct Author: Decodable, Equatable, Hashable, Sendable {
         let displayName: String?
         let farmName: String?
+        /// The handle of the farm the author posted AS, only where that farm
+        /// has a published page (agri-saas #3043) — what makes «Пиши»
+        /// possible from a post. A message to it reaches the farm's active
+        /// OWNER, not necessarily this author.
+        var farmHandle: String? = nil
     }
 
     /// A photo or a voice note (P9.6). The post's body may then be empty

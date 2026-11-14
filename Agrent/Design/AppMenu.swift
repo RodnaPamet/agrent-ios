@@ -164,7 +164,10 @@ struct AppMenuButton<Extra: View>: View {
         // on purpose and you will go back.
         .sheet(isPresented: $showingAdmin) { AdminView() }
         .sheet(isPresented: $showingMachines) { MachinesView() }
-        .sheet(isPresented: $showingChannels) { ChannelsView() }
+        .sheet(isPresented: $showingChannels) {
+            // Its own path (`RoutedStack`), not the tab's this menu sits on.
+            ChannelsView().environment(\.routedSurface, nil)
+        }
         .sheet(isPresented: $showingLibrary) { InspirationView() }
         // Each screen owns its own NavigationStack, the same shape AdminView
         // uses. The «Затвори» does NOT belong to the screen, though (#119):
