@@ -34,6 +34,10 @@ enum ChannelsAPI {
     static func postPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/posts" }
     static func replyPath(_ postID: String) -> String { "/api/social/channel-posts/\(URLEscape.segment(postID))/replies" }
     static func resolvedPath(_ postID: String) -> String { "/api/social/channel-posts/\(URLEscape.segment(postID))/resolved" }
+    /// One post by id (agri-saas #3030): the post a permalink names, its
+    /// channel, and its parent when it is a reply. A removed post answers 200
+    /// collapsed, since a link can predate the removal.
+    static func onePostPath(_ postID: String) -> String { "/api/social/channel-posts/\(URLEscape.segment(postID))" }
     static func joinPath(_ channelID: String) -> String { "\(listPath)/\(URLEscape.segment(channelID))/join" }
     /// Moves the person's read cursor to NOW (agri-saas #2990). No body: the
     /// server takes its own clock, so a phone with a wrong one cannot park
@@ -115,6 +119,17 @@ enum ChannelsAPI {
         _ = try await APIClient.shared.postMultipart(
             mediaPath(channelID), file: media.data, fileName: media.fileName, mimeType: media.mimeType,
             fields: fields, fileField: media.field)
+    }
+
+    static func post(_ postID: String) async throws -> PostLookup {
+        let data = try await APIClient.shared.data(for: onePostPath(postID))
+        return try await APIClient.shared.decode(data, as: PostLookup.self)
+    }
+
+    struct PostLookup: Decodable, Sendable {
+        let post: ChannelPost
+        let channelId: String
+        let parentPostId: String?
     }
 
     static func attachment(_ postID: String) async throws -> Data {
