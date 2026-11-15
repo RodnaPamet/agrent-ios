@@ -36,6 +36,7 @@
 /api/social/channel-posts/{postId}/attachment
 /api/social/channel-posts/{postId}/replies
 /api/social/channel-posts/{postId}/resolved
+/api/social/channel-search
 /api/social/channels
 /api/social/channels/{channelId}
 /api/social/channels/{channelId}/join

@@ -6,6 +6,9 @@ import SwiftUI
 struct ChannelsView: View {
     @State private var state: LoadState<[Channel]> = .loading
     @State private var unread = ChannelUnreadStore.shared
+    /// Search (#614): while anything is typed, results replace the channels.
+    @State private var search = ChannelSearch()
+    @State private var searchScope: ChannelsAPI.SearchScope = .joined
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -13,11 +16,22 @@ struct ChannelsView: View {
         // path, and a screen inside can push an `AppRoute` — the conversation
         // «Пиши» opens (#596).
         RoutedStack {
-            content
+            VStack(spacing: 0) {
+                // Search (#614): on Return, as Борса and Новини search.
+                SearchField(text: $search.needle, prompt: ChannelWords.searchPrompt) {
+                    Task { await search.submit() }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                content
+            }
                 .inlineTitle("Канали")
                 .navigationDestination(for: Channel.self) { ChannelFeedView(channel: $0) { Task { await load() } } }
                 .navigationDestination(for: ChannelPost.self) { ChannelThreadView(parent: $0) }
                 .navigationDestination(for: ForYouView.Destination.self) { _ in ForYouView() }
+                .navigationDestination(for: ChannelsAPI.SearchHit.self) { hit in
+                    ChannelLinkView(channelID: hit.channelId, postID: hit.post.id)
+                }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Затвори") { dismiss() }
@@ -35,6 +49,8 @@ struct ChannelsView: View {
             ProgressView("Зареждане…").frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let message):
             ErrorState(message: message) { await load() }
+        case .loaded where search.isActive:
+            searchResults
         case .loaded(let channels, _):
             List {
                 // «За Вас» first (P9.7, #614): what happened to the person
@@ -67,6 +83,51 @@ struct ChannelsView: View {
             .pageBackground()
             .refreshable { await PullToRefresh.bounded { await load() } }
         }
+    }
+
+    /// Newest first, under a line saying where it looked and that the order
+    /// is by date: there is no "best match" in this product.
+    private var searchResults: some View {
+        List {
+            Picker("Къде", selection: $searchScope) {
+                Text(ChannelWords.searchJoined).tag(ChannelsAPI.SearchScope.joined)
+                Text(ChannelWords.searchAll).tag(ChannelsAPI.SearchScope.all)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: searchScope) { Task { await search.choose(searchScope) } }
+            .pageRow()
+            if search.tooShort {
+                Text(ChannelWords.searchTooShort).font(.footnote).foregroundStyle(Palette.secondaryText).pageRow()
+            } else if let failure = search.failure, search.hits.isEmpty {
+                Text(failure).font(.footnote).foregroundStyle(Palette.error).pageRow()
+            } else if search.hits.isEmpty {
+                if search.searching {
+                    ProgressView().frame(maxWidth: .infinity).pageRow()
+                } else if search.applied != nil {
+                    Text(ChannelWords.searchNothing).font(.footnote).foregroundStyle(Palette.secondaryText).pageRow()
+                }
+            } else {
+                Section {
+                    ForEach(search.hits) { hit in
+                        NavigationLink(value: hit) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(hit.channelNameBg)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Palette.accent)
+                                ChannelPostRow(post: hit.post)
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                        .onAppear { if hit.id == search.hits.last?.id { Task { await search.loadMore() } } }
+                        .pageRow()
+                    }
+                    if search.searching { ProgressView().frame(maxWidth: .infinity).pageRow() }
+                } header: {
+                    SectionHeader(ChannelWords.searchHeader(search.applied ?? search.scope))
+                }
+            }
+        }
+        .pageBackground()
     }
 
     private func row(_ channel: Channel) -> some View {

@@ -149,4 +149,21 @@ enum ChannelWords {
         let oldest = page.last?.createdAt ?? .distantFuture
         return page + shown.filter { !fresh.contains($0.id) && $0.createdAt <= oldest }
     }
+
+    // MARK: - Search (#614)
+
+    static let searchPrompt = "Търсене в каналите"
+    static let searchJoined = "Моите канали"
+    static let searchAll = "Всички канали"
+    static let searchTooShort = "Напишете поне 2 букви."
+    static let searchNothing = "Няма публикации с тези думи."
+
+    /// Above the results: where it looked, from the server's answer, and
+    /// that the order is by date, never "best match" (there is no ranking).
+    static func searchHeader(_ scope: ChannelsAPI.SearchScope) -> String {
+        switch scope {
+        case .joined: "В моите канали, най-новите първо"
+        case .all: "Във всички канали, най-новите първо"
+        }
+    }
 }
