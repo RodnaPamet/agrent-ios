@@ -9,23 +9,15 @@ struct LunarCalendarView: View {
     /// Frost and spray warnings by day (#611; agri-saas #3077). Replaced
     /// whole on each read: a future warning can be withdrawn.
     @State private var warnings = LunarWarnings()
-    @Environment(\.dismiss) private var dismiss
 
+    /// A page inside «Календари» (#633), whose stack it is pushed on.
     var body: some View {
-        RoutedStack {
-            content
-                .inlineTitle(LunarWords.title)
-                .navigationDestination(for: LunarDay.self) { day in
-                    LunarDayView(day: day, warnings: LunarWords.warnings(warnings, on: day.date))
-                }
-                .task(id: month) { await load() }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Затвори") { dismiss() }
-                            .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                }
-        }
+        content
+            .inlineTitle(LunarWords.title)
+            .navigationDestination(for: LunarDay.self) { day in
+                LunarDayView(day: day, warnings: LunarWords.warnings(warnings, on: day.date))
+            }
+            .task(id: month) { await load() }
     }
 
     @ViewBuilder
