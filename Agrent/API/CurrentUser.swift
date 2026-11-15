@@ -74,6 +74,12 @@ struct CurrentUser: Decodable, Equatable, Sendable {
     /// never the identity the spray sheet needs.
     let avatarUrl: String?
 
+    /// The 07:15 channel digest (#620; agri-saas #3076): whether this person
+    /// ALSO gets a morning recap of channel mentions and replies. Additive,
+    /// never a batching of other pushes. The server sends a boolean always;
+    /// nil is a server from before the field, and the switch is not drawn.
+    let channelDigestOptIn: Bool?
+
     /// Runtime feature flags as the server resolved them for this caller
     /// (agri-saas#1209) — at the ENVELOPE root, beside `user`, not inside it.
     ///
@@ -159,7 +165,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
 
     private enum Outer: String, CodingKey { case user, featureFlags, tenant }
     private enum Inner: String, CodingKey {
-        case id, name, email, role, bottomTabOrder, avatarUrl, deletion, permissions
+        case id, name, email, role, bottomTabOrder, avatarUrl, deletion, permissions, channelDigestOptIn
     }
 
     init(from decoder: Decoder) throws {
@@ -173,6 +179,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.avatarUrl = (try? user.decodeIfPresent(String.self, forKey: .avatarUrl)) ?? nil
         self.deletion = (try? user.decodeIfPresent(Deletion.self, forKey: .deletion)) ?? nil
         self.permissions = (try? user.decodeIfPresent(Permissions.self, forKey: .permissions)) ?? nil
+        self.channelDigestOptIn = (try? user.decodeIfPresent(Bool.self, forKey: .channelDigestOptIn)) ?? nil
         self.featureFlags = (try? outer.decodeIfPresent([String: Bool].self, forKey: .featureFlags)) ?? nil
         // Lenient like the flags: a tenant block that will not decode costs a
         // first sign-in its starting farm (it is asked to choose), never the
@@ -253,13 +260,13 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         return CurrentUser(id: id, name: name, email: email, role: roleHere,
                            bottomTabOrder: bottomTabOrder, featureFlags: featureFlags,
                            avatarUrl: avatarUrl, tenant: tenant, deletion: deletion,
-                           permissions: tierHere)
+                           permissions: tierHere, channelDigestOptIn: channelDigestOptIn)
     }
 
     init(id: String, name: String?, email: String?, role: String?,
          bottomTabOrder: [String]? = nil, featureFlags: [String: Bool]? = nil,
          avatarUrl: String? = nil, tenant: Tenant? = nil, deletion: Deletion? = nil,
-         permissions: Permissions? = nil) {
+         permissions: Permissions? = nil, channelDigestOptIn: Bool? = nil) {
         self.id = id
         self.name = name
         self.email = email
@@ -270,6 +277,7 @@ struct CurrentUser: Decodable, Equatable, Sendable {
         self.tenant = tenant
         self.deletion = deletion
         self.permissions = permissions
+        self.channelDigestOptIn = channelDigestOptIn
     }
 }
 

@@ -433,6 +433,8 @@ final class RouteContractTests: XCTestCase {
                 ChannelsAPI.activityPath(),
                 ChannelsAPI.searchPath("x", scope: .joined),
             ]),
+            // #620: the channel digest switch, agri-saas #3076.
+            ("ChannelDigest.swift", [ChannelDigestAPI.path]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
             // #605: the person's live updates (agri-saas P7.6).
