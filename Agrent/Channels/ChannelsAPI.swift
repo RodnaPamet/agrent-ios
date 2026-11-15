@@ -21,10 +21,8 @@ enum ChannelsAPI {
     static let flag = "social.channels"
 
     static let listPath = "/api/social/channels"
-    static func feedPath(_ channelID: String, before: Date? = nil, limit: Int = 50) -> String {
-        var path = "\(listPath)/\(URLEscape.segment(channelID))?limit=\(limit)"
-        if let before { path += "&before=\(cursor(before))" }
-        return path
+    static func feedPath(_ channelID: String, before: Date? = nil, beforeID: String? = nil, limit: Int = 50) -> String {
+        "\(listPath)/\(URLEscape.segment(channelID))?limit=\(limit)" + page(before: before, id: beforeID)
     }
     static func repliesPath(_ postID: String, after: Date? = nil, limit: Int = 50) -> String {
         var path = "/api/social/channel-posts/\(URLEscape.segment(postID))/replies?limit=\(limit)"
@@ -61,6 +59,22 @@ enum ChannelsAPI {
         BgDate.isoInstant(date).addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? BgDate.isoInstant(date)
     }
 
+    /// The page cursor's query: the oldest row's instant AND its id.
+    ///
+    /// Posts written by one statement share an instant to the millisecond
+    /// (the server's `now()` holds for a transaction; a batch of cards is one
+    /// `createMany`), and with the instant alone a strict `before` dropped
+    /// every row tied with the page's last one: five tied, paged two at a
+    /// time, came back as two (backend 2, 2026-11-15). The id breaks the tie.
+    /// A server from before `beforeId` reads its parameters by name and never
+    /// reads this one, so it is sent either way.
+    static func page(before: Date?, id: String?) -> String {
+        guard let before else { return "" }
+        var query = "&before=\(cursor(before))"
+        if let id { query += "&beforeId=\(URLEscape.queryValue(id))" }
+        return query
+    }
+
     static let maxBody = 4000
 
     static func channels() async throws -> [Channel] {
@@ -68,8 +82,8 @@ enum ChannelsAPI {
         return try await APIClient.shared.decode(data, as: ChannelList.self).channels
     }
 
-    static func feed(_ channelID: String, before: Date? = nil) async throws -> ChannelPage {
-        let data = try await APIClient.shared.data(for: feedPath(channelID, before: before))
+    static func feed(_ channelID: String, before: Date? = nil, beforeID: String? = nil) async throws -> ChannelPage {
+        let data = try await APIClient.shared.data(for: feedPath(channelID, before: before, beforeID: beforeID))
         return try await APIClient.shared.decode(data, as: ChannelPage.self)
     }
 
@@ -135,14 +149,12 @@ enum ChannelsAPI {
     /// «За Вас» (P9.7, agri-saas #2941): mentions of the person and replies
     /// to their posts, across every channel, newest first. `before` is the
     /// oldest item's instant; a bad one is a 400, never page one again.
-    static func activityPath(before: Date? = nil, limit: Int = 50) -> String {
-        var path = "/api/social/activity?limit=\(limit)"
-        if let before { path += "&before=\(cursor(before))" }
-        return path
+    static func activityPath(before: Date? = nil, beforeID: String? = nil, limit: Int = 50) -> String {
+        "/api/social/activity?limit=\(limit)" + page(before: before, id: beforeID)
     }
 
-    static func activity(before: Date? = nil) async throws -> ActivityPage {
-        let data = try await APIClient.shared.data(for: activityPath(before: before))
+    static func activity(before: Date? = nil, beforeID: String? = nil) async throws -> ActivityPage {
+        let data = try await APIClient.shared.data(for: activityPath(before: before, beforeID: beforeID))
         return try await APIClient.shared.decode(data, as: ActivityPage.self)
     }
 

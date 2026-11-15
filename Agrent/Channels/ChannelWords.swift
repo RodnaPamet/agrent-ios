@@ -137,4 +137,16 @@ enum ChannelWords {
         var seen = Set(items.map(\.id))
         return items + older.filter { seen.insert($0.id).inserted }
     }
+
+    /// The feed's newest page over what is already on screen: the page
+    /// replaces its own range, and older pages already read stay below it.
+    /// Each post once, by id: the newest page is a moving window, so it
+    /// overlaps what was read. `<=` on the boundary's instant, because
+    /// posts written by one statement share it (a batch of cards), and an
+    /// older page's post at that instant belongs below, not gone.
+    static func newest(_ page: [ChannelPost], over shown: [ChannelPost]) -> [ChannelPost] {
+        let fresh = Set(page.map(\.id))
+        let oldest = page.last?.createdAt ?? .distantFuture
+        return page + shown.filter { !fresh.contains($0.id) && $0.createdAt <= oldest }
+    }
 }
