@@ -17,6 +17,7 @@ struct ChannelsView: View {
                 .inlineTitle("Канали")
                 .navigationDestination(for: Channel.self) { ChannelFeedView(channel: $0) { Task { await load() } } }
                 .navigationDestination(for: ChannelPost.self) { ChannelThreadView(parent: $0) }
+                .navigationDestination(for: ForYouView.Destination.self) { _ in ForYouView() }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Затвори") { dismiss() }
@@ -36,6 +37,22 @@ struct ChannelsView: View {
             ErrorState(message: message) { await load() }
         case .loaded(let channels, _):
             List {
+                // «За Вас» first (P9.7, #614): what happened to the person
+                // across every channel.
+                Section {
+                    NavigationLink(value: ForYouView.Destination()) {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(ChannelWords.forYou).font(.body)
+                                Text(ChannelWords.forYouHint).font(.caption).foregroundStyle(Palette.secondaryText)
+                            }
+                        } icon: {
+                            Image(systemName: "at").foregroundStyle(Palette.accent)
+                        }
+                    }
+                    .accessibilityInputLabels(A11y.Spoken.forYou)
+                }
+                .pageRow()
                 ForEach(ChannelWords.sections(channels), id: \.title) { section in
                     Section {
                         ForEach(section.channels) { channel in

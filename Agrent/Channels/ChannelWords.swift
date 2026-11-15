@@ -115,4 +115,26 @@ enum ChannelWords {
         }
         return "Пиши на \(farm)"
     }
+
+    /// «За Вас» (owner ruling 2026-11-14, agri-saas `nav-vocabulary.md`):
+    /// never «Активност», which names a task's and a machine's tab.
+    static let forYou = "За Вас"
+    static let forYouEmpty = "Тук ще виждате, когато някой Ви спомене или Ви отговори в канал."
+    static let forYouHint = "Споменавания и отговори на Ваши публикации"
+
+    /// What happened, in the channel's name. The server sends a descriptor;
+    /// the sentence is ours.
+    static func reason(_ item: ChannelsAPI.ActivityItem) -> String {
+        switch item.reason {
+        case .mention: "Спомена Ви в «\(item.channelNameBg)»"
+        case .reply: "Отговор на Ваша публикация в «\(item.channelNameBg)»"
+        case .unknown: "В «\(item.channelNameBg)»"
+        }
+    }
+
+    /// Newest first, each post once: a page boundary can repeat one.
+    static func merged(_ older: [ChannelsAPI.ActivityItem], into items: [ChannelsAPI.ActivityItem]) -> [ChannelsAPI.ActivityItem] {
+        var seen = Set(items.map(\.id))
+        return items + older.filter { seen.insert($0.id).inserted }
+    }
 }

@@ -210,6 +210,8 @@ enum A11y {
         // app is «Профил» (the farm's page is reached through «Стопанство»),
         // and nothing else answers to "Profile" or "Sign out".
         static let profile = spokenNames("Профил", "Profile")
+        /// «Канали»'s «За Вас» (#614): mentions and replies.
+        static let forYou = spokenNames("За Вас", "For you")
         /// The Дневник page's «Дневник (PDF)» (#246) — the БАБХ register,
         /// not the journal itself, so not «Дневник» alone: that is a tab.
         static let farmRecord = spokenNames("Дневник (PDF)", "Farm record")

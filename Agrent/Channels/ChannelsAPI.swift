@@ -132,6 +132,50 @@ enum ChannelsAPI {
         let parentPostId: String?
     }
 
+    /// «За Вас» (P9.7, agri-saas #2941): mentions of the person and replies
+    /// to their posts, across every channel, newest first. `before` is the
+    /// oldest item's instant; a bad one is a 400, never page one again.
+    static func activityPath(before: Date? = nil, limit: Int = 50) -> String {
+        var path = "/api/social/activity?limit=\(limit)"
+        if let before { path += "&before=\(cursor(before))" }
+        return path
+    }
+
+    static func activity(before: Date? = nil) async throws -> ActivityPage {
+        let data = try await APIClient.shared.data(for: activityPath(before: before))
+        return try await APIClient.shared.decode(data, as: ActivityPage.self)
+    }
+
+    struct ActivityPage: Decodable, Sendable {
+        let items: [ActivityItem]
+        let hasMore: Bool
+    }
+
+    /// One thing that happened to the person. `reason` is a descriptor, not
+    /// a sentence: the phone words it (`ChannelWords.reason`). A post that
+    /// both mentions and replies reads `mention`, as its push does.
+    struct ActivityItem: Decodable, Identifiable, Equatable, Hashable, Sendable {
+        enum Reason: String, Decodable, Sendable { case mention, reply, unknown }
+        let post: ChannelPost
+        let channelId: String
+        let channelNameBg: String
+        let reason: Reason
+        /// Set on a reply. The row opens the thread either way:
+        /// `ChannelLinkView` reads the post and climbs to its parent.
+        let parentPostId: String?
+        var id: String { post.id }
+
+        private enum CodingKeys: String, CodingKey { case post, channelId, channelNameBg, reason, parentPostId }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            post = try c.decode(ChannelPost.self, forKey: .post)
+            channelId = try c.decode(String.self, forKey: .channelId)
+            channelNameBg = try c.decode(String.self, forKey: .channelNameBg)
+            reason = Reason(rawValue: (try? c.decode(String.self, forKey: .reason)) ?? "") ?? .unknown
+            parentPostId = try c.decodeIfPresent(String.self, forKey: .parentPostId)
+        }
+    }
+
     static func attachment(_ postID: String) async throws -> Data {
         try await APIClient.shared.data(for: attachmentPath(postID))
     }
