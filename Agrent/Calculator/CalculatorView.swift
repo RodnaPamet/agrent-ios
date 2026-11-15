@@ -10,6 +10,8 @@ struct CalculatorView: View {
     @State private var removal = CostRemoval()
     @State private var askingCost: CostEntry?
     @State private var confirmingCost = false
+    /// «Нулирай» (#610): every cost of the farm.
+    @State private var reset = CostReset()
     /// «Разходи» by type (#500): the chosen chips (none is «Всички») and the
     /// types unfolded.
     @State private var chosenTypes: Set<CostCategory> = []
@@ -38,9 +40,31 @@ struct CalculatorView: View {
                     await costs.load()
                     await store.load()
                 }
+                .costReset(reset) {
+                    await costs.load()
+                    await store.load()
+                }
             .navigationTitle("Калкулатор")
             .appMenu()
             .toolbar {
+                // «Нулирай» (#610) in «Още», left of «Нов разход»: the create
+                // action stays rightmost (owner, 2026-11-06).
+                if let scope = resetScope {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Button(role: .destructive) {
+                                reset.ask(scope)
+                            } label: {
+                                Label(CostReset.actionTitle, systemImage: "arrow.counterclockwise")
+                            }
+                            .accessibilityInputLabels(A11y.Spoken.resetCosts)
+                        } label: {
+                            Label("Още", systemImage: "ellipsis.circle")
+                        }
+                        .accessibilityLabel("Още")
+                        .accessibilityInputLabels(A11y.Spoken.more)
+                    }
+                }
                 // «Нов разход», top right (owner, 2026-11-06; `ScreenAction`).
                 // It was a wide bar at the bottom, as «Нов запис» was.
                 //
@@ -159,6 +183,14 @@ struct CalculatorView: View {
 
     // MARK: - Costs
 
+    /// What «Нулирай» would delete, when it is offered: to the owner or an
+    /// admin, with costs on the screen and no reset or swipe under way.
+    private var resetScope: CostReset.Scope? {
+        guard CostReset.offered(to: people.user), !reset.hidesCosts, removal.undoable == nil,
+              let page = costs.state.value, !page.items.isEmpty else { return nil }
+        return CostReset.scope(costs.summary.value, listed: page.totalCount ?? page.items.count)
+    }
+
     /// What has been entered, so a save can be CHECKED.
     ///
     /// A duplicate cost row is permanent and nothing here retries, so an
@@ -181,7 +213,7 @@ struct CalculatorView: View {
                 Text(message).font(.footnote).foregroundStyle(Palette.error)
             }
 
-        case .loaded(let page, _) where page.items.isEmpty:
+        case .loaded(let page, _) where page.items.isEmpty || reset.hidesCosts:
             Section(titled: "Разходи") {
                 Text("Още няма въведени разходи.")
                     .font(.footnote)
