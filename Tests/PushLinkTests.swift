@@ -192,4 +192,16 @@ final class PushLinkTests: XCTestCase {
         XCTAssertEqual(row.severity, item.severity)
         XCTAssertEqual(row.assigneeUserId, item.assigneeUserId)
     }
+
+    /// The 07:15 digest (#620): «За Вас», never a channel named "for-you".
+    /// Positive control: a real channel id still opens its channel.
+    func testTheDigestOpensForYouAheadOfTheChannelCase() {
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/for-you"), .forYou(farm: "ferma-1"))
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/for-you")?.farm, "ferma-1")
+        XCTAssertEqual(AppRoute(.forYou(farm: "ferma-1")), .forYou)
+        XCTAssertEqual(AppRoute.forYou.home, .exchange)
+        XCTAssertEqual(PushLink.parse("/t/ferma-1/channels/clx0abc123"),
+                       .channel(farm: "ferma-1", id: "clx0abc123", post: nil))
+        XCTAssertNil(PushLink.parse("/channels/for-you"), "the server always sends the farm-shell form")
+    }
 }

@@ -58,6 +58,14 @@ import Foundation
 /// The slug is the recipient's farm as a navigation shell, never "the farm
 /// the post belongs to": channels name no farm.
 ///
+/// ── «За Вас» (#620) ──
+///
+/// `/t/{slug}/channels/for-you`: the 07:15 channel digest (backend 2,
+/// 2026-11-15). On the web `for-you` is a static segment beside
+/// `[channelId]`, which Next resolves first; this parser is ordered, so the
+/// case sits AHEAD of the channel one, or the link would open a channel
+/// named "for-you" and say it is not found.
+///
 /// ── A personal message (#593; agri-saas #3035) ──
 ///
 /// `/t/{slug}/exchange/threads/dm/{conversationId}`: that conversation. The
@@ -70,6 +78,7 @@ enum PushLink: Equatable, Sendable {
     case listing(farm: String, id: String)
     case notifications(farm: String)
     case channel(farm: String, id: String, post: String?)
+    case forYou(farm: String)
     /// A machine left the farm's area (#574; agri-saas #2948): that machine.
     case machine(farm: String, id: String)
     case directMessage(farm: String, id: String)
@@ -90,6 +99,10 @@ enum PushLink: Equatable, Sendable {
         guard parts.first?.isEmpty == true else { return nil }
         if parts.count == 4, parts[1] == "t", parts[3] == "notifications", let farm = decoded(parts[2]) {
             return .notifications(farm: farm)
+        }
+        if parts.count == 5, parts[1] == "t", parts[3] == "channels", parts[4] == "for-you",
+           let farm = decoded(parts[2]) {
+            return .forYou(farm: farm)
         }
         if parts.count == 5, parts[1] == "t", parts[3] == "channels",
            let farm = decoded(parts[2]), let id = decoded(parts[4]) {
@@ -137,7 +150,7 @@ enum PushLink: Equatable, Sendable {
     var farm: String {
         switch self {
         case .task(let farm, _), .thread(let farm, _), .location(let farm, _), .listing(let farm, _),
-             .notifications(let farm), .channel(let farm, _, _), .machine(let farm, _),
+             .notifications(let farm), .channel(let farm, _, _), .forYou(let farm), .machine(let farm, _),
              .directMessage(let farm, _): farm
         }
     }
