@@ -133,6 +133,14 @@ enum BgDate {
         date.formatted(.dateTime.hour().minute().locale(locale))
     }
 
+    /// 14:20 in a given calendar's zone: a lunar sign change (#611) is read
+    /// on the farm's clock, Europe/Sofia, whatever zone the phone is in.
+    static func time(_ date: Date, in calendar: Calendar) -> String {
+        var style = Date.FormatStyle.dateTime.hour().minute().locale(locale)
+        style.timeZone = calendar.timeZone
+        return date.formatted(style)
+    }
+
     /// 14:32:05 — a clock time to the SECOND, for Админ → «Диагностика».
     ///
     /// The one place in the app where seconds are the point: the owner times
