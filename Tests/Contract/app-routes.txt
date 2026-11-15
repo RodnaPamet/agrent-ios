@@ -11,6 +11,7 @@
 /api/account/avatar
 /api/account/avatar/{userId}
 /api/account/bottom-tabs
+/api/account/channel-digest
 /api/account/deletion
 /api/auth/accept-terms
 /api/auth/me

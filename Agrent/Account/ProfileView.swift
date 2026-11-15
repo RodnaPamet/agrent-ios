@@ -66,6 +66,10 @@ struct ProfileView: View {
     @State private var farms = FarmStore.shared
     @State private var addingFarm = false
     @State private var permission = PushPermission.shared
+    /// The 07:15 channel digest (#620): its state from `/me`, the toggle's
+    /// own copy, which follows the switch back after a refusal.
+    @State private var digest = ChannelDigestSwitch(on: false)
+    @State private var digestOn = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -136,6 +140,34 @@ struct ProfileView: View {
                 }
             }
             .pageRow()
+
+            // The channels' morning recap (#620): the person's own, not a
+            // farm's, and ADDITIVE, so it never reads as batching the
+            // switch above. Drawn once `/me` says where it stands.
+            if flags.isOn(ChannelsAPI.flag), me.user?.channelDigestOptIn != nil {
+                Section {
+                    Toggle(isOn: $digestOn) {
+                        Label(ChannelDigestSwitch.title, systemImage: "sun.horizon")
+                    }
+                    .disabled(digest.saving)
+                    .accessibilityInputLabels(A11y.spokenNames(ChannelDigestSwitch.title, "Обзор", "Morning digest"))
+                    .onChange(of: digestOn) { Task { await digest.set(digestOn) } }
+                    .onChange(of: digest.on) { digestOn = digest.on }
+                    .task(id: me.user?.channelDigestOptIn) {
+                        digest.adopt(me.user?.channelDigestOptIn)
+                        digestOn = digest.on
+                    }
+                } footer: {
+                    SectionFooter { Text(ChannelDigestSwitch.note) }
+                }
+                .pageRow()
+                .alert(ChannelDigestSwitch.failedTitle, isPresented: Bindable(digest).showsFailure,
+                       presenting: digest.failure) { _ in
+                    Button("Затвори", role: .cancel) {}
+                } message: { failure in
+                    Text(failure)
+                }
+            }
 
             // What the assistant has learned about this person, across farms
             // (#507, owner 2026-11-01: "see and delete"). Here and not on a
