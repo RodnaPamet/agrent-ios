@@ -173,4 +173,45 @@ enum ChannelWords {
     static let cardOpen = "Отвори"
 
     static func newsSource(_ source: String) -> String { "Източник: \(source)" }
+
+    static let listingHeading = "Обяви"
+    static let schemeHeading = "Подпомагане"
+    static let eventHeading = "Събития"
+
+    /// «Пшеница, 25 т» or «Пшеница, 25 т — 188,65 EUR/т»: two sentences, as
+    /// the web's (`channels.card.listing.line` / `.withPrice`), so an absent
+    /// price leaves no dangling dash. A price without its currency is no
+    /// price anybody can act on, and is left out.
+    static func listingLine(_ listing: ChannelPost.Card.Listing) -> String? {
+        guard let quantity = decimal(listing.quantityTonnes, fraction: 0...3) else { return nil }
+        let commodity = CommodityName.canonical(listing.commodity) ?? listing.commodity
+        if let raw = listing.pricePerTonne, let currency = listing.priceCurrency, !currency.isEmpty,
+           let price = decimal(raw, fraction: 2...2) {
+            return "\(commodity), \(quantity) т — \(price) \(currency)/т"
+        }
+        return "\(commodity), \(quantity) т"
+    }
+
+    /// «Краен срок: 1 декември 2026 г.» from a day key; nil for none, so no
+    /// empty «Краен срок:» is ever drawn.
+    static func deadline(_ day: String?) -> String? {
+        day.flatMap(BgDate.parseISODay).map { "Краен срок: \(BgDate.full($0))" }
+    }
+
+    /// «Начало: 15 март, 10:00».
+    static func eventStart(_ date: Date?) -> String? {
+        date.map { "Начало: \(BgDate.dayMonth($0)), \(BgDate.time($0))" }
+    }
+
+    /// A decimal STRING as the reader reads it («1 250,5»), through Decimal,
+    /// never a double: tonnes and money keep the digits the server stored.
+    static func decimal(_ raw: String, fraction: ClosedRange<Int>) -> String? {
+        guard let value = Decimal(string: raw, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        let formatter = NumberFormatter()
+        formatter.locale = BgDate.locale
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = fraction.lowerBound
+        formatter.maximumFractionDigits = fraction.upperBound
+        return formatter.string(from: NSDecimalNumber(decimal: value))
+    }
 }

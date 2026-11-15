@@ -368,6 +368,41 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
     struct Card: Equatable, Hashable, Sendable {
         let kind: String
         let news: News?
+        var listing: Listing? = nil
+        var scheme: Scheme? = nil
+        var event: Event? = nil
+
+        /// A LISTING card (agri-saas #3084): decimals as STRINGS, never a
+        /// double; a price counts only with its currency.
+        struct Listing: Decodable, Equatable, Hashable, Sendable {
+            let listingId: String?
+            let commodity: String
+            let quantityTonnes: String
+            let pricePerTonne: String?
+            let priceCurrency: String?
+        }
+
+        /// A support SCHEME: the source's own title; days as day keys.
+        struct Scheme: Decodable, Equatable, Hashable, Sendable {
+            let title: String
+            let authority: String?
+            let closesOn: String?
+            let url: String?
+        }
+
+        /// An EVENT: `startsAt` an instant, as a fair has a time of day.
+        struct Event: Decodable, Equatable, Hashable, Sendable {
+            let title: String
+            let startsAt: Date?
+            let place: String?
+            let url: String?
+        }
+
+        /// Only a web address opens: anything else is not followed.
+        static func webLink(_ url: String?) -> URL? {
+            guard let url, let parsed = URL(string: url), ["http", "https"].contains(parsed.scheme?.lowercased()) else { return nil }
+            return parsed
+        }
 
         /// A NEWS card's facts: `{tag, title, url, source, publishedAt}`.
         struct News: Decodable, Equatable, Hashable, Sendable {
@@ -376,22 +411,23 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
             let source: String?
             let publishedAt: Date?
 
-            /// Only a web address opens: anything else is not followed.
-            var link: URL? {
-                guard let url, let parsed = URL(string: url), ["http", "https"].contains(parsed.scheme?.lowercased()) else { return nil }
-                return parsed
-            }
+            var link: URL? { Card.webLink(url) }
         }
     }
 
     private struct CardWire: Decodable {
-        let kind: String
-        let news: Card.News?
+        let card: Card
         private enum CodingKeys: String, CodingKey { case kind, payload }
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            kind = try c.decode(String.self, forKey: .kind)
-            news = kind == "NEWS" ? (try? c.decodeIfPresent(Card.News.self, forKey: .payload)) ?? nil : nil
+            let kind = try c.decode(String.self, forKey: .kind)
+            func payload<T: Decodable>(_ type: T.Type, if wanted: String) -> T? {
+                kind == wanted ? (try? c.decodeIfPresent(T.self, forKey: .payload)) ?? nil : nil
+            }
+            card = Card(kind: kind, news: payload(Card.News.self, if: "NEWS"),
+                        listing: payload(Card.Listing.self, if: "LISTING"),
+                        scheme: payload(Card.Scheme.self, if: "SCHEME"),
+                        event: payload(Card.Event.self, if: "EVENT"))
         }
     }
 
@@ -426,8 +462,7 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
         author = try? c.decodeIfPresent(Author.self, forKey: .author)
         // A removed post serves no bytes, so it carries no attachment here.
         attachment = deleted ? nil : (try? c.decodeIfPresent(Attachment.self, forKey: .attachment)) ?? nil
-        card = deleted ? nil : (try? c.decodeIfPresent(CardWire.self, forKey: .card))
-            .flatMap { $0 }.map { Card(kind: $0.kind, news: $0.news) }
+        card = deleted ? nil : (try? c.decodeIfPresent(CardWire.self, forKey: .card))?.card
     }
 }
 
