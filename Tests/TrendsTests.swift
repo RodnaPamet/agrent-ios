@@ -514,3 +514,27 @@ final class LeadSeriesTests: XCTestCase {
         XCTAssertEqual(SeriesSource.name(of: series(stage: "Gotham - DEPPROD", observed: "2026-07-20")), "България")
     }
 }
+
+/// A sparse range still draws (owner's screenshot, 2026-11-15: «1 мес.» for
+/// wheat was bare gridlines, the weekly EC price having one point in it).
+@MainActor
+final class SparseTrendsChartTests: XCTestCase {
+    func testOnePointGetsADotAndAnAxisAroundIt() {
+        let day = Date(timeIntervalSince1970: 1_760_832_000)
+        XCTAssertTrue(TrendsView.showsDots(1))
+        let domain = TrendsView.xDomain([day])
+        XCTAssertLessThan(domain.lowerBound, day)
+        XCTAssertGreaterThan(domain.upperBound, day)
+        XCTAssertEqual(domain.upperBound.timeIntervalSince(domain.lowerBound), 14 * 86_400, accuracy: 1)
+    }
+
+    func testAFullRangeIsLeftAlone() {
+        let days = (0..<12).map { Date(timeIntervalSince1970: 1_760_000_000 + Double($0) * 604_800) }
+        XCTAssertFalse(TrendsView.showsDots(12), "a year of weeks reads as a line")
+        XCTAssertTrue(TrendsView.showsDots(4))
+        XCTAssertFalse(TrendsView.showsDots(0))
+        let domain = TrendsView.xDomain(days)
+        XCTAssertEqual(domain.lowerBound, days.first)
+        XCTAssertEqual(domain.upperBound, days.last)
+    }
+}
