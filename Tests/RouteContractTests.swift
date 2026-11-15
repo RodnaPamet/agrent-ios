@@ -202,9 +202,6 @@ final class RouteContractTests: XCTestCase {
         // #3038 (0ee0eee) wrote a task's machines (#586, 2026-11-13).
         "/api/t/{tenantSlug}/machines/trackers": "agri-saas #2948: the tracker register",
         "/api/t/{tenantSlug}/machines/trackers/{id}": "agri-saas #2948: removing a tracker",
-        // «Лунен календар» (#611), built against agri-saas #3073's branch spec.
-        "/api/lunar": "agri-saas #3073: the lunar calendar",
-        "/api/t/{tenantSlug}/agro/signals": "agri-saas #3077: the farm's agro warnings by day",
     ]
 
     /// Files whose `/x` literals are not API paths at all.
