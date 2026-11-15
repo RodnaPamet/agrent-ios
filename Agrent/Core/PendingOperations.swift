@@ -411,9 +411,9 @@ actor PendingOperations {
     /// the same answer. Whatever must not read it as final checks for it
     /// FIRST: the drain stops on it and touches nothing (`OutboxStore`, #168),
     /// a parcel line's tap leaves the queue alone (`FieldOperationRules
-    /// .failure`), and the spray sheet offers «Запази за по-късно» on one all
-    /// the same — kept for the updated app, where the web's live path keeps
-    /// nothing (`ParcelOperationSheet.QueueOffer`, #169).
+    /// .failure`), and «Нов запис» keeps one all the same — for the updated
+    /// app, where the web's live path keeps nothing (`TreatmentAttempt
+    /// .mayWait`, #169).
     ///
     /// A DecodingError is NOT queued, and that is the subtle one: if the
     /// response failed to decode, the write very likely SUCCEEDED and only

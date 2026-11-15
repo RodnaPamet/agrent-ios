@@ -337,8 +337,7 @@ struct LiveTreatmentRecorder: TreatmentRecorder {
     /// ── The answer it failed with is the outbox's answer too ──
     ///
     /// The live save and the drain post to the same route from the same
-    /// build on the same budget, as the spray sheet's save and its queue do
-    /// (`ParcelOperationSheet.queueForLater`). A 429 closes the outbox's
+    /// build on the same budget. A 429 closes the outbox's
     /// pause before the row joins it, so the next foreground does not spend
     /// a request to be told the same thing; a 426 tells the outbox this
     /// build is retired, so its banner says the entry waits for the update.

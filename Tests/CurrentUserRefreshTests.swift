@@ -220,8 +220,7 @@ final class CurrentUserRefreshTests: XCTestCase {
     ///   · `MainTabView.task`'s `load()`               — the launch's own read
     ///   · `OutboxStore.identify`'s `load()`            — the launch flush
     ///   · `OfflinePrefetch.warm`'s `settled()`         — the launch warm
-    ///   · `FarmRiskStore`, `ParcelMapView`,
-    ///     `ParcelOperationSheet`'s `load()`            — screens opened early
+    ///   · `FarmRiskStore`, `ParcelMapView`'s `load()` — screens opened early
     ///
     /// (`AuthClient`'s `load()` is the sign-in path's version of the first
     /// line: it runs before `MainTabView` exists, which then finds the memo.)
@@ -235,7 +234,6 @@ final class CurrentUserRefreshTests: XCTestCase {
             Task { await store.settled() },   // prefetch
             Task { await store.load() },      // FarmRiskStore
             Task { await store.load() },      // ParcelMapView
-            Task { await store.load() },      // ParcelOperationSheet
         ]
         for _ in 0..<50 { await Task.yield() }
         XCTAssertEqual(me.calls, 1, "a cold launch sent more than one /me")

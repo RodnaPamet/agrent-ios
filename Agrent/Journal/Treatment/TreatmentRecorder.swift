@@ -229,8 +229,7 @@ struct TreatmentAttempt: Equatable, Sendable {
     /// May an entry whose save failed this way wait in the outbox? Only when
     /// a later send can land it: the retry policy's failures
     /// (`PendingOperations.isWorthRetrying`), and a 426 — the build turned
-    /// away unread, so the updated app sends it as it stands, as the spray
-    /// sheet keeps one (`ParcelOperationSheet.QueueOffer`). A refusal will be
+    /// away unread, so the updated app sends it as it stands (#169). A refusal will be
     /// a refusal tomorrow and stays on screen, where it can be corrected.
     ///
     /// A short answer is not here: it arrives as a 201, and the person is

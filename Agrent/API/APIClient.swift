@@ -183,8 +183,8 @@ actor APIClient {
         /// on every request since #169 (`ClientHeader.contractVersion`). It
         /// is 1, and so is the server's floor, so nothing answers this app
         /// with a 426 yet: the day the floor passes this build's contract,
-        /// every gated route does. The spray sheet then keeps a record for
-        /// the updated app (`ParcelOperationSheet.QueueOffer`, #169).
+        /// every gated route does. «Нов запис» then keeps a record for the
+        /// updated app (`TreatmentAttempt.mayWait`, #169).
         case clientTooOld
         /// 304 Not Modified — the server confirms the cached copy is current.
         ///
