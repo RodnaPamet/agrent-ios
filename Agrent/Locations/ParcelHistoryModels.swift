@@ -244,7 +244,7 @@ struct ParcelHistoryOperation: Decodable, Identifiable, Equatable, Sendable {
     /// nearly this file's own contribution to the defect class it complains
     /// about.
     ///
-    /// What I argued: `ParcelOperationSheet` sends `doseValue: spraying ? dose
+    /// What I argued: the old parcel sheet (retired, #616) sent `doseValue: spraying ? dose
     /// : nil` and puts a fertiliser dose in `fertilizerDoseValue`, so every
     /// fertiliser line must have a null in the column this projection reads.
     ///

@@ -29,7 +29,7 @@ import SwiftUI
 /// ── THE SITES, and why only these ──
 ///
 ///   1. A spray or fertiliser operation saved, or kept for later
-///      (`ParcelMapView` / `ParcelOperationSheet`). The web's own haptic
+///      (`ParcelMapView` / `TreatmentEntryFlow`). The web's own haptic
 ///      moment: field work, often with gloves and no signal, where the sheet
 ///      closing is easy to miss.
 ///   2. A task's status changed (`TaskDetailView`) — the other half of field

@@ -81,7 +81,7 @@ import Foundation
 /// The server's accepted shape for this header value is recorded NOWHERE —
 /// not in the generated OpenAPI spec, not in this repo. Every
 /// `Idempotency-Key` this app has ever sent is a UUID: `APIClient.post`'s
-/// `UUID().uuidString` default, `JournalAPI`, `ParcelOperationSheet`,
+/// `UUID().uuidString` default, `JournalAPI`, the old parcel sheet,
 /// `OutboxStore`, `ItemCatalogue`, `FarmRiskModels`. So a UUID is the one
 /// shape KNOWN to be accepted in production.
 ///

@@ -5,7 +5,7 @@ import XCTest
 ///
 /// Found on a real phone: offline, the spray sheet's product picker was
 /// empty on a device that had never opened the sheet while online.
-/// `ParcelOperationSheet` fetches products in its own `.task`, and
+/// The old parcel sheet fetched products in its own `.task`, and
 /// `CachedResource` writes the cache only after a successful fetch — so
 /// the data was fetched at the exact moment signal is least likely.
 ///

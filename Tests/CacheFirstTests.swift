@@ -41,9 +41,9 @@ final class CacheFirstTests: XCTestCase {
             locations.components(separatedBy: "loadShowingCacheFirst").count - 1, 2,
             "both the locations list and the parcels must show cache first")
 
-        let sheet = source("Agrent/Locations/ParcelOperationSheet.swift")
+        let references = source("Agrent/Journal/Treatment/OperationReferenceStore.swift")
         XCTAssertEqual(
-            sheet.components(separatedBy: "loadShowingCacheFirst").count - 1, 2,
+            references.components(separatedBy: "loadShowingCacheFirst").count - 1, 2,
             "products and units must show cache first")
     }
 

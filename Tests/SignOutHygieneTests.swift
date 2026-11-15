@@ -568,9 +568,9 @@ final class SignOutHygieneTests: XCTestCase {
     }
 
     /// Every queued operation is stamped with who recorded it.
-    func testTheSheetStampsTheOwner() {
-        XCTAssertTrue(read("Agrent/Locations/ParcelOperationSheet.swift")
-            .contains("ownerUserID: me?.id"), "a queued operation has no owner")
+    func testAKeptEntryIsStampedWithItsOwner() {
+        XCTAssertTrue(read("Agrent/API/TreatmentAPI.swift")
+            .contains("ownerUserID: owner"), "a queued entry has no owner")
     }
 
     // MARK: - the singleton guard

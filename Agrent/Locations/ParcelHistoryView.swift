@@ -18,8 +18,8 @@ import SwiftUI
 ///
 /// ── Where it is reached from, and where it is deliberately not ──
 ///
-/// From a row on Риск по парцели. NOT from `ParcelOperationSheet`, which the
-/// map tap opens: that sheet is a form to RECORD an operation and the tap is
+/// From a row on Риск по парцели. NOT from «Нов запис», which the
+/// map tap opens: that is a form to RECORD an operation and the tap is
 /// gated on `mayCreateOperations`, which is false for MECHANISATOR, READER and
 /// AUDITOR. Putting the archive there would have buried it in a create form
 /// and hidden it from the operator who sprayed the field.

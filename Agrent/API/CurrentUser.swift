@@ -404,7 +404,7 @@ final class CurrentUserStore {
     /// cold launch with no signal. Measured on a real phone: 15.8 seconds
     /// from the task starting to anything else happening.
     ///
-    /// It gates more than startup. `ParcelOperationSheet.canSave` requires
+    /// It gates more than startup. The spray sheet of the time required
     /// a known user, so across a fresh launch in a field a farmer could not
     /// have recorded a spray at all — the offline outbox depended on an
     /// identity the app refused to remember.

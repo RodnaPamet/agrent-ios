@@ -71,19 +71,20 @@ final class OutboxRetryPolicyTests: XCTestCase {
         XCTAssertNil(RateLimitGate.wait(for: unwell))
     }
 
-    /// THE SPRAY SHEET'S OFFER (#169). «Запази за по-късно» on exactly what
+    /// «НОВ ЗАПИС» KEEPS A 426 FOR THE UPDATED APP (#169), on exactly what
     /// the retry policy calls retriable — AND on a 426, which the policy
     /// calls final: the server's version gate turned the BUILD away, not the
-    /// record, so the record is kept for the updated app. The web keeps
-    /// nothing on a 426; the divergence is the owner's (PARITY.md, Locations).
-    func testTheSpraySheetKeepsA426ForTheUpdatedApp() {
-        typealias Offer = ParcelOperationSheet.QueueOffer
-        XCTAssertEqual(Offer.after(APIClient.APIError.clientTooOld), .afterUpdate)
+    /// record. The web keeps nothing on a 426; the divergence is the owner's
+    /// (PARITY.md, Locations). Was the retired parcel sheet's `QueueOffer`
+    /// (#616); `TreatmentAttempt.mayWait` is the same decision.
+    func testANewEntryKeepsA426ForTheUpdatedApp() {
+        XCTAssertTrue(TreatmentAttempt.mayWait(APIClient.APIError.clientTooOld))
+        XCTAssertTrue(TreatmentAttempt.waitsForUpdate(APIClient.APIError.clientTooOld))
         // The policy itself is unchanged: retrying from the same build buys
         // the same 426, and the drain and a line's tap rely on it (#168).
         XCTAssertFalse(PendingOperations.isWorthRetrying(APIClient.APIError.clientTooOld))
 
-        // Positive controls: everything else gets the policy's answer, as before.
+        // Positive controls: everything else gets the policy's answer.
         let retriable: [Error] = [
             URLError(.notConnectedToInternet), URLError(.timedOut),
             APIClient.APIError.http(status: 503, code: nil, message: nil),
@@ -91,7 +92,8 @@ final class OutboxRetryPolicyTests: XCTestCase {
             APIClient.APIError.http(status: 429, code: "RATE_LIMITED", message: nil, retryAfterSeconds: 12),
         ]
         for error in retriable {
-            XCTAssertEqual(Offer.after(error), .retry, "\(error)")
+            XCTAssertTrue(TreatmentAttempt.mayWait(error), "\(error)")
+            XCTAssertFalse(TreatmentAttempt.waitsForUpdate(error), "\(error)")
         }
         let refused: [Error] = [
             APIClient.APIError.http(status: 400, code: nil, message: nil),
@@ -101,20 +103,8 @@ final class OutboxRetryPolicyTests: XCTestCase {
             DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x")),
         ]
         for error in refused {
-            XCTAssertEqual(Offer.after(error), .notOffered, "\(error)")
+            XCTAssertFalse(TreatmentAttempt.mayWait(error), "\(error)")
         }
-
-        // What each one promises. The 426's names the update, not a
-        // connection — signal will not send it — and not «автоматично»,
-        // which would promise what only the operator can start.
-        XCTAssertNil(Offer.notOffered.caption, "a refusal is offered a queue")
-        XCTAssertEqual(Offer.retry.caption,
-                       "Записът остава на устройството и се изпраща автоматично, когато има връзка.")
-        let update = Offer.afterUpdate.caption ?? ""
-        XCTAssertTrue(update.contains("след обновяване на приложението"), update)
-        XCTAssertFalse(update.contains("връзка"), update)
-        XCTAssertFalse(update.contains("автоматично"), update)
-        XCTAssertTrue(update.hasSuffix("."), update)
     }
 }
 
@@ -430,43 +420,25 @@ final class OutboxRateLimitTests: XCTestCase {
         return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
     }
 
-    /// THE SHEET'S 429 IS THE OUTBOX'S 429. The live save posts to the same
-    /// route on the same budget, so the error that made the operator queue
-    /// the operation closes the outbox's pause — BEFORE the item joins the
-    /// queue, or the next foreground flush spends a request on it inside the
-    /// window. Deleting that one line fails nothing else in this suite.
-    func testTheSheetsRateLimitPausesTheQueueBeforeQueueing() {
-        let text = read("Agrent/Locations/ParcelOperationSheet.swift")
-        guard let absorb = text.range(of: "OutboxStore.shared.pause.absorb(failureError)"),
-              let enqueue = text.range(of: "OutboxStore.shared.enqueue(") else {
-            return XCTFail("the sheet no longer hands its failure to the outbox's pause")
+    /// THE LIVE SAVE'S 429 AND 426 ARE THE OUTBOX'S. «Нов запис» posts to
+    /// the same route on the same budget as the drain, so the error that
+    /// kept the entry closes the outbox's pause, and a 426 tells it this
+    /// build is retired — both BEFORE the row joins the queue, or the next
+    /// foreground flush spends a request on it inside the window, or sends
+    /// it into the same 426. Source checks on `LiveTreatmentRecorder.keep`
+    /// (the retired parcel sheet's `queueForLater` held them before #616);
+    /// comments are stripped, so a sentence ABOUT a call is not taken for it.
+    func testKeepingAnEntryTellsTheOutboxBeforeQueueing() {
+        let text = SignOutHygieneTests.code(read("Agrent/API/TreatmentAPI.swift"))
+        guard let keep = text.range(of: "func keep(_ entry: TreatmentAttempt.Sent, after error: Error) async -> Bool {"),
+              let enqueue = text.range(of: "await outbox.enqueue(row)", range: keep.upperBound..<text.endIndex) else {
+            return XCTFail("positive control: `keep` and its enqueue are where this expects them")
         }
-        XCTAssertLessThan(absorb.lowerBound, enqueue.lowerBound,
-                          "the item joins the queue before the pause closes")
-    }
-
-    /// THE SHEET'S 426 IS THE OUTBOX'S 426, told before anything is kept
-    /// (#169). The button stands on the decision
-    /// `testTheSpraySheetKeepsA426ForTheUpdatedApp` reads, and `save()` tells
-    /// the outbox of the 426 before «Запази за по-късно» can even be tapped,
-    /// so a record kept on one joins a queue that already waits for the
-    /// update — rather than being sent into the same 426 by the next trigger
-    /// while the banner still offers «Изпрати». Source checks, because
-    /// nothing in this suite renders the sheet; comments are stripped, so a
-    /// sentence ABOUT the call is not taken for it.
-    func testTheSheetTellsTheOutboxBeforeKeepingA426() {
-        let text = SignOutHygieneTests.code(read("Agrent/Locations/ParcelOperationSheet.swift"))
-        guard let save = text.range(of: "private func save() async {"),
-              let keep = text.range(of: "private func queueForLater() async {") else {
-            return XCTFail("positive control: the sheet's save and its queueing are where this expects them")
-        }
-        let saving = text[save.upperBound..<keep.lowerBound]
-        XCTAssertTrue(saving.contains("queueOffer = QueueOffer.after(error)"),
-                      "the offer is decided by something no test reads")
-        XCTAssertTrue(saving.contains("OutboxStore.shared.absorbClientTooOld(error)"),
+        let before = text[keep.upperBound..<enqueue.lowerBound]
+        XCTAssertTrue(before.contains("outbox.pause.absorb(error)"), "the row joins the queue before the pause closes")
+        XCTAssertTrue(before.contains("outbox.absorbClientTooOld(error)"),
                       "the outbox learns of the 426 only by sending the kept record into it")
-        XCTAssertTrue(text.contains("if let promise = queueOffer.caption {"),
-                      "the button is shown on something other than the decision")
+        XCTAssertTrue(before.contains("ownerUserID: owner"), "a queued entry has no owner")
     }
 
     /// THE BANNER HIDES «Изпрати» WHILE IT SHOWS THE WAIT, and says why.
@@ -1218,8 +1190,8 @@ final class OutboxLineMarkTests: XCTestCase {
         let queue = makeQueue(), wire = Wire(), identity = Identity(owner)
         let outbox = makeOutbox(queue, wire, identity)
         let refusal = APIClient.APIError.clientTooOld
-        XCTAssertEqual(ParcelOperationSheet.QueueOffer.after(refusal), .afterUpdate,
-                       "positive control: the sheet offers to keep it")
+        XCTAssertTrue(TreatmentAttempt.waitsForUpdate(refusal),
+                      "positive control: «Нов запис» keeps it for the update")
 
         // `save()`: the live answer is the outbox's answer too.
         outbox.absorbClientTooOld(refusal)

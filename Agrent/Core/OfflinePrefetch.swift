@@ -4,8 +4,8 @@ import Foundation
 ///
 /// ── The gap this closes, found on a real phone ──
 ///
-/// `ParcelOperationSheet` fetches products and rate units in its own
-/// `.task`, when the sheet opens. `CachedResource` writes the cache only
+/// The parcel sheet of the time (retired, #616) fetched products and rate units in its own
+/// `.task`, when the sheet opened. `CachedResource` writes the cache only
 /// after a successful fetch. So the catalogue a farmer needs to record a
 /// spray was fetched at the exact moment they are least likely to have
 /// signal — standing in a field with the sheet already open.

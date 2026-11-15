@@ -157,7 +157,7 @@ extension AppRoute {
 }
 
 /// A parcel and the block it is in: what «Ново мероприятие»
-/// (`ParcelOperationSheet`) needs, carried on a history route (#387).
+/// (`TreatmentEntryFlow`, #612) needs, carried on a history route (#387).
 struct ParcelInBlock: Hashable, Sendable {
     let locationID: String
     let parcel: Parcel
