@@ -201,7 +201,10 @@ struct TreatmentFieldsView: View {
     }
 
     static let pestExample = "напр. Листни въшки"
-    static let phenophaseExample = "напр. BBCH 31 или братене"
+    /// One stage in both spellings: «братене» (tillering) is BBCH 21–29.
+    /// It read «BBCH 31 или братене» until the owner asked (2026-11-15), and
+    /// 31 is the start of «вретенене», a different stage.
+    static let phenophaseExample = "напр. BBCH 25 или братене"
     /// Where it goes, as the farmer will see it on the printed sheet
     /// (agri-saas #2089): not in the chemical table, which has no such
     /// column, but in the scouting table's «Фенофаза/BBCH», on a row marked
