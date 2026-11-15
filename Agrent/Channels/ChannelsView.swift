@@ -384,6 +384,8 @@ struct ChannelPostRow: View {
     /// the thread would fight the row's own tap.
     var showsMedia = false
     @State private var people = CurrentUserStore.shared
+    /// «Отвори» on a listing card opens the listing on this stack.
+    @Environment(\.pushRoute) private var pushRoute
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -404,8 +406,8 @@ struct ChannelPostRow: View {
             }
             if post.deleted {
                 Text(ChannelWords.deleted).font(.subheadline).italic().foregroundStyle(Palette.secondaryText)
-            } else if let news = post.card?.news {
-                newsCard(news)
+            } else if let card = post.card, let drawn = CardFace(card) {
+                cardView(drawn)
             } else {
                 // An attachment post may have no text (P9.6).
                 if !post.body.isEmpty {
@@ -430,23 +432,71 @@ struct ChannelPostRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// A NEWS card: «Новини», the headline, «Източник: …», and on the post's
-    /// own screen «Отвори». Not in a feed row, whose tap opens the thread.
+    /// A machine-written card (#629): its kind's heading, the main line, a
+    /// detail, and on the post's own screen «Отвори». Not in a feed row,
+    /// whose tap opens the thread.
     @ViewBuilder
-    private func newsCard(_ news: ChannelPost.Card.News) -> some View {
+    private func cardView(_ face: CardFace) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(ChannelWords.newsHeading)
+            Text(face.heading)
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(Palette.accent)
-            Text(news.title).font(.body.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-            if let source = news.source, !source.isEmpty {
-                Text(ChannelWords.newsSource(source)).font(.caption).foregroundStyle(Palette.secondaryText)
+            Text(face.line).font(.body.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+            ForEach(face.details, id: \.self) { detail in
+                Text(detail).font(.caption).foregroundStyle(Palette.secondaryText)
             }
-            if showsMedia, let link = news.link {
-                Link(ChannelWords.cardOpen, destination: link)
-                    .font(.subheadline.weight(.semibold))
-                    .accessibilityInputLabels(A11y.spokenNames(ChannelWords.cardOpen, "Open"))
+            if showsMedia {
+                if let link = face.link {
+                    Link(ChannelWords.cardOpen, destination: link)
+                        .font(.subheadline.weight(.semibold))
+                        .accessibilityInputLabels(A11y.spokenNames(ChannelWords.cardOpen, "Open"))
+                } else if let listingID = face.listingID {
+                    Button(ChannelWords.cardOpen) { pushRoute(.listingID(listingID)) }
+                        .font(.subheadline.weight(.semibold))
+                        .accessibilityInputLabels(A11y.spokenNames(ChannelWords.cardOpen, "Open"))
+                }
             }
+        }
+    }
+}
+
+/// What a card shows, by kind. Nil when the kind is unknown or its facts
+/// are missing (the web's rule: NEWS, SCHEME and EVENT need a title,
+/// LISTING a commodity and a quantity), and the post shows its body.
+struct CardFace: Equatable {
+    let heading: String
+    let line: String
+    let details: [String]
+    let link: URL?
+    let listingID: String?
+
+    init?(_ card: ChannelPost.Card) {
+        if let news = card.news {
+            heading = ChannelWords.newsHeading
+            line = news.title
+            details = [news.source.flatMap { $0.isEmpty ? nil : ChannelWords.newsSource($0) }].compactMap { $0 }
+            link = news.link
+            listingID = nil
+        } else if let listing = card.listing, let text = ChannelWords.listingLine(listing) {
+            heading = ChannelWords.listingHeading
+            line = text
+            details = []
+            link = nil
+            listingID = listing.listingId
+        } else if let scheme = card.scheme {
+            heading = ChannelWords.schemeHeading
+            line = scheme.title
+            details = [scheme.authority, ChannelWords.deadline(scheme.closesOn)].compactMap { $0.flatMap { $0.isEmpty ? nil : $0 } }
+            link = ChannelPost.Card.webLink(scheme.url)
+            listingID = nil
+        } else if let event = card.event {
+            heading = ChannelWords.eventHeading
+            line = event.title
+            details = [ChannelWords.eventStart(event.startsAt), event.place].compactMap { $0.flatMap { $0.isEmpty ? nil : $0 } }
+            link = ChannelPost.Card.webLink(event.url)
+            listingID = nil
+        } else {
+            return nil
         }
     }
 }
