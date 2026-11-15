@@ -175,8 +175,20 @@ struct TrendsView: View {
                 )
                 .foregroundStyle(Palette.accent)
                 .interpolationMethod(.monotone)
+                // A line through one point draws nothing: the owner's
+                // screenshot (2026-11-15) showed «1 мес.» for wheat as bare
+                // gridlines, the weekly EC price having one point in it. A
+                // sparse range shows its points as dots.
+                if Self.showsDots(points.count) {
+                    PointMark(
+                        x: .value("Дата", points[index].day),
+                        y: .value("Цена", points[index].price)
+                    )
+                    .foregroundStyle(Palette.accent)
+                }
             }
         }
+        .chartXScale(domain: Self.xDomain(points.map(\.day)))
         // Fitted to the data, not anchored at zero.
         //
         // Swift Charts includes zero by default, which for wheat at
@@ -232,6 +244,19 @@ struct TrendsView: View {
 
     /// The visible data's range with a margin, so the line is not drawn on
     /// the frame.
+    /// Dots where a line alone would say little: one to a handful of points.
+    static func showsDots(_ count: Int) -> Bool { count > 0 && count <= 6 }
+
+    /// The dates the axis spans: the points', widened around a single day so
+    /// the axis has room for its date rather than collapsing to one instant.
+    static func xDomain(_ days: [Date]) -> ClosedRange<Date> {
+        guard let first = days.min(), let last = days.max() else { return Date()...Date() }
+        guard first < last else {
+            return first.addingTimeInterval(-7 * 86_400)...first.addingTimeInterval(7 * 86_400)
+        }
+        return first...last
+    }
+
     private func yDomain(_ prices: [Double]) -> ClosedRange<Double> {
         guard let low = prices.min(), let high = prices.max() else { return 0...1 }
         guard high > low else { return (low - 1)...(high + 1) }
