@@ -93,6 +93,9 @@ struct PriceSeries: Decodable, Identifiable, Equatable, Sendable {
     /// the `At` suffix.
     let lastObservedAt: String?
     let points: [PricePoint]
+    /// The page a source's prices come from, for a link beside them: set on
+    /// ZarnoBorsa's (#627), whose terms ask for one. Absent on the feeds.
+    var sourceUrl: String? = nil
 
     /// STAGE IS PART OF THE IDENTITY, and the contract said (source, region).
     ///
@@ -121,6 +124,20 @@ struct PriceSeries: Decodable, Identifiable, Equatable, Sendable {
 
     static let platformSource = "platform"
 
+    /// ZarnoBorsa.com's prices, read daily with Agrent's subscription (#627,
+    /// owner 2026-11-15): Bulgarian EXW and Black Sea FOB, each point on the
+    /// day ZarnoBorsa dated it. Shown with the source and a link to it.
+    var isZarnoBorsa: Bool { source == Self.zarnoborsaSource }
+
+    static let zarnoborsaSource = "zarnoborsa"
+    static let zarnoborsaHome = "https://zarnoborsa.com"
+
+    /// Where the link beside a ZarnoBorsa price goes; nil for other sources.
+    var attributionURL: URL? {
+        guard isZarnoBorsa else { return nil }
+        return URL(string: sourceUrl ?? Self.zarnoborsaHome)
+    }
+
     /// What the series is called on screen. The platform's was typed, not
     /// observed, so it has no market label worth showing; the phone names it.
     var displayLabel: String? { isPlatformPrice ? "Въведена от Agrent" : label }
@@ -147,7 +164,7 @@ extension Array where Element == PriceSeries {
     /// 1. **Agrent's typed price**, whatever its unit or region: typed ALWAYS
     ///    wins until it is cleared (owner, 2026-10-10, #1587). Typed diesel is
     ///    per litre and the bulletin per 1000 litres, so ranking inside a group
-    ///    would never see it.
+    ///    would never see it. Then **ZarnoBorsa's EXW for Bulgaria** (#627).
     /// 2. **One group**, by (region, currency, unit), preferring Bulgaria, then
     ///    the EU average, then whichever group reported last. Grouped before
     ///    anything is compared, because wheat arrives in USD from Alpha Vantage
@@ -166,6 +183,12 @@ extension Array where Element == PriceSeries {
     func lead() -> PriceSeries? {
         let withPoints = filter { !$0.points.isEmpty }
         if let typed = withPoints.first(where: \.isPlatformPrice) { return typed }
+        // Then ZarnoBorsa's Bulgarian farm-gate price (owner, 2026-11-15:
+        // it fills every crop not typed), ahead of the EC national average.
+        let zarnoborsa = withPoints.filter {
+            $0.isZarnoBorsa && $0.region.uppercased() == "BG" && ($0.stage ?? "").uppercased() == "EXW"
+        }
+        if let local = zarnoborsa.freshest() { return local }
 
         var order: [String] = []
         var groups: [String: [PriceSeries]] = [:]

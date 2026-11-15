@@ -30,6 +30,12 @@ enum SeriesSource {
 
     static func parts(of series: PriceSeries) -> [String] {
         if series.isPlatformPrice { return ["Въведена от Agrent"] }
+        if series.isZarnoBorsa {
+            // «ZarnoBorsa.com · България · EXW»: whose number first, as its
+            // terms ask, then where and on what basis.
+            let basis = (series.stage ?? "").uppercased()
+            return ["ZarnoBorsa.com", SeriesVocabulary.region(series.region)] + (basis.isEmpty ? [] : [basis])
+        }
         let region = SeriesVocabulary.region(series.region)
         if isNationalAverage(series) { return ["Средна за \(region)"] }
         if series.source == listingsSource { return ["Обявите в Agrent"] }
@@ -51,6 +57,9 @@ enum SeriesSource {
     }
 
     static let listingsSource = "listings"
+
+    /// The link's words under a ZarnoBorsa price (#627).
+    static let zarnoborsaLink = "Източник: ZarnoBorsa.com"
     static let ecSource = "ec-agrifood"
 
     private struct Stage {

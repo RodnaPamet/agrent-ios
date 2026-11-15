@@ -129,6 +129,7 @@ struct TrendsView: View {
             headline(lead, latest: latest)
             chart(lead)
             infoRow(lead, latest: latest)
+            attribution(lead)
         }
         .padding(14)
         .background(Palette.Surface.card, in: RoundedRectangle(cornerRadius: 12))
@@ -270,5 +271,16 @@ struct TrendsView: View {
         // in a second one. Built from the parts: VoiceOver reads «·» aloud as
         // "middle dot".
         .accessibilityLabel(A11y.sentence(source + [day.map { "към \($0)" }, age]))
+    }
+
+    /// «Източник: ZarnoBorsa.com», a link, under a price that came from it:
+    /// its terms allow the reuse with a link to it as the source (#627).
+    @ViewBuilder
+    private func attribution(_ lead: PriceSeries) -> some View {
+        if let url = lead.attributionURL {
+            Link(SeriesSource.zarnoborsaLink, destination: url)
+                .font(.footnote)
+                .accessibilityInputLabels(A11y.spokenNames("ZarnoBorsa", "Източник"))
+        }
     }
 }

@@ -262,6 +262,12 @@ struct DashboardView: View {
                         .font(.caption)
                         .foregroundStyle(Palette.secondaryText)
                         .accessibilityLabel(A11y.sentence(SeriesSource.parts(of: lead)))
+                    if let url = lead.attributionURL {
+                        // Its terms allow the reuse with a link (#627).
+                        Link(SeriesSource.zarnoborsaLink, destination: url)
+                            .font(.caption)
+                            .accessibilityInputLabels(A11y.spokenNames("ZarnoBorsa", "Източник"))
+                    }
 
                     if let age = Staleness.days(
                         generatedAt: store.prices.value?.generatedAt ?? Date(),
