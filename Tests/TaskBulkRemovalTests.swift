@@ -109,6 +109,27 @@ final class TaskBulkRemovalTests: XCTestCase {
                        "Нищо не е изтрито: 1 от 3 избрани задачи са част от записано мероприятие в Дневника. Махнете ги от избора и опитайте пак.")
     }
 
+    /// With the ids (agri-saas 09d4bb4): exactly those are unticked, the
+    /// rest stay ticked, and the sentence says so.
+    func testTheRefusedTasksAreUntickedAndTheRestStay() async throws {
+        let calls = Calls(), bulk = bulk(calls)
+        let envelope = Data(#"""
+        {"error":{"code":"TASK_BELONGS_TO_TREATMENT","message":"x","params":{"refused":2,"selected":4},
+                  "details":{"refusedTaskIds":["t2","t4"]}}}
+        """#.utf8)
+        calls.refusal = APIClient.conflict(from: envelope)
+        bulk.start()
+        bulk.selectAll(["t1", "t2", "t3", "t4"])
+        bulk.confirm()
+        await bulk.commit()
+        XCTAssertEqual(bulk.selected, ["t1", "t3"])
+        XCTAssertTrue(bulk.selecting)
+        let failure = try XCTUnwrap(bulk.failure)
+        XCTAssertTrue(failure.hasPrefix("Нищо не е изтрито: 2 от 4 избрани задачи"), failure)
+        XCTAssertTrue(failure.hasSuffix(TaskBulkRemoval.untickedText), failure)
+        XCTAssertNil(failure.range(of: "[ыэё]|ь(?!о)", options: .regularExpression), failure)
+    }
+
     func testTheCountIsSaidForEitherRefusal() {
         let text = UserMessage.text(for: APIClient.APIError.http(status: 403, code: "TASK_DELETE_NOT_PERMITTED", message: "x",
                                                                  params: ["refused": "2", "selected": "5"]))

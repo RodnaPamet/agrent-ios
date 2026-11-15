@@ -153,14 +153,27 @@ final class TaskBulkRemoval {
             stage = .idle
             batches += 1
         } catch {
-            // All or nothing: every one is still there, still ticked.
+            // All or nothing: every one is still there, still ticked, less
+            // the ones the server named, so «Изтрий» again deletes the rest.
             hidden = []
             stage = .idle
             selecting = true
-            failure = UserMessage.text(for: error)
+            let refused = Self.refusedIDs(error)
+            selected.subtract(refused)
+            failure = UserMessage.text(for: error) + (refused.isEmpty ? "" : " " + Self.untickedText)
             showsFailure = true
         }
     }
+
+    /// The tasks a refusal named (`details.refusedTaskIds`, agri-saas
+    /// 09d4bb4); empty from a server before it, which then names none.
+    nonisolated static func refusedIDs(_ error: Error) -> Set<String> {
+        guard case APIClient.APIError.http(_, _, _, let params, _) = error,
+              let joined = params?[APIClient.ErrorEnvelope.Err.refusedTaskIdsKey] else { return [] }
+        return Set(joined.split(separator: "\n").map(String.init).filter { !$0.isEmpty })
+    }
+
+    nonisolated static let untickedText = "Махнахме ги от избора. Натиснете «Изтрий» отново за останалите."
 
     nonisolated static let actionTitle = "Изтрий"
     nonisolated static let selectAllTitle = "Избери всички"
