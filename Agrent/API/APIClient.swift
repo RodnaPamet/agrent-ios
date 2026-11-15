@@ -284,8 +284,12 @@ actor APIClient {
                 /// hold. Each field is read on its own, so none of them can
                 /// cost the others.
                 var suggestions: [String]? = nil
+                /// The tasks that stopped an all-or-nothing bulk delete
+                /// (agri-saas #3081's sibling, 09d4bb4; agrent-ios #625), so
+                /// the phone can untick exactly those.
+                var refusedTaskIds: [String]? = nil
 
-                private enum CodingKeys: String, CodingKey { case currentVersion, expectedVersion, suggestions }
+                private enum CodingKeys: String, CodingKey { case currentVersion, expectedVersion, suggestions, refusedTaskIds }
 
                 init(currentVersion: Int?, expectedVersion: Int?, suggestions: [String]? = nil) {
                     self.currentVersion = currentVersion
@@ -298,6 +302,7 @@ actor APIClient {
                     currentVersion = (try? c.decodeIfPresent(Int.self, forKey: .currentVersion)) ?? nil
                     expectedVersion = (try? c.decodeIfPresent(Int.self, forKey: .expectedVersion)) ?? nil
                     suggestions = (try? c.decodeIfPresent([String].self, forKey: .suggestions)) ?? nil
+                    refusedTaskIds = (try? c.decodeIfPresent([String].self, forKey: .refusedTaskIds)) ?? nil
                 }
             }
 
@@ -313,6 +318,10 @@ actor APIClient {
             /// server sends when it has nothing to suggest. That is still an
             /// answer, unlike a missing key.
             static let suggestionsKey = "suggestions"
+            /// Where `details.refusedTaskIds` travels in `params`, one per
+            /// line, for the reason `suggestionsKey` gives. A task id is a
+            /// cuid, so a newline can't be part of one.
+            static let refusedTaskIdsKey = "refusedTaskIds"
             let code: String?
             let message: String?
             let details: Details?
@@ -379,6 +388,9 @@ actor APIClient {
                 var params = object.params?.values
                 if let suggestions = object.details?.suggestions {
                     params = (params ?? [:]).merging([Self.suggestionsKey: suggestions.joined(separator: "\n")]) { own, _ in own }
+                }
+                if let refused = object.details?.refusedTaskIds {
+                    params = (params ?? [:]).merging([Self.refusedTaskIdsKey: refused.joined(separator: "\n")]) { own, _ in own }
                 }
                 self.init(code: object.code, message: object.message,
                           details: object.details, params: params)
