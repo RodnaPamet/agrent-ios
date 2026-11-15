@@ -46,7 +46,7 @@ final class LunarTests: XCTestCase {
         for group in LunarWords.Group.allCases {
             XCTAssertTrue(LunarWords.advice(odd, group, warned: false).isEmpty)
         }
-        XCTAssertEqual(LunarWords.advice(read[1], .field, warned: false), ["Сеитба на фуражни треви и житни за зелена маса."],
+        XCTAssertEqual(LunarWords.advice(read[1], .field, warned: false).map(\.text), ["Сеитба на фуражни треви и житни за зелена маса."],
                        "an unknown recommendation is no advice, not an error")
     }
 
@@ -54,12 +54,12 @@ final class LunarTests: XCTestCase {
         let day = try await days(page)[0]
         XCTAssertEqual(LunarWords.dayType(day), "Листен ден")
         XCTAssertEqual(LunarWords.moon(day), "Растящ сърп, Риби")
-        XCTAssertEqual(LunarWords.advice(day, .vegetable, warned: false),
+        XCTAssertEqual(LunarWords.advice(day, .vegetable, warned: false).map(\.text),
                        ["Сеитба и разсаждане на зеле, салата, спанак и праз."])
         XCTAssertEqual(LunarWords.recommendations.count, 22, "the server's closed set (#3073 rules.ts)")
         let all = Array(LunarWords.recommendations.values) + Array(LunarWords.signs.values)
             + Array(LunarWords.phaseNames.values) + Array(LunarWords.dayTypes.values)
-            + [LunarWords.traditionNotice, LunarWords.nothing, LunarWords.warning(2)]
+            + [LunarWords.traditionNotice, LunarWords.nothing]
         for text in all {
             XCTAssertNil(text.range(of: "[ыэё]|ь(?!о)", options: .regularExpression), text)
         }
@@ -74,18 +74,33 @@ final class LunarTests: XCTestCase {
         XCTAssertEqual(LunarWords.dayType(read[2], calendar: calendar), "Плоден ден от 5:10")
     }
 
-    /// Owner, 2026-11-15: no sowing or planting on a frost or spray warning
-    /// day; everything else stays.
-    func testAWarningHoldsBackSowingOnly() async throws {
+    /// Owner, 2026-11-15: on a frost or spray warning day the sowing and
+    /// planting lines stay, STRUCK; everything else is untouched.
+    func testAWarningStrikesSowingOnly() async throws {
         let day = try await days(page)[2]
         XCTAssertTrue(LunarWords.heldBack(day))
-        XCTAssertTrue(LunarWords.advice(day, .field, warned: true).isEmpty)
-        XCTAssertTrue(LunarWords.advice(day, .vegetable, warned: true).isEmpty)
-        XCTAssertEqual(LunarWords.advice(day, .perennial, warned: true), ["Бране на плодове за съхранение."],
-                       "harvesting is not sowing")
-        XCTAssertEqual(LunarWords.advice(day, .perennial, warned: false).count, 2, "positive control")
-        XCTAssertEqual(LunarWords.warning(1), "Предупреждение за слана или пръскане в 1 блок. Сеитбата не се препоръчва.")
-        XCTAssertEqual(LunarWarnings(blocksByDay: ["2026-03-23": 2]).blocks(on: "2026-03-23"), 2)
-        XCTAssertEqual(LunarWarnings().blocks(on: "2026-03-23"), 0)
+        XCTAssertEqual(LunarWords.advice(day, .field, warned: true),
+                       [.init(text: "Сеитба на житни за зърно, царевица и фасул.", struck: true)])
+        XCTAssertEqual(LunarWords.advice(day, .perennial, warned: true), [
+            .init(text: "Садене на плодни дървета и лози.", struck: true),
+            .init(text: "Бране на плодове за съхранение.", struck: false),
+        ], "harvesting is not sowing")
+        XCTAssertFalse(LunarWords.advice(day, .field, warned: false)[0].struck, "positive control")
+    }
+
+    func testTheWarningsAreWordedPerKind() {
+        let warnings = LunarWarnings(frostBlocks: ["2026-03-23": 2], sprayBlocks: ["2026-03-23": 1, "2026-03-24": 3],
+                                     horizon: "2026-03-24")
+        XCTAssertEqual(LunarWords.warnings(warnings, on: "2026-03-23"),
+                       ["Предупреждение за слана в 2 блока", "Неподходящ ден за пръскане в 1 блок"])
+        XCTAssertEqual(LunarWords.warnings(warnings, on: "2026-03-24"), ["Неподходящ ден за пръскане в 3 блока"])
+        XCTAssertTrue(LunarWords.warnings(warnings, on: "2026-03-25").isEmpty)
+        XCTAssertTrue(warnings.warned(on: "2026-03-24"))
+        XCTAssertFalse(warnings.warned(on: "2026-03-25"))
+        let end = try? XCTUnwrap(BgDate.parseISODay("2026-03-24"))
+        XCTAssertEqual(end.map(LunarWords.horizon), "Прогноза за слана и пръскане има само до 24 март.")
+        for text in LunarWords.warnings(warnings, on: "2026-03-23") + [LunarWords.struckSpoken] {
+            XCTAssertNil(text.range(of: "[ыэё]|ь(?!о)", options: .regularExpression), text)
+        }
     }
 }

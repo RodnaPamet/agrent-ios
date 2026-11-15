@@ -15,7 +15,7 @@ struct LunarCalendarView: View {
             content
                 .inlineTitle(LunarWords.title)
                 .navigationDestination(for: LunarDay.self) { day in
-                    LunarDayView(day: day, warnedBlocks: warnings.blocks(on: day.date))
+                    LunarDayView(day: day, warnings: LunarWords.warnings(warnings, on: day.date))
                 }
                 .task(id: month) { await load() }
                 .toolbar {
@@ -43,6 +43,12 @@ struct LunarCalendarView: View {
                             .font(.footnote)
                             .foregroundStyle(Palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let horizon = warnings.horizon.flatMap(BgDate.parseISODay) {
+                            Text(LunarWords.horizon(horizon))
+                                .font(.footnote)
+                                .foregroundStyle(Palette.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     } header: {
                         SectionHeader(LunarWords.traditionTitle)
                     }
@@ -91,8 +97,8 @@ struct LunarCalendarView: View {
                 .font(.subheadline.weight(.semibold))
             Text(LunarWords.dayType(day)).font(.body)
             Text(LunarWords.moon(day)).font(.caption).foregroundStyle(Palette.secondaryText)
-            if warnings.blocks(on: day.date) > 0 {
-                Label(LunarWords.warning(warnings.blocks(on: day.date)), systemImage: "exclamationmark.triangle")
+            ForEach(LunarWords.warnings(warnings, on: day.date), id: \.self) { line in
+                Label(line, systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(Palette.error)
             }
@@ -119,7 +125,8 @@ struct LunarCalendarView: View {
 /// One day: its type and Moon, then the tradition's advice per crop group.
 struct LunarDayView: View {
     let day: LunarDay
-    let warnedBlocks: Int
+    /// The day's warnings, worded; empty for none or past the forecast.
+    let warnings: [String]
 
     var body: some View {
         List {
@@ -128,8 +135,8 @@ struct LunarDayView: View {
                     Text(LunarWords.dayType(day)).font(.headline)
                     Text(LunarWords.moon(day)).font(.subheadline).foregroundStyle(Palette.secondaryText)
                 }
-                if warnedBlocks > 0, LunarWords.heldBack(day) {
-                    Label(LunarWords.warning(warnedBlocks), systemImage: "exclamationmark.triangle")
+                ForEach(warnings, id: \.self) { line in
+                    Label(line, systemImage: "exclamationmark.triangle")
                         .font(.subheadline)
                         .foregroundStyle(Palette.error)
                 }
@@ -137,11 +144,20 @@ struct LunarDayView: View {
             .pageRow()
             ForEach(LunarWords.Group.allCases, id: \.self) { group in
                 Section {
-                    let advice = LunarWords.advice(day, group, warned: warnedBlocks > 0)
+                    let advice = LunarWords.advice(day, group, warned: !warnings.isEmpty)
                     if advice.isEmpty {
                         Text(LunarWords.nothing).font(.footnote).foregroundStyle(Palette.secondaryText)
                     } else {
-                        ForEach(advice, id: \.self) { Text($0) }
+                        ForEach(advice, id: \.self) { line in
+                            if line.struck {
+                                Text(line.text)
+                                    .strikethrough()
+                                    .foregroundStyle(Palette.secondaryText)
+                                    .accessibilityLabel("\(line.text) \(LunarWords.struckSpoken)")
+                            } else {
+                                Text(line.text)
+                            }
+                        }
                     }
                 } header: {
                     SectionHeader(group.title)

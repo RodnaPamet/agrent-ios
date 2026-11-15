@@ -107,10 +107,22 @@ struct LunarDay: Decodable, Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
-/// Frost and spray warnings by day: how many blocks have one. Empty until
-/// the farm's signals can be read (#611); the calendar ships only then.
+/// Frost and spray warnings by day: how many blocks have one (#611;
+/// agri-saas #3077). Owner, 2026-11-15: a frost day is a 2 m minimum of
+/// 2 °C or less; a spray warning is a day unsuitable for spraying.
+///
+/// Only as far as a forecast reaches: `horizon` is the last day the
+/// server's forecast informed. A day past it is UNKNOWN, never "no
+/// warning", so the screen says where the forecast ends and claims
+/// nothing beyond it. A read REPLACES this whole value: a future warning
+/// can be withdrawn when the forecast changes.
 struct LunarWarnings: Equatable, Sendable {
-    var blocksByDay: [String: Int] = [:]
+    var frostBlocks: [String: Int] = [:]
+    var sprayBlocks: [String: Int] = [:]
+    /// `YYYY-MM-DD`, Europe/Sofia; nil until the signals have been read.
+    var horizon: String?
 
-    func blocks(on date: String) -> Int { blocksByDay[date] ?? 0 }
+    func frost(on date: String) -> Int { frostBlocks[date] ?? 0 }
+    func spray(on date: String) -> Int { sprayBlocks[date] ?? 0 }
+    func warned(on date: String) -> Bool { frost(on: date) > 0 || spray(on: date) > 0 }
 }

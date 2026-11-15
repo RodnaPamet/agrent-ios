@@ -70,22 +70,43 @@ enum LunarWords {
         key.hasPrefix("sow") || key == "plantTreesVines"
     }
 
-    /// A group's advice as sentences: unknown keys dropped, and sowing
-    /// dropped on a day with a warning.
-    static func advice(_ day: LunarDay, _ group: Group, warned: Bool) -> [String] {
-        day.recommendations.keys(group)
-            .filter { !(warned && isSowing($0)) }
-            .compactMap { recommendations[$0] }
+    /// One line of advice. On a warned day the sowing lines stay, struck
+    /// through (owner, 2026-11-15): the tradition's answer visible and
+    /// visibly overridden, and a warned day never looks like a day the
+    /// tradition says nothing for.
+    struct Advice: Equatable, Hashable, Sendable {
+        let text: String
+        let struck: Bool
     }
 
-    /// Whether a warning actually held something back that day.
+    /// A group's advice: unknown keys dropped, sowing struck on a warned day.
+    static func advice(_ day: LunarDay, _ group: Group, warned: Bool) -> [Advice] {
+        day.recommendations.keys(group).compactMap { key in
+            recommendations[key].map { Advice(text: $0, struck: warned && isSowing(key)) }
+        }
+    }
+
+    /// Whether a warning strikes anything that day.
     static func heldBack(_ day: LunarDay) -> Bool {
         Group.allCases.contains { day.recommendations.keys($0).contains(where: isSowing) }
     }
 
-    static func warning(_ blocks: Int) -> String {
-        "Предупреждение за слана или пръскане в " + Plural.bg(blocks, "блок", "блока")
-            + ". Сеитбата не се препоръчва."
+    /// «Предупреждение за слана в 2 блока», and the spray warning beside it.
+    static func warnings(_ warnings: LunarWarnings, on date: String) -> [String] {
+        var lines: [String] = []
+        let frost = warnings.frost(on: date), spray = warnings.spray(on: date)
+        if frost > 0 { lines.append("Предупреждение за слана в " + Plural.bg(frost, "блок", "блока")) }
+        if spray > 0 { lines.append("Неподходящ ден за пръскане в " + Plural.bg(spray, "блок", "блока")) }
+        return lines
+    }
+
+    /// Spoken after a struck line: VoiceOver does not read a strikethrough.
+    static let struckSpoken = "не се препоръчва заради предупреждението"
+
+    /// Where the forecast ends: «Прогноза за слана и пръскане има само до
+    /// 17 ноември.» Nothing is claimed for the days after it.
+    static func horizon(_ day: Date) -> String {
+        "Прогноза за слана и пръскане има само до \(BgDate.dayMonth(day))."
     }
 
     /// «Коренов ден» or, on a day the sign changes, «Коренов ден до 14:20,
