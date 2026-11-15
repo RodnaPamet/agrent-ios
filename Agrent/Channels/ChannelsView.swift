@@ -251,11 +251,7 @@ struct ChannelFeedView: View {
     private func loadNewest() async {
         do {
             let page = try await ChannelsAPI.feed(channel.id)
-            // The newest page replaces its own range; older pages already
-            // read stay below it.
-            let fresh = Set(page.posts.map(\.id))
-            let oldest = page.posts.last?.createdAt ?? .distantFuture
-            posts = page.posts + posts.filter { !fresh.contains($0.id) && $0.createdAt < oldest }
+            posts = ChannelWords.newest(page.posts, over: posts)
             if !loaded { hasMore = page.hasMore }
             failure = nil
             await markRead()
@@ -281,9 +277,9 @@ struct ChannelFeedView: View {
     }
 
     private func loadOlder() async {
-        guard let oldest = posts.last?.createdAt else { return }
+        guard let oldest = posts.last else { return }
         do {
-            let page = try await ChannelsAPI.feed(channel.id, before: oldest)
+            let page = try await ChannelsAPI.feed(channel.id, before: oldest.createdAt, beforeID: oldest.id)
             let seen = Set(posts.map(\.id))
             posts += page.posts.filter { !seen.contains($0.id) }
             hasMore = page.hasMore

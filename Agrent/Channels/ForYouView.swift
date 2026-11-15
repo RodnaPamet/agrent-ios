@@ -2,7 +2,7 @@ import SwiftUI
 
 /// «За Вас» (P9.7, #614; agri-saas #2941): what happened to the person
 /// across every channel: mentions, and replies to their posts. Newest
-/// first, paged on the oldest item's instant.
+/// first, paged on the oldest item's instant and id.
 ///
 /// Read-only. A row opens the post's thread through `ChannelLinkView`,
 /// which reads the post by id and climbs to its parent, so a reply opens
@@ -83,11 +83,11 @@ struct ForYouView: View {
     }
 
     private func loadMore() async {
-        guard hasMore, !loadingMore, let items = state.value, let oldest = items.last?.post.createdAt else { return }
+        guard hasMore, !loadingMore, let items = state.value, let oldest = items.last?.post else { return }
         loadingMore = true
         defer { loadingMore = false }
         do {
-            let page = try await ChannelsAPI.activity(before: oldest)
+            let page = try await ChannelsAPI.activity(before: oldest.createdAt, beforeID: oldest.id)
             state = .loaded(ChannelWords.merged(page.items, into: items), .fresh)
             hasMore = page.hasMore
             moreFailed = nil

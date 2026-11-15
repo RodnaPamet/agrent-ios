@@ -24,6 +24,19 @@ final class ForYouTests: XCTestCase {
         let before = ChannelsAPI.activityPath(before: Date(timeIntervalSince1970: 0))
         XCTAssertTrue(before.hasPrefix("/api/social/activity?limit=50&before="), before)
         XCTAssertFalse(before.contains(":"), "the instant is escaped in the query")
+        XCTAssertFalse(before.contains("beforeId"), "no id without one given")
+    }
+
+    /// The tie-break: posts written by one statement share an instant, and
+    /// the instant alone dropped all but one of them at a page boundary.
+    func testTheCursorCarriesTheOldestRowsId() {
+        let at = Date(timeIntervalSince1970: 0)
+        let activity = ChannelsAPI.activityPath(before: at, beforeID: "p 9")
+        XCTAssertTrue(activity.hasSuffix("&beforeId=p%209"), activity)
+        let feed = ChannelsAPI.feedPath("c1", before: at, beforeID: "p9")
+        XCTAssertTrue(feed.contains("&before="), feed)
+        XCTAssertTrue(feed.hasSuffix("&beforeId=p9"), feed)
+        XCTAssertEqual(ChannelsAPI.page(before: nil, id: "p9"), "", "an id is nothing without its instant")
     }
 
     func testThePageReads() async throws {
@@ -55,5 +68,29 @@ final class ForYouTests: XCTestCase {
         let items = try await APIClient.shared.decode(page, as: ChannelsAPI.ActivityPage.self).items
         let merged = ChannelWords.merged(Array(items[1...]), into: Array(items[..<2]))
         XCTAssertEqual(merged.map(\.id), ["p2", "p1", "p9"])
+    }
+
+    /// Ten cards from one `createMany` share an instant. The newest page
+    /// holds the first two; the rest, read before as older pages, stay
+    /// below, each once. The instant is the one the server writes for such
+    /// a batch (one statement, one `now()`), and the test checks the tie
+    /// is real before trusting the merge.
+    func testTheNewestPageKeepsTiedOlderPostsOnce() throws {
+        func post(_ id: String, _ at: Date) -> ChannelPost {
+            ChannelPost(id: id, authorUserId: "system", body: "Карта \(id)", kind: "CARD", createdAt: at,
+                        deleted: false, resolvedAt: nil, replyCount: 0, author: nil)
+        }
+        let batch = Date(timeIntervalSince1970: 1_763_190_000.123)
+        let cards = (0..<10).map { post("c\(9 - $0)", batch) }
+        XCTAssertEqual(Set(cards.map(\.createdAt)).count, 1, "positive control: the ten share one instant")
+        let newer = post("n1", batch.addingTimeInterval(60))
+
+        // On screen: everything read so far, newest first.
+        let shown = [newer] + cards
+        // A fresh newest page: a new post, the older one, and two cards.
+        let fresh = [post("n2", batch.addingTimeInterval(120)), newer] + cards.prefix(2)
+        let merged = ChannelWords.newest(fresh, over: shown)
+        XCTAssertEqual(merged.map(\.id), ["n2", "n1"] + cards.map(\.id), "every card, in order")
+        XCTAssertEqual(Set(merged.map(\.id)).count, merged.count, "no post twice")
     }
 }
