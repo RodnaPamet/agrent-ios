@@ -131,6 +131,12 @@ enum A11y {
         /// (`ScreenAction`).
         static let newEntry = spokenNames("Нов запис", "Запис", "New entry")
         static let newCost = spokenNames("Нов разход", "Разход", "New expense")
+        /// The calculator's «Нулирай» (#610): every cost of the farm, and
+        /// its question's answer, «Изтрий всички».
+        static let resetCosts = spokenNames("Нулирай", "Reset")
+        static let deleteAll = spokenNames("Изтрий всички", "Delete all")
+        /// The calculator's «Още» menu, which holds «Нулирай».
+        static let more = spokenNames("Още", "More")
         static let newListing = spokenNames("Нова обява", "Обява", "New listing")
         static let insure = spokenNames("Застраховай", "Insure")
         /// A parcel history's «+» (owner, 2026-11-06).

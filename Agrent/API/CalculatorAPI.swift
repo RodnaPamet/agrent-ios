@@ -200,3 +200,21 @@ enum CostsAPI {
         return data
     }
 }
+
+extension CostsAPI {
+    /// «Нулирай» (#610, owner 2026-11-15): every cost of the farm, in one
+    /// call (agri-saas #3071). OWNER or ADMIN, else 403
+    /// `ADMIN_FORBIDDEN_FOR_ROLE`. A soft delete, atomic; invoice files stay.
+    /// No body, no query.
+    ///
+    /// `deleted` is what THIS call removed. A repeat answers 0, so a retry is
+    /// harmless, and a count lower than the question said means somebody
+    /// else deleted some in between, which is not an error.
+    ///
+    /// NOT EXERCISED from dev, CI or A11yShots: it empties the farm's books.
+    static func deleteAll() async throws -> Int {
+        struct Answer: Decodable { let deleted: Int }
+        let data = try await APIClient.shared.deleteReturningData(listPath)
+        return try await APIClient.shared.decode(data, as: Answer.self).deleted
+    }
+}
