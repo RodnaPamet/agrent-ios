@@ -358,10 +358,47 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
         var isVoice: Bool { mime?.hasPrefix("audio/") == true || durationMs != nil }
     }
 
+    /// A machine-written card (P9.4, #629): its kind and FACTS, the words
+    /// being the reader's. Only NEWS is drawn so far; any other kind, or a
+    /// payload this build cannot read, is nil here and the post shows its
+    /// plain-text `body`, which the server writes for every card. Null on a
+    /// hidden card, as the body is emptied.
+    var card: Card? = nil
+
+    struct Card: Equatable, Hashable, Sendable {
+        let kind: String
+        let news: News?
+
+        /// A NEWS card's facts: `{tag, title, url, source, publishedAt}`.
+        struct News: Decodable, Equatable, Hashable, Sendable {
+            let title: String
+            let url: String?
+            let source: String?
+            let publishedAt: Date?
+
+            /// Only a web address opens: anything else is not followed.
+            var link: URL? {
+                guard let url, let parsed = URL(string: url), ["http", "https"].contains(parsed.scheme?.lowercased()) else { return nil }
+                return parsed
+            }
+        }
+    }
+
+    private struct CardWire: Decodable {
+        let kind: String
+        let news: Card.News?
+        private enum CodingKeys: String, CodingKey { case kind, payload }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try c.decode(String.self, forKey: .kind)
+            news = kind == "NEWS" ? (try? c.decodeIfPresent(Card.News.self, forKey: .payload)) ?? nil : nil
+        }
+    }
+
     var isQuestion: Bool { kind == "QUESTION" }
 
     private enum CodingKeys: String, CodingKey {
-        case id, authorUserId, body, kind, createdAt, deleted, resolvedAt, replyCount, author, attachment
+        case id, authorUserId, body, kind, createdAt, deleted, resolvedAt, replyCount, author, attachment, card
     }
     init(id: String, authorUserId: String, body: String, kind: String, createdAt: Date, deleted: Bool,
          resolvedAt: Date?, replyCount: Int, author: Author? = nil, attachment: Attachment? = nil) {
@@ -389,6 +426,8 @@ struct ChannelPost: Decodable, Identifiable, Equatable, Hashable, Sendable {
         author = try? c.decodeIfPresent(Author.self, forKey: .author)
         // A removed post serves no bytes, so it carries no attachment here.
         attachment = deleted ? nil : (try? c.decodeIfPresent(Attachment.self, forKey: .attachment)) ?? nil
+        card = deleted ? nil : (try? c.decodeIfPresent(CardWire.self, forKey: .card))
+            .flatMap { $0 }.map { Card(kind: $0.kind, news: $0.news) }
     }
 }
 

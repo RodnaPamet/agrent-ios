@@ -404,6 +404,8 @@ struct ChannelPostRow: View {
             }
             if post.deleted {
                 Text(ChannelWords.deleted).font(.subheadline).italic().foregroundStyle(Palette.secondaryText)
+            } else if let news = post.card?.news {
+                newsCard(news)
             } else {
                 // An attachment post may have no text (P9.6).
                 if !post.body.isEmpty {
@@ -426,5 +428,25 @@ struct ChannelPostRow: View {
         }
         .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
+    }
+
+    /// A NEWS card: «Новини», the headline, «Източник: …», and on the post's
+    /// own screen «Отвори». Not in a feed row, whose tap opens the thread.
+    @ViewBuilder
+    private func newsCard(_ news: ChannelPost.Card.News) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(ChannelWords.newsHeading)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Palette.accent)
+            Text(news.title).font(.body.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+            if let source = news.source, !source.isEmpty {
+                Text(ChannelWords.newsSource(source)).font(.caption).foregroundStyle(Palette.secondaryText)
+            }
+            if showsMedia, let link = news.link {
+                Link(ChannelWords.cardOpen, destination: link)
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityInputLabels(A11y.spokenNames(ChannelWords.cardOpen, "Open"))
+            }
+        }
     }
 }

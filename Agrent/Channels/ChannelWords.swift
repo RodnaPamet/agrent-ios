@@ -166,4 +166,11 @@ enum ChannelWords {
         case .all: "Във всички канали, най-новите първо"
         }
     }
+
+    // MARK: - Cards (#629), the web's `channels.card.*`
+
+    static let newsHeading = "Новини"
+    static let cardOpen = "Отвори"
+
+    static func newsSource(_ source: String) -> String { "Източник: \(source)" }
 }
