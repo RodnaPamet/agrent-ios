@@ -188,6 +188,41 @@ enum ChannelsAPI {
         }
     }
 
+    /// Search (P9.7, agri-saas #3072): posts whose text holds the needle,
+    /// NEWEST FIRST. There is no relevance score in this product, so nothing
+    /// here may read as "best match". A needle under two characters is a 400
+    /// `SEARCH_TOO_SHORT`, so the phone does not send one.
+    static let searchMinimum = 2
+
+    enum SearchScope: String, Decodable, Sendable { case joined, all }
+
+    static func searchPath(_ needle: String, scope: SearchScope, before: Date? = nil, beforeID: String? = nil,
+                           limit: Int = 50) -> String {
+        "/api/social/channel-search?q=\(URLEscape.queryValue(needle))&scope=\(scope.rawValue)&limit=\(limit)"
+            + page(before: before, id: beforeID)
+    }
+
+    static func search(_ needle: String, scope: SearchScope, before: Date? = nil,
+                       beforeID: String? = nil) async throws -> SearchPage {
+        let data = try await APIClient.shared.data(for: searchPath(needle, scope: scope, before: before, beforeID: beforeID))
+        return try await APIClient.shared.decode(data, as: SearchPage.self)
+    }
+
+    /// `scope` is what the server APPLIED, which the screen says, rather
+    /// than what was asked.
+    struct SearchPage: Decodable, Sendable {
+        let hits: [SearchHit]
+        let hasMore: Bool
+        let scope: SearchScope
+    }
+
+    struct SearchHit: Decodable, Identifiable, Equatable, Hashable, Sendable {
+        let post: ChannelPost
+        let channelId: String
+        let channelNameBg: String
+        var id: String { post.id }
+    }
+
     static func attachment(_ postID: String) async throws -> Data {
         try await APIClient.shared.data(for: attachmentPath(postID))
     }
