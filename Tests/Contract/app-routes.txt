@@ -24,6 +24,7 @@
 /api/auth/token/refresh
 /api/library/books
 /api/library/books/{slug}
+/api/lunar
 /api/me/farms
 /api/me/news-preferences
 /api/me/stream

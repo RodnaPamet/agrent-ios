@@ -202,6 +202,8 @@ final class RouteContractTests: XCTestCase {
         // #3038 (0ee0eee) wrote a task's machines (#586, 2026-11-13).
         "/api/t/{tenantSlug}/machines/trackers": "agri-saas #2948: the tracker register",
         "/api/t/{tenantSlug}/machines/trackers/{id}": "agri-saas #2948: removing a tracker",
+        // «Лунен календар» (#611), built against agri-saas #3073's branch spec.
+        "/api/lunar": "agri-saas #3073: the lunar calendar",
     ]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -437,6 +439,8 @@ final class RouteContractTests: XCTestCase {
             ]),
             // #620: the channel digest switch, agri-saas #3076.
             ("ChannelDigest.swift", [ChannelDigestAPI.path]),
+            // #611: «Лунен календар», agri-saas #3073.
+            ("LunarAPI.swift", [LunarAPI.path(from: Date(), to: Date())]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
             // #605: the person's live updates (agri-saas P7.6).
