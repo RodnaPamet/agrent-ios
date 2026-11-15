@@ -60,6 +60,8 @@ enum AppRoute: Hashable, Sendable {
     case notifications
     /// A channel, or one post's thread in it, from a reply push (#584).
     case channelID(String, post: String?)
+    /// «За Вас», from the 07:15 channel digest push (#620).
+    case forYou
     /// A machine's day, from its alert push (#574).
     case machineID(String)
     /// A personal conversation (#593); `title` is the inbox row's name, for
@@ -82,6 +84,7 @@ enum AppRoute: Hashable, Sendable {
         case .publicFarm(let handle): hasher.combine("publicFarm"); hasher.combine(handle)
         case .notifications: hasher.combine("notifications")
         case .channelID(let id, let post): hasher.combine("channelID"); hasher.combine(id); hasher.combine(post)
+        case .forYou: hasher.combine("forYou")
         case .machineID(let id): hasher.combine("machineID"); hasher.combine(id)
         case .directConversation(let id, _): hasher.combine("directConversation"); hasher.combine(id)
         }
@@ -105,7 +108,7 @@ enum AppRoute: Hashable, Sendable {
         case .parcelHistory: .farmRisk
         case .notifications: .notifications
         // «Канали» is a menu sheet, not a tab; people talk on «Борса».
-        case .channelID: .exchange
+        case .channelID, .forYou: .exchange
         // The machines live on the farm's map; «Машини» itself is a menu
         // sheet, not a tab.
         case .machineID: .locations
@@ -133,6 +136,7 @@ enum AppRoute: Hashable, Sendable {
         case .publicFarm(let handle): PublicFarmView(handle: handle)
         case .notifications: NotificationsView()
         case .channelID(let id, let post): ChannelLinkView(channelID: id, postID: post)
+        case .forYou: ForYouView()
         case .machineID(let id): MachineLinkView(assetID: id)
         case .directConversation(let id, let title): DirectConversationView(conversationID: id, title: title)
         }
@@ -150,6 +154,7 @@ extension AppRoute {
         case .listing(_, let id): self = .listingID(id)
         case .notifications: self = .notifications
         case .channel(_, let id, let post): self = .channelID(id, post: post)
+        case .forYou: self = .forYou
         case .machine(_, let id): self = .machineID(id)
         case .directMessage(_, let id): self = .directConversation(id: id, title: nil)
         }
