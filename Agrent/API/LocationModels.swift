@@ -266,3 +266,9 @@ struct ParcelGeometry: Decodable, Equatable, Sendable {
 
     var isMultiPolygon: Bool { type == "MultiPolygon" }
 }
+
+extension Parcel {
+    /// The crop as stored, for MATCHING only (a treatment's crop picker,
+    /// #608) — never shown; shown names go through `CommodityName`.
+    var storedCrop: String? { cropType }
+}

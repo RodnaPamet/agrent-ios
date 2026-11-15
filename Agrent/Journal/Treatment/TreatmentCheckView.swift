@@ -129,16 +129,19 @@ struct TreatmentCheckView: View {
         }
         .safeAreaInset(edge: .bottom) { actions }
         .inlineTitle("Проверка")
+        // «Назад» at the top left goes to the parcels (#609); «Отказ», which
+        // abandons the whole entry, moves to the right so the two are never
+        // side by side.
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button("Отказ", action: onCancel)
                     .disabled(saving)
                     .accessibilityInputLabels(A11y.Spoken.cancel)
             }
         }
-        // A save under way is not abandoned by a swipe back, and its refusal
+        // A save under way is not abandoned by going back, and its refusal
         // does not land on a screen that has gone.
-        .navigationBarBackButtonHidden(saving)
+        .stepBack(disabled: saving)
         // Said, not only drawn: the refusal replaces the spinner under the
         // cursor.
         .onChange(of: failure) { _, now in

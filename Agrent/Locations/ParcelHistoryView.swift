@@ -813,9 +813,13 @@ private struct CreatingSheets: ViewModifier {
                 NewCropSeasonSheet(parcelID: parcelID, forYield: true, seasons: seasons, areaHa: areaHa,
                                    onSaved: onRecorded)
             }
-            .sheet(isPresented: $operation) {
+            // The same «Нов запис» as Дневник's (#608), opened on this parcel:
+            // its crop chosen and the parcel ticked. It used to be a form of
+            // its own, which the owner found did not match.
+            .sheet(isPresented: $operation, onDismiss: FarmRecordAPI.removeGenerated) {
                 if let recordIn {
-                    ParcelOperationSheet(locationID: recordIn.locationID, parcel: recordIn.parcel, onSaved: onRecorded)
+                    TreatmentEntryFlow(recorder: LiveTreatmentRecorder(), preselect: [recordIn.parcel.id],
+                                       cropValue: recordIn.parcel.storedCrop, onSaved: onRecorded)
                 }
             }
             .sheet(isPresented: $weeds) {

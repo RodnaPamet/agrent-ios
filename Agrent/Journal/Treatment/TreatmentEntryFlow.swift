@@ -29,15 +29,20 @@ struct TreatmentEntryFlow: View {
     /// `preselect`: parcels to tick once the crop is chosen, those a
     /// machine's GPS route crossed (#574). Offered, not saved: the person
     /// checks them, and nothing is written until «Добави».
+    /// `cropValue`: the stored crop of the parcel it was opened from (a
+    /// parcel's history, #608), chosen at once when the farm grows it, so
+    /// that parcel is ticked under its crop with nothing to pick.
     init(recorder: TreatmentRecorder, prefill: TreatmentDraft? = nil, preselect: Set<String> = [],
-         onSaved: @escaping () -> Void) {
+         cropValue: String? = nil, onSaved: @escaping () -> Void) {
         self.recorder = recorder
         self.onSaved = onSaved
         self.preselect = preselect
+        self.cropValue = cropValue
         _draft = State(initialValue: prefill ?? TreatmentDraft())
     }
 
     private let preselect: Set<String>
+    private let cropValue: String?
     @State private var reference = OperationReferenceStore()
     @State private var place = TreatmentPlaceStore()
     @State private var path: [Step] = []
@@ -131,9 +136,19 @@ struct TreatmentEntryFlow: View {
     /// retry chooses the lone crop as the first read would have.
     private func loadPlace() async {
         await place.load()
-        if cropKey == nil, let crops = place.state.value, crops.count == 1 {
-            cropKey = crops[0].key
-            await place.loadFields(for: crops[0])
+        guard cropKey == nil, let crops = place.state.value else { return }
+        if let crop = Self.crop(holding: cropValue, in: crops) ?? (crops.count == 1 ? crops[0] : nil) {
+            cropKey = crop.key
+            await place.loadFields(for: crop)
+        }
+    }
+
+    /// The farm's crop that groups a parcel's stored crop value, if any —
+    /// matched case-blind, as the grouping is.
+    static func crop(holding value: String?, in crops: [TreatmentPlace.Crop]) -> TreatmentPlace.Crop? {
+        guard let value = value?.trimmingCharacters(in: .whitespaces), !value.isEmpty else { return nil }
+        return crops.first { crop in
+            crop.values.contains { $0.compare(value, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
         }
     }
 

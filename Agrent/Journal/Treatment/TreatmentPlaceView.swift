@@ -80,6 +80,7 @@ struct TreatmentPlaceView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { cropMenu }
         }
+        .stepBack()
         // The crop's parcels, asked for as it is chosen — and again on a
         // return, which a cache-first read makes cheap.
         .task(id: cropKey) {
