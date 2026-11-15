@@ -103,4 +103,57 @@ final class LunarTests: XCTestCase {
             XCTAssertNil(text.range(of: "[ыэё]|ь(?!о)", options: .regularExpression), text)
         }
     }
+
+    // MARK: - The farm's warnings (agri-saas #3077)
+
+    private func signals(_ json: String) async throws -> LunarWarnings {
+        AgroSignalsAPI.warnings(try await APIClient.shared.decode(Data(json.utf8), as: AgroSignalsAPI.Page.self))
+    }
+
+    /// Blocks per day per kind, each block once; spray's presence is the
+    /// warning; disease is not about sowing; an unknown kind still warns.
+    func testSignalsBecomeBlocksPerDay() async throws {
+        let warnings = try await signals("""
+        {"signals":[
+          {"locationId":"b1","kind":"FROST_RISK","level":"FROST","signalDate":"2026-11-16"},
+          {"locationId":"b2","kind":"FROST_RISK","level":"FROST","signalDate":"2026-11-16"},
+          {"locationId":"b2","kind":"FROST_RISK","level":"FROST","signalDate":"2026-11-16"},
+          {"locationId":"b1","kind":"SPRAY_WINDOW","signalDate":"2026-11-15"},
+          {"locationId":"b3","kind":"DISEASE_RISK","signalDate":"2026-11-15"},
+          {"locationId":"b4","kind":"HAIL_RISK","signalDate":"2026-11-17"}
+        ],"horizon":"2026-11-17","frostThresholdC":2,"truncated":false}
+        """)
+        XCTAssertTrue(warnings.known)
+        XCTAssertEqual(warnings.frost(on: "2026-11-16"), 2, "each block once")
+        XCTAssertEqual(warnings.spray(on: "2026-11-15"), 1)
+        XCTAssertTrue(warnings.warned(on: "2026-11-15"))
+        XCTAssertTrue(warnings.warned(on: "2026-11-17"), "an unknown kind is a warning, never dropped")
+        XCTAssertEqual(LunarWords.warnings(warnings, on: "2026-11-17"), ["Предупреждение в 1 блок"])
+        XCTAssertFalse(warnings.warned(on: "2026-11-18"))
+        XCTAssertEqual(warnings.horizon, "2026-11-17")
+    }
+
+    func testTheNotesSayWhatTheWarningsCannotSay() async throws {
+        let full = try await signals(#"{"signals":[],"horizon":"2026-11-17","frostThresholdC":2,"truncated":true}"#)
+        let notes = LunarWords.warningNotes(full, farmOpen: true)
+        XCTAssertEqual(notes[0], "Прогноза за слана и пръскане има само до 17 ноември.")
+        XCTAssertTrue(notes[1].contains("2 °C"), notes[1])
+        XCTAssertTrue(notes[2].hasPrefix("Списъкът с предупреждения е непълен."), notes[2])
+
+        let noWeather = try await signals(#"{"signals":[],"horizon":null,"frostThresholdC":2,"truncated":false}"#)
+        XCTAssertTrue(LunarWords.warningNotes(noWeather, farmOpen: true)[0].hasPrefix("Няма прогноза"))
+        XCTAssertTrue(LunarWords.warningNotes(LunarWarnings(), farmOpen: true)[0].contains("не можаха да се заредят"),
+                      "a failed read is unknown, never \"no warning\"")
+        XCTAssertTrue(LunarWords.warningNotes(LunarWarnings(), farmOpen: false)[0].contains("когато е избрано стопанство"))
+        for note in notes + LunarWords.warningNotes(LunarWarnings(), farmOpen: true) {
+            XCTAssertNil(note.range(of: "[ыэё]|ь(?!о)", options: .regularExpression), note)
+        }
+    }
+
+    func testTheSignalsPathIsTheFarmsAndTheMonths() throws {
+        let day = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 11, day: 15, hour: 12)))
+        let month = LunarAPI.month(containing: day, calendar: calendar)
+        let path = AgroSignalsAPI.path(from: month.from, to: month.to, calendar: calendar)
+        XCTAssertTrue(path.hasSuffix("/agro/signals?from=2026-11-01&to=2026-11-30"), path)
+    }
 }

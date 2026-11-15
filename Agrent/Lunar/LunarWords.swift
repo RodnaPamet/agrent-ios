@@ -97,6 +97,8 @@ enum LunarWords {
         let frost = warnings.frost(on: date), spray = warnings.spray(on: date)
         if frost > 0 { lines.append("Предупреждение за слана в " + Plural.bg(frost, "блок", "блока")) }
         if spray > 0 { lines.append("Неподходящ ден за пръскане в " + Plural.bg(spray, "блок", "блока")) }
+        let other = warnings.other(on: date)
+        if other > 0 { lines.append("Предупреждение в " + Plural.bg(other, "блок", "блока")) }
         return lines
     }
 
@@ -107,6 +109,26 @@ enum LunarWords {
     /// 17 ноември.» Nothing is claimed for the days after it.
     static func horizon(_ day: Date) -> String {
         "Прогноза за слана и пръскане има само до \(BgDate.dayMonth(day))."
+    }
+
+    /// The page's notes on what the warnings can and cannot say: where the
+    /// forecast ends, the frost rule, a cut list, or why there are none.
+    static func warningNotes(_ warnings: LunarWarnings, farmOpen: Bool) -> [String] {
+        guard farmOpen else { return ["Предупрежденията за слана и пръскане се виждат, когато е избрано стопанство."] }
+        guard warnings.known else { return ["Предупрежденията за слана и пръскане не можаха да се заредят. Сеитбата не е проверена спрямо тях."] }
+        var notes: [String] = []
+        if let day = warnings.horizon.flatMap(BgDate.parseISODay) {
+            notes.append(horizon(day))
+        } else {
+            notes.append("Няма прогноза за времето за това стопанство, затова няма и предупреждения.")
+        }
+        if let threshold = warnings.frostThresholdC {
+            notes.append("Слана: най-ниска температура \(Num.text(threshold)) °C или по-малко.")
+        }
+        if warnings.truncated {
+            notes.append("Списъкът с предупреждения е непълен. Липсата на предупреждение не значи, че няма такова.")
+        }
+        return notes
     }
 
     /// «Коренов ден» or, on a day the sign changes, «Коренов ден до 14:20,

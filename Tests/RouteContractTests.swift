@@ -204,6 +204,7 @@ final class RouteContractTests: XCTestCase {
         "/api/t/{tenantSlug}/machines/trackers/{id}": "agri-saas #2948: removing a tracker",
         // «Лунен календар» (#611), built against agri-saas #3073's branch spec.
         "/api/lunar": "agri-saas #3073: the lunar calendar",
+        "/api/t/{tenantSlug}/agro/signals": "agri-saas #3077: the farm's agro warnings by day",
     ]
 
     /// Files whose `/x` literals are not API paths at all.
@@ -441,6 +442,7 @@ final class RouteContractTests: XCTestCase {
             ("ChannelDigest.swift", [ChannelDigestAPI.path]),
             // #611: «Лунен календар», agri-saas #3073.
             ("LunarAPI.swift", [LunarAPI.path(from: Date(), to: Date())]),
+            ("AgroSignals.swift", [AgroSignalsAPI.path(from: Date(), to: Date())]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
             // #605: the person's live updates (agri-saas P7.6).

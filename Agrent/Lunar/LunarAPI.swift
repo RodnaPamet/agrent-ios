@@ -119,10 +119,20 @@ struct LunarDay: Decodable, Identifiable, Equatable, Hashable, Sendable {
 struct LunarWarnings: Equatable, Sendable {
     var frostBlocks: [String: Int] = [:]
     var sprayBlocks: [String: Int] = [:]
-    /// `YYYY-MM-DD`, Europe/Sofia; nil until the signals have been read.
+    /// A kind this build does not know: still a warning.
+    var otherBlocks: [String: Int] = [:]
+    /// `YYYY-MM-DD`, Europe/Sofia; nil for a farm with no forecast.
     var horizon: String?
+    /// The owner's frost rule as the server applies it (2 °C).
+    var frostThresholdC: Double?
+    /// The list was cut short: a missing warning may not have arrived.
+    var truncated = false
+    /// The signals were read. False with no farm open or a failed read, so
+    /// nothing is claimed either way.
+    var known = false
 
     func frost(on date: String) -> Int { frostBlocks[date] ?? 0 }
     func spray(on date: String) -> Int { sprayBlocks[date] ?? 0 }
-    func warned(on date: String) -> Bool { frost(on: date) > 0 || spray(on: date) > 0 }
+    func other(on date: String) -> Int { otherBlocks[date] ?? 0 }
+    func warned(on date: String) -> Bool { frost(on: date) > 0 || spray(on: date) > 0 || other(on: date) > 0 }
 }

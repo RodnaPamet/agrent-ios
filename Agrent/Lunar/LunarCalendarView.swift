@@ -6,8 +6,9 @@ import SwiftUI
 struct LunarCalendarView: View {
     @State private var month = LunarAPI.month(containing: Date()).from
     @State private var state: LoadState<[LunarDay]> = .loading
-    /// Frost and spray warnings by day (#611); empty until they can be read.
-    var warnings = LunarWarnings()
+    /// Frost and spray warnings by day (#611; agri-saas #3077). Replaced
+    /// whole on each read: a future warning can be withdrawn.
+    @State private var warnings = LunarWarnings()
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -43,8 +44,8 @@ struct LunarCalendarView: View {
                             .font(.footnote)
                             .foregroundStyle(Palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
-                        if let horizon = warnings.horizon.flatMap(BgDate.parseISODay) {
-                            Text(LunarWords.horizon(horizon))
+                        ForEach(LunarWords.warningNotes(warnings, farmOpen: FarmPath.openSlug != nil), id: \.self) { note in
+                            Text(note)
                                 .font(.footnote)
                                 .foregroundStyle(Palette.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -114,9 +115,16 @@ struct LunarCalendarView: View {
     private func load() async {
         state = .loading
         let range = LunarAPI.month(containing: month)
+        // The farm's warnings beside the Moon, the same window. A failed
+        // read leaves them unknown, never "none".
+        async let signals: LunarWarnings? = FarmPath.openSlug == nil ? nil
+            : try? AgroSignalsAPI.load(from: range.from, to: range.to)
         do {
-            state = .loaded(try await LunarAPI.load(from: range.from, to: range.to), .fresh)
+            let days = try await LunarAPI.load(from: range.from, to: range.to)
+            warnings = await signals ?? LunarWarnings()
+            state = .loaded(days, .fresh)
         } catch {
+            _ = await signals
             state = .failed(UserMessage.text(for: error))
         }
     }
