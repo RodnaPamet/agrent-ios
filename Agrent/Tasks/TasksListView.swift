@@ -17,6 +17,8 @@ struct TasksListView: View {
     /// The row whose «Изтрий» is being asked about (owner, 2026-10-26).
     @State private var confirmingRemoval: WorkItemSummary?
     @State private var confirming = false
+    /// «Още» → «Изтрий» for several tasks (#625).
+    @State private var bulk = TaskBulkRemoval()
     /// «Нова задача» is open.
     @State private var composing = false
     @Environment(\.scenePhase) private var scenePhase
@@ -41,10 +43,45 @@ struct TasksListView: View {
             // while nobody has said). An operator's job is completing work,
             // not creating it.
             .toolbar {
-                if people.user?.mayWrite ?? true {
-                    ScreenAction(title: "Нова задача", spoken: A11y.Spoken.newTask) { composing = true }
+                if bulk.selecting {
+                    // Ticking (#625): «Избери всички» and «Отказ» in place
+                    // of the screen's actions.
+                    ToolbarItem(placement: .topBarLeading) {
+                        let ids = deletableIDs
+                        Button(bulk.allSelected(ids) ? TaskBulkRemoval.clearAllTitle : TaskBulkRemoval.selectAllTitle) {
+                            bulk.selectAll(ids)
+                        }
+                        .accessibilityInputLabels(A11y.spokenNames(TaskBulkRemoval.selectAllTitle, "Select all"))
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Отказ") { bulk.cancel() }
+                            .accessibilityInputLabels(A11y.Spoken.cancel)
+                    }
+                } else {
+                    // «Изтрий» in «Още», left of «Нова задача», as «Нулирай»
+                    // is in the calculator (owner, 2026-11-15).
+                    if !deletableIDs.isEmpty {
+                        ToolbarItem(placement: .primaryAction) {
+                            Menu {
+                                Button(role: .destructive) {
+                                    bulk.start()
+                                } label: {
+                                    Label(TaskBulkRemoval.actionTitle, systemImage: "trash")
+                                }
+                                .accessibilityInputLabels(A11y.Spoken.deleteTreatment)
+                            } label: {
+                                Label("Още", systemImage: "ellipsis.circle")
+                            }
+                            .accessibilityLabel("Още")
+                            .accessibilityInputLabels(A11y.Spoken.more)
+                        }
+                    }
+                    if people.user?.mayWrite ?? true {
+                        ScreenAction(title: "Нова задача", spoken: A11y.Spoken.newTask) { composing = true }
+                    }
                 }
             }
+            .taskBulkRemoval(bulk) { await store.load() }
             // Under the list, as on Дневник: what went, and
             // «Отмени» for its five seconds (`taskRemoval`, shared with a
             // parcel's tasks).
@@ -103,11 +140,19 @@ struct TasksListView: View {
                     )
                     .pageRow()
                 }
-                // What the list shows: a row swiped away isn't counted.
-                Section(titled: Plural.bg(removal.visible(page.items).count, "задача", "задачи")) {
-                ForEach(removal.visible(page.items)) { item in
-                    NavigationLink(value: AppRoute.task(item)) {
-                        TaskRow(item: item)
+                // What the list shows: a row swiped away, or several deleted
+                // at once and waiting out their window, isn't counted.
+                let shown = visible(page.items)
+                Section(titled: Plural.bg(shown.count, "задача", "задачи")) {
+                ForEach(shown) { item in
+                    Group {
+                        if bulk.selecting {
+                            selectableRow(item)
+                        } else {
+                            NavigationLink(value: AppRoute.task(item)) {
+                                TaskRow(item: item)
+                            }
+                        }
                     }
                     .pageRow()
                     // Not a full swipe: «Изтрий», then the question, then
@@ -126,6 +171,44 @@ struct TasksListView: View {
             .contentMargins(.bottom, 96, for: .scrollContent)
             .refreshable { await PullToRefresh.bounded { await store.load() } }
         }
+    }
+}
+
+extension TasksListView {
+    /// The rows on screen: the server's, less a swiped one and a ticked
+    /// batch waiting out «Отмени».
+    private func visible(_ items: [WorkItemSummary]) -> [WorkItemSummary] {
+        removal.visible(items).filter { !bulk.hidden.contains($0.id) }
+    }
+
+    /// What may be ticked (#625): what the swipe would offer.
+    private var deletableIDs: [String] {
+        visible(store.state.value?.items ?? []).filter { TaskBulkRemoval.offered($0, to: people.user) }.map(\.id)
+    }
+
+    /// A row while ticking: the whole row toggles, and a task this person
+    /// may not delete shows without a circle and does nothing.
+    @ViewBuilder
+    private func selectableRow(_ item: WorkItemSummary) -> some View {
+        let offered = TaskBulkRemoval.offered(item, to: people.user)
+        let ticked = bulk.selected.contains(item.id)
+        Button {
+            if offered { bulk.toggle(item.id) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: ticked ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(ticked ? Palette.accent : Palette.secondaryText)
+                    .opacity(offered ? 1 : 0)
+                    .accessibilityHidden(true)
+                TaskRow(item: item)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!offered)
+        .accessibilityAddTraits(ticked ? .isSelected : [])
+        .accessibilityHint(offered ? "Избира задачата за изтриване" : "Тази задача не може да бъде изтрита от Вас")
     }
 }
 

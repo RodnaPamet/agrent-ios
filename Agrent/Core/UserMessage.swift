@@ -327,6 +327,16 @@ enum UserMessage {
                   let limit = params?["limitBytes"].flatMap({ Int64($0) }) else { return nil }
             return "Мястото за документи е запълнено (\(DocumentSize.text(used)) от \(DocumentSize.text(limit))). "
                 + "Изтрийте стари документи, за да освободите място."
+        case "TASK_DELETE_NOT_PERMITTED", "TASK_BELONGS_TO_TREATMENT":
+            // A bulk delete (#625) is all or nothing (owner ruling, agri-saas
+            // #2187) and says how many of the selected it refused. The single
+            // delete sends no counts, and gets the table's sentence.
+            guard let refused = params?["refused"].flatMap({ Int($0) }),
+                  let selected = params?["selected"].flatMap({ Int($0) }) else { return nil }
+            let why = code == "TASK_BELONGS_TO_TREATMENT"
+                ? "са част от записано мероприятие в Дневника"
+                : "са създадени от друг човек"
+            return "Нищо не е изтрито: \(refused) от \(selected) избрани задачи \(why). Махнете ги от избора и опитайте пак."
         case "FARM_NAME_TOO_LONG":
             // The bound is the server's (`params.max`, agri-saas #1388) — it
             // was a hardcoded 120 here, which would have gone on saying 120

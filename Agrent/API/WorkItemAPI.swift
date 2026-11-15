@@ -50,6 +50,23 @@ enum WorkItemAPI {
         _ = try await APIClient.shared.deleteReturningData(detailPath(id))
     }
 
+    /// Several tasks in one call (#625; agri-saas #2187/#2220): `{taskIds}`,
+    /// 1 to 100, answering `{deleted}`. ALL OR NOTHING (owner ruling): one
+    /// refused task leaves every selected one, with 403
+    /// `TASK_DELETE_NOT_PERMITTED` or 409 `TASK_BELONGS_TO_TREATMENT` and
+    /// `{refused, selected}`. A repeat is harmless: what is already gone is
+    /// left out. A soft delete, as the single route's is. NOT EXERCISED from
+    /// dev, CI or A11yShots.
+    static var bulkDeletePath: String { "\(base)/bulk/delete" }
+    static let bulkMaximum = 100
+
+    static func delete(_ ids: [String]) async throws -> Int {
+        struct Body: Encodable { let taskIds: [String] }
+        struct Answer: Decodable { let deleted: Int }
+        let data = try await APIClient.shared.postReturningData(bulkDeletePath, body: Body(taskIds: ids), idempotencyKey: nil)
+        return try await APIClient.shared.decode(data, as: Answer.self).deleted
+    }
+
     /// Nothing left to delete: removed from the web or another phone.
     static func isGone(_ error: Error) -> Bool {
         if case APIClient.APIError.http(404, "TASK_NOT_FOUND"?, _, _, _) = error { return true }

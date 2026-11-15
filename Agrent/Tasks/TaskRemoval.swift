@@ -14,11 +14,12 @@ import Observation
 /// closed inside the window sends nothing: the task is still there on the
 /// next launch, which errs on the side of the farm's work.
 ///
-/// ── And then it is gone ──
+/// ── And then it is gone from the app ──
 ///
-/// `DELETE /tasks/{taskId}` is a hard delete: the task's comments and links
-/// go with it (agri-saas #2187). The window is the only way back, which is
-/// why it is longer under assistive technology.
+/// `DELETE /tasks/{taskId}` is a SOFT delete on the server (`deletedAt`;
+/// removed for good later by its retention purge — backend 2, 2026-11-15),
+/// but nothing in either client brings one back. The window is the only way
+/// back from here, which is why it is longer under assistive technology.
 ///
 /// A second confirmed delete inside the window sends the first at once: the
 /// bar names one task, and an «Отмени» standing for an earlier one would

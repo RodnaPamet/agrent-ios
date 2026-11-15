@@ -160,6 +160,7 @@
 /api/t/{tenantSlug}/reports/campaign-diary
 /api/t/{tenantSlug}/reports/field-briefing
 /api/t/{tenantSlug}/tasks
+/api/t/{tenantSlug}/tasks/bulk/delete
 /api/t/{tenantSlug}/tasks/{id}
 /api/t/{tenantSlug}/tasks/{id}/assign
 /api/t/{tenantSlug}/tasks/{id}/comments

@@ -357,6 +357,8 @@ final class RouteContractTests: XCTestCase {
             ]),
             ("WorkItemAPI.swift", [
                 WorkItemAPI.listPath, WorkItemAPI.detailPath(id), WorkItemAPI.statusPath(id),
+                // agrent-ios#625: several tasks at once.
+                WorkItemAPI.bulkDeletePath,
                 // agrent-ios#462: one parcel's tasks, from Блокове.
                 WorkItemAPI.parcelTasksPath(parcel),
                 // agrent-ios#177: any task's parcels (agri-saas #1410).
