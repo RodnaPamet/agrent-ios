@@ -513,9 +513,15 @@ struct ParcelHistoryView: View {
     }
 
     private func riskSpoken(_ reading: ParcelRisk, _ freshness: Freshness?) -> String {
-        A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
-                      + [rainWords(reading)] + explanation(reading, freshness).map(Optional.some)
-                      + [RiskExplanation.moistureNote] + evenness(reading).map(Optional.some))
+        // In steps: one long `+` chain is more than CI's type checker will
+        // solve in its time limit.
+        var clauses: [String?] = ["Риск"]
+        clauses += ParcelRiskReadings.spoken(reading, freshness)
+        clauses.append(rainWords(reading))
+        clauses += explanation(reading, freshness).map { Optional($0) }
+        clauses.append(RiskExplanation.moistureNote)
+        clauses += evenness(reading).map { Optional($0) }
+        return A11y.sentence(clauses)
     }
 
     private func rainWords(_ reading: ParcelRisk) -> String? {
