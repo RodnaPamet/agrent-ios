@@ -551,7 +551,7 @@ struct ParcelHistoryView: View {
         let archive = store.state.value
         return RiskAnalysisQuestion.text(
             parcel: archive?.parcel.name ?? parcelName, risk: reading, freshness: freshness,
-            trend: trend?.state.value.flatMap(RiskTrendWords.change),
+            trend: trend?.state.value.flatMap { RiskTrendWords.change($0) },
             rain: rainWords(reading),
             seasons: archive?.seasons.items ?? [], operations: archive?.operations.items ?? [],
             weeds: archive?.weeds.items ?? [])
