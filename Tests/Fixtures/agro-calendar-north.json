@@ -2708,7 +2708,47 @@
       }
      ]
     }
-   ]
+   ],
+   "costs": {
+    "basis": {
+     "areaDa": 100,
+     "currency": "BGN",
+     "unit": "stotinki"
+    },
+    "cite": {
+     "source": "mzh-tk-wine-2026",
+     "page": 9
+    },
+    "lines": [
+     {
+      "key": "fuel",
+      "published": 417779,
+      "perDaEurCents": 2136
+     },
+     {
+      "key": "materials",
+      "published": 3244644,
+      "perDaEurCents": 16590
+     },
+     {
+      "key": "wagesWorkers",
+      "published": 5918399,
+      "perDaEurCents": 30260
+     },
+     {
+      "key": "wagesMachineOperators",
+      "published": 508475,
+      "perDaEurCents": 2600
+     },
+     {
+      "key": "services",
+      "published": 1020000,
+      "perDaEurCents": 5215
+     }
+    ],
+    "publishedTotal": 11109297,
+    "perDaEurCentsTotal": 56801
+   }
   }
  ]
 }

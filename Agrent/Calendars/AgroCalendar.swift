@@ -68,21 +68,41 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
         let group: String
         let name: Text
         let windows: [Window]
+        /// МЗХ's direct costs, only where МЗХ prices a card (agri-saas #3127:
+        /// wine grapes, 2026). ABSENT on every other crop: МЗХ prices none.
+        let costs: Costs?
         var id: String { key }
 
-        private enum CodingKeys: String, CodingKey { case key, group, name, windows }
+        private enum CodingKeys: String, CodingKey { case key, group, name, windows, costs }
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             key = try c.decode(String.self, forKey: .key)
             group = try c.decode(String.self, forKey: .group)
             name = try c.decode(Text.self, forKey: .name)
             windows = (try? c.decodeIfPresent(Lenient<Window>.self, forKey: .windows))?.values ?? []
+            // A costs block that does not read is left out, never the crop.
+            costs = try? c.decodeIfPresent(Costs.self, forKey: .costs)
         }
 
         var title: String { name.bg ?? key }
 
         func windows(_ kind: Window.Kind, in region: AgroRegion) -> [Window] {
             windows.filter { $0.kind == kind && $0.applies(to: region) }
+        }
+    }
+
+    /// A card's direct costs per decare, in euro cents the SERVER converted
+    /// (owner, 2026-11-16: МЗХ's лв figures at 1,95583, marked
+    /// «превалутирано»; the phone holds no peg). The лв figures as printed
+    /// are the server's to keep; only euro is shown (EUR only, 2026-11-06).
+    struct Costs: Decodable, Equatable, Sendable {
+        let cite: Citation
+        let lines: [Line]
+        let perDaEurCentsTotal: Int?
+
+        struct Line: Decodable, Equatable, Sendable {
+            let key: String
+            let perDaEurCents: Int?
         }
     }
 
@@ -200,6 +220,26 @@ enum AgroWords {
     static let works = "Основни работи"
     static let harvest = "Прибиране"
     static let sources = "Източници"
+    // МЗХ's costs (#637), the card's own words (agri-saas #3127 catalogue).
+    static let costsTitle = "Разходи по МЗХ"
+    static let costTotal = "Общо преки разходи"
+    static let costLabels: [String: String] = [
+        "fuel": "Горива",
+        "materials": "Материали, препарати за растителна защита и торове",
+        "wagesWorkers": "Заплати и осигуровки на работниците",
+        "wagesMachineOperators": "Заплати и осигуровки на механизаторите",
+        "services": "Услуги",
+    ]
+
+    /// «21,36 EUR на дка».
+    static func perDa(_ cents: Int) -> String { "\(InsurancePremium.eur(cents)) на дка" }
+
+    /// «по МЗХ (2026), превалутирано», the owner's marker (2026-11-16), word
+    /// for word: no lev figure and no rate on screen (EUR only).
+    static func costsNote(year: String?) -> String {
+        "по МЗХ\(year.map { " (\($0))" } ?? ""), превалутирано"
+    }
+
     static let nowBadge = "Сега"
     static let depth = "Дълбочина"
 

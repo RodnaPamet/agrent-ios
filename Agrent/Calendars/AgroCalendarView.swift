@@ -103,6 +103,7 @@ struct AgroCropView: View {
             section(AgroWords.sowing, crop.windows(.sowing, in: region))
             section(AgroWords.works, crop.windows(.fieldwork, in: region))
             section(AgroWords.harvest, crop.windows(.harvest, in: region))
+            costsSection
             Section {
                 ForEach(sources, id: \.id) { source in
                     if let url = source.url.flatMap(URL.init(string:)) {
@@ -159,6 +160,45 @@ struct AgroCropView: View {
                 .foregroundStyle(Palette.secondaryText)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// МЗХ's direct costs per дка, where МЗХ prices the card (#637): euro
+    /// only, as the server converted them, under the owner's marker and the
+    /// card's page. A line the server could not convert is left out.
+    @ViewBuilder
+    private var costsSection: some View {
+        if let costs = crop.costs, let total = costs.perDaEurCentsTotal {
+            Section {
+                ForEach(costs.lines, id: \.key) { line in
+                    if let cents = line.perDaEurCents, let label = AgroWords.costLabels[line.key] {
+                        costRow(label, cents)
+                    }
+                }
+                costRow(AgroWords.costTotal, total, bold: true)
+            } header: {
+                SectionHeader(AgroWords.costsTitle)
+            } footer: {
+                SectionFooter {
+                    Text(([AgroWords.costsNote(year: year(of: costs))]
+                          + [AgroWords.cite(costs.cite, in: calendar)].compactMap { $0 }).joined(separator: "; "))
+                }
+            }
+            .pageRow()
+        }
+    }
+
+    private func costRow(_ label: String, _ cents: Int, bold: Bool = false) -> some View {
+        AdaptiveRow(spacing: 8) {
+            Text(label).font(bold ? .body.weight(.semibold) : .body)
+            Spacer(minLength: 8)
+            Text(AgroWords.perDa(cents)).font(bold ? .body.weight(.semibold) : .body).monospacedDigit()
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The card's year, from its source's `published` («2026-09» → «2026»).
+    private func year(of costs: AgroCalendar.Costs) -> String? {
+        calendar.sources[costs.cite.source]?.published.map { String($0.prefix(4)) }
     }
 
     private var sources: [(id: String, label: String, url: String?)] {
