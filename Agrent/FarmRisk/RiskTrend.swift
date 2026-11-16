@@ -88,12 +88,13 @@ final class RiskTrendStore {
 /// so tests pin it.
 enum RiskTrendWords {
     /// First and last pass with a value, over the period the server used.
-    static func change(_ history: ParcelRiskHistory) -> String? {
+    /// `only` keeps one index, for the chart's menu (owner, 2026-11-16).
+    static func change(_ history: ParcelRiskHistory, only: RiskTrendPoints.Index? = nil) -> String? {
         var sentences: [String] = []
-        if let ndvi = Self.ends(history.passes.compactMap(\.ndvi)) {
+        if only != .ndmi, let ndvi = Self.ends(history.passes.compactMap(\.ndvi)) {
             sentences.append(Self.sentence("зеленината", ndvi))
         }
-        if let ndmi = Self.ends(history.passes.compactMap(\.ndmi)) {
+        if only != .ndvi, let ndmi = Self.ends(history.passes.compactMap(\.ndmi)) {
             sentences.append(Self.sentence("влагата", ndmi))
         }
         guard !sentences.isEmpty else { return nil }

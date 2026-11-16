@@ -225,6 +225,7 @@ final class RouteContractTests: XCTestCase {
         "WindFieldSource.swift": "Open-Meteo's /v1/forecast, a third-party host, not agri-saas",
         // The rain since a parcel's picture (owner, 2026-11-08), the same host.
         "RainSince.swift": "Open-Meteo's /v1/forecast, a third-party host, not agri-saas",
+        "DailyWeather.swift": "Open-Meteo's /v1/forecast, a third-party host, not agri-saas",
     ]
 
     // MARK: - Every path the app builds

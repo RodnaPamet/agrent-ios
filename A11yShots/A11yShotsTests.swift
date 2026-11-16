@@ -2322,6 +2322,23 @@ final class A11yShotsTests: XCTestCase {
         app.swipeUp()
         Thread.sleep(forTimeInterval: 1)
         capture("32b-risk-trend", app: app)
+        // The chart's menu (owner, 2026-11-16): rain per day, from the seam's
+        // invented days, then back to the indices so the next run opens on them.
+        let metric = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@",
+                                                      "Зеленина и влага", "Зеленина и влага")).firstMatch
+        XCTAssertTrue(metric.waitForExistence(timeout: 10), "no metric menu\n\(app.debugDescription)")
+        metric.tap()
+        let rainItem = app.buttons["Валежи, л/м²"]
+        XCTAssertTrue(rainItem.waitForExistence(timeout: 10), "no rain in the menu\n\(app.debugDescription)")
+        rainItem.tap()
+        let rainChart = app.descendants(matching: .any)["Валежи за 14 дни"]
+        XCTAssertTrue(rainChart.waitForExistence(timeout: 10), "no rain chart\n\(app.debugDescription)")
+        Thread.sleep(forTimeInterval: 1)
+        capture("32c-risk-rain", app: app)
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@",
+                                         "Валежи", "Валежи")).firstMatch.tap()
+        let back = app.buttons["Зеленина и влага"]
+        if back.waitForExistence(timeout: 5) { back.tap() }
         app.swipeDown()
         Thread.sleep(forTimeInterval: 1)
         risk.tap()

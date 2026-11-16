@@ -30,21 +30,31 @@ enum RiskExplanation {
     static let moistureNote = "Влагата (NDMI) е водата в растенията, не в почвата."
 
     static func text(vegetation: RiskLevel, moisture: RiskLevel, stale: Bool) -> String? {
+        let all = sentences(vegetation: vegetation, moisture: moisture, stale: stale)
+        return all.isEmpty ? nil : all.joined(separator: " ")
+    }
+
+    /// The same words one sentence each: the parcel's screen sets the
+    /// reading's meaning apart from its caveats (owner, 2026-11-16: the
+    /// section "is too dense, it needs logical split").
+    static func sentences(vegetation: RiskLevel, moisture: RiskLevel, stale: Bool) -> [String] {
         var sentences: [String] = []
         switch (vegetation, moisture) {
         case (_, .notAssessed):
             // Bare or sparse ground (NDVI below 0,2): moisture is not graded,
             // so say why, and nothing about drought.
-            sentences.append("Зеленината е много ниска: на парцела вероятно няма култура (след жътва, обработено или преди поникване). Затова влагата не се оценява.")
+            sentences.append("Зеленината е много ниска: на парцела вероятно няма култура (след жътва, обработено или преди поникване).")
+            sentences.append("Затова влагата не се оценява.")
             if stale {
                 sentences.append("Снимката е отпреди повече от \(Staleness.satellitePass) дни и може да не отразява днешното състояние.")
             }
-            return sentences.joined(separator: " ")
+            return sentences
         // Vegetation never takes `notAssessed`; read as no reading if it did.
         case (.unknown, _), (_, .unknown), (.notAssessed, _):
             return stale
-                ? nil
-                : "Сателитът няма ясна снимка на парцела (облаци, сняг или без заснемане), затова няма оценка. Проверете отново след следващото заснемане."
+                ? []
+                : ["Сателитът няма ясна снимка на парцела (облаци, сняг или без заснемане), затова няма оценка.",
+                   "Проверете отново след следващото заснемане."]
         case (.good, .good):
             sentences.append("Културата е зелена и има достатъчно влага: няма признаци на проблем.")
         case (.good, .watch):
@@ -66,6 +76,6 @@ enum RiskExplanation {
         if stale {
             sentences.append("Снимката е отпреди повече от \(Staleness.satellitePass) дни и може да не отразява днешното състояние.")
         }
-        return sentences.joined(separator: " ")
+        return sentences
     }
 }

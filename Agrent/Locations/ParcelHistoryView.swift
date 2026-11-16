@@ -89,6 +89,8 @@ struct ParcelHistoryView: View {
     /// The rain since its satellite picture (owner, 2026-11-08), so a dry
     /// reading from before a wet week is read as old, not as dry.
     @State private var rain = RainSinceStore()
+    /// Rain and temperature per day for the chart's menu (owner, 2026-11-16).
+    @State private var weather = DailyWeatherStore()
     /// The parcel's tasks, from Блокове (#462). One store for the card and
     /// the list it opens.
     @State private var tasks: ParcelTasksStore?
@@ -398,13 +400,17 @@ struct ParcelHistoryView: View {
             }
             .padding(.vertical, 6)
         case .loaded(let reading, let freshness):
-            // Three parts, each its own tap target in the list row (a row
+            // Four parts under their own small headings (owner, 2026-11-16:
+            // "too dense, it needs logical split for clarity"): what the
+            // satellite read, what that means, how even the field is, and
+            // the period. Each tap target is its own in the list row (a row
             // with several controls needs them `.borderless`, or the whole
-            // row is one button): the reading, which asks the assistant for
-            // a short analysis (owner, 2026-11-07) while it is on; the trend
-            // over the period chosen (#562), whose picker must take its own
-            // taps; and the analysis link, said in words.
-            VStack(alignment: .leading, spacing: 10) {
+            // row is one button): the reading asks the assistant for a short
+            // analysis (owner, 2026-11-07) while it is on; the chart's menu
+            // and period take their own taps; the analysis link says it in
+            // words.
+            VStack(alignment: .leading, spacing: 16) {
+                SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
                 if flags.isOn(AssistantAPI.flag) {
                     Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
                         riskReading(reading, freshness)
@@ -422,7 +428,13 @@ struct ParcelHistoryView: View {
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel(riskSpoken(reading, freshness))
                 }
-                if let trend { RiskTrendView(store: trend) }
+                if let trend {
+                    riskPart("Във времето") {
+                        RiskTrendView(store: trend, weather: weather, place: parcelCentre.map {
+                            (latitude: $0.latitude, longitude: $0.longitude)
+                        })
+                    }
+                }
                 if flags.isOn(AssistantAPI.flag) {
                     Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
                         HStack(spacing: 4) {
@@ -441,30 +453,59 @@ struct ParcelHistoryView: View {
         }
     }
 
-    private func riskReading(_ reading: ParcelRisk, _ freshness: Freshness?) -> some View {
+    /// One part of «Риск» under its own small heading.
+    private func riskPart<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Риск", font: ParcelHistoryCopy.sectionTitleFont)
-            ParcelRiskReadings(risk: reading, freshness: freshness, explainsMoisture: true)
+            SectionTitle(title, font: .subheadline.weight(.semibold))
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func riskReading(_ reading: ParcelRisk, _ freshness: Freshness?) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            riskPart("Сега") {
+                ParcelRiskReadings(risk: reading, freshness: freshness)
+                // Beside the picture's date, which is what it qualifies.
+                if let words = rainWords(reading) {
+                    Label(words, systemImage: "cloud.rain")
+                        .font(.footnote)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             // The app's own reading of the pair (owner, 2026-11-07), above
-            // the assistant's longer one.
-            if let words = explanation(reading, freshness) {
-                Text(words)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+            // the assistant's longer one: the meaning first, its caveats
+            // smaller under it.
+            let meaning = explanation(reading, freshness)
+            if let first = meaning.first {
+                riskPart("Какво означава") {
+                    Text(first)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(Array(meaning.dropFirst().enumerated()), id: \.offset) { _, caveat in
+                        Text(caveat)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text(RiskExplanation.moistureNote)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            if let words = rainWords(reading) {
-                Label(words, systemImage: "cloud.rain")
-                    .font(.subheadline)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            // How even the field is (#562 stage 2), over the visible part.
-            if let words = evenness(reading) {
-                Text(words)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+            // How even the field is (#562 stage 2), over the visible part:
+            // a line per finding.
+            let field = evenness(reading)
+            if !field.isEmpty {
+                riskPart("В полето") {
+                    ForEach(Array(field.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -472,9 +513,15 @@ struct ParcelHistoryView: View {
     }
 
     private func riskSpoken(_ reading: ParcelRisk, _ freshness: Freshness?) -> String {
-        A11y.sentence(["Риск"] + ParcelRiskReadings.spoken(reading, freshness)
-                      + [RiskExplanation.moistureNote, explanation(reading, freshness),
-                         rainWords(reading), evenness(reading)])
+        // In steps: one long `+` chain is more than CI's type checker will
+        // solve in its time limit.
+        var clauses: [String?] = ["Риск"]
+        clauses += ParcelRiskReadings.spoken(reading, freshness)
+        clauses.append(rainWords(reading))
+        clauses += explanation(reading, freshness).map { Optional($0) }
+        clauses.append(RiskExplanation.moistureNote)
+        clauses += evenness(reading).map { Optional($0) }
+        return A11y.sentence(clauses)
     }
 
     private func rainWords(_ reading: ParcelRisk) -> String? {
@@ -483,22 +530,26 @@ struct ParcelHistoryView: View {
     }
 
     /// The parcel's middle, from the outline the route carries.
+    private var parcelCentre: CLLocationCoordinate2D? {
+        guard let outline, outline.isDrawable else { return nil }
+        return MKCoordinateRegion(fitting: [outline])?.center
+    }
+
     private func loadRain() async {
-        guard let day = risk?.state.value?.acquired, let outline, outline.isDrawable,
-              let centre = MKCoordinateRegion(fitting: [outline])?.center else { return }
+        guard let day = risk?.state.value?.acquired, let centre = parcelCentre else { return }
         await rain.load(latitude: centre.latitude, longitude: centre.longitude, after: day)
     }
 
-    private func evenness(_ reading: ParcelRisk) -> String? {
+    private func evenness(_ reading: ParcelRisk) -> [String] {
         var sentences = reading.withinField.map { RiskWithinField.sentences($0, mean: reading.ndvi) } ?? []
         // Where in the field (#562 stage 2b); nothing when it cannot say.
         if let weakest = reading.weakest.flatMap(RiskWithinField.weakest) { sentences.append(weakest) }
-        return sentences.isEmpty ? nil : sentences.joined(separator: " ")
+        return sentences
     }
 
-    private func explanation(_ reading: ParcelRisk, _ freshness: Freshness?) -> String? {
-        RiskExplanation.text(vegetation: reading.vegetation, moisture: reading.moisture,
-                             stale: FarmRiskView.acquisition(reading, freshness)?.isStale ?? false)
+    private func explanation(_ reading: ParcelRisk, _ freshness: Freshness?) -> [String] {
+        RiskExplanation.sentences(vegetation: reading.vegetation, moisture: reading.moisture,
+                                  stale: FarmRiskView.acquisition(reading, freshness)?.isStale ?? false)
     }
 
     /// The question for the assistant, from what this screen holds.
@@ -506,7 +557,7 @@ struct ParcelHistoryView: View {
         let archive = store.state.value
         return RiskAnalysisQuestion.text(
             parcel: archive?.parcel.name ?? parcelName, risk: reading, freshness: freshness,
-            trend: trend?.state.value.flatMap(RiskTrendWords.change),
+            trend: trend?.state.value.flatMap { RiskTrendWords.change($0) },
             rain: rainWords(reading),
             seasons: archive?.seasons.items ?? [], operations: archive?.operations.items ?? [],
             weeds: archive?.weeds.items ?? [])
