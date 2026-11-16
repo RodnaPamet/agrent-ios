@@ -73,6 +73,95 @@ struct AppMenuButton<Extra: View>: View {
         }
     }
 
+    /// A group's rows: the bar's overflow that belongs to it, then the
+    /// screens that are never on the bar.
+    @ViewBuilder
+    private func rows(_ group: MenuGroup) -> some View {
+        ForEach(tabs.overflow.filter { $0.menuGroup == group }) { surface in
+            Button {
+                presented = surface
+            } label: {
+                // Борса off the bar takes its unread badge with it, so the
+                // count rides on the row that opens it.
+                Label(menuLabel(surface), systemImage: surface.icon)
+            }
+        }
+        switch group {
+        case .farm:
+            // «Машини» (#574): OWNER and ADMIN only (owner, 2026-11-09), and
+            // only on the server's word. An unknown role shows nothing, as
+            // the screen is where the drivers are.
+            if showsMachines {
+                Button {
+                    showingMachines = true
+                } label: {
+                    Label("Машини", systemImage: "location.north.circle")
+                }
+                .accessibilityInputLabels(A11y.Spoken.machines)
+            }
+        case .market:
+            EmptyView()
+        case .contact:
+            // «Канали» (P9.8, #583): every role, mechanisators included
+            // (#2986 §1), once the server switches channels on.
+            if flags.isOn(ChannelsAPI.flag) {
+                Button {
+                    showingChannels = true
+                } label: {
+                    Label(MessagingPolicy.counted("Канали", unread: channelUnread.total),
+                          systemImage: "bubble.left.and.text.bubble.right")
+                }
+                .accessibilityInputLabels(A11y.spokenNames("Канали", "Channels"))
+            }
+        case .knowledge:
+            // «Календари» (#633): the agronomic calendar for every role, and
+            // «Лунен календар» inside it once the server switches that on.
+            Button {
+                showingLunar = true
+            } label: {
+                Label(AgroWords.calendars, systemImage: "calendar")
+            }
+            .accessibilityInputLabels(A11y.spokenNames("Календари", "Календар", "Calendars"))
+            // «Вдъхновение» (#580): every role, mechanisators included
+            // (owner, 2026-11-12), once the server switches it on.
+            if flags.isOn(LibraryAPI.flag) {
+                Button {
+                    showingLibrary = true
+                } label: {
+                    Label("Вдъхновение", systemImage: "books.vertical")
+                }
+                .accessibilityInputLabels(A11y.spokenNames("Вдъхновение", "Книги", "Library"))
+            }
+        }
+    }
+
+    private var showsMachines: Bool { people.user?.permissions?.canAdmin == true }
+
+    private func hasRows(_ group: MenuGroup) -> Bool {
+        if tabs.overflow.contains(where: { $0.menuGroup == group }) { return true }
+        switch group {
+        case .farm: return showsMachines
+        case .market: return false
+        case .contact: return flags.isOn(ChannelsAPI.flag)
+        case .knowledge: return true
+        }
+    }
+
+    /// The group's name, with the unread counts of the rows inside it, so a
+    /// count is not hidden by a closed dropdown.
+    private func groupLabel(_ group: MenuGroup) -> String {
+        var unreadInside = 0
+        for surface in tabs.overflow where surface.menuGroup == group {
+            switch surface {
+            case .exchange: unreadInside += unread.count
+            case .notifications: unreadInside += notifications.unreadCount
+            default: break
+            }
+        }
+        if group == .contact, flags.isOn(ChannelsAPI.flag) { unreadInside += channelUnread.total }
+        return MessagingPolicy.counted(group.title, unread: unreadInside)
+    }
+
     var body: some View {
         Menu {
             // Context, not an action. Which farm you are signed into is the
@@ -86,64 +175,27 @@ struct AppMenuButton<Extra: View>: View {
             // The open farm by NAME (#179) — a person can hold several now,
             // and the slug is a URL fragment rather than what anyone calls
             // their farm. The slug stands in until the name is known.
+            // Four groups, each its own dropdown (owner, 2026-11-16: "the
+            // hamburger menu became too long - organise it in sections with
+            // dropdown for each section"; «Връзка» was the owner's name).
+            // Headed by the open farm by NAME (#179); the slug stands in
+            // until the name is known.
+            //
+            // EVERY surface not in the bottom row is still here, in its
+            // group: a farmer who takes Дневник off the bar must still be
+            // able to open the diary. The groups are derived from the bar, so
+            // the two cannot drift, and an empty group is not shown.
             Section(titled: farms.activeFarm.map { $0.name ?? $0.slug } ?? "") {
-                // EVERY surface not in the bottom row, always.
-                //
-                // This is what makes the tab customiser safe rather than a
-                // trap. A farmer who takes Дневник out of the bar must
-                // still be able to open the diary, and a preference
-                // control that can strand a feature is not a setting. The
-                // list is derived from the bar, so the two cannot drift.
-                ForEach(tabs.overflow) { surface in
-                    Button {
-                        presented = surface
-                    } label: {
-                        // Борса off the bar takes its unread badge with it,
-                        // so the count rides on the row that opens it.
-                        Label(menuLabel(surface), systemImage: surface.icon)
+                ForEach(MenuGroup.allCases) { group in
+                    if hasRows(group) {
+                        Menu {
+                            rows(group)
+                        } label: {
+                            Label(groupLabel(group), systemImage: group.icon)
+                        }
+                        .accessibilityInputLabels(A11y.spokenNames(group.title))
                     }
                 }
-                // «Машини» (#574): OWNER and ADMIN only (owner, 2026-11-09),
-                // and only on the server's word. An unknown role shows
-                // nothing, as the screen is where the drivers are.
-                if people.user?.permissions?.canAdmin == true {
-                    Button {
-                        showingMachines = true
-                    } label: {
-                        Label("Машини", systemImage: "location.north.circle")
-                    }
-                    .accessibilityInputLabels(A11y.Spoken.machines)
-                }
-                // «Канали» (P9.8, #583): every role, mechanisators included
-                // (#2986 §1), once the server switches channels on.
-                if flags.isOn(ChannelsAPI.flag) {
-                    Button {
-                        showingChannels = true
-                    } label: {
-                        Label(MessagingPolicy.counted("Канали", unread: channelUnread.total),
-                              systemImage: "bubble.left.and.text.bubble.right")
-                    }
-                    .accessibilityInputLabels(A11y.spokenNames("Канали", "Channels"))
-                }
-                // «Вдъхновение» (#580): every role, mechanisators included
-                // (owner, 2026-11-12), once the server switches it on.
-                if flags.isOn(LibraryAPI.flag) {
-                    Button {
-                        showingLibrary = true
-                    } label: {
-                        Label("Вдъхновение", systemImage: "books.vertical")
-                    }
-                    .accessibilityInputLabels(A11y.spokenNames("Вдъхновение", "Книги", "Library"))
-                }
-                // «Календари» (#633): the agronomic calendar for every role,
-                // and «Лунен календар» inside it once the server switches
-                // that on. Neither names a farm.
-                Button {
-                    showingLunar = true
-                } label: {
-                    Label(AgroWords.calendars, systemImage: "calendar")
-                }
-                .accessibilityInputLabels(A11y.spokenNames("Календари", "Календар", "Calendars"))
             }
 
             // ITS OWN SECTION, last — where «Профил» and «Изход» sat before
@@ -327,5 +379,41 @@ struct TabCustomiserRow: View {
         .buttonStyle(.plain)
         .accessibilityHint("Избира кои екрани са в долната лента")
         .sheet(isPresented: $editing) { TabCustomiserView() }
+    }
+}
+
+/// The menu's groups (owner, 2026-11-16), in order.
+enum MenuGroup: String, CaseIterable, Identifiable, Sendable {
+    case farm, market, contact, knowledge
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .farm: "Стопанство"
+        case .market: "Пазар"
+        case .contact: "Връзка"
+        case .knowledge: "Знания"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .farm: "leaf"
+        case .market: "chart.line.uptrend.xyaxis"
+        case .contact: "bell"
+        case .knowledge: "book"
+        }
+    }
+}
+
+extension AppSurface {
+    /// Which of the menu's groups the surface sits in when it is not on the
+    /// bar (owner, 2026-11-16: four groups).
+    var menuGroup: MenuGroup {
+        switch self {
+        case .journal, .tasks, .locations, .farmRisk, .dashboard, .calculator, .documents: .farm
+        case .exchange, .trends, .promotions: .market
+        case .news, .notifications: .contact
+        }
     }
 }

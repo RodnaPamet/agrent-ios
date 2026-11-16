@@ -1021,11 +1021,27 @@ final class A11yShotsTests: XCTestCase {
             XCTFail("this suite must never tap «Изход» — it would clear the Keychain")
             return false
         }
+        // The menu's rows sit in four dropdowns (owner, 2026-11-16): open
+        // the row's group first. Админ stays a plain row.
+        if let group = Self.menuGroup[label] {
+            let opener = labelled(group, in: app.buttons)
+            guard opener.waitForExistence(timeout: 5) else { return false }
+            opener.tap()
+        }
         let row = labelled(label, in: app.buttons)
         guard row.waitForExistence(timeout: 5) else { return false }
         row.tap()
         return true
     }
+
+    /// Which group a menu row sits in (`MenuGroup`, `AppSurface.menuGroup`).
+    private static let menuGroup: [String: String] = [
+        "Дневник": "Стопанство", "Задачи": "Стопанство", "Блокове": "Стопанство", "Риск": "Стопанство",
+        "Табло": "Стопанство", "Калкулатор": "Стопанство", "Документи": "Стопанство", "Машини": "Стопанство",
+        "Борса": "Пазар", "Тенденции": "Пазар", "Промоции": "Пазар",
+        "Новини": "Връзка", "Известия": "Връзка", "Канали": "Връзка",
+        "Календари": "Знания", "Вдъхновение": "Знания",
+    ]
 
     /// The button whose label IS `label`, or is `label` followed by a
     /// counted suffix — «Борса (2)».
@@ -2847,6 +2863,12 @@ final class A11yShotsTests: XCTestCase {
         app.launch()
         assertSeamActive(app)
         XCTAssertTrue(openMenu(app), "no «Меню» on the root")
+        // The count rides on the closed group too, so it is not hidden
+        // (owner, 2026-11-16: the menu in dropdowns).
+        let group = labelled("Връзка", in: app.buttons)
+        XCTAssertTrue(group.waitForExistence(timeout: 15), "no «Връзка» group\n\(app.debugDescription)")
+        XCTAssertTrue(group.label.contains("("), "the group hides the unread count: \(group.label)")
+        group.tap()
         let row = app.buttons["Известия (2)"]
         XCTAssertTrue(row.waitForExistence(timeout: 15), "the menu has no «Известия (2)»\n\(app.debugDescription)")
         capture("22-notifications-menu", app: app)
