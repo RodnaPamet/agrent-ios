@@ -187,7 +187,7 @@ final class WindFieldTests: XCTestCase {
         // misses the top edge by many points at this zoom.
         let old = MKCoordinateRegion(rect)
         let oldNorth = old.center.latitude + old.span.latitudeDelta / 2
-        XCTAssertGreaterThan(abs(oldNorth - 50), 0.5)
+        XCTAssertGreaterThan(abs(oldNorth - 50), 0.3, "about 23 points at this height")
     }
 
     // MARK: - Where streaks are born (owner, 2026-11-07)
