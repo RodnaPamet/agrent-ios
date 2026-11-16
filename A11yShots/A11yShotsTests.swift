@@ -2271,6 +2271,15 @@ final class A11yShotsTests: XCTestCase {
         app.buttons["Пауза"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Вятър в '")).firstMatch.exists,
                       "▶ did not move the hour\n\(app.debugDescription)")
+        // Zoomed out (owner, 2026-11-16: the clouds and the В/Н signs
+        // stopped matching the map): the layers must stay on the land, and
+        // the map stops short of the globe.
+        let map = app.maps.firstMatch
+        if map.exists {
+            for _ in 0..<4 { map.pinch(withScale: 0.4, velocity: -1.5) }
+            Thread.sleep(forTimeInterval: 3)
+            capture("31c-wind-zoomed-out", app: app)
+        }
         toggle.tap()
         let anyLine = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Вятър сега' OR label BEGINSWITH 'Вятър в '"))
         XCTAssertFalse(anyLine.firstMatch.waitForExistence(timeout: 2), "the wind stayed on")
