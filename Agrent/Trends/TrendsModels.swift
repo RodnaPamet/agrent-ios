@@ -125,7 +125,8 @@ struct PriceSeries: Decodable, Identifiable, Equatable, Sendable {
     static let platformSource = "platform"
 
     /// ZarnoBorsa.com's prices, read daily with Agrent's subscription (#627,
-    /// owner 2026-11-15): Bulgarian EXW and Black Sea FOB, each point on the
+    /// owner 2026-11-15): Bulgaria's EXW and FOB (ZarnoBorsa markets 1044 and
+    /// 1129; the stage tells them apart, both are `BG`), each point on the
     /// day ZarnoBorsa dated it. Shown with the source and a link to it.
     var isZarnoBorsa: Bool { source == Self.zarnoborsaSource }
 
