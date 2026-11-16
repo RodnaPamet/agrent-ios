@@ -230,6 +230,19 @@ extension Array where Element == PriceSeries {
     fileprivate func freshest() -> PriceSeries? {
         self.min { Self.fresher($0, than: $1) }
     }
+
+    /// ZarnoBorsa's Bulgarian FOB, shown as ONE line under an EXW headline
+    /// (owner, 2026-11-16: «Second price line»; EXW stays the price and the
+    /// only chart line). Nil under any other headline: FOB beside the EC
+    /// average or a typed price would be a second quotation the 2026-10-23
+    /// rule keeps off the screen.
+    func fobBeside(_ lead: PriceSeries?) -> PriceSeries? {
+        guard let lead, lead.isZarnoBorsa, (lead.stage ?? "").uppercased() == "EXW" else { return nil }
+        return filter {
+            !$0.points.isEmpty && $0.isZarnoBorsa && $0.region.uppercased() == lead.region.uppercased()
+                && ($0.stage ?? "").uppercased() == "FOB"
+        }.freshest()
+    }
 }
 
 /// How the lead price moved across the range on screen (#409): the owner
@@ -312,6 +325,7 @@ struct PricesResponse: Decodable, Equatable, Sendable {
 extension PricesResponse {
     /// The one series Тенденции and Табло quote — see `lead()`.
     var lead: PriceSeries? { series.lead() }
+    var fob: PriceSeries? { series.fobBeside(lead) }
 
     /// How old the lead's last observation is, both ends server-side.
     var leadStaleDays: Int? {
@@ -365,4 +379,17 @@ enum Staleness {
     /// image current while the parcel map, hard-coding ten, called the same
     /// image stale in orange. One fact, two screens, two answers.
     static let satellitePass = 10
+}
+
+/// The FOB line's words, pure so tests pin them (owner, 2026-11-16).
+enum TrendsWords {
+    /// Shown: «FOB България: 244,75 €/т · 13 ноември». Spoken: the same
+    /// without the «·», which VoiceOver reads aloud as "middle dot".
+    static func fob(_ series: PriceSeries, _ point: PricePoint) -> (shown: String, spoken: String) {
+        let unit = series.currency == "EUR" && series.unit == "EUR/t"
+            ? "€/т" : SeriesVocabulary.priceUnit(unit: series.unit, currency: series.currency)
+        let price = "FOB \(SeriesVocabulary.region(series.region)): \(Num.text(point.price)) \(unit)"
+        guard let day = point.day.map(BgDate.dayMonth) else { return (price, price) }
+        return ("\(price) · \(day)", A11y.sentence([price, "към \(day)"]))
+    }
 }

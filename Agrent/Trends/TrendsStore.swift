@@ -70,6 +70,14 @@ final class TrendsStore {
     /// time — both server values. See `Staleness`.
     var staleDays: Int? { prices.value?.leadStaleDays }
 
+    /// ZarnoBorsa's FOB under an EXW headline, and its latest price
+    /// (owner, 2026-11-16).
+    var fobLatest: (series: PriceSeries, point: PricePoint)? {
+        guard let fob = prices.value?.fob,
+              let point = fob.points.max(by: { ($0.day ?? .distantPast) < ($1.day ?? .distantPast) }) else { return nil }
+        return (fob, point)
+    }
+
     /// The most recent price in the lead, with its day.
     var latest: PricePoint? {
         lead?.points.max { ($0.day ?? .distantPast) < ($1.day ?? .distantPast) }
