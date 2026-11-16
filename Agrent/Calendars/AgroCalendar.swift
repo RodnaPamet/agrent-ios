@@ -107,7 +107,10 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
     }
 
     /// A span of the year, `MM-DD` to `MM-DD`; `from` after `to` wraps New
-    /// Year. Every window is cited: one without `cite` is not read.
+    /// Year. Every window has ONE kind of backing, never both (agri-saas
+    /// #3095): МЗХ's citations, or Agrent's written basis for a window an
+    /// admin corrected or added (owner, 2026-11-16). One with neither is not
+    /// read.
     struct Window: Decodable, Identifiable, Equatable, Hashable, Sendable {
         enum Kind: String, Decodable, Sendable { case sowing, fieldwork, harvest }
         let id: String
@@ -120,14 +123,21 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
         let depth: Amount?
         let title: Text?
         let note: Text?
-        /// Never empty: the first is the window's own source.
+        /// МЗХ's sources, for a `published` window; EMPTY for a corrected or
+        /// added one, which carries `basis` instead. The server sends the two
+        /// mutually exclusive, so "beside" cannot be drawn.
         let citations: [Citation]
-        var cite: Citation { citations[0] }
+        var cite: Citation? { citations.first }
+        let origin: Origin
+        /// Agrent's reason, required on a corrected or added window.
+        let basis: Text?
+
+        enum Origin: String, Sendable { case published, corrected, added }
 
         /// The file writes `cite` and `alsoCite`; the API (agri-saas #3094)
         /// sends them together as `cites`. Either is read.
         private enum CodingKeys: String, CodingKey {
-            case id, kind, band, region, from, to, seedRate, depth, title, note, cite, alsoCite, cites
+            case id, kind, band, region, from, to, seedRate, depth, title, note, cite, alsoCite, cites, origin, basis
         }
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -141,11 +151,30 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
             depth = try? c.decodeIfPresent(Amount.self, forKey: .depth)
             title = try? c.decodeIfPresent(Text.self, forKey: .title)
             note = try? c.decodeIfPresent(Text.self, forKey: .note)
-            if let cites = try? c.decodeIfPresent([Citation].self, forKey: .cites), !cites.isEmpty {
-                citations = cites
+            // An origin this build does not know is not read: a fourth kind
+            // must not render as one of these three.
+            let rawOrigin = (try? c.decodeIfPresent(String.self, forKey: .origin)) ?? Origin.published.rawValue
+            guard let origin = Origin(rawValue: rawOrigin) else {
+                throw DecodingError.dataCorruptedError(forKey: .origin, in: c, debugDescription: "unknown origin")
+            }
+            self.origin = origin
+            if origin == .published {
+                basis = nil
+                if let cites = try? c.decodeIfPresent([Citation].self, forKey: .cites), !cites.isEmpty {
+                    citations = cites
+                } else {
+                    let cite = try c.decode(Citation.self, forKey: .cite)
+                    citations = [cite] + ((try? c.decodeIfPresent([Citation].self, forKey: .alsoCite)) ?? [])
+                }
             } else {
-                let cite = try c.decode(Citation.self, forKey: .cite)
-                citations = [cite] + ((try? c.decodeIfPresent([Citation].self, forKey: .alsoCite)) ?? [])
+                // Corrected or added: a non-blank basis, and no citation
+                // shown even if one were sent.
+                let basis = try c.decode(Text.self, forKey: .basis)
+                guard let words = basis.bg, !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw DecodingError.dataCorruptedError(forKey: .basis, in: c, debugDescription: "blank basis")
+                }
+                self.basis = basis
+                citations = []
             }
         }
 
@@ -220,6 +249,22 @@ enum AgroWords {
     static let works = "Основни работи"
     static let harvest = "Прибиране"
     static let sources = "Източници"
+    /// «Коригирано от Agrent: …», shown INSTEAD of a citation (agri-saas
+    /// #3095; corrected and added read alike, as the owner was offered).
+    static func corrected(_ basis: String) -> String { "Коригирано от Agrent: \(basis)" }
+
+    /// The sowing band (owner, 2026-11-16: an added sowing window carries one
+    /// too, so the screen now says it). Nil for a band this build does not
+    /// know.
+    static func band(_ band: String?) -> String? {
+        switch band {
+        case "early": "Ранна сеитба"
+        case "optimal": "Оптимален срок"
+        case "late": "Късна сеитба"
+        default: nil
+        }
+    }
+
     // МЗХ's costs (#637), the card's own words (agri-saas #3127 catalogue).
     static let costsTitle = "Разходи по МЗХ"
     static let costTotal = "Общо преки разходи"

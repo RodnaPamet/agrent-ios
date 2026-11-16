@@ -37,7 +37,7 @@ final class AgroCalendarTests: XCTestCase {
         let wheat = try XCTUnwrap(try calendar().crops.first { $0.key == "wheat-bread" })
         let north = wheat.windows(.sowing, in: .north)
         XCTAssertEqual(north.map(\.from), ["09-25"])
-        XCTAssertEqual(north.first?.cite.page, "20")
+        XCTAssertEqual(north.first?.cite?.page, "20")
         let southWheat = try XCTUnwrap(try calendar(.south).crops.first { $0.key == "wheat-bread" })
         XCTAssertEqual(southWheat.windows(.sowing, in: .south).map(\.from), ["10-01"])
         XCTAssertFalse(southWheat.windows(.fieldwork, in: .south).isEmpty, "\"both\" windows apply to either region")
@@ -52,7 +52,7 @@ final class AgroCalendarTests: XCTestCase {
         let pruning = try XCTUnwrap(apple.windows.first { $0.id == "apple.pruning" })
         XCTAssertEqual(pruning.from, "12-15")
         XCTAssertEqual(pruning.to, "03-30")
-        XCTAssertEqual(try calendar().sources[pruning.cite.source]?.publisher, "МЗХ")
+        XCTAssertEqual(try calendar().sources[try XCTUnwrap(pruning.cite).source]?.publisher, "МЗХ")
     }
 
     func testAWindowCanWrapTheYear() {
@@ -151,5 +151,33 @@ final class AgroCalendarTests: XCTestCase {
         XCTAssertNil(AgroWords.year(""))
         XCTAssertNil(AgroWords.year(nil))
         XCTAssertEqual(AgroWords.costsNote(year: nil), "по МЗХ, превалутирано")
+    }
+
+    /// agri-saas#3095 (owner, 2026-11-16): a corrected or added window has a
+    /// basis and NO citation; one with neither, a blank basis, or an origin
+    /// this build does not know is left out.
+    func testCorrectedAndAddedWindowsShowTheirBasisInsteadOfACitation() throws {
+        let json = """
+        {"sources":{"a":{"title":"A","publisher":"МЗХ","url":"https://example.org/a.pdf"}},
+         "crops":[{"key":"x","group":"field","name":{"bg":"Х"},"windows":[
+           {"id":"x.p","kind":"sowing","band":"optimal","region":"both","from":"09-01","to":"09-30","origin":"published","cites":[{"source":"a","page":1}]},
+           {"id":"x.c","kind":"sowing","band":"early","region":"north","from":"09-10","to":"09-20","origin":"corrected",
+            "basis":{"bg":"Студена есен."},"supersedes":{"from":"09-01","to":"09-15","cites":[{"source":"a","page":2}]}},
+           {"id":"x.a","kind":"harvest","region":"both","from":"07-01","to":"07-15","origin":"added","basis":{"bg":"По опита на стопанството."}},
+           {"id":"x.blank","kind":"harvest","region":"both","from":"08-01","to":"08-15","origin":"added","basis":{"bg":"  "}},
+           {"id":"x.none","kind":"harvest","region":"both","from":"08-01","to":"08-15","origin":"added"},
+           {"id":"x.new","kind":"harvest","region":"both","from":"08-01","to":"08-15","origin":"proposed","basis":{"bg":"Нещо."}}]}]}
+        """
+        let calendar = try JSONDecoder().decode(AgroCalendar.self, from: Data(json.utf8))
+        let windows = try XCTUnwrap(calendar.crops.first).windows
+        XCTAssertEqual(windows.map(\.id), ["x.p", "x.c", "x.a"])
+        let corrected = windows[1]
+        XCTAssertEqual(corrected.origin, .corrected)
+        XCTAssertTrue(corrected.citations.isEmpty, "the superseded citation is never shown as the window's")
+        XCTAssertEqual(AgroWords.corrected(try XCTUnwrap(corrected.basis?.bg)), "Коригирано от Agrent: Студена есен.")
+        XCTAssertEqual(windows[2].origin, .added)
+        XCTAssertEqual(windows[0].origin, .published, "positive control")
+        XCTAssertEqual(AgroWords.band("early"), "Ранна сеитба")
+        XCTAssertNil(AgroWords.band("someday"))
     }
 }
