@@ -1,16 +1,20 @@
 import XCTest
 @testable import Agrent
 
-/// «Агрономически календар» (#633): the bundled dataset reads, every
+/// «Агрономически календар» (#633): the server's dataset reads, every
 /// window is cited to a source that exists, units are the closed set, and
 /// the words are plain Bulgarian.
 final class AgroCalendarTests: XCTestCase {
 
-    private func calendar() throws -> AgroCalendar {
-        try XCTUnwrap(AgroCalendar.bundled(), "the bundled agro-calendar.json must read")
+    /// The server's answer for a region, as `GET /api/agro-calendar` sends
+    /// it (`Tests/Fixtures/agro-calendar-<region>.json`, the compiled МЗХ
+    /// dataset in the API's shape).
+    private func calendar(_ region: AgroRegion = .north) throws -> AgroCalendar {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "agro-calendar-\(region.rawValue)", withExtension: "json"))
+        return try JSONDecoder().decode(AgroCalendar.self, from: Data(contentsOf: url))
     }
 
-    func testTheBundledFieldCropsAllReadAndAreAllCited() throws {
+    func testTheFieldCropsAllReadAndAreAllCited() throws {
         let calendar = try calendar()
         XCTAssertGreaterThanOrEqual(calendar.crops(in: .field).count, 8)
         XCTAssertFalse(calendar.crops(in: .vegetable).isEmpty)
@@ -34,8 +38,9 @@ final class AgroCalendarTests: XCTestCase {
         let north = wheat.windows(.sowing, in: .north)
         XCTAssertEqual(north.map(\.from), ["09-25"])
         XCTAssertEqual(north.first?.cite.page, "20")
-        XCTAssertEqual(wheat.windows(.sowing, in: .south).map(\.from), ["10-01"])
-        XCTAssertFalse(wheat.windows(.fieldwork, in: .south).isEmpty, "\"both\" windows apply to either region")
+        let southWheat = try XCTUnwrap(try calendar(.south).crops.first { $0.key == "wheat-bread" })
+        XCTAssertEqual(southWheat.windows(.sowing, in: .south).map(\.from), ["10-01"])
+        XCTAssertFalse(southWheat.windows(.fieldwork, in: .south).isEmpty, "\"both\" windows apply to either region")
         XCTAssertEqual(AgroWords.amount(try XCTUnwrap(north.first?.seedRate)), "500–600 кълняеми семена на м²")
         XCTAssertEqual(AgroWords.span("09-25", "10-10"), "25 септември – 10 октомври")
     }
@@ -95,5 +100,17 @@ final class AgroCalendarTests: XCTestCase {
         let windows = try XCTUnwrap(calendar.crops.first).windows
         XCTAssertEqual(windows.map(\.id), ["x.1"], "a window with no citation is left out")
         XCTAssertEqual(windows[0].citations.map(\.page), ["4", "20–21"])
+    }
+
+    /// Every window the compiled dataset holds reads from the API's shape:
+    /// none is lost to the decoder (37 crops; 121 windows north, 122 south).
+    func testNoWindowIsLostReadingTheAPI() throws {
+        XCTAssertEqual(try calendar(.north).crops.count, 37)
+        XCTAssertEqual(try calendar(.north).crops.flatMap(\.windows).count, 121)
+        XCTAssertEqual(try calendar(.south).crops.flatMap(\.windows).count, 122)
+    }
+
+    func testThePathNamesTheRegion() {
+        XCTAssertEqual(AgroCalendarAPI.path(region: .south), "/api/agro-calendar?region=south")
     }
 }
