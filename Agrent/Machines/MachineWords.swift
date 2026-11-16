@@ -2,6 +2,14 @@ import Foundation
 
 /// What «Машини» says about a machine, pure so tests pin it.
 enum MachineWords {
+    /// The empty map's sentence: «+» is named only where there is one to
+    /// tap (the server has a tracker register).
+    static func noMachines(canAddTracker: Bool) -> String {
+        canAddTracker
+            ? "Още няма проследявани машини. Добавете GPS тракер с «+» или свържете телематиката на производителя от уеб приложението."
+            : "Още няма проследявани машини. Свържете телематиката на производителя от уеб приложението."
+    }
+
     /// «Движи се», «Спряна, с включен двигател», «Спряна»; the moving flag is
     /// the server's, so the phone and the web agree.
     static func state(_ position: Machine.Position) -> String {

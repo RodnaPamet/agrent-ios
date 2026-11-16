@@ -19,7 +19,12 @@ final class MachinesStore {
     /// #2948 ships the reads before the register). Then the screen offers no
     /// register and no «Нов тракер», rather than an error and a form that
     /// cannot save.
-    private(set) var registerAvailable = true
+    ///
+    /// FALSE UNTIL THE SERVER SAYS SO. It used to start true, so «+» showed
+    /// while the first read was in flight and vanished when the 404 came
+    /// back (owner's screenshot, 2026-11-16: "clicking on a new machine
+    /// makes the '+' button disappear"; production has no register route).
+    private(set) var registerAvailable = false
 
     /// A tracker reports every 30 seconds or so; a minute between reads is
     /// fresh enough for "where is the tractor" and kind to a rural signal.
@@ -40,6 +45,7 @@ final class MachinesStore {
                 registerAvailable = false
                 registerFailure = nil
             } else {
+                // A failed read is not an answer: what was known stays.
                 registerFailure = UserMessage.text(for: error)
             }
         }
