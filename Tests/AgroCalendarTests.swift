@@ -74,7 +74,10 @@ final class AgroCalendarTests: XCTestCase {
          ]}]}
         """
         let calendar = try JSONDecoder().decode(AgroCalendar.self, from: Data(json.utf8))
-        XCTAssertEqual(calendar.crops.first?.windows.map(\.id), ["x.1"], "an uncited window is not served")
+        // Owner, 2026-11-16 (agri-saas#3141): citations are off the screen,
+        // so an uncited window is READ — a phone that dropped it would go
+        // blank the day the server stops sending them.
+        XCTAssertEqual(calendar.crops.first?.windows.map(\.id), ["x.1", "x.2"])
     }
 
     func testTheWordsArePlainBulgarian() throws {
@@ -98,7 +101,7 @@ final class AgroCalendarTests: XCTestCase {
         """
         let calendar = try JSONDecoder().decode(AgroCalendar.self, from: Data(json.utf8))
         let windows = try XCTUnwrap(calendar.crops.first).windows
-        XCTAssertEqual(windows.map(\.id), ["x.1"], "a window with no citation is left out")
+        XCTAssertEqual(windows.map(\.id), ["x.1", "x.2"], "a window with no citation is read")
         XCTAssertEqual(windows[0].citations.map(\.page), ["4", "20–21"])
     }
 
@@ -179,5 +182,17 @@ final class AgroCalendarTests: XCTestCase {
         XCTAssertEqual(windows[0].origin, .published, "positive control")
         XCTAssertEqual(AgroWords.band("early"), "Ранна сеитба")
         XCTAssertNil(AgroWords.band("someday"))
+    }
+
+    /// The calendar still reads when the server sends no `sources` map and
+    /// no citations at all (agri-saas#3141).
+    func testACalendarWithNoSourcesReads() throws {
+        let json = """
+        {"crops":[{"key":"x","group":"field","name":{"bg":"Х"},"windows":[
+          {"id":"x.1","kind":"sowing","band":"optimal","region":"both","from":"09-01","to":"09-30"}]}]}
+        """
+        let calendar = try JSONDecoder().decode(AgroCalendar.self, from: Data(json.utf8))
+        XCTAssertTrue(calendar.sources.isEmpty)
+        XCTAssertEqual(calendar.crops.first?.windows.map(\.id), ["x.1"])
     }
 }

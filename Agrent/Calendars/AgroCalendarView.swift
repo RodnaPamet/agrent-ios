@@ -92,7 +92,7 @@ struct AgroCropPage: Hashable {
     let region: AgroRegion
 }
 
-/// One crop: sowing, the main field work, harvest, and the sources.
+/// One crop: sowing, the main field work and harvest (no citations on screen, owner 2026-11-16).
 struct AgroCropView: View {
     let calendar: AgroCalendar
     let crop: AgroCalendar.Crop
@@ -105,15 +105,7 @@ struct AgroCropView: View {
             section(AgroWords.harvest, crop.windows(.harvest, in: region))
             costsSection
             Section {
-                ForEach(sources, id: \.id) { source in
-                    if let url = source.url.flatMap(URL.init(string:)) {
-                        Link(source.label, destination: url).font(.footnote)
-                    } else {
-                        Text(source.label).font(.footnote)
-                    }
-                }
-            } header: {
-                SectionHeader(AgroWords.sources)
+                EmptyView()
             } footer: {
                 SectionFooter { Text(AgroWords.notice) }
             }
@@ -158,16 +150,14 @@ struct AgroCropView: View {
                 Text(note).font(.subheadline).foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            // Its backing: МЗХ's citations, or Agrent's reason INSTEAD of them.
+            // Agrent's reason on a corrected or added window. МЗХ's own
+            // citations are no longer drawn (owner, 2026-11-16: «МЗХ, 2024,
+            // стр. N» off the calendar); the data still carries them.
             if let basis = window.basis?.bg {
                 Text(AgroWords.corrected(basis))
                     .font(.caption2)
                     .foregroundStyle(Palette.accent)
                     .fixedSize(horizontal: false, vertical: true)
-            } else {
-                Text(window.citations.compactMap { AgroWords.cite($0, in: calendar) }.joined(separator: "; "))
-                    .font(.caption2)
-                    .foregroundStyle(Palette.secondaryText)
             }
         }
         .accessibilityElement(children: .combine)
@@ -189,10 +179,7 @@ struct AgroCropView: View {
             } header: {
                 SectionHeader(AgroWords.costsTitle)
             } footer: {
-                SectionFooter {
-                    Text(([AgroWords.costsNote(year: year(of: costs))]
-                          + [AgroWords.cite(costs.cite, in: calendar)].compactMap { $0 }).joined(separator: "; "))
-                }
+                SectionFooter { Text(AgroWords.costsNote(year: year(of: costs))) }
             }
             .pageRow()
         }
@@ -209,13 +196,7 @@ struct AgroCropView: View {
 
     /// The card's year, from its source's `published` («2026-09» → «2026»).
     private func year(of costs: AgroCalendar.Costs) -> String? {
-        AgroWords.year(calendar.sources[costs.cite.source]?.published)
+        costs.cite.flatMap { AgroWords.year(calendar.sources[$0.source]?.published) }
     }
 
-    private var sources: [(id: String, label: String, url: String?)] {
-        let ids = Set(crop.windows.flatMap { $0.citations.map(\.source) })
-        return ids.sorted().compactMap { id in
-            calendar.sources[id].map { (id, "\($0.publisher ?? ""): \($0.title)", $0.url) }
-        }
-    }
 }
