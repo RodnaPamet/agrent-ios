@@ -157,6 +157,14 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
 enum AgroRegion: String, CaseIterable, Identifiable, Sendable {
     case north, south
     var id: String { rawValue }
+
+    /// The half the farm's blocks lie in, to open the calendar on (owner,
+    /// 2026-11-16): only when every block the server could place agrees.
+    /// Blocks in both halves, or none placed, give no default.
+    static func of(_ locations: [Location]) -> AgroRegion? {
+        let placed = Set(locations.compactMap(\.agroRegion))
+        return placed.count == 1 ? placed.first : nil
+    }
     var title: String {
         switch self {
         case .north: "Северна България"

@@ -4,13 +4,20 @@ import SwiftUI
 /// Bulgaria, each with what is due now.
 struct AgroCalendarView: View {
     @AppStorage("agroCalendar.region") private var regionKey = AgroRegion.north.rawValue
+    /// Set once the farmer picks a half themselves: from then on their choice
+    /// stands, and the blocks no longer move the picker (owner, 2026-11-16).
+    @AppStorage("agroCalendar.regionChosen") private var regionChosen = false
     @State private var store = AgroCalendarStore()
+    @State private var locations = LocationsStore()
 
     private var region: AgroRegion { AgroRegion(rawValue: regionKey) ?? .north }
 
     var body: some View {
         List {
-            Picker("Район", selection: $regionKey) {
+            Picker("Район", selection: Binding(get: { regionKey }, set: {
+                regionKey = $0
+                regionChosen = true
+            })) {
                 ForEach(AgroRegion.allCases) { Text($0.title).tag($0.rawValue) }
             }
             .pickerStyle(.segmented)
@@ -50,6 +57,16 @@ struct AgroCalendarView: View {
         }
         .pageBackground()
         .inlineTitle(AgroWords.title)
+        // Until the farmer has picked, open on the half the farm's blocks lie
+        // in, from the cached block list (agri-saas #3100). No farm open, no
+        // agreement, or a failure: the picker stays as it is.
+        .task {
+            guard !regionChosen, FarmPath.openSlug != nil else { return }
+            await locations.load()
+            if !regionChosen, let blocks = locations.state.value, let half = AgroRegion.of(blocks) {
+                regionKey = half.rawValue
+            }
+        }
         .task(id: region) { await store.load(region) }
         .navigationDestination(for: AgroCropPage.self) { page in
             if let calendar = store.state.value, let crop = calendar.crops.first(where: { $0.key == page.key }) {
