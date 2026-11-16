@@ -27,9 +27,28 @@ struct AgroCalendar: Decodable, Sendable {
     }
 
     /// A source as cited by one window: which document, and its page.
+    ///
+    /// The page is a number, or a string where the source cites a span
+    /// («20–21»), as agri-saas's `AgroCalendarCitation` allows; both are
+    /// shown as written.
     struct Citation: Decodable, Equatable, Hashable, Sendable {
         let source: String
-        let page: Int?
+        let page: String?
+
+        private enum CodingKeys: String, CodingKey { case source, page }
+        init(source: String, page: String?) {
+            self.source = source
+            self.page = page
+        }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            source = try c.decode(String.self, forKey: .source)
+            if let number = try? c.decodeIfPresent(Int.self, forKey: .page) {
+                page = String(number)
+            } else {
+                page = try? c.decodeIfPresent(String.self, forKey: .page)
+            }
+        }
     }
 
     /// `{min, max, unit}` with the unit always named: `seeds/m2`,
@@ -81,11 +100,14 @@ struct AgroCalendar: Decodable, Sendable {
         let depth: Amount?
         let title: Text?
         let note: Text?
-        let cite: Citation
-        let alsoCite: [Citation]?
+        /// Never empty: the first is the window's own source.
+        let citations: [Citation]
+        var cite: Citation { citations[0] }
 
+        /// The file writes `cite` and `alsoCite`; the API (agri-saas #3094)
+        /// sends them together as `cites`. Either is read.
         private enum CodingKeys: String, CodingKey {
-            case id, kind, band, region, from, to, seedRate, depth, title, note, cite, alsoCite
+            case id, kind, band, region, from, to, seedRate, depth, title, note, cite, alsoCite, cites
         }
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -99,8 +121,12 @@ struct AgroCalendar: Decodable, Sendable {
             depth = try? c.decodeIfPresent(Amount.self, forKey: .depth)
             title = try? c.decodeIfPresent(Text.self, forKey: .title)
             note = try? c.decodeIfPresent(Text.self, forKey: .note)
-            cite = try c.decode(Citation.self, forKey: .cite)
-            alsoCite = try? c.decodeIfPresent([Citation].self, forKey: .alsoCite)
+            if let cites = try? c.decodeIfPresent([Citation].self, forKey: .cites), !cites.isEmpty {
+                citations = cites
+            } else {
+                let cite = try c.decode(Citation.self, forKey: .cite)
+                citations = [cite] + ((try? c.decodeIfPresent([Citation].self, forKey: .alsoCite)) ?? [])
+            }
         }
 
         /// Its own region's windows, and those for both.
@@ -108,7 +134,6 @@ struct AgroCalendar: Decodable, Sendable {
             self.region == "both" || self.region == region.rawValue
         }
 
-        var citations: [Citation] { [cite] + (alsoCite ?? []) }
     }
 
     /// Reads a list, keeping the entries that read: an uncited or

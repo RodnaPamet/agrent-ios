@@ -33,7 +33,7 @@ final class AgroCalendarTests: XCTestCase {
         let wheat = try XCTUnwrap(try calendar().crops.first { $0.key == "wheat-bread" })
         let north = wheat.windows(.sowing, in: .north)
         XCTAssertEqual(north.map(\.from), ["09-25"])
-        XCTAssertEqual(north.first?.cite.page, 20)
+        XCTAssertEqual(north.first?.cite.page, "20")
         XCTAssertEqual(wheat.windows(.sowing, in: .south).map(\.from), ["10-01"])
         XCTAssertFalse(wheat.windows(.fieldwork, in: .south).isEmpty, "\"both\" windows apply to either region")
         XCTAssertEqual(AgroWords.amount(try XCTUnwrap(north.first?.seedRate)), "500–600 кълняеми семена на м²")
@@ -79,5 +79,21 @@ final class AgroCalendarTests: XCTestCase {
         for text in texts {
             XCTAssertNil(text.range(of: "[ыэё]|ь(?!о)", options: .regularExpression), text)
         }
+    }
+
+    /// The API's shape (agri-saas #3094): `cites` together, a page as a
+    /// number or as a span.
+    func testTheAPIsCitesAreRead() throws {
+        let json = """
+        {"sources":{"a":{"title":"A","publisher":"МЗХ","url":"https://example.org/a.pdf"}},
+         "crops":[{"key":"x","group":"field","name":{"bg":"Х"},"windows":[
+           {"id":"x.1","kind":"harvest","region":"both","from":"07-01","to":"07-31",
+            "cites":[{"source":"a","page":4},{"source":"a","page":"20–21"}]},
+           {"id":"x.2","kind":"harvest","region":"both","from":"08-01","to":"08-31","cites":[]}]}]}
+        """
+        let calendar = try JSONDecoder().decode(AgroCalendar.self, from: Data(json.utf8))
+        let windows = try XCTUnwrap(calendar.crops.first).windows
+        XCTAssertEqual(windows.map(\.id), ["x.1"], "a window with no citation is left out")
+        XCTAssertEqual(windows[0].citations.map(\.page), ["4", "20–21"])
     }
 }
