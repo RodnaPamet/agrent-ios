@@ -15,8 +15,17 @@ import Foundation
 /// cannot read is left out, never the whole calendar.
 struct AgroCalendar: Decodable, Equatable, Sendable {
     let compiledAt: String?
+    /// Kept for the costs marker's year; empty when the server sends none.
     let sources: [String: Source]
     let crops: [Crop]
+
+    private enum CodingKeys: String, CodingKey { case compiledAt, sources, crops }
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        compiledAt = try? c.decodeIfPresent(String.self, forKey: .compiledAt)
+        sources = (try? c.decodeIfPresent([String: Source].self, forKey: .sources)) ?? [:]
+        crops = try c.decode([Crop].self, forKey: .crops)
+    }
 
     struct Source: Decodable, Equatable, Sendable {
         let title: String
@@ -96,7 +105,7 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
     /// «превалутирано»; the phone holds no peg). The лв figures as printed
     /// are the server's to keep; only euro is shown (EUR only, 2026-11-06).
     struct Costs: Decodable, Equatable, Sendable {
-        let cite: Citation
+        let cite: Citation?
         let lines: [Line]
         let perDaEurCentsTotal: Int?
 
@@ -159,12 +168,18 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
             }
             self.origin = origin
             if origin == .published {
+                // Citations are read where sent, but no longer REQUIRED on
+                // the phone: the owner took them off the screen (2026-11-16,
+                // agri-saas#3141), and the server validates the dataset. A
+                // phone that dropped an uncited window would go blank the
+                // day the server stops sending them.
                 basis = nil
                 if let cites = try? c.decodeIfPresent([Citation].self, forKey: .cites), !cites.isEmpty {
                     citations = cites
-                } else {
-                    let cite = try c.decode(Citation.self, forKey: .cite)
+                } else if let cite = try? c.decodeIfPresent(Citation.self, forKey: .cite) {
                     citations = [cite] + ((try? c.decodeIfPresent([Citation].self, forKey: .alsoCite)) ?? [])
+                } else {
+                    citations = []
                 }
             } else {
                 // Corrected or added: a non-blank basis, and no citation
