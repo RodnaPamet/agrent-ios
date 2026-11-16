@@ -113,4 +113,22 @@ final class AgroCalendarTests: XCTestCase {
     func testThePathNamesTheRegion() {
         XCTAssertEqual(AgroCalendarAPI.path(region: .south), "/api/agro-calendar?region=south")
     }
+
+    /// agri-saas #3100: `agroRegion` on each block, nil when the server could
+    /// not tell or sends a word this build does not know; the calendar opens
+    /// on a half only when every placed block agrees.
+    func testTheBlocksPickTheHalfOnlyWhenTheyAgree() throws {
+        func blocks(_ regions: [String]) throws -> [Location] {
+            let rows = regions.enumerated().map { index, region in
+                "{\"id\":\"l\(index)\",\"name\":\"Блок \(index)\",\"status\":\"ACTIVE\"\(region)}"
+            }
+            return try JSONDecoder().decode([Location].self, from: Data("[\(rows.joined(separator: ","))]".utf8))
+        }
+        let south = #","agroRegion":"south""#, north = #","agroRegion":"north""#
+        let unknown = #","agroRegion":"null""#, null = #","agroRegion":null"#
+        XCTAssertEqual(AgroRegion.of(try blocks([south, south, null, ""])), .south, "null and absent have no opinion")
+        XCTAssertNil(AgroRegion.of(try blocks([south, north])), "both halves: no default")
+        XCTAssertNil(AgroRegion.of(try blocks([null, ""])), "none placed: no default")
+        XCTAssertNil(try blocks([unknown]).first?.agroRegion, "an unknown word is no region")
+    }
 }

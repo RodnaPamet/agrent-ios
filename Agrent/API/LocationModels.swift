@@ -87,6 +87,14 @@ struct Location: Decodable, Equatable, Sendable, Identifiable {
 
     let counts: Counts?
 
+    /// North or South Bulgaria for the agronomic calendar (agri-saas #3100):
+    /// derived on the server from the centre of `boundsJson` and the owner's
+    /// oblast table (2026-11-16). Nil when the server could not tell, never a
+    /// nearest guess, and nil for a value this build does not know.
+    var agroRegion: AgroRegion? { agroRegionRaw.flatMap(AgroRegion.init(rawValue:)) }
+
+    private let agroRegionRaw: String?
+
     struct Counts: Decodable, Equatable, Sendable {
         let parcels: Int
     }
@@ -101,6 +109,7 @@ struct Location: Decodable, Equatable, Sendable, Identifiable {
         case createdAt, updatedAt, boundsJson
         case kindRaw = "kind"
         case counts = "_count"
+        case agroRegionRaw = "agroRegion"
     }
 }
 
