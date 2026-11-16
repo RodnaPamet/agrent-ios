@@ -12,7 +12,10 @@ final class AgroCalendarTests: XCTestCase {
 
     func testTheBundledFieldCropsAllReadAndAreAllCited() throws {
         let calendar = try calendar()
-        XCTAssertEqual(calendar.crops(in: .field).count, 8)
+        XCTAssertGreaterThanOrEqual(calendar.crops(in: .field).count, 8)
+        XCTAssertFalse(calendar.crops(in: .vegetable).isEmpty)
+        XCTAssertFalse(calendar.crops(in: .perennial).isEmpty)
+        for crop in calendar.crops { XCTAssertFalse(crop.windows.isEmpty, "\(crop.key) has no windows") }
         let windows = calendar.crops.flatMap(\.windows)
         XCTAssertEqual(Set(windows.map(\.id)).count, windows.count, "ids are unique")
         for window in windows {
@@ -38,6 +41,15 @@ final class AgroCalendarTests: XCTestCase {
     }
 
     /// A window across New Year is one window, not two.
+    /// Pruning from mid-December to the end of March is one window.
+    func testPerennialPruningWrapsTheYear() throws {
+        let apple = try XCTUnwrap(try calendar().crops.first { $0.key == "apple" })
+        let pruning = try XCTUnwrap(apple.windows.first { $0.id == "apple.pruning" })
+        XCTAssertEqual(pruning.from, "12-15")
+        XCTAssertEqual(pruning.to, "03-30")
+        XCTAssertEqual(try calendar().sources[pruning.cite.source]?.publisher, "МЗХ")
+    }
+
     func testAWindowCanWrapTheYear() {
         func day(_ month: Int, _ day: Int) -> Date {
             FarmRecordAPI.farmCalendar.date(from: DateComponents(year: 2026, month: month, day: day, hour: 12))!

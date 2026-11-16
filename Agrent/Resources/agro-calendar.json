@@ -49,6 +49,30 @@
       "publisher": "KWS",
       "url": "https://mediamaster.kws.com/01_Products/BG_Bulgaria/Rapeseed/Variety-Sheets/Rapica-2024-FINAL.pdf",
       "published": "2024"
+    },
+    "mzh-tk-perennials-2024": {
+      "title": "Конвенционално отглеждане на трайни насаждения: модел на разходите при примерна технология",
+      "publisher": "МЗХ",
+      "url": "https://www.mzh.government.bg/media/filer_public/2024/10/16/kanventsionalno_otglezhdane_na_traini_nasazhdeniia__.pdf",
+      "published": "2024-10"
+    },
+    "mzh-tk-vegetables-2024": {
+      "title": "Конвенционално отглеждане на зеленчукови култури: модел на разходите при примерна технология",
+      "publisher": "МЗХ",
+      "url": "https://www.mzh.government.bg/media/filer_public/2024/10/16/konventsionalno_otglezhdane_na_zelenchukovi_kulturi.pdf",
+      "published": "2024-10"
+    },
+    "mzh-tk-legumes-2024": {
+      "title": "Конвенционално отглеждане на едногодишни бобови култури: модел на разходите при примерна технология",
+      "publisher": "МЗХ",
+      "url": "https://www.mzh.government.bg/media/filer_public/2024/10/16/kanventsionalno_otglezhdane_na_ednogodishni_bobovi_kulturi.pdf",
+      "published": "2024-10"
+    },
+    "mzh-tk-wine-2026": {
+      "title": "Технологична карта: винени лозя",
+      "publisher": "МЗХ",
+      "url": "https://www.mzh.government.bg/media/filer_public/2026/09/01/tk_vineni_lozia.pdf",
+      "published": "2026-09"
     }
   },
   "crops": [
@@ -843,6 +867,1696 @@
         }
       ],
       "commodityCanonical": "rapeseed"
+    },
+    {
+      "key": "soy",
+      "group": "field",
+      "name": {
+        "bg": "Соя"
+      },
+      "windows": [
+        {
+          "id": "soy.sow",
+          "kind": "sowing",
+          "region": "both",
+          "from": "04-10",
+          "to": "05-05",
+          "band": "optimal",
+          "note": {
+            "bg": "Сеитба. По примерната технология на МЗХ."
+          },
+          "cite": {
+            "source": "mzh-tk-legumes-2024",
+            "page": 4
+          }
+        }
+      ]
+    },
+    {
+      "key": "dry-bean",
+      "group": "field",
+      "name": {
+        "bg": "Фасул"
+      },
+      "windows": [
+        {
+          "id": "dry-bean.sow",
+          "kind": "sowing",
+          "region": "both",
+          "from": "04-10",
+          "to": "05-05",
+          "band": "optimal",
+          "note": {
+            "bg": "Сеитба. По примерната технология на МЗХ."
+          },
+          "cite": {
+            "source": "mzh-tk-legumes-2024",
+            "page": 11
+          }
+        }
+      ]
+    },
+    {
+      "key": "pea",
+      "group": "field",
+      "name": {
+        "bg": "Грах"
+      },
+      "windows": [
+        {
+          "id": "pea.sow",
+          "kind": "sowing",
+          "region": "both",
+          "from": "02-01",
+          "to": "03-30",
+          "band": "optimal",
+          "note": {
+            "bg": "Сеитба. По примерната технология на МЗХ."
+          },
+          "cite": {
+            "source": "mzh-tk-legumes-2024",
+            "page": 19
+          }
+        }
+      ]
+    },
+    {
+      "key": "lentil",
+      "group": "field",
+      "name": {
+        "bg": "Леща"
+      },
+      "windows": [
+        {
+          "id": "lentil.sow",
+          "kind": "sowing",
+          "region": "both",
+          "from": "02-01",
+          "to": "03-30",
+          "band": "optimal",
+          "note": {
+            "bg": "Сеитба. По примерната технология на МЗХ."
+          },
+          "cite": {
+            "source": "mzh-tk-legumes-2024",
+            "page": 26
+          }
+        }
+      ]
+    },
+    {
+      "key": "broad-bean",
+      "group": "field",
+      "name": {
+        "bg": "Бакла"
+      },
+      "windows": [
+        {
+          "id": "broad-bean.sow",
+          "kind": "sowing",
+          "region": "both",
+          "from": "02-20",
+          "to": "03-15",
+          "band": "optimal",
+          "note": {
+            "bg": "Сеитба. По примерната технология на МЗХ."
+          },
+          "cite": {
+            "source": "mzh-tk-legumes-2024",
+            "page": 39
+          }
+        }
+      ]
+    },
+    {
+      "key": "vetch",
+      "group": "field",
+      "name": {
+        "bg": "Фий"
+      },
+      "windows": [
+        {
+          "id": "vetch.sow",
+          "kind": "sowing",
+          "region": "both",
+          "from": "02-20",
+          "to": "03-15",
+          "band": "optimal",
+          "note": {
+            "bg": "Сеитба. По примерната технология на МЗХ."
+          },
+          "cite": {
+            "source": "mzh-tk-legumes-2024",
+            "page": 51
+          }
+        }
+      ]
+    },
+    {
+      "key": "tomato",
+      "group": "vegetable",
+      "name": {
+        "bg": "Домати"
+      },
+      "windows": [
+        {
+          "id": "tomato.plant",
+          "kind": "sowing",
+          "region": "both",
+          "from": "05-01",
+          "to": "05-30",
+          "band": "optimal",
+          "note": {
+            "bg": "Разсаждане на полето. По примерната технология на МЗХ за средноранно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 102
+          }
+        },
+        {
+          "id": "tomato.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-20",
+          "to": "11-10",
+          "note": {
+            "bg": "Прибиране на продукцията. По примерната технология на МЗХ за средноранно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 100
+          }
+        }
+      ]
+    },
+    {
+      "key": "pepper",
+      "group": "vegetable",
+      "name": {
+        "bg": "Пипер"
+      },
+      "windows": [
+        {
+          "id": "pepper.plant",
+          "kind": "sowing",
+          "region": "both",
+          "from": "05-01",
+          "to": "05-30",
+          "band": "optimal",
+          "note": {
+            "bg": "Разсаждане на полето. По примерната технология на МЗХ за средноранно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 87
+          }
+        },
+        {
+          "id": "pepper.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-20",
+          "to": "11-10",
+          "note": {
+            "bg": "Прибиране на продукцията. По примерната технология на МЗХ за средноранно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 87
+          }
+        }
+      ]
+    },
+    {
+      "key": "aubergine",
+      "group": "vegetable",
+      "name": {
+        "bg": "Патладжан"
+      },
+      "windows": [
+        {
+          "id": "aubergine.plant",
+          "kind": "sowing",
+          "region": "both",
+          "from": "05-01",
+          "to": "05-30",
+          "band": "optimal",
+          "note": {
+            "bg": "Разсаждане на полето. По примерната технология на МЗХ за средноранно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 77
+          }
+        },
+        {
+          "id": "aubergine.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-20",
+          "to": "11-10",
+          "note": {
+            "bg": "Прибиране на продукцията. По примерната технология на МЗХ за средноранно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 74
+          }
+        }
+      ]
+    },
+    {
+      "key": "onion-sets",
+      "group": "vegetable",
+      "name": {
+        "bg": "Лук от арпаджик"
+      },
+      "windows": [
+        {
+          "id": "onion-sets.plant",
+          "kind": "sowing",
+          "region": "both",
+          "from": "04-01",
+          "to": "04-30",
+          "band": "optimal",
+          "note": {
+            "bg": "Засаждане на арпаджика, за лук на глави."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 15
+          }
+        },
+        {
+          "id": "onion-sets.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "07-01",
+          "to": "07-30",
+          "note": {
+            "bg": "Прибиране на лука."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 15
+          }
+        }
+      ]
+    },
+    {
+      "key": "gherkin",
+      "group": "vegetable",
+      "name": {
+        "bg": "Краставица (корнишон)"
+      },
+      "windows": [
+        {
+          "id": "gherkin.sow",
+          "kind": "sowing",
+          "region": "both",
+          "from": "04-15",
+          "to": "05-15",
+          "band": "optimal",
+          "note": {
+            "bg": "Сеитба на полето. По примерната технология на МЗХ за средноранно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 112
+          }
+        },
+        {
+          "id": "gherkin.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-15",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Капково напояване през сезона."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 113
+          }
+        },
+        {
+          "id": "gherkin.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-01",
+          "to": "08-30",
+          "note": {
+            "bg": "Прибиране на продукцията."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 113
+          }
+        }
+      ]
+    },
+    {
+      "key": "cabbage-late",
+      "group": "vegetable",
+      "name": {
+        "bg": "Зеле (късно)"
+      },
+      "windows": [
+        {
+          "id": "cabbage-late.plant",
+          "kind": "sowing",
+          "region": "both",
+          "from": "07-15",
+          "to": "07-20",
+          "band": "optimal",
+          "note": {
+            "bg": "Разсаждане на полето, за късно полско производство."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 123
+          }
+        },
+        {
+          "id": "cabbage-late.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-15",
+          "to": "09-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Капково напояване през сезона."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 124
+          }
+        },
+        {
+          "id": "cabbage-late.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "11-15",
+          "to": "12-05",
+          "note": {
+            "bg": "Прибиране на главите."
+          },
+          "cite": {
+            "source": "mzh-tk-vegetables-2024",
+            "page": 123
+          }
+        }
+      ]
+    },
+    {
+      "key": "sour-cherry",
+      "group": "perennial",
+      "name": {
+        "bg": "Вишна"
+      },
+      "windows": [
+        {
+          "id": "sour-cherry.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 6
+          }
+        },
+        {
+          "id": "sour-cherry.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 6
+          }
+        },
+        {
+          "id": "sour-cherry.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 5
+          }
+        },
+        {
+          "id": "sour-cherry.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 5
+          }
+        },
+        {
+          "id": "sour-cherry.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "06-15",
+          "to": "07-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 4
+          }
+        }
+      ]
+    },
+    {
+      "key": "cherry",
+      "group": "perennial",
+      "name": {
+        "bg": "Череша"
+      },
+      "windows": [
+        {
+          "id": "cherry.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 14
+          }
+        },
+        {
+          "id": "cherry.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 14
+          }
+        },
+        {
+          "id": "cherry.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 13
+          }
+        },
+        {
+          "id": "cherry.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 13
+          }
+        },
+        {
+          "id": "cherry.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "05-20",
+          "to": "06-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 14
+          }
+        }
+      ]
+    },
+    {
+      "key": "plum",
+      "group": "perennial",
+      "name": {
+        "bg": "Слива"
+      },
+      "windows": [
+        {
+          "id": "plum.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 21
+          }
+        },
+        {
+          "id": "plum.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 21
+          }
+        },
+        {
+          "id": "plum.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 20
+          }
+        },
+        {
+          "id": "plum.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 20
+          }
+        },
+        {
+          "id": "plum.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-10",
+          "to": "09-15",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 19
+          }
+        }
+      ]
+    },
+    {
+      "key": "apricot",
+      "group": "perennial",
+      "name": {
+        "bg": "Кайсия"
+      },
+      "windows": [
+        {
+          "id": "apricot.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 29
+          }
+        },
+        {
+          "id": "apricot.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната. Прореждане на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 29
+          }
+        },
+        {
+          "id": "apricot.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 27
+          }
+        },
+        {
+          "id": "apricot.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 28
+          }
+        },
+        {
+          "id": "apricot.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "06-25",
+          "to": "07-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 27
+          }
+        }
+      ]
+    },
+    {
+      "key": "peach",
+      "group": "perennial",
+      "name": {
+        "bg": "Праскова"
+      },
+      "windows": [
+        {
+          "id": "peach.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 36
+          }
+        },
+        {
+          "id": "peach.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 34
+          }
+        },
+        {
+          "id": "peach.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 35
+          }
+        },
+        {
+          "id": "peach.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "06-25",
+          "to": "07-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 34
+          }
+        }
+      ]
+    },
+    {
+      "key": "quince",
+      "group": "perennial",
+      "name": {
+        "bg": "Дюля"
+      },
+      "windows": [
+        {
+          "id": "quince.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 42
+          }
+        },
+        {
+          "id": "quince.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 42
+          }
+        },
+        {
+          "id": "quince.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 40
+          }
+        },
+        {
+          "id": "quince.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 40
+          }
+        },
+        {
+          "id": "quince.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "10-01",
+          "to": "10-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 40
+          }
+        }
+      ]
+    },
+    {
+      "key": "pear",
+      "group": "perennial",
+      "name": {
+        "bg": "Круша"
+      },
+      "windows": [
+        {
+          "id": "pear.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 49
+          }
+        },
+        {
+          "id": "pear.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 49
+          }
+        },
+        {
+          "id": "pear.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 48
+          }
+        },
+        {
+          "id": "pear.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 48
+          }
+        },
+        {
+          "id": "pear.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-15",
+          "to": "11-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 47
+          }
+        }
+      ]
+    },
+    {
+      "key": "apple",
+      "group": "perennial",
+      "name": {
+        "bg": "Ябълка"
+      },
+      "windows": [
+        {
+          "id": "apple.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 57
+          }
+        },
+        {
+          "id": "apple.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната. Прореждане на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 57
+          }
+        },
+        {
+          "id": "apple.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 55
+          }
+        },
+        {
+          "id": "apple.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 56
+          }
+        },
+        {
+          "id": "apple.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-15",
+          "to": "11-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 55
+          }
+        },
+        {
+          "id": "apple.protection",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Растителна защита"
+          },
+          "note": {
+            "bg": "15 третирания по схема: първото извън вегетацията (1–25 февруари), последното в края на август."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 58
+          }
+        }
+      ]
+    },
+    {
+      "key": "medlar",
+      "group": "perennial",
+      "name": {
+        "bg": "Мушмула"
+      },
+      "windows": [
+        {
+          "id": "medlar.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "12-15",
+          "to": "03-30",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 63
+          }
+        },
+        {
+          "id": "medlar.summer",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "07-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Летни операции"
+          },
+          "note": {
+            "bg": "Лятна резитба и просветляване на короната."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 64
+          }
+        },
+        {
+          "id": "medlar.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 62
+          }
+        },
+        {
+          "id": "medlar.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 63
+          }
+        },
+        {
+          "id": "medlar.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "10-01",
+          "to": "10-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 62
+          }
+        }
+      ]
+    },
+    {
+      "key": "walnut",
+      "group": "perennial",
+      "name": {
+        "bg": "Орех"
+      },
+      "windows": [
+        {
+          "id": "walnut.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "01-01",
+          "to": "04-01",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 70
+          }
+        },
+        {
+          "id": "walnut.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 70
+          }
+        },
+        {
+          "id": "walnut.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "10-01",
+          "to": "10-30",
+          "note": {
+            "bg": "Прибиране, механизирано с тръсачна машина."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 69
+          }
+        }
+      ]
+    },
+    {
+      "key": "hazelnut",
+      "group": "perennial",
+      "name": {
+        "bg": "Лешник"
+      },
+      "windows": [
+        {
+          "id": "hazelnut.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "01-01",
+          "to": "04-01",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 76
+          }
+        },
+        {
+          "id": "hazelnut.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 76
+          }
+        },
+        {
+          "id": "hazelnut.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "10-01",
+          "to": "10-30",
+          "note": {
+            "bg": "Прибиране, механизирано с тръсачна машина."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 75
+          }
+        }
+      ]
+    },
+    {
+      "key": "chestnut",
+      "group": "perennial",
+      "name": {
+        "bg": "Кестен"
+      },
+      "windows": [
+        {
+          "id": "chestnut.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-01",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 81
+          }
+        },
+        {
+          "id": "chestnut.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 81
+          }
+        }
+      ]
+    },
+    {
+      "key": "almond",
+      "group": "perennial",
+      "name": {
+        "bg": "Бадем"
+      },
+      "windows": [
+        {
+          "id": "almond.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "01-01",
+          "to": "04-01",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на растенията, извън вегетацията."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 86
+          }
+        },
+        {
+          "id": "almond.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 86
+          }
+        },
+        {
+          "id": "almond.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "09-01",
+          "to": "09-30",
+          "note": {
+            "bg": "Прибиране, механизирано с тръсачна машина."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 85
+          }
+        }
+      ]
+    },
+    {
+      "key": "strawberry",
+      "group": "perennial",
+      "name": {
+        "bg": "Ягода"
+      },
+      "windows": [
+        {
+          "id": "strawberry.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 92
+          }
+        },
+        {
+          "id": "strawberry.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "06-01",
+          "to": "06-30",
+          "note": {
+            "bg": "Беритба на плодовете."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 93
+          }
+        },
+        {
+          "id": "strawberry.protection",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-20",
+          "to": "08-30",
+          "title": {
+            "bg": "Растителна защита"
+          },
+          "note": {
+            "bg": "10 третирания по схема през сезона."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 94
+          }
+        }
+      ]
+    },
+    {
+      "key": "raspberry",
+      "group": "perennial",
+      "name": {
+        "bg": "Малина"
+      },
+      "windows": [
+        {
+          "id": "raspberry.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 99
+          }
+        },
+        {
+          "id": "raspberry.protection",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-20",
+          "to": "09-30",
+          "title": {
+            "bg": "Растителна защита"
+          },
+          "note": {
+            "bg": "12 третирания по схема през сезона."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 96
+          }
+        },
+        {
+          "id": "raspberry.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "01-01",
+          "to": "04-01",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на малините, пролетна и след прибиране."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 100
+          }
+        }
+      ]
+    },
+    {
+      "key": "table-grape",
+      "group": "perennial",
+      "name": {
+        "bg": "Десертно лозе"
+      },
+      "windows": [
+        {
+          "id": "table-grape.feeding",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "02-01",
+          "to": "04-30",
+          "title": {
+            "bg": "Подхранване"
+          },
+          "note": {
+            "bg": "Подхранване на насаждението."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 106
+          }
+        },
+        {
+          "id": "table-grape.irrigation",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "04-01",
+          "to": "08-30",
+          "title": {
+            "bg": "Напояване"
+          },
+          "note": {
+            "bg": "Поливане по схемата на примерната технология."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 107
+          }
+        },
+        {
+          "id": "table-grape.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "01-01",
+          "to": "04-01",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на лозите и сваляне на пръчките."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 108
+          }
+        },
+        {
+          "id": "table-grape.green",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "05-01",
+          "to": "05-30",
+          "title": {
+            "bg": "Зелени операции"
+          },
+          "note": {
+            "bg": "Филизене и връзване на лозите."
+          },
+          "cite": {
+            "source": "mzh-tk-perennials-2024",
+            "page": 108
+          }
+        }
+      ]
+    },
+    {
+      "key": "wine-grape",
+      "group": "perennial",
+      "name": {
+        "bg": "Винено лозе"
+      },
+      "windows": [
+        {
+          "id": "wine-grape.pruning",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "01-01",
+          "to": "04-01",
+          "title": {
+            "bg": "Резитба"
+          },
+          "note": {
+            "bg": "Резитба на лозите и ремонт на телената конструкция."
+          },
+          "cite": {
+            "source": "mzh-tk-wine-2026",
+            "page": 12
+          }
+        },
+        {
+          "id": "wine-grape.green",
+          "kind": "fieldwork",
+          "region": "both",
+          "from": "05-01",
+          "to": "06-30",
+          "title": {
+            "bg": "Зелени операции"
+          },
+          "note": {
+            "bg": "Филизене, връзване и промушване на леторастите."
+          },
+          "cite": {
+            "source": "mzh-tk-wine-2026",
+            "page": 12
+          }
+        },
+        {
+          "id": "wine-grape.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "09-01",
+          "to": "09-30",
+          "note": {
+            "bg": "Беритба на гроздето."
+          },
+          "cite": {
+            "source": "mzh-tk-wine-2026",
+            "page": 12
+          }
+        }
+      ]
     }
   ]
 }
