@@ -148,6 +148,9 @@ struct AgroCropView: View {
                     }
                 }
             }
+            if window.kind == .sowing, let band = AgroWords.band(window.band) {
+                Text(band).font(.caption.weight(.semibold)).foregroundStyle(Palette.secondaryText)
+            }
             if let title = window.title?.bg { Text(title).font(.subheadline.weight(.semibold)) }
             if let seed = window.seedRate { Text(AgroWords.amount(seed)).font(.subheadline) }
             if let depth = window.depth { Text("\(AgroWords.depth) \(AgroWords.amount(depth))").font(.subheadline) }
@@ -155,9 +158,17 @@ struct AgroCropView: View {
                 Text(note).font(.subheadline).foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text(window.citations.compactMap { AgroWords.cite($0, in: calendar) }.joined(separator: "; "))
-                .font(.caption2)
-                .foregroundStyle(Palette.secondaryText)
+            // Its backing: МЗХ's citations, or Agrent's reason INSTEAD of them.
+            if let basis = window.basis?.bg {
+                Text(AgroWords.corrected(basis))
+                    .font(.caption2)
+                    .foregroundStyle(Palette.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(window.citations.compactMap { AgroWords.cite($0, in: calendar) }.joined(separator: "; "))
+                    .font(.caption2)
+                    .foregroundStyle(Palette.secondaryText)
+            }
         }
         .accessibilityElement(children: .combine)
     }
