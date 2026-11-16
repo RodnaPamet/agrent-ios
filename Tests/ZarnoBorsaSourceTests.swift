@@ -56,4 +56,23 @@ final class ZarnoBorsaSourceTests: XCTestCase {
         XCTAssertEqual(words.shown, "FOB България: 188,65 €/т · 13 ноември")
         XCTAssertFalse(words.spoken.contains("·"))
     }
+
+    /// МЗХ's weekly purchase price (agrent-ios#635, agri-saas#3137): after a
+    /// typed price and ZarnoBorsa's EXW, ahead of the EC average; named
+    /// «МЗХ / САПИ», «евро на тон» from the bare `t` unit.
+    func testMZHPurchasePriceLeadsAfterZarnoBorsa() throws {
+        let mzh = try series("mzh", stage: "PURCHASE", unit: "t", lastObserved: "2026-09-30")
+        let exw = try series("zarnoborsa", stage: "EXW", lastObserved: "2026-11-14")
+        let ec = try series("ec-agrifood", stage: "National average", lastObserved: "2026-11-10")
+        let typed = try series("platform", stage: nil, lastObserved: "2026-11-15")
+        XCTAssertEqual([ec, mzh].lead()?.id, mzh.id, "МЗХ over a fresher EC average")
+        XCTAssertEqual([ec, mzh, exw].lead()?.id, exw.id, "ZarnoBorsa EXW still first")
+        XCTAssertEqual([ec, mzh, typed].lead()?.id, typed.id, "a typed price still wins")
+        XCTAssertEqual(SeriesSource.parts(of: mzh), ["МЗХ / САПИ", "Средна изкупна цена"])
+        XCTAssertEqual(SeriesSource.attribution(of: mzh), "Източник: МЗХ / САПИ")
+        XCTAssertNil(mzh.attributionURL, "no link unless the server sends one")
+        XCTAssertNil(SeriesSource.attribution(of: ec), "positive control: the feeds carry none")
+        XCTAssertEqual(SeriesVocabulary.priceUnit(unit: mzh.unit, currency: mzh.currency), "евро на тон")
+        XCTAssertNil([ec, mzh].fobBeside(mzh), "no FOB line under МЗХ")
+    }
 }
