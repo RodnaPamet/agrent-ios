@@ -73,6 +73,18 @@
       "publisher": "МЗХ",
       "url": "https://www.mzh.government.bg/media/filer_public/2026/09/01/tk_vineni_lozia.pdf",
       "published": "2026-09"
+    },
+    "mzh-oa-2017-09-20": {
+      "title": "Оперативен анализ за основни земеделски култури, 20 септември 2017",
+      "publisher": "МЗХ",
+      "url": "https://www.mzh.government.bg/media/filer_public/2018/02/23/operativen_analiz_2017-09-20.pdf",
+      "published": "2017-09"
+    },
+    "mzh-oa-2019-10-02": {
+      "title": "Оперативен анализ за основни земеделски култури, 2 октомври 2019",
+      "publisher": "МЗХ",
+      "url": "https://www.mzh.government.bg/media/filer_public/2019/10/02/operativen_analiz_2019-10-02.pdf",
+      "published": "2019-10"
     }
   },
   "crops": [
@@ -889,6 +901,26 @@
             "source": "mzh-tk-legumes-2024",
             "page": 4
           }
+        },
+        {
+          "id": "soy.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "09-01",
+          "to": "10-15",
+          "note": {
+            "bg": "По данните на МЗХ: към 14 септември 2017 г. бяха прибрани 39% от соята, а към 26 септември 2019 г. – 83%."
+          },
+          "cite": {
+            "source": "mzh-oa-2017-09-20",
+            "page": 4
+          },
+          "alsoCite": [
+            {
+              "source": "mzh-oa-2019-10-02",
+              "page": 4
+            }
+          ]
         }
       ]
     },
@@ -913,6 +945,26 @@
             "source": "mzh-tk-legumes-2024",
             "page": 11
           }
+        },
+        {
+          "id": "dry-bean.harvest",
+          "kind": "harvest",
+          "region": "both",
+          "from": "08-15",
+          "to": "09-30",
+          "note": {
+            "bg": "По данните на МЗХ: към средата на септември 2017 г. бяха прибрани 81% от фасула, а към 26 септември 2019 г. – 94%."
+          },
+          "cite": {
+            "source": "mzh-oa-2017-09-20",
+            "page": 4
+          },
+          "alsoCite": [
+            {
+              "source": "mzh-oa-2019-10-02",
+              "page": 4
+            }
+          ]
         }
       ]
     },
