@@ -160,12 +160,34 @@ final class WindFieldTests: XCTestCase {
     /// The map's region onto the canvas: the centre in the middle, the
     /// west edge at 0, and north up.
     func testTheProjectionFollowsTheMap() {
-        let projection = WindProjection(region: WindGrid.bulgaria, size: CGSize(width: 400, height: 800))
+        let projection = WindProjection(area: MapArea(region: WindGrid.bulgaria), size: CGSize(width: 400, height: 800))
         let centre = projection.point(latitude: 42.75, longitude: 25.5)
         XCTAssertEqual(centre.x, 200, accuracy: 0.001)
         XCTAssertEqual(centre.y, 400, accuracy: 20, "Mercator puts the middle latitude near, not at, half height")
         XCTAssertEqual(projection.point(latitude: 42.75, longitude: 25.5 - 4.2).x, 0, accuracy: 0.001)
         XCTAssertLessThan(projection.point(latitude: 44, longitude: 25).y, projection.point(latitude: 42, longitude: 25).y)
+    }
+
+    /// Zoomed out, the layer follows the rectangle MapKit draws, edge to
+    /// edge (owner's screenshots, 2026-11-16: the clouds and the В/Н signs
+    /// no longer matched the map). Built from a map rectangle as MapKit
+    /// reports it, the top edge lands on 0 and the bottom on the height;
+    /// the old centre ± half-span reading put them ~25 points off here.
+    func testZoomedOutTheLayerFollowsTheMapsRectangle() {
+        let northWest = MKMapPoint(CLLocationCoordinate2D(latitude: 50, longitude: 18))
+        let southEast = MKMapPoint(CLLocationCoordinate2D(latitude: 35, longitude: 32))
+        let rect = MKMapRect(x: northWest.x, y: northWest.y,
+                             width: southEast.x - northWest.x, height: southEast.y - northWest.y)
+        let area = MapArea(region: MKCoordinateRegion(rect), mapRect: rect)
+        let projection = WindProjection(area: area, size: CGSize(width: 400, height: 760))
+        XCTAssertEqual(projection.point(latitude: 50, longitude: 18).y, 0, accuracy: 0.01)
+        XCTAssertEqual(projection.point(latitude: 35, longitude: 32).y, 760, accuracy: 0.01)
+        XCTAssertEqual(projection.point(latitude: 35, longitude: 32).x, 400, accuracy: 0.01)
+        // Positive control: the region alone, as the layer used to read it,
+        // misses the top edge by many points at this zoom.
+        let old = MKCoordinateRegion(rect)
+        let oldNorth = old.center.latitude + old.span.latitudeDelta / 2
+        XCTAssertGreaterThan(abs(oldNorth - 50), 0.3, "about 23 points at this height")
     }
 
     // MARK: - Where streaks are born (owner, 2026-11-07)
@@ -231,7 +253,7 @@ final class WindFieldTests: XCTestCase {
 
     /// The canvas point back to its place: the projection the other way.
     func testThePlaceUnderAPointIsTheOneDrawnThere() {
-        let projection = WindProjection(region: Self.block(latitude: 43.2, longitude: 24.4),
+        let projection = WindProjection(area: MapArea(region: Self.block(latitude: 43.2, longitude: 24.4)),
                                         size: CGSize(width: 390, height: 700))
         for (lat, lon) in [(43.2, 24.4), (43.6, 24.1), (42.8, 24.85)] {
             let back = projection.coordinate(of: projection.point(latitude: lat, longitude: lon))

@@ -63,7 +63,12 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// Every frame of a pan or zoom, not only its end: for a layer drawn
     /// over the map that must stay on the land it describes (the wind,
     /// owner 2026-11-07). Nil costs nothing.
-    var onVisibleRegion: ((MKCoordinateRegion) -> Void)?
+    var onVisibleRegion: ((MapArea) -> Void)?
+    /// A layer is drawn over the map (the wind): the map stays flat and
+    /// north-up, and does not zoom out past `layerZoomOutLimit`, so the
+    /// layer's flat projection matches the map (owner's screenshots,
+    /// 2026-11-16: zoomed out, the streaks stopped matching the map).
+    var overlayLocked = false
 
     /// The XYZ template, or nil for imagery alone.
     let tileTemplate: String?
@@ -113,6 +118,10 @@ struct SatelliteParcelMap: UIViewRepresentable {
     /// drawn from the position on the phone and sent nowhere. The caller
     /// reads `DeviceLocation.access`, so a change of mind redraws this.
     var showsDeviceLocation = false
+
+    /// Metres from the ground: all of Bulgaria and its neighbours in view,
+    /// well short of the globe.
+    static let layerZoomOutLimit: CLLocationDistance = 2_500_000
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -183,6 +192,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
         context.coordinator.onTap = onTap
         context.coordinator.onRegionChange = onRegionChange
         context.coordinator.onVisibleRegion = onVisibleRegion
+        context.coordinator.lockForOverlay(overlayLocked, in: view)
         // The gesture is removed rather than made a no-op, so the map does
         // not consume a touch it will do nothing with.
         context.coordinator.tap?.isEnabled = onTap != nil
@@ -236,7 +246,28 @@ struct SatelliteParcelMap: UIViewRepresentable {
         var contrast: ColorSchemeContrast = .standard
         var onTap: (([Parcel]) -> Void)?
         var onRegionChange: ((MKCoordinateRegion) -> Void)?
-        var onVisibleRegion: ((MKCoordinateRegion) -> Void)?
+        var onVisibleRegion: ((MapArea) -> Void)?
+        private var lockedForOverlay = false
+
+        /// Flat and north-up while a layer is drawn over the map, and no
+        /// further out than a little past Bulgaria: past that MapKit's
+        /// satellite imagery turns into a globe a flat layer cannot follow.
+        /// Released, the map gets its gestures and range back.
+        func lockForOverlay(_ locked: Bool, in view: MKMapView) {
+            guard locked != lockedForOverlay else { return }
+            lockedForOverlay = locked
+            view.isRotateEnabled = !locked
+            view.isPitchEnabled = !locked
+            view.cameraZoomRange = locked
+                ? MKMapView.CameraZoomRange(maxCenterCoordinateDistance: SatelliteParcelMap.layerZoomOutLimit)
+                : MKMapView.CameraZoomRange()
+            if locked, view.camera.heading != 0 || view.camera.pitch != 0 {
+                let camera = view.camera.copy() as? MKMapCamera ?? view.camera
+                camera.heading = 0
+                camera.pitch = 0
+                view.setCamera(camera, animated: !UIAccessibility.isReduceMotionEnabled)
+            }
+        }
         weak var tap: UITapGestureRecognizer?
         private var mountedBase: Base?
         private var mountedBlocks: [OrthoBlock] = []
@@ -494,11 +525,11 @@ struct SatelliteParcelMap: UIViewRepresentable {
         }
 
         func mapViewDidChangeVisibleRegion(_ view: MKMapView) {
-            onVisibleRegion?(view.region)
+            onVisibleRegion?(MapArea(region: view.region, mapRect: view.visibleMapRect))
         }
 
         func mapView(_ view: MKMapView, regionDidChangeAnimated animated: Bool) {
-            onVisibleRegion?(view.region)
+            onVisibleRegion?(MapArea(region: view.region, mapRect: view.visibleMapRect))
             onRegionChange?(view.region)
         }
 

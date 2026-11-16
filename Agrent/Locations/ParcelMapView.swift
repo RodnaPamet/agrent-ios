@@ -285,7 +285,8 @@ struct ParcelMapView: View {
                 onRegionChange: { region in
                     if mode == .orthophoto { ortho.showBlocks(in: region) }
                 },
-                onVisibleRegion: { [windRegion] region in windRegion.region = region },
+                onVisibleRegion: { [windRegion] area in windRegion.area = area },
+                overlayLocked: windOnMap,
                 tileTemplate: mode == .precise ? indices.tiles?.tileUrl : nil,
                 shape: mode == .simplified ? .boundingBoxes : .outlines,
                 contrast: contrast,
@@ -298,11 +299,11 @@ struct ParcelMapView: View {
                     // Clouds and rain under the wind (owner, 2026-11-07).
                     ZStack {
                         CloudLayer(field: field, hour: windHour,
-                                   region: { [windRegion] in windRegion.region },
+                                   area: { [windRegion] in windRegion.area },
                                    onImagery: true)
-                        PressureLayer(field: field, hour: windHour, region: { [windRegion] in windRegion.region })
+                        PressureLayer(field: field, hour: windHour, area: { [windRegion] in windRegion.area })
                         WindFlowLayer(wind: WindVectors(field, hour: windHour),
-                                      region: { [windRegion] in windRegion.region }, particles: windParticles,
+                                      area: { [windRegion] in windRegion.area }, particles: windParticles,
                                       halo: true)
                     }
                 }
@@ -414,7 +415,7 @@ struct ParcelMapView: View {
         do {
             let field = try await WindFieldSources.current.field()
             windParticles.reset(latitudes: field.latitudes, longitudes: field.longitudes)
-            windRegion.region = mapRegion(for: mode)
+            windRegion.area = MapArea(region: mapRegion(for: mode))
             windHour = WindVectors.hourNow(field)
             windField = field
             windFailed = false
