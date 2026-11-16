@@ -198,7 +198,7 @@ struct AgroCropView: View {
 
     /// The card's year, from its source's `published` («2026-09» → «2026»).
     private func year(of costs: AgroCalendar.Costs) -> String? {
-        calendar.sources[costs.cite.source]?.published.map { String($0.prefix(4)) }
+        AgroWords.year(calendar.sources[costs.cite.source]?.published)
     }
 
     private var sources: [(id: String, label: String, url: String?)] {

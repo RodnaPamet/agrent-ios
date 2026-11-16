@@ -234,6 +234,12 @@ enum AgroWords {
     /// «21,36 EUR на дка».
     static func perDa(_ cents: Int) -> String { "\(InsurancePremium.eur(cents)) на дка" }
 
+    /// «2026» from «2026-09» or «2026»; nil for a missing or malformed one.
+    static func year(_ published: String?) -> String? {
+        guard let published, published.count >= 4, published.prefix(4).allSatisfy(\.isNumber) else { return nil }
+        return String(published.prefix(4))
+    }
+
     /// «по МЗХ (2026), превалутирано», the owner's marker (2026-11-16), word
     /// for word: no lev figure and no rate on screen (EUR only).
     static func costsNote(year: String?) -> String {
@@ -279,7 +285,9 @@ enum AgroWords {
     static func cite(_ citation: AgroCalendar.Citation, in calendar: AgroCalendar) -> String? {
         guard let source = calendar.sources[citation.source] else { return nil }
         var parts = [source.publisher ?? source.title]
-        if let year = source.published?.prefix(4) { parts.append(String(year)) }
+        // `published` is optional in the spec and «YYYY» or «YYYY-MM»: no
+        // year, or a blank one, leaves the year out rather than «МЗХ, , стр. 9».
+        if let year = AgroWords.year(source.published) { parts.append(year) }
         if let page = citation.page { parts.append("стр. \(page)") }
         return parts.joined(separator: ", ")
     }

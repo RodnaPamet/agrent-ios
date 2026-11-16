@@ -146,5 +146,10 @@ final class AgroCalendarTests: XCTestCase {
         XCTAssertEqual(AgroWords.perDa(56801), "568,01 EUR на дка")
         XCTAssertEqual(AgroWords.costsNote(year: "2026"), "по МЗХ (2026), превалутирано")
         XCTAssertNil(AgroWords.costsNote(year: "2026").range(of: "лв|лева|1,95583", options: .regularExpression))
+        // `published` is optional in the spec: no year, never an empty one.
+        XCTAssertEqual(AgroWords.year("2026-09"), "2026")
+        XCTAssertNil(AgroWords.year(""))
+        XCTAssertNil(AgroWords.year(nil))
+        XCTAssertEqual(AgroWords.costsNote(year: nil), "по МЗХ, превалутирано")
     }
 }
