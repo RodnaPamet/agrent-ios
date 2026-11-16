@@ -135,16 +135,15 @@ struct AppMenuButton<Extra: View>: View {
                     }
                     .accessibilityInputLabels(A11y.spokenNames("Вдъхновение", "Книги", "Library"))
                 }
-                // «Лунен календар» (#611): every role, once the server
-                // switches it on. The Moon names no farm.
-                if flags.isOn(LunarAPI.flag) {
-                    Button {
-                        showingLunar = true
-                    } label: {
-                        Label(LunarWords.title, systemImage: "moon.stars")
-                    }
-                    .accessibilityInputLabels(A11y.spokenNames("Лунен календар", "Луна", "Lunar calendar"))
+                // «Календари» (#633): the agronomic calendar for every role,
+                // and «Лунен календар» inside it once the server switches
+                // that on. Neither names a farm.
+                Button {
+                    showingLunar = true
+                } label: {
+                    Label(AgroWords.calendars, systemImage: "calendar")
                 }
+                .accessibilityInputLabels(A11y.spokenNames("Календари", "Календар", "Calendars"))
             }
 
             // ITS OWN SECTION, last — where «Профил» and «Изход» sat before
@@ -182,7 +181,7 @@ struct AppMenuButton<Extra: View>: View {
         .sheet(isPresented: $showingLibrary) { InspirationView() }
         .sheet(isPresented: $showingLunar) {
             // Its own path (`RoutedStack`), not the tab's this menu sits on.
-            LunarCalendarView().environment(\.routedSurface, nil)
+            CalendarsView().environment(\.routedSurface, nil)
         }
         // Each screen owns its own NavigationStack, the same shape AdminView
         // uses. The «Затвори» does NOT belong to the screen, though (#119):
