@@ -36,6 +36,11 @@ enum SeriesSource {
             let basis = (series.stage ?? "").uppercased()
             return ["ZarnoBorsa.com", SeriesVocabulary.region(series.region)] + (basis.isEmpty ? [] : [basis])
         }
+        if series.isMZH {
+            // «МЗХ / САПИ · Средна изкупна цена»: whose figure, then what it
+            // is (the bulletin's national average purchase price).
+            return ["МЗХ / САПИ", "Средна изкупна цена"]
+        }
         let region = SeriesVocabulary.region(series.region)
         if isNationalAverage(series) { return ["Средна за \(region)"] }
         if series.source == listingsSource { return ["Обявите в Agrent"] }
@@ -60,6 +65,16 @@ enum SeriesSource {
 
     /// The link's words under a ZarnoBorsa price (#627).
     static let zarnoborsaLink = "Източник: ZarnoBorsa.com"
+
+    /// Under an МЗХ price (owner, 2026-11-16).
+    static let mzhAttribution = "Източник: МЗХ / САПИ"
+
+    /// The source line under a lead that needs one; nil for the others.
+    static func attribution(of series: PriceSeries) -> String? {
+        if series.isZarnoBorsa { return zarnoborsaLink }
+        if series.isMZH { return mzhAttribution }
+        return nil
+    }
     static let ecSource = "ec-agrifood"
 
     private struct Stage {

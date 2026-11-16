@@ -316,12 +316,20 @@ struct TrendsView: View {
 
     /// «Източник: ZarnoBorsa.com», a link, under a price that came from it:
     /// its terms allow the reuse with a link to it as the source (#627).
+    /// МЗХ's line is the same words, linked only when the server sends the
+    /// bulletin's address (agri-saas#3137 does not promise one).
     @ViewBuilder
     private func attribution(_ lead: PriceSeries) -> some View {
-        if let url = lead.attributionURL {
-            Link(SeriesSource.zarnoborsaLink, destination: url)
-                .font(.footnote)
-                .accessibilityInputLabels(A11y.spokenNames("ZarnoBorsa", "Източник"))
+        if let words = SeriesSource.attribution(of: lead) {
+            if let url = lead.attributionURL {
+                Link(words, destination: url)
+                    .font(.footnote)
+                    .accessibilityInputLabels(A11y.spokenNames(lead.isMZH ? "МЗХ" : "ZarnoBorsa", "Източник"))
+            } else {
+                Text(words)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+            }
         }
     }
 }

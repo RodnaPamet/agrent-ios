@@ -131,10 +131,18 @@ struct PriceSeries: Decodable, Identifiable, Equatable, Sendable {
     var isZarnoBorsa: Bool { source == Self.zarnoborsaSource }
 
     static let zarnoborsaSource = "zarnoborsa"
+
+    /// МЗХ's weekly «Оперативен анализ» (agrent-ios#635, agri-saas#3137):
+    /// national average PURCHASE prices for grains, from САПИ. Dated on the
+    /// bulletin table's own «към» day. Live for everyone, «Източник: МЗХ /
+    /// САПИ» (owner, 2026-11-16).
+    var isMZH: Bool { source == Self.mzhSource }
+    static let mzhSource = "mzh"
     static let zarnoborsaHome = "https://zarnoborsa.com"
 
     /// Where the link beside a ZarnoBorsa price goes; nil for other sources.
     var attributionURL: URL? {
+        if isMZH { return sourceUrl.flatMap(URL.init(string:)) }
         guard isZarnoBorsa else { return nil }
         return URL(string: sourceUrl ?? Self.zarnoborsaHome)
     }
@@ -190,6 +198,12 @@ extension Array where Element == PriceSeries {
             $0.isZarnoBorsa && $0.region.uppercased() == "BG" && ($0.stage ?? "").uppercased() == "EXW"
         }
         if let local = zarnoborsa.freshest() { return local }
+        // Then МЗХ's Bulgarian purchase price (owner, 2026-11-16: typed >
+        // ZarnoBorsa EXW > МЗХ > EC), ahead of the EC average.
+        let mzh = withPoints.filter {
+            $0.isMZH && $0.region.uppercased() == "BG" && ($0.stage ?? "").uppercased() == "PURCHASE"
+        }
+        if let national = mzh.freshest() { return national }
 
         var order: [String] = []
         var groups: [String: [PriceSeries]] = [:]
