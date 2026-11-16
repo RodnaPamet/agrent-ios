@@ -129,6 +129,7 @@ struct TrendsView: View {
             headline(lead, latest: latest)
             chart(lead)
             infoRow(lead, latest: latest)
+            fobRow
             attribution(lead)
         }
         .padding(14)
@@ -296,6 +297,21 @@ struct TrendsView: View {
         // in a second one. Built from the parts: VoiceOver reads «·» aloud as
         // "middle dot".
         .accessibilityLabel(A11y.sentence(source + [day.map { "към \($0)" }, age]))
+    }
+
+    /// «FOB България: 244,75 €/т · 13 ноември»: the port price as one line
+    /// under the EXW headline (owner, 2026-11-16, «Second price line»), with
+    /// no chart of its own. Only under ZarnoBorsa's EXW (`fobBeside`).
+    @ViewBuilder
+    private var fobRow: some View {
+        if let fob = store.fobLatest {
+            let text = TrendsWords.fob(fob.series, fob.point)
+            Text(text.shown)
+                .font(.footnote)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel(text.spoken)
+        }
     }
 
     /// «Източник: ZarnoBorsa.com», a link, under a price that came from it:

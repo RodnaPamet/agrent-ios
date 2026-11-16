@@ -40,4 +40,20 @@ final class ZarnoBorsaSourceTests: XCTestCase {
         XCTAssertNil(ec.attributionURL, "positive control: the feeds carry no link")
         XCTAssertEqual(SeriesSource.zarnoborsaLink, "Източник: ZarnoBorsa.com")
     }
+
+    /// FOB is one line under an EXW headline, and only there (owner,
+    /// 2026-11-16: «Second price line»).
+    func testFOBIsOneLineUnderTheEXWHeadlineOnly() throws {
+        let exw = try series("zarnoborsa", stage: "EXW", lastObserved: "2026-11-14")
+        let fob = try series("zarnoborsa", stage: "FOB", lastObserved: "2026-11-13")
+        let ec = try series("ec-agrifood", stage: "National average", lastObserved: "2026-10-19")
+        let typed = try series("platform", stage: nil, lastObserved: "2026-11-15")
+        XCTAssertEqual([ec, fob, exw].fobBeside([ec, fob, exw].lead())?.id, fob.id)
+        XCTAssertNil([ec, fob].fobBeside([ec, fob].lead()), "no FOB line under the EC average")
+        XCTAssertNil([typed, exw, fob].fobBeside([typed, exw, fob].lead()), "nor under a typed price")
+        let point = try XCTUnwrap(fob.points.first)
+        let words = TrendsWords.fob(fob, point)
+        XCTAssertEqual(words.shown, "FOB България: 188,65 €/т · 13 ноември")
+        XCTAssertFalse(words.spoken.contains("·"))
+    }
 }
