@@ -6,14 +6,14 @@ import Foundation
 /// with sources, correct afterwards); the field crops come from МЗХ's
 /// integrated-production guide (2024) and its weekly bulletins (#636).
 ///
-/// ── Bundled for now ──
+/// ── From the server ──
 ///
-/// The dataset ships in the app (`agro-calendar.json`) so the first version
-/// needs no server. The same file is meant to be served by agri-saas later,
-/// so a correction will not need a release; the shape is the server's to
-/// settle, and this type reads it leniently: an entry it cannot read is
-/// left out, never the whole calendar.
-struct AgroCalendar: Decodable, Sendable {
+/// `GET /api/agro-calendar?region=` (agri-saas #3094, live 2026-11-16),
+/// person-scoped like `/api/lunar`: a correction needs no release. It was
+/// bundled in the app for the first build (154.1); the bundled copy is gone
+/// now that the server serves the same bytes. Read leniently: an entry it
+/// cannot read is left out, never the whole calendar.
+struct AgroCalendar: Decodable, Equatable, Sendable {
     let compiledAt: String?
     let sources: [String: Source]
     let crops: [Crop]
@@ -151,12 +151,6 @@ struct AgroCalendar: Decodable, Sendable {
         private struct Skip: Decodable {}
     }
 
-    static func bundled() -> AgroCalendar? {
-        guard let url = Bundle.main.url(forResource: "agro-calendar", withExtension: "json"),
-              let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(AgroCalendar.self, from: data)
-    }
-
     func crops(in group: AgroGroup) -> [Crop] { crops.filter { $0.group == group.rawValue } }
 }
 
@@ -198,7 +192,6 @@ enum AgroWords {
     static let works = "Основни работи"
     static let harvest = "Прибиране"
     static let sources = "Източници"
-    static let none = "Календарът не можа да се зареди."
     static let nowBadge = "Сега"
     static let depth = "Дълбочина"
 

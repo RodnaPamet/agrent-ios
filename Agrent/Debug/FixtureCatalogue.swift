@@ -165,6 +165,10 @@ enum FixtureCatalogue {
         // is another question, and `NO_FIXTURE` is its true answer. One
         // cloudy pass, so the screenshot shows the line's break.
         (RiskTrendAPI.path("par_holes", days: 14), "risk-history-holes"),
+        // #633: the agronomic calendar by region, the compiled МЗХ dataset in
+        // the API's shape (public sources, nothing personal).
+        (AgroCalendarAPI.path(region: .north), "agro-calendar-north"),
+        (AgroCalendarAPI.path(region: .south), "agro-calendar-south"),
         // #574: the synthetic tractor's day, as «Машини» opens it: today.
         (MachinesAPI.trackPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-track"),
         (MachinesAPI.workedPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-worked"),

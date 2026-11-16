@@ -440,6 +440,7 @@ final class RouteContractTests: XCTestCase {
             ("ChannelDigest.swift", [ChannelDigestAPI.path]),
             // #611: «Лунен календар», agri-saas #3073.
             ("LunarAPI.swift", [LunarAPI.path(from: Date(), to: Date())]),
+            ("AgroCalendarAPI.swift", [AgroCalendarAPI.path(region: .north)]),
             ("AgroSignals.swift", [AgroSignalsAPI.path(from: Date(), to: Date())]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),

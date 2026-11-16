@@ -4,7 +4,7 @@ import SwiftUI
 /// Bulgaria, each with what is due now.
 struct AgroCalendarView: View {
     @AppStorage("agroCalendar.region") private var regionKey = AgroRegion.north.rawValue
-    private let calendar = AgroCalendar.bundled()
+    @State private var store = AgroCalendarStore()
 
     private var region: AgroRegion { AgroRegion(rawValue: regionKey) ?? .north }
 
@@ -22,7 +22,15 @@ struct AgroCalendarView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .pageRow()
-            if let calendar {
+            switch store.state {
+            case .loading:
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 80)
+                    .pageRow()
+            case .failed(let message):
+                ErrorState(message: message) { await store.load(region) }
+                    .pageRow()
+            case .loaded(let calendar, _):
                 ForEach(AgroGroup.allCases) { group in
                     let crops = calendar.crops(in: group)
                     if !crops.isEmpty {
@@ -38,14 +46,13 @@ struct AgroCalendarView: View {
                         }
                     }
                 }
-            } else {
-                Text(AgroWords.none).foregroundStyle(Palette.secondaryText).pageRow()
             }
         }
         .pageBackground()
         .inlineTitle(AgroWords.title)
+        .task(id: region) { await store.load(region) }
         .navigationDestination(for: AgroCropPage.self) { page in
-            if let calendar, let crop = calendar.crops.first(where: { $0.key == page.key }) {
+            if let calendar = store.state.value, let crop = calendar.crops.first(where: { $0.key == page.key }) {
                 AgroCropView(calendar: calendar, crop: crop, region: page.region)
             }
         }
