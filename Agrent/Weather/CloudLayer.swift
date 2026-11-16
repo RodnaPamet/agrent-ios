@@ -19,7 +19,7 @@ struct CloudLayer: View {
     let hour: Int
     /// As `WindFlowLayer`'s: read every frame, so the clouds stay on the land
     /// while the map pans without the map re-rendering.
-    let region: () -> MKCoordinateRegion
+    let area: () -> MapArea
     /// Over a satellite photograph: the cloud near-white rather than grey,
     /// as the photograph is dark (the block's map, owner 2026-11-07).
     var onImagery = false
@@ -32,7 +32,7 @@ struct CloudLayer: View {
         TimelineView(.animation(minimumInterval: 1.0 / 30)) { _ in
             Canvas { context, size in
                 guard let grid = CloudGrid(field, hour: hour) else { return }
-                let projection = WindProjection(region: region(), size: size)
+                let projection = WindProjection(area: area(), size: size)
                 context.addFilter(.blur(radius: Self.sample * 1.2))
                 var y: CGFloat = 0
                 while y < size.height + Self.sample {
@@ -132,20 +132,6 @@ struct CloudLook: Equatable, Sendable {
     }
 }
 
-extension WindProjection {
-    /// The place under a canvas point: `point(latitude:longitude:)` the other
-    /// way round, through the inverse of the same Mercator.
-    func coordinate(of point: CGPoint) -> (latitude: Double, longitude: Double) {
-        let west = region.center.longitude - region.span.longitudeDelta / 2
-        func mercator(_ latitude: Double) -> Double { log(tan(.pi / 4 + latitude * .pi / 360)) }
-        let north = mercator(region.center.latitude + region.span.latitudeDelta / 2)
-        let south = mercator(region.center.latitude - region.span.latitudeDelta / 2)
-        let longitude = west + Double(point.x / max(size.width, 1)) * region.span.longitudeDelta
-        let m = north - Double(point.y / max(size.height, 1)) * (north - south)
-        let latitude = (2 * atan(exp(m)) - .pi / 2) * 180 / .pi
-        return (latitude, longitude)
-    }
-}
 
 extension String {
     /// «Облачно 80 %»: the first letter only, as a line starts.

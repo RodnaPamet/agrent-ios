@@ -87,30 +87,61 @@ struct WindVectors: Equatable, Sendable {
     }
 }
 
-/// The map's visible region to the canvas's points, in Web Mercator, as
-/// MapKit draws it.
-struct WindProjection: Equatable, Sendable {
+/// What the map shows: its region, and the exact Web Mercator rectangle
+/// MapKit draws. The rectangle is the truth; the region is derived from it
+/// and kept for what only needs an extent (where streaks are born).
+struct MapArea: Sendable {
     let region: MKCoordinateRegion
-    let size: CGSize
+    let mapRect: MKMapRect
 
-    static func == (a: WindProjection, b: WindProjection) -> Bool {
-        a.size == b.size && a.region.center.latitude == b.region.center.latitude
-            && a.region.center.longitude == b.region.center.longitude
-            && a.region.span.latitudeDelta == b.region.span.latitudeDelta
-            && a.region.span.longitudeDelta == b.region.span.longitudeDelta
+    init(region: MKCoordinateRegion, mapRect: MKMapRect) {
+        self.region = region
+        self.mapRect = mapRect
     }
 
-    private static func mercator(_ latitude: Double) -> Double {
-        log(tan(.pi / 4 + latitude * .pi / 360))
+    /// From a region alone, before the map has reported its rectangle: the
+    /// rectangle whose corners are the region's.
+    init(region: MKCoordinateRegion) {
+        self.region = region
+        let northWest = MKMapPoint(CLLocationCoordinate2D(
+            latitude: region.center.latitude + region.span.latitudeDelta / 2,
+            longitude: region.center.longitude - region.span.longitudeDelta / 2))
+        let southEast = MKMapPoint(CLLocationCoordinate2D(
+            latitude: region.center.latitude - region.span.latitudeDelta / 2,
+            longitude: region.center.longitude + region.span.longitudeDelta / 2))
+        mapRect = MKMapRect(x: northWest.x, y: northWest.y,
+                            width: southEast.x - northWest.x, height: southEast.y - northWest.y)
+    }
+}
+
+/// The map's visible rectangle to the canvas's points, through `MKMapPoint`,
+/// MapKit's own projection.
+///
+/// It used to rebuild the edges from the region as centre ± half a span.
+/// On a Mercator map the centre latitude is not halfway between the top and
+/// the bottom, so the layer sat off the land by an amount that grew as the
+/// map zoomed out: about 11 points across Bulgaria, 25 at the Balkans, 40
+/// further out (owner's screenshots, 2026-11-16).
+struct WindProjection: Sendable {
+    let mapRect: MKMapRect
+    let size: CGSize
+
+    init(area: MapArea, size: CGSize) {
+        mapRect = area.mapRect
+        self.size = size
     }
 
     func point(latitude: Double, longitude: Double) -> CGPoint {
-        let west = region.center.longitude - region.span.longitudeDelta / 2
-        let north = Self.mercator(region.center.latitude + region.span.latitudeDelta / 2)
-        let south = Self.mercator(region.center.latitude - region.span.latitudeDelta / 2)
-        let x = (longitude - west) / region.span.longitudeDelta * size.width
-        let y = (north - Self.mercator(latitude)) / (north - south) * size.height
-        return CGPoint(x: x, y: y)
+        let p = MKMapPoint(CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
+        return CGPoint(x: (p.x - mapRect.minX) / max(mapRect.width, 1) * size.width,
+                       y: (p.y - mapRect.minY) / max(mapRect.height, 1) * size.height)
+    }
+
+    /// The place under a canvas point: the inverse of `point`.
+    func coordinate(of point: CGPoint) -> (latitude: Double, longitude: Double) {
+        let p = MKMapPoint(x: mapRect.minX + Double(point.x / max(size.width, 1)) * mapRect.width,
+                           y: mapRect.minY + Double(point.y / max(size.height, 1)) * mapRect.height)
+        return (p.coordinate.latitude, p.coordinate.longitude)
     }
 }
 
@@ -221,7 +252,7 @@ struct WindFlowLayer: View {
     /// The map's region AS IT IS NOW, read every frame: the block map hands
     /// in a box its UIKit map writes to while it pans, so the streaks stay
     /// on the land without the map re-rendering 60 times a second.
-    let region: () -> MKCoordinateRegion
+    let area: () -> MapArea
     let particles: WindParticles
     /// A dark edge under each streak, for a satellite photograph, which can
     /// be any colour (`Palette.Map.labelHalo`, the map labels' own).
@@ -230,9 +261,9 @@ struct WindFlowLayer: View {
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                let region = region()
-                particles.step(wind, now: timeline.date, region: region)
-                let projection = WindProjection(region: region, size: size)
+                let area = area()
+                particles.step(wind, now: timeline.date, region: area.region)
+                let projection = WindProjection(area: area, size: size)
                 // Two paths per band: the older half of each trail faint, the
                 // newer half strong, so a streak fades behind its head. Eight
                 // strokes a frame rather than one per particle.
@@ -272,8 +303,9 @@ struct WindFlowLayer: View {
 /// state written every frame of a pan would re-render the map it came from.
 @MainActor
 final class MapRegionBox {
-    var region: MKCoordinateRegion
-    init(_ region: MKCoordinateRegion) { self.region = region }
+    var area: MapArea
+    var region: MKCoordinateRegion { area.region }
+    init(_ region: MKCoordinateRegion) { area = MapArea(region: region) }
 }
 
 /// The streaks' colours by strength: calm enough to spray, a breeze,

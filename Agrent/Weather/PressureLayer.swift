@@ -14,21 +14,21 @@ import SwiftUI
 struct PressureLayer: View {
     let isobars: [PressureAnalysis.Isobar]
     let centres: [PressureAnalysis.Centre]
-    let region: () -> MKCoordinateRegion
+    let area: () -> MapArea
 
-    init(field: WindField, hour: Int, region: @escaping () -> MKCoordinateRegion) {
+    init(field: WindField, hour: Int, area: @escaping () -> MapArea) {
         let grid = field.pressure.indices.contains(hour) ? field.pressure[hour] : []
         isobars = grid.isEmpty ? [] : PressureAnalysis.isobars(grid, latitudes: field.latitudes,
                                                                longitudes: field.longitudes)
         centres = grid.isEmpty ? [] : PressureAnalysis.centres(grid, latitudes: field.latitudes,
                                                                longitudes: field.longitudes)
-        self.region = region
+        self.area = area
     }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30)) { _ in
             Canvas { context, size in
-                let projection = WindProjection(region: region(), size: size)
+                let projection = WindProjection(area: area(), size: size)
                 var lines = Path()
                 for isobar in isobars {
                     let points = isobar.path.map { projection.point(latitude: $0.latitude, longitude: $0.longitude) }
