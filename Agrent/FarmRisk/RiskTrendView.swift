@@ -136,7 +136,18 @@ struct RiskTrendView: View {
         // makes 0,70 → 0,68 look like a collapse. Below 0 only when NDMI is.
         .chartYScale(domain: RiskTrendPoints.domain(points))
         .chartXScale(domain: RiskTrendPoints.period(days: history.days))
-        .chartXAxis { dateAxis }
+        .chartXAxis {
+            // Inline in each chart, so the CI guard can see the dates go
+            // through `BgDate`.
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine()
+                if let date = value.as(Date.self) {
+                    AxisValueLabel {
+                        Text(BgDate.dayMonthShort(date)).font(.caption2).axisLabelScaling()
+                    }
+                }
+            }
+        }
         .chartYAxis { valueAxis(places: 1) }
         .frame(height: 160)
         // One stop: the sentence under it says what the lines say.
@@ -151,7 +162,18 @@ struct RiskTrendView: View {
                 .foregroundStyle(Palette.ChartSeries.colors[1])
         }
         .chartXScale(domain: RiskTrendPoints.period(days: store.days))
-        .chartXAxis { dateAxis }
+        .chartXAxis {
+            // Inline in each chart, so the CI guard can see the dates go
+            // through `BgDate`.
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine()
+                if let date = value.as(Date.self) {
+                    AxisValueLabel {
+                        Text(BgDate.dayMonthShort(date)).font(.caption2).axisLabelScaling()
+                    }
+                }
+            }
+        }
         .chartYAxis { valueAxis(places: 0) }
         .frame(height: 160)
         .accessibilityElement(children: .ignore)
@@ -181,23 +203,23 @@ struct RiskTrendView: View {
         .chartForegroundStyleScale(["Най-висока": Palette.ChartSeries.colors[0],
                                     "Най-ниска": Palette.ChartSeries.colors[1]])
         .chartXScale(domain: RiskTrendPoints.period(days: store.days))
-        .chartXAxis { dateAxis }
+        .chartXAxis {
+            // Inline in each chart, so the CI guard can see the dates go
+            // through `BgDate`.
+            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine()
+                if let date = value.as(Date.self) {
+                    AxisValueLabel {
+                        Text(BgDate.dayMonthShort(date)).font(.caption2).axisLabelScaling()
+                    }
+                }
+            }
+        }
         .chartYAxis { valueAxis(places: 0) }
         .frame(height: 160)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Температура за \(store.days) дни")
         .accessibilityValue(DailyWeatherWords.temperature(days) ?? "")
-    }
-
-    private var dateAxis: some AxisContent {
-        AxisMarks(values: .automatic(desiredCount: 4)) { value in
-            AxisGridLine()
-            if let date = value.as(Date.self) {
-                AxisValueLabel {
-                    Text(BgDate.dayMonthShort(date)).font(.caption2).axisLabelScaling()
-                }
-            }
-        }
     }
 
     private func valueAxis(places: Int) -> some AxisContent {
