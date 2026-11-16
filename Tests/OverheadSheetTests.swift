@@ -180,7 +180,13 @@ final class OverheadSheetTests: XCTestCase {
     }
 
     /// No conversion is left in the app's source: no rate, no «Превалутирано».
+    ///
+    /// ONE exception, the owner's (2026-11-16, #637): МЗХ's vineyard costs are
+    /// converted ON THE SERVER and shown under the marker «по МЗХ (2026),
+    /// превалутирано», so that one word may stand in the calendar's file. The
+    /// rate itself stays banned everywhere: the phone never holds it.
     func testNoConversionIsLeftInTheApp() throws {
+        let markerAllowedIn: Set<String> = ["AgroCalendar.swift"]
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let sources = try XCTUnwrap(FileManager.default.enumerator(
             at: root.appendingPathComponent("Agrent"), includingPropertiesForKeys: nil))
@@ -189,7 +195,8 @@ final class OverheadSheetTests: XCTestCase {
             files += 1
             let text = try String(contentsOf: url, encoding: .utf8)
             for trace in ["1,95583", "1.95583", "Превалутира", "превалутира", "EuroChangeover", "фиксирания курс",
-                          "конвертиране", "обменен курс"] {
+                          "конвертиране", "обменен курс"]
+            where !(trace == "превалутира" && markerAllowedIn.contains(url.lastPathComponent)) {
                 XCTAssertFalse(text.contains(trace), "\(url.lastPathComponent) still has «\(trace)»")
             }
         }

@@ -92,7 +92,7 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
     }
 
     /// A card's direct costs per decare, in euro cents the SERVER converted
-    /// (owner, 2026-11-16: МЗХ's лв figures at 1,95583, marked
+    /// (owner, 2026-11-16: МЗХ's лв figures at the euro peg, marked
     /// «превалутирано»; the phone holds no peg). The лв figures as printed
     /// are the server's to keep; only euro is shown (EUR only, 2026-11-06).
     struct Costs: Decodable, Equatable, Sendable {
