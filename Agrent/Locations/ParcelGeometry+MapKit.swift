@@ -82,6 +82,31 @@ extension ParcelGeometry {
         }
     }
 
+    /// Whether a point falls on the parcel: inside an outline and outside
+    /// its holes, by ray casting on the raw rings. For naming what the map
+    /// is centred on (#642), so it needs no MapKit renderer.
+    func contains(_ point: CLLocationCoordinate2D) -> Bool {
+        func inside(_ ring: [CLLocationCoordinate2D]) -> Bool {
+            guard ring.count >= 3 else { return false }
+            var hit = false
+            var j = ring.count - 1
+            for i in ring.indices {
+                let a = ring[i], b = ring[j]
+                if (a.latitude > point.latitude) != (b.latitude > point.latitude),
+                   point.longitude < (b.longitude - a.longitude) * (point.latitude - a.latitude)
+                       / (b.latitude - a.latitude) + a.longitude {
+                    hit.toggle()
+                }
+                j = i
+            }
+            return hit
+        }
+        return coordinates.contains { polygon in
+            guard let outer = polygon.first, inside(outer.compactMap(Self.coordinate(from:))) else { return false }
+            return !polygon.dropFirst().contains { inside($0.compactMap(Self.coordinate(from:))) }
+        }
+    }
+
     /// ONE rectangle for the whole parcel — the simplified map's shape.
     ///
     /// Built by unioning what `mapPolygons` produces rather than by walking

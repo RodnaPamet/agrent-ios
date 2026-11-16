@@ -8,7 +8,9 @@ struct ParcelMapView: View {
 
     @State private var importing = false
     /// «Времето» for this block is open (#551).
-    @State private var showingWeather = false
+    /// «Времето» for the point the map is centred on (#642), set when the
+    /// button is tapped.
+    @State private var weatherAt: WeatherPoint?
     /// The wind drawn ON this map (owner, 2026-11-07: "a button on top of the
     /// location button renders the wind directly on the map"): Open-Meteo's
     /// field for the hour under way, as moving streaks over the parcels.
@@ -145,7 +147,7 @@ struct ParcelMapView: View {
             // a block with nothing drawable has no place to ask about.
             if weatherCentre != nil {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingWeather = true } label: {
+                    Button { weatherAt = weatherPoint() } label: {
                         Label("Времето", systemImage: "cloud.sun")
                     }
                     .accessibilityInputLabels(A11y.spokenNames("Времето", "Вятър", "Weather"))
@@ -160,10 +162,8 @@ struct ParcelMapView: View {
                 .accessibilityHint(mode.next(in: modes).hint)
             }
         }
-        .sheet(isPresented: $showingWeather) {
-            if let centre = weatherCentre {
-                WeatherSheet(place: location.name, latitude: centre.latitude, longitude: centre.longitude)
-            }
+        .sheet(item: $weatherAt) { point in
+            WeatherSheet(place: point.place, latitude: point.latitude, longitude: point.longitude)
         }
         .sheet(item: $choosing) { choice in
             ParcelChooser(parcels: choice.parcels) { picked in
@@ -506,6 +506,21 @@ struct ParcelMapView: View {
             windHour += 1
         }
         windPlaying = false
+    }
+
+    /// «Времето» for where the map is looking (owner, 2026-11-16: "the
+    /// weather at the map's current view, not one for all locations"): the
+    /// visible region's centre at the tap, named by the parcel under it, or
+    /// as the map's centre. The block's centre only before the map has
+    /// reported a region.
+    private func weatherPoint() -> WeatherPoint? {
+        let visible = windRegion.region
+        let reported = visible.center.latitude != WindGrid.bulgaria.center.latitude
+            || visible.center.longitude != WindGrid.bulgaria.center.longitude
+        guard let centre = reported ? visible.center : weatherCentre else { return nil }
+        let parcels = store.state.value?.parcels.filter(\.isDrawable) ?? []
+        return WeatherPoint(place: WeatherPoint.place(at: centre, parcels: parcels, block: location.name),
+                            latitude: centre.latitude, longitude: centre.longitude)
     }
 
     /// The block's centre, for its weather: the middle of its drawn parcels,
