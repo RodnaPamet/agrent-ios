@@ -131,4 +131,25 @@ final class AgroCalendarTests: XCTestCase {
         XCTAssertNil(AgroRegion.of(try blocks([null, ""])), "none placed: no default")
         XCTAssertNil(try blocks([unknown]).first?.agroRegion, "an unknown word is no region")
     }
+
+    /// МЗХ's vineyard costs (#637, agri-saas #3127): euro per дка as the
+    /// server converted them, only on the one priced card, with the owner's
+    /// marker and no lev figure or rate on screen.
+    func testTheVineCostsAreTheServersEuroFigures() throws {
+        let calendar = try calendar()
+        let priced = calendar.crops.filter { $0.costs != nil }.map(\.key)
+        XCTAssertEqual(priced, ["wine-grape"], "МЗХ prices one card")
+        let costs = try XCTUnwrap(calendar.crops.first { $0.key == "wine-grape" }?.costs)
+        XCTAssertEqual(costs.perDaEurCentsTotal, 56801)
+        XCTAssertEqual(costs.lines.compactMap(\.perDaEurCents), [2136, 16590, 30260, 2600, 5215])
+        XCTAssertEqual(Set(costs.lines.map(\.key)), Set(AgroWords.costLabels.keys), "every line has words")
+        XCTAssertEqual(AgroWords.perDa(56801), "568,01 EUR на дка")
+        XCTAssertEqual(AgroWords.costsNote(year: "2026"), "по МЗХ (2026), превалутирано")
+        XCTAssertNil(AgroWords.costsNote(year: "2026").range(of: "лв|лева|1,95583", options: .regularExpression))
+        // `published` is optional in the spec: no year, never an empty one.
+        XCTAssertEqual(AgroWords.year("2026-09"), "2026")
+        XCTAssertNil(AgroWords.year(""))
+        XCTAssertNil(AgroWords.year(nil))
+        XCTAssertEqual(AgroWords.costsNote(year: nil), "по МЗХ, превалутирано")
+    }
 }
