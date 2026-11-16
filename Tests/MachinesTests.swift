@@ -238,4 +238,14 @@ private struct MachinesListProbe: Decodable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         machines = ((try? c.decode([Lossy<Machine>].self, forKey: .machines)) ?? []).compactMap(\.value)
     }
+
+    /// «+» only once the server has answered that it keeps a tracker
+    /// register (owner, 2026-11-16: it showed, then vanished on the 404),
+    /// and the empty map names «+» only then.
+    @MainActor
+    func testNoTrackerButtonUntilTheRegisterIsKnown() {
+        XCTAssertFalse(MachinesStore().registerAvailable, "not before the first answer")
+        XCTAssertTrue(MachineWords.noMachines(canAddTracker: true).contains("«+»"))
+        XCTAssertFalse(MachineWords.noMachines(canAddTracker: false).contains("«+»"))
+    }
 }

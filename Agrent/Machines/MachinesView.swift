@@ -69,7 +69,7 @@ struct MachinesView: View {
                 Section {
                     if placed(machines).isEmpty {
                         Text(machines.isEmpty
-                             ? "Още няма проследявани машини. Добавете GPS тракер с «+» или свържете телематиката на производителя от уеб приложението."
+                             ? MachineWords.noMachines(canAddTracker: store.registerAvailable)
                              : "Машините още не са подали местоположение.")
                             .font(.subheadline)
                             .foregroundStyle(Palette.secondaryText)
