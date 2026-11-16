@@ -60,7 +60,7 @@ final class ProfileTests: XCTestCase {
         XCTAssertLessThan(screens.lowerBound, admin.lowerBound, "«Админ» is no longer last")
         // Between the two, the screens' section closes and another opens.
         let between = String(menu[screens.upperBound..<admin.lowerBound])
-        XCTAssertTrue(between.contains("ForEach(tabs.overflow)"), "positive control: no screens before Админ")
+        XCTAssertTrue(between.contains("ForEach(MenuGroup.allCases)"), "positive control: no screens before Админ")
         XCTAssertTrue(between.contains("\n            Section {"),
                       "«Админ» is a row in the screens' section again")
     }
