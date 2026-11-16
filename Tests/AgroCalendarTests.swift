@@ -195,4 +195,21 @@ final class AgroCalendarTests: XCTestCase {
         XCTAssertTrue(calendar.sources.isEmpty)
         XCTAssertEqual(calendar.crops.first?.windows.map(\.id), ["x.1"])
     }
+
+    /// The server's own response for all three window states (agri-saas
+    /// #3150, captured from `calendarFor()` by backend-1, 2026-11-17): the
+    /// corrected window keeps МЗХ's citation only inside `supersedes`, which
+    /// the phone never reads, so it is not mistaken for still sourced.
+    func testTheServersCapturedOverridesDecode() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "agro-calendar-overrides", withExtension: "json"))
+        let calendar = try JSONDecoder().decode(AgroCalendar.self, from: Data(contentsOf: url))
+        let windows = try XCTUnwrap(calendar.crops.first).windows
+        XCTAssertEqual(windows.map(\.origin), [.corrected, .added, .published])
+        let corrected = windows[0]
+        XCTAssertEqual(corrected.from, "09-20", "the live figure, not the superseded 09-25")
+        XCTAssertTrue(corrected.citations.isEmpty, "the citation inside `supersedes` is not the window's")
+        XCTAssertEqual(corrected.basis?.bg, "МЗХ коригира срока с писмо от 12.11.2026 заради сухата есен.")
+        XCTAssertEqual(windows[1].band, "late")
+        XCTAssertEqual(windows[2].cite?.page, "21")
+    }
 }
