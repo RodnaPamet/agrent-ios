@@ -6,8 +6,10 @@ enum MachineWords {
     /// tap (the server has a tracker register).
     static func noMachines(canAddTracker: Bool) -> String {
         canAddTracker
-            ? "Още няма проследявани машини. Добавете GPS тракер с «+» или свържете телематиката на производителя от уеб приложението."
-            : "Още няма проследявани машини. Свържете телематиката на производителя от уеб приложението."
+            ? "Още няма проследявани машини. Добавете GPS тракер с «+»."
+            // No «+» and no web page to send the farmer to: the makers'
+            // telematics are not connected yet (owner, 2026-11-16).
+            : "Още няма свързани машини. Ще се появят тук, щом системата на производителя им бъде свързана."
     }
 
     /// «Движи се», «Спряна, с включен двигател», «Спряна»; the moving flag is
