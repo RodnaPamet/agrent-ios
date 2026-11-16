@@ -94,4 +94,25 @@ final class RiskTrendTests: XCTestCase {
                                                  seasons: [], operations: [], weeds: [])
         XCTAssertTrue(question.contains("За 14 дни зеленината спадна"), question)
     }
+
+    /// The chart's menu draws one index alone and says only its change.
+    func testOneIndexAlone() throws {
+        let both = history([("2026-09-01", 0.5, 0.1), ("2026-09-20", 0.6, 0.2)])
+        let ndvi = try XCTUnwrap(RiskTrendWords.change(both, only: .ndvi))
+        XCTAssertTrue(ndvi.contains("зеленината"))
+        XCTAssertFalse(ndvi.contains("влагата"))
+        let ndmi = try XCTUnwrap(RiskTrendWords.change(both, only: .ndmi))
+        XCTAssertFalse(ndmi.contains("зеленината"))
+    }
+
+    /// The parcel screen shows the meaning apart from its caveats; joined,
+    /// the sentences are the text the assistant and VoiceOver read.
+    func testTheExplanationSplitsIntoSentences() {
+        for (vegetation, moisture) in [(RiskLevel.stress, RiskLevel.notAssessed), (.watch, .stress), (.unknown, .good)] {
+            let parts = RiskExplanation.sentences(vegetation: vegetation, moisture: moisture, stale: false)
+            XCTAssertGreaterThan(parts.count, 1)
+            XCTAssertEqual(parts.joined(separator: " "),
+                           RiskExplanation.text(vegetation: vegetation, moisture: moisture, stale: false))
+        }
+    }
 }
