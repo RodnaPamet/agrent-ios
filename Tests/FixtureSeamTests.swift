@@ -153,6 +153,7 @@ final class FixtureSeamTests: XCTestCase {
             (AgroCalendarAPI.path(region: .north), "agro-calendar-north"),
             (AgroCalendarAPI.path(region: .south), "agro-calendar-south"),
             (AgroBenchmarksAPI.path, "agro-benchmarks"),
+            (CampaignProgressAPI.path, "agro-progress"),
             (AgroThresholdsAPI.path, "agro-thresholds"),
             (MachinesAPI.listPath, "machines-list"),
             (MachinesAPI.trackersPath, "machine-trackers"),
@@ -569,6 +570,10 @@ final class FixtureSeamTests: XCTestCase {
         ("agro-thresholds", {
             let read = try await AgroThresholdsAPI.decode($0)
             if read.thresholds.isEmpty { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "no thresholds")) }
+        }),
+        ("agro-progress", {
+            let read = try await CampaignProgressAPI.decode($0)
+            if read.progress?.isEmpty ?? true { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "no progress")) }
         }),
         ("agro-benchmarks", {
             let figures = try await AgroBenchmarksAPI.decode($0)

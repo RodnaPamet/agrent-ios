@@ -172,6 +172,9 @@ enum FixtureCatalogue {
         // #638: national yields and support rates, the server's own answer
         // (public МЗХ figures, nothing personal).
         (AgroBenchmarksAPI.path, "agro-benchmarks"),
+        // #635: МЗХ's field-campaign progress, the server's own answer for the
+        // 05.11.2026 bulletin (public national figures, nothing personal).
+        (CampaignProgressAPI.path, "agro-progress"),
         // #636: pest and disease thresholds, the server's own answer.
         (AgroThresholdsAPI.path, "agro-thresholds"),
         // #574: the synthetic tractor's day, as «Машини» opens it: today.
