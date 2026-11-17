@@ -172,6 +172,8 @@ enum FixtureCatalogue {
         // #638: national yields and support rates, the server's own answer
         // (public МЗХ figures, nothing personal).
         (AgroBenchmarksAPI.path, "agro-benchmarks"),
+        // #636: pest and disease thresholds, the server's own answer.
+        (AgroThresholdsAPI.path, "agro-thresholds"),
         // #574: the synthetic tractor's day, as «Машини» opens it: today.
         (MachinesAPI.trackPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-track"),
         (MachinesAPI.workedPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-worked"),

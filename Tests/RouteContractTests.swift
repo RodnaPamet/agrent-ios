@@ -443,6 +443,8 @@ final class RouteContractTests: XCTestCase {
             ("AgroCalendarAPI.swift", [AgroCalendarAPI.path(region: .north)]),
             // #638: national yields and support rates, agri-saas #3157.
             ("AgroBenchmarks.swift", [AgroBenchmarksAPI.path]),
+            // #636: pest and disease thresholds, agri-saas #3157.
+            ("AgroThresholds.swift", [AgroThresholdsAPI.path]),
             ("AgroSignals.swift", [AgroSignalsAPI.path(from: Date(), to: Date())]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),

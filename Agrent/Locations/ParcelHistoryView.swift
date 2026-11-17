@@ -71,6 +71,9 @@ struct ParcelHistoryView: View {
     @State private var removal: HistoryRemoval
     /// The assistant's analysis of the risk, asked (owner, 2026-11-07).
     @State private var analysing: RiskQuestion?
+    /// The pest thresholds for this year's crop (#636), and whether they are open.
+    @State private var thresholds = AgroThresholdsStore()
+    @State private var showingThresholds = false
     @State private var flags = FeatureFlags.shared
 
     /// The «+» that is open, and which screen it is on (`creatingSheets`).
@@ -135,11 +138,17 @@ struct ParcelHistoryView: View {
             .task(id: risk?.state.value?.acquiredDate) { await loadRain() }
             .task { await tasks?.load() }
             .task { if comments.state.value == nil { await comments.load() } }
+            .task { await thresholds.load() }
             .toolbar { addMenu }
             // On the screen, not on the row: a sheet on a list row goes when
             // the row scrolls away.
             .sheet(item: $analysing) { asked in
                 RiskAnalysisSheet(parcelID: parcelID, question: asked.text)
+            }
+            .sheet(isPresented: $showingThresholds) {
+                if let crop = thisYearsCrop {
+                    ThresholdsSheet(cropName: crop.label, thresholds: thresholds.state.value?.for(crop.slug) ?? [])
+                }
             }
             .modifier(creatingSheets(on: nil))
             .writeFeedback(feedback)
@@ -435,6 +444,22 @@ struct ParcelHistoryView: View {
                         })
                     }
                 }
+                // What to look for on this year's crop and when treating
+                // pays (#636, owner 2026-11-17): the crop the РЕКОЛТИ record
+                // names for this year; nothing without one.
+                if let crop = thisYearsCrop, thresholds.state.value?.for(crop.slug).isEmpty == false {
+                    Button { showingThresholds = true } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "ladybug")
+                            Text(ThresholdWords.riskRow(crop.label))
+                            Image(systemName: "chevron.right").font(.caption2)
+                        }
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Palette.accent)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityInputLabels(A11y.spokenNames("Прагове", "Вредители", "Thresholds"))
+                }
                 if flags.isOn(AssistantAPI.flag) {
                     Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
                         HStack(spacing: 4) {
@@ -451,6 +476,11 @@ struct ParcelHistoryView: View {
             }
             .padding(.vertical, 6)
         }
+    }
+
+    /// This year's crop from РЕКОЛТИ, for the thresholds row (#636).
+    private var thisYearsCrop: (slug: String, label: String)? {
+        AgroThresholds.thisYearsCrop(store.state.value?.seasons.items ?? [])
     }
 
     /// One part of «Риск» under its own small heading.

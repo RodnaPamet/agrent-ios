@@ -153,6 +153,7 @@ final class FixtureSeamTests: XCTestCase {
             (AgroCalendarAPI.path(region: .north), "agro-calendar-north"),
             (AgroCalendarAPI.path(region: .south), "agro-calendar-south"),
             (AgroBenchmarksAPI.path, "agro-benchmarks"),
+            (AgroThresholdsAPI.path, "agro-thresholds"),
             (MachinesAPI.listPath, "machines-list"),
             (MachinesAPI.trackersPath, "machine-trackers"),
             (MachinesAPI.assetsPath, "assets-list"),
@@ -565,6 +566,10 @@ final class FixtureSeamTests: XCTestCase {
         ("risk-history-holes", { _ = try await RiskTrendAPI.decode($0) }),
         ("agro-calendar-north", { _ = try await AgroCalendarAPI.decode($0) }),
         ("agro-calendar-south", { _ = try await AgroCalendarAPI.decode($0) }),
+        ("agro-thresholds", {
+            let read = try await AgroThresholdsAPI.decode($0)
+            if read.thresholds.isEmpty { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "no thresholds")) }
+        }),
         ("agro-benchmarks", {
             let figures = try await AgroBenchmarksAPI.decode($0)
             if figures.shownRates.isEmpty { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "no rates")) }
