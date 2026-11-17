@@ -46,6 +46,24 @@ final class OrthophotoTests: XCTestCase {
         XCTAssertEqual(odd.footer, "Ортофото: МЗХ")
     }
 
+    /// The server sends «Ортофото: МЗХ» (`ORTHO_ATTRIBUTION`), already
+    /// prefixed: the footer read «Ортофото: Ортофото: МЗХ, …» on the owner's
+    /// phone (2026-11-17). Both shapes now read the same.
+    func testTheServersPrefixIsNotSaidTwice() async throws {
+        let day = BgDate.full(try XCTUnwrap(BgDate.parseISODay("2023-10-21")))
+        let prefixed = try await APIClient.shared.decode(
+            Data(#"{"year":2023,"flightDate":"2023-10-21","attribution":"Ортофото: МЗХ"}"#.utf8), as: OrthoCoverage.self)
+        XCTAssertEqual(prefixed.footer, "Ортофото: МЗХ, заснемане \(day)")
+        XCTAssertEqual(OrthoCoverage.withoutPrefix("Ортофото: Ортофото: МЗХ"), "МЗХ")
+        XCTAssertEqual(OrthoCoverage.withoutPrefix("МЗХ"), "МЗХ", "control: no prefix, unchanged")
+        XCTAssertNil(OrthoCoverage.withoutPrefix("Ортофото: "), "nothing left is nothing")
+        // The fixture is the server's real value now, so the screenshot run
+        // would have shown the doubled word.
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "ortho-coverage", withExtension: "json"))
+        let fixture = try await APIClient.shared.decode(Data(contentsOf: url), as: OrthoCoverage.self)
+        XCTAssertFalse(fixture.footer.contains("Ортофото: Ортофото"))
+    }
+
     // MARK: - The blocks
 
     private let blocksJSON = #"""

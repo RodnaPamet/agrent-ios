@@ -122,10 +122,25 @@ struct OrthoCoverage: Decodable, Equatable, Sendable {
     }
 
     /// The footer: whose photo it is, and the day it was taken where known.
+    ///
+    /// The server's attribution is «Ортофото: МЗХ» — already prefixed — so the
+    /// prefix is taken off before this line adds its own. The footer read
+    /// «Ортофото: Ортофото: МЗХ, …» on the owner's phone (2026-11-17). Taken
+    /// off rather than not added, so an attribution that is just «МЗХ» (the
+    /// fixture's, or a later server's) still reads right.
     var footer: String {
-        let source = attribution?.recorded ?? "МЗХ"
+        let source = Self.withoutPrefix(attribution?.recorded) ?? "МЗХ"
         guard let day = flightDate.flatMap(BgDate.parseISODay) else { return "Ортофото: \(source)" }
         return "Ортофото: \(source), заснемане \(BgDate.full(day))"
+    }
+
+    /// «Ортофото: МЗХ» → «МЗХ»; anything else as it came. Nil for nothing left.
+    static func withoutPrefix(_ text: String?) -> String? {
+        guard var text = text?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        while let range = text.range(of: "Ортофото:", options: [.anchored, .caseInsensitive]) {
+            text = String(text[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return text.isEmpty ? nil : text
     }
 }
 
