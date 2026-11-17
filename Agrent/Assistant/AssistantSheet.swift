@@ -165,7 +165,7 @@ private struct AssistantTurnView: View {
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(AssistantText.writing)
-            case .answered(let text, let links, let note, let proposal, let promotions):
+            case .answered(let text, let links, let note, let proposal, let promotions, let document):
                 // Paragraphs, lists and tables as blocks (owner, 2026-11-01:
                 // tables reached the screen as rows of «|»). VoiceOver hears
                 // the words, never the Markdown marks.
@@ -197,6 +197,12 @@ private struct AssistantTurnView: View {
                             .foregroundStyle(Palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+                // A ДНЕВНИК offered as a download (#661, owner 2026-11-17):
+                // made when tapped, from what is recorded. Reading it needs
+                // no write right.
+                if let document {
+                    AssistantDocumentButton(document: document)
                 }
                 if let note {
                     Label(note, systemImage: "exclamationmark.circle")

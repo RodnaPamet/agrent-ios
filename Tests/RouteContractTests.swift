@@ -309,6 +309,8 @@ final class RouteContractTests: XCTestCase {
             ("BottomTabsStore.swift", [BottomTabsAPI.path]),
             ("JournalAPI.swift", [JournalAPI.listPath, JournalAPI.path(cursor: "c"), JournalAPI.entryPath(id)]),
             // «Ново мероприятие»'s save and its read by handle (#293).
+            // #661: the block register the assistant may offer, agri-saas #3158.
+            ("AssistantDocument.swift", [AssistantDocumentAPI.blockRegisterPath("{locationId}")]),
             ("TreatmentAPI.swift", [TreatmentAPI.recordPath, TreatmentAPI.treatmentPath("{treatmentGroupId}"),
                                     TreatmentAPI.documentPath("{treatmentGroupId}")]),
             // «Коригирай»: the prefill and the correction, one path (#392).

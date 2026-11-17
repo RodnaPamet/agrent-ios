@@ -12,7 +12,7 @@ final class AssistantPromotionTests: XCTestCase {
     }
 
     private func promotions(_ event: AssistantEvent) -> [AssistantPromotion] {
-        if case .answer(_, _, _, let promotions) = event { return promotions }
+        if case .answer(_, _, _, let promotions, _) = event { return promotions }
         return []
     }
 
@@ -33,7 +33,7 @@ final class AssistantPromotionTests: XCTestCase {
         XCTAssertNotNil(rows[0].validTo)
         XCTAssertNil(rows[1].safetyWording, "null is no wording applies, not an empty one")
         XCTAssertNil(rows[1].validTo, "an open campaign")
-        if case .answer(let text, _, _, _) = answer { XCTAssertEqual(text, "Пръскай при сухо време.") }
+        if case .answer(let text, _, _, _, _) = answer { XCTAssertEqual(text, "Пръскай при сухо време.") }
 
         XCTAssertEqual(promotions(try event(#"{"type":"answer","text":"Без промоции."}"#)), [], "absent is none")
     }
@@ -75,7 +75,7 @@ final class AssistantPromotionTests: XCTestCase {
         store.draft = "Какво да сея?"
         store.send(context: nil)
         await store.settled()
-        guard case .answered(_, _, let note, _, let promotions) = store.turns.first?.phase else {
+        guard case .answered(_, _, let note, _, let promotions, _) = store.turns.first?.phase else {
             return XCTFail("no answer: \(String(describing: store.turns.first?.phase))")
         }
         XCTAssertNotNil(note)
