@@ -220,8 +220,11 @@ struct AgroCropView: View {
             } header: {
                 SectionHeader(BenchmarkWords.nationalTitle)
             } footer: {
-                if let rate = rates.first {
-                    SectionFooter { Text(AgroWords.costsNote(year: String(rate.campaign))) }
+                // The marker says the euro was converted; only a rate has one.
+                SectionFooter {
+                    if let rate = rates.first {
+                        Text(AgroWords.costsNote(year: String(rate.campaign)))
+                    }
                 }
             }
             .pageRow()
