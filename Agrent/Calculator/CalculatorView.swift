@@ -695,7 +695,7 @@ struct CalculatorView: View {
                 ValueRow(BenchmarkWords.rateLabel(rate)) {
                     Text(BenchmarkWords.perDa(cents))
                 }
-                Text(AgroWords.costsNote(year: String(rate.campaign)))
+                Text(BenchmarkWords.rateNote(rate))
                     .font(.footnote)
                     .foregroundStyle(Palette.secondaryText)
             }

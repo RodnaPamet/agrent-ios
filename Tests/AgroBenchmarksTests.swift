@@ -7,7 +7,8 @@ import XCTest
 final class AgroBenchmarksTests: XCTestCase {
 
     /// `GET /api/agro-benchmarks` as the server sends it
-    /// (`Tests/Fixtures/agro-benchmarks.json`, dumped from agri-saas#3157).
+    /// (`Tests/Fixtures/agro-benchmarks.json`, dumped from agri-saas#3157 and
+    /// moved to the Campaign 2025 euro order by agri-saas#3166).
     private func figures() throws -> AgroBenchmarks {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "agro-benchmarks", withExtension: "json"))
         return try JSONDecoder().decode(AgroBenchmarks.self, from: Data(contentsOf: url))
@@ -18,7 +19,25 @@ final class AgroBenchmarksTests: XCTestCase {
         XCTAssertEqual(figures.yields.count, 13)
         XCTAssertEqual(figures.supportRates.count, 10)
         XCTAssertEqual(figures.shownRates.count, 10, "every rate carries the server's euro figure")
-        XCTAssertEqual(figures.campaign, 2024)
+        XCTAssertEqual(figures.campaign, 2025)
+    }
+
+    /// agri-saas#3166: the 2025 order is in euro, so its rates are divided,
+    /// not converted, and must not carry «превалутирано»; the protein rate is
+    /// still the 2024 leva one, and says so.
+    func testOnlyARateConvertedFromLevaIsMarkedConverted() throws {
+        let figures = try figures()
+        let pepper = try XCTUnwrap(figures.shownRates.first { $0.scheme == "veg-pepper" })
+        XCTAssertFalse(pepper.isConverted)
+        XCTAssertEqual(BenchmarkWords.rateNote(pepper), "по МЗХ (2025)")
+        let protein = try XCTUnwrap(figures.rates(for: "peas").first)
+        XCTAssertTrue(protein.isConverted)
+        XCTAssertTrue(BenchmarkWords.rateNote(protein).hasPrefix("по МЗХ (2024), превалутирано. "))
+        XCTAssertTrue(BenchmarkWords.rateNote(protein).contains("2025"))
+        // An older server sent no currency: every rate then was in leva.
+        let json = #"{"supportRates":[{"scheme":"a","campaign":2024,"perDaEurCents":500}]}"#
+        let old = try XCTUnwrap(try JSONDecoder().decode(AgroBenchmarks.self, from: Data(json.utf8)).shownRates.first)
+        XCTAssertTrue(old.isConverted)
     }
 
     func testAYieldIsShownPerDecareAsTheHectareFigureOverTen() throws {
@@ -50,8 +69,9 @@ final class AgroBenchmarksTests: XCTestCase {
 
     func testTheOverThirtyHectareRateIsSaidInDecares() throws {
         let fruit = try XCTUnwrap(try figures().shownRates.first { $0.scheme == "fruit" })
-        XCTAssertEqual(fruit.perDaEurCents, 9388)
-        XCTAssertEqual(BenchmarkWords.over300(try XCTUnwrap(fruit.perDaOver30EurCents)), "Над 300 дка: 62,59 EUR на дка")
+        // РД 09-470/2026: 1 126,54 / 751,03 евро/ха.
+        XCTAssertEqual(fruit.perDaEurCents, 11265)
+        XCTAssertEqual(BenchmarkWords.over300(try XCTUnwrap(fruit.perDaOver30EurCents)), "Над 300 дка: 75,10 EUR на дка")
     }
 
     func testARateWithoutTheServersEuroIsNotShown() throws {

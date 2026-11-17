@@ -309,7 +309,13 @@ enum AgroWords {
     /// «по МЗХ (2026), превалутирано», the owner's marker (2026-11-16), word
     /// for word: no lev figure and no rate on screen (EUR only).
     static func costsNote(year: String?) -> String {
-        "по МЗХ\(year.map { " (\($0))" } ?? ""), превалутирано"
+        sourceNote(year: year, converted: true)
+    }
+
+    /// «по МЗХ (2025)», with «, превалутирано» only when the euro figure was
+    /// converted from leva. A source published in euro is not marked.
+    static func sourceNote(year: String?, converted: Bool) -> String {
+        "по МЗХ\(year.map { " (\($0))" } ?? "")" + (converted ? ", превалутирано" : "")
     }
 
     static let nowBadge = "Сега"

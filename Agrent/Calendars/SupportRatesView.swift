@@ -26,12 +26,12 @@ struct SupportRatesView: View {
                     ErrorState(message: message) { await store.load() }
                         .pageRow()
                 case .loaded(let figures, _):
+                    // The source line is per row: one list now holds the 2025
+                    // order in euro and the 2024 protein rate in leva.
                     Section {
                         ForEach(figures.shownRates) { rate in
                             row(rate).pageRow()
                         }
-                    } footer: {
-                        SectionFooter { Text(AgroWords.costsNote(year: figures.campaign.map(String.init))) }
                     }
                 }
             }
@@ -64,6 +64,10 @@ struct SupportRatesView: View {
                     .foregroundStyle(Palette.secondaryText)
                     .monospacedDigit()
             }
+            Text(BenchmarkWords.rateNote(rate))
+                .font(.footnote)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
