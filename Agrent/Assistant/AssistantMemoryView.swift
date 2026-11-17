@@ -380,14 +380,14 @@ private struct AssistantMemoryEditView: View {
 
 /// The screen's words. The conversations' follow the web's (#2715).
 enum AssistantMemoryText {
-    static let title = "Какво помни асистентът"
+    static let title = "Какво помни Агрент"
     static let listTitle = "Запомнено"
-    static let listNote = "Асистентът използва тези неща във всеки отговор. Докоснете, за да поправите, или плъзнете, за да изтриете. Изтритото не се запомня отново от същите думи."
+    static let listNote = "Агрент използва тези неща във всеки отговор. Докоснете, за да поправите, или плъзнете, за да изтриете. Изтритото не се запомня отново от същите думи."
     static let emptyTitle = "Още нищо"
-    static let emptyMessage = "Асистентът ще запомня какво му казвате за себе си и за работата си — култури, предпочитания, начин на отговор."
+    static let emptyMessage = "Агрент ще запомня какво му казвате за себе си и за работата си — култури, предпочитания, начин на отговор."
     static let editTitle = "Поправи"
-    static let editPlaceholder = "Какво да помни асистентът"
-    static let editNote = "Вашите думи — асистентът не ги пренаписва."
+    static let editPlaceholder = "Какво да помни Агрент"
+    static let editNote = "Вашите думи — Агрент не ги пренаписва."
     static let editHint = "Отваря за поправка"
     static let openHint = "Отваря разговора, за да го прочетете и продължите"
     /// The bar names what went, so «Отмени» is a choice about a sentence
@@ -400,18 +400,18 @@ enum AssistantMemoryText {
     }
     static let forgottenAnnouncement = "Забравено. Можете да отмените."
     static let forgetAll = "Изтрий всичко запомнено"
-    static let forgetAllQuestion = "Да забрави ли асистентът всичко запомнено?"
+    static let forgetAllQuestion = "Да забрави ли Агрент всичко запомнено?"
     static let forgetAllNote = "Всичко запомнено ще бъде изтрито и няма да може да бъде върнато. Минали разговори остават."
     static let notForgotten = "Не е изтрито"
 
     static let conversationsTitle = "Минали разговори"
-    static let conversationsNote = "Всички Ваши разговори с асистента, от всички стопанства. Докоснете, за да прочетете и продължите разговор, или плъзнете, за да го изтриете. Запазват се, докато съществува профилът Ви, и асистентът може да погледне в тях, когато го попитате за нещо отпреди. Изтриването на разговор не изтрива запомненото от него — то е отделно, по-горе."
+    static let conversationsNote = "Всички Ваши разговори с Агрент, от всички стопанства. Докоснете, за да прочетете и продължите разговор, или плъзнете, за да го изтриете. Запазват се, докато съществува профилът Ви, и Агрент може да погледне в тях, когато го попитате за нещо отпреди. Изтриването на разговор не изтрива запомненото от него — то е отделно, по-горе."
     static let noConversationsTitle = "Няма записани разговори"
-    static let noConversationsMessage = "Когато разговаряте с асистента, разговорът ще се появи тук и ще можете да го изтриете."
+    static let noConversationsMessage = "Когато разговаряте с Агрент, разговорът ще се появи тук и ще можете да го изтриете."
     static let noOpening = "(разговор без въпрос)"
     static let forgetAllConversations = "Изтрий всички разговори"
     static let forgetAllConversationsQuestion = "Да изтрия ли всички разговори?"
-    static let forgetAllConversationsNote = "Асистентът ще забрави всички минали разговори и няма да може да поглежда в тях. Това не може да бъде върнато. Запомненото остава."
+    static let forgetAllConversationsNote = "Агрент ще забрави всички минали разговори и няма да може да поглежда в тях. Това не може да бъде върнато. Запомненото остава."
 }
 
 /// A prepared entry on its way into «Нов запис», from a past conversation.

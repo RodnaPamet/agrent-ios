@@ -105,7 +105,7 @@ struct AdminPromotionEditor: View {
                 } header: {
                     SectionHeader("ПРЗ")
                 } footer: {
-                    SectionFooter { Text("Само за продукт за растителна защита: асистентът го показва със задължителния текст за безопасност.") }
+                    SectionFooter { Text("Само за продукт за растителна защита: Агрент го показва със задължителния текст за безопасност.") }
                 }
                 Section {
                     let label = pictureLabel
