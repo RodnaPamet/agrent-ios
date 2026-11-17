@@ -39,4 +39,12 @@ final class ParcelsStore {
             try await LocationsAPI.decodeParcels(from: data)
         } publish: { [weak self] in self?.state = $0 }
     }
+
+    /// A rename shows at once (#667); the next read confirms it.
+    func applyNickname(_ displayName: String?, to parcelID: String) {
+        guard case .loaded(var response, let freshness) = state,
+              let index = response.parcels.firstIndex(where: { $0.id == parcelID }) else { return }
+        response.parcels[index].displayName = displayName
+        state = .loaded(response, freshness)
+    }
 }

@@ -200,10 +200,13 @@ struct TreatmentPlaceView: View {
         } label: {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(field.parcel.name)
+                    Text(field.parcel.title)
                         .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     MetaRow {
+                        // The number the ДНЕВНИК will print, under the
+                        // farmer's own name for the field (#667).
+                        if field.parcel.nickname != nil { Text(field.parcel.name); MetaSeparator() }
                         Text(field.blockName)
                         if let area { MetaSeparator(); Text(area.text) }
                     }
@@ -222,11 +225,16 @@ struct TreatmentPlaceView: View {
         }
         .buttonStyle(.plain)
         .cardRow()
-        .accessibilityLabel(A11y.sentence([field.parcel.name, field.blockName, area?.spoken]))
+        .accessibilityLabel(A11y.sentence([field.parcel.title,
+                                           field.parcel.nickname.map { _ in "номер \(field.parcel.name)" },
+                                           field.blockName, area?.spoken]))
         .accessibilityAddTraits(picked ? .isSelected : [])
         // The name on the row is what Voice Control should answer to; two
         // blocks with a field of the same name fall back to numbering.
-        .accessibilityInputLabels([field.parcel.name, "\(field.parcel.name) \(field.blockName)"])
+        // The farmer's own name answers too (#667), and first: it is the
+        // name they say.
+        .accessibilityInputLabels([field.parcel.nickname, field.parcel.name,
+                                   "\(field.parcel.title) \(field.blockName)"].compactMap { $0 })
     }
 
     /// Each chosen parcel's treated area (#363, owner 2026-10-20): its whole

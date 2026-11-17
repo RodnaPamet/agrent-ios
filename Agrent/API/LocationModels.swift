@@ -182,7 +182,8 @@ struct BoundingBox: Decodable, Equatable, Sendable {
 struct ParcelsResponse: Decodable, Equatable, Sendable {
     let locationId: String
     let bounds: BoundingBox?
-    let parcels: [Parcel]
+    /// `var` so a rename shows at once, before the next read (#667).
+    var parcels: [Parcel]
 }
 
 /// `Identifiable` AND `Hashable` so a tap can drive `sheet(item:)`,
@@ -191,7 +192,17 @@ struct ParcelsResponse: Decodable, Equatable, Sendable {
 /// wrong field.
 struct Parcel: Decodable, Equatable, Hashable, Sendable, Identifiable {
     let id: String
+    /// The field NUMBER the ДНЕВНИК prints («Поле №»). Never replaced by the
+    /// farmer's own name: that is `displayName`, and the papers keep this.
     let name: String
+
+    /// The farmer's own name for the parcel (owner, 2026-11-17, #667) —
+    /// «Нивата до реката» where the papers say «20688.13». What the app and
+    /// Агрент call it; the ДНЕВНИК never prints it. Absent on a server
+    /// before agri-saas#3170, and nil then, so a `var` with a default: the
+    /// memberwise init keeps working and a rename can update it in place.
+    var displayName: String? = nil
+
     let cropType: String?
 
     /// A NUMBER here, unlike the exchange's `quantityTonnes`, which is a

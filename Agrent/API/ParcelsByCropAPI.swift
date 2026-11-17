@@ -41,6 +41,8 @@ enum ParcelsByCropAPI {
     struct CropParcel: Decodable, Equatable, Sendable {
         let id: String
         let name: String
+        /// The farmer's own name (#667); nil on an older server.
+        let displayName: String?
         let cropType: String
         let areaHa: Double?
         let locationId: String
@@ -52,13 +54,14 @@ enum ParcelsByCropAPI {
         let geometry: ParcelGeometry?
 
         private enum CodingKeys: String, CodingKey {
-            case id, name, cropType, areaHa, locationId, locationName, geometry
+            case id, name, displayName, cropType, areaHa, locationId, locationName, geometry
         }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             id = try c.decode(String.self, forKey: .id)
             name = try c.decode(String.self, forKey: .name)
+            displayName = (try? c.decodeIfPresent(String.self, forKey: .displayName)) ?? nil
             cropType = try c.decode(String.self, forKey: .cropType)
             areaHa = (try? c.decodeIfPresent(Double.self, forKey: .areaHa)) ?? nil
             locationId = try c.decode(String.self, forKey: .locationId)
@@ -70,7 +73,7 @@ enum ParcelsByCropAPI {
         /// they take a block's own parcel. What this route does not carry —
         /// soil, cadastre, lease — is nil.
         var parcel: Parcel {
-            Parcel(id: id, name: name, cropType: cropType, areaHa: areaHa, geometry: geometry,
+            Parcel(id: id, name: name, displayName: displayName, cropType: cropType, areaHa: areaHa, geometry: geometry,
                    soilType: nil, cadastralId: nil, ekatte: nil, hasActiveLease: nil,
                    absentFromImportAt: nil)
         }

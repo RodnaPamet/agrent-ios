@@ -80,6 +80,8 @@ struct ParcelHistoryView: View {
     @State private var creating: Creating?
     /// Who is signed in: which «+» to offer.
     @State private var people = CurrentUserStore.shared
+    /// «Преименувай» (#667).
+    @State private var renaming = false
     /// A season, an operation or an observation saved from its sheet.
     /// Played here, because the sheet closes on success (`WriteFeedback`).
     @State private var feedback = WriteFeedback()
@@ -144,6 +146,15 @@ struct ParcelHistoryView: View {
             // the row scrolls away.
             .sheet(item: $analysing) { asked in
                 RiskAnalysisSheet(parcelID: parcelID, question: asked.text)
+            }
+            .sheet(isPresented: $renaming) {
+                if let block = recordIn, let parcel = store.state.value?.parcel {
+                    ParcelRenameSheet(number: parcel.name, current: parcel.nickname) { name in
+                        try await LocationsAPI.setDisplayName(locationID: block.locationID,
+                                                              parcelID: parcelID, displayName: name)
+                        store.applyNickname(name)
+                    }
+                }
             }
             .sheet(isPresented: $showingThresholds) {
                 if let crop = thisYearsCrop {
@@ -381,12 +392,36 @@ struct ParcelHistoryView: View {
     /// on a screen whose first card is a list of crops by harvest year it
     /// would read as exactly that. So it stays off: РЕКОЛТИ is the record,
     /// and the label on the parcel is not.
+    ///
+    /// The farmer's own name first (#667), with the field number under it —
+    /// the number is what the ДНЕВНИК prints, so it stays in sight.
     private func header(_ archive: ParcelHistoryStore.Archive) -> some View {
-        Text(archive.parcel.name.recorded ?? parcelName)
-            .font(.headline)
-            .fixedSize(horizontal: false, vertical: true)
-            .listRowSeparator(.hidden)
-            .pageRow()
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(archive.parcel.nickname ?? archive.parcel.name.recorded ?? parcelName)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                if archive.parcel.nickname != nil {
+                    Text(archive.parcel.name)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                        .accessibilityLabel("номер \(archive.parcel.name)")
+                }
+            }
+            Spacer()
+            // «Преименувай», next to the name (owner, 2026-11-17, #667). Needs
+            // the block — the parcel route is under it — so only from a block.
+            if recordIn != nil, people.user?.mayWrite ?? false {
+                Button { renaming = true } label: {
+                    Label("Преименувай", systemImage: "pencil")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityInputLabels(A11y.Spoken.rename)
+            }
+        }
+        .listRowSeparator(.hidden)
+        .pageRow()
     }
 
     // MARK: - Risk
@@ -586,7 +621,7 @@ struct ParcelHistoryView: View {
     private func question(_ reading: ParcelRisk, _ freshness: Freshness?) -> String {
         let archive = store.state.value
         return RiskAnalysisQuestion.text(
-            parcel: archive?.parcel.name ?? parcelName, risk: reading, freshness: freshness,
+            parcel: archive?.parcel.nickname ?? archive?.parcel.name ?? parcelName, risk: reading, freshness: freshness,
             trend: trend?.state.value.flatMap { RiskTrendWords.change($0) },
             rain: rainWords(reading),
             seasons: archive?.seasons.items ?? [], operations: archive?.operations.items ?? [],

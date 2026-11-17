@@ -32,7 +32,7 @@ struct ParcelChooser: View {
                     onPick(parcel)
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(parcel.name)
+                        Text(parcel.title)
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.primary)
                         // The same row as `ParcelMapView.parcelRowContent`,
@@ -53,7 +53,7 @@ struct ParcelChooser: View {
                     }
                 }
                 .accessibilityLabel(A11y.sentence([
-                    parcel.name,
+                    parcel.title,
                     CommodityName.freeText(parcel.cropType),
                     parcel.areaHa.map { Area(hectares: $0).spoken },
                 ]))

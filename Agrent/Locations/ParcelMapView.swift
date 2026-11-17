@@ -58,6 +58,11 @@ struct ParcelMapView: View {
     /// choose between.
     @State private var choosing: ParcelChoice?
 
+    /// «Преименувай» (#667): the parcel whose own name is being given, and
+    /// who may give one — a writer, as for every other edit to a parcel.
+    @State private var renaming: Parcel?
+    @State private var people = CurrentUserStore.shared
+
     @State private var indices: SatelliteIndexStore
 
     /// «Ортофотокарта»'s flight date and physical blocks (#458).
@@ -174,9 +179,17 @@ struct ParcelMapView: View {
                 DispatchQueue.main.async { openHistory(picked) }
             }
         }
+        .sheet(item: $renaming) { parcel in
+            ParcelRenameSheet(number: parcel.name, current: parcel.nickname) { name in
+                try await LocationsAPI.setDisplayName(locationID: location.id, parcelID: parcel.id,
+                                                      displayName: name)
+                store.applyNickname(name, to: parcel.id)
+            }
+        }
         .task {
             if store.state.value == nil { await store.load() }
         }
+        .task { _ = await people.load() }
     }
 
     @ViewBuilder
@@ -563,7 +576,7 @@ struct ParcelMapView: View {
     /// Every role: the history is a read, and the button there keeps the
     /// write's own gate.
     private func openHistory(_ parcel: Parcel) {
-        pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.name,
+        pushRoute(.parcelHistory(parcelID: parcel.id, parcelName: parcel.title,
                                  recordIn: ParcelInBlock(locationID: location.id, parcel: parcel)))
     }
 
@@ -865,17 +878,36 @@ struct ParcelMapView: View {
         // now: it opens the history, which everyone may read (#387).
         Button { openHistory(parcel) } label: { parcelRowContent(parcel) }
             .buttonStyle(.plain)
+            // «Преименувай» on a swipe (owner, 2026-11-17, #667), for writers.
+            // In a List a swipe action is also one of the row's actions for
+            // VoiceOver, Switch Control and Full Keyboard Access, so the
+            // gesture is not the only way in.
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                if people.user?.mayWrite ?? false {
+                    Button { renaming = parcel } label: {
+                        Label("Преименувай", systemImage: "pencil")
+                    }
+                    .tint(Palette.accent)
+                    .accessibilityInputLabels(A11y.Spoken.rename)
+                }
+            }
     }
 
     @ViewBuilder
     private func parcelRowContent(_ parcel: Parcel) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(parcel.name).font(.subheadline.weight(.medium))
+                Text(parcel.title).font(.subheadline.weight(.medium))
                 // THREE values on one line, which at accessibility5 gave each
                 // of them a few characters: «Пшени / ца · 324,78 / дка». Caught by
                 // photographing the screen rather than by reading it.
                 MetaRow {
+                    // The number the papers carry, beside the farmer's own
+                    // name, so the ДНЕВНИК stays recognisable from here.
+                    if parcel.nickname != nil {
+                        Text(parcel.name)
+                        if parcel.cropType != nil || parcel.areaHa != nil { MetaSeparator() }
+                    }
                     if let crop = CommodityName.freeText(parcel.cropType) { Text(crop) }
                     if let area = parcel.areaHa {
                         if parcel.cropType != nil { MetaSeparator() }
@@ -935,7 +967,8 @@ struct ParcelMapView: View {
             // — the system already announces the right verb per technology.
             .accessibilityHint("Отваря историята на парцела")
         .accessibilityLabel(A11y.sentence([
-            parcel.name,
+            parcel.title,
+            parcel.nickname.map { _ in "номер \(parcel.name)" },
             CommodityName.freeText(parcel.cropType),
             parcel.areaHa.map { Area(hectares: $0).spoken },
             parcel.hasActiveLease == true ? "под аренда" : nil,

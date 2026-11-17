@@ -113,6 +113,8 @@ enum A11y {
         static let cancel = spokenNames("Отказ", "Cancel")
         static let close = spokenNames("Затвори", "Close")
         static let save = spokenNames("Запази", "Save")
+        /// A parcel's own name (#667).
+        static let rename = spokenNames("Преименувай", "Rename")
         /// «Документи» (#468): the upload, its menu and the scanner.
         static let upload = spokenNames("Качи", "Upload")
         static let uploadDocument = spokenNames("Качи документ", "Upload document")
