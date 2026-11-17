@@ -23,6 +23,9 @@ struct AgroBenchmarks: Decodable, Equatable, Sendable {
         let harvest: Int
         let kgPerHa: Int
 
+        /// «Пшеница»: the server's label, else the commodity's own name.
+        var title: String { label?.bg ?? CommodityName.canonical(commodity) ?? commodity }
+
         /// kg/дка: the hectare figure over 10.
         var kgPerDa: Double { Double(kgPerHa) / 10 }
     }
@@ -55,6 +58,12 @@ struct AgroBenchmarks: Decodable, Equatable, Sendable {
         guard let commodity else { return nil }
         return yields.first { $0.commodity == commodity }
     }
+
+    /// A calendar crop's national yield, by the commodity it joins.
+    func yield(for crop: AgroCalendar.Crop) -> Yield? { yield(for: crop.commodityCanonical) }
+
+    /// A calendar crop's coupled-support schemes.
+    func rates(for crop: AgroCalendar.Crop) -> [Rate] { rates(for: crop.commodityCanonical) }
 
     /// The coupled-support schemes that name the commodity, euro figure known.
     func rates(for commodity: String?) -> [Rate] {

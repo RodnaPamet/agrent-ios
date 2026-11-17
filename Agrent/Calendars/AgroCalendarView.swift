@@ -205,8 +205,8 @@ struct AgroCropView: View {
     /// converted, so it carries the vine card's marker.
     @ViewBuilder
     private var nationalSection: some View {
-        let national = benchmarks?.yield(for: crop.commodityCanonical)
-        let rates = benchmarks?.rates(for: crop.commodityCanonical) ?? []
+        let national = benchmarks?.yield(for: crop)
+        let rates = benchmarks?.rates(for: crop) ?? []
         if national != nil || !rates.isEmpty {
             Section {
                 if let national {

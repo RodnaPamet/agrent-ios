@@ -97,7 +97,9 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
             commodityCanonical = try? c.decodeIfPresent(String.self, forKey: .commodityCanonical)
         }
 
-        var title: String { name.bg ?? key }
+        /// The Bulgarian name; for a crop the server names only in its key,
+        /// the commodity's own name, then the key.
+        var title: String { name.bg ?? CommodityName.canonical(commodityCanonical) ?? key }
 
         func windows(_ kind: Window.Kind, in region: AgroRegion) -> [Window] {
             windows.filter { $0.kind == kind && $0.applies(to: region) }
