@@ -429,7 +429,7 @@ struct ParcelHistoryView: View {
                     .buttonStyle(.plain)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(riskSpoken(reading, freshness))
-                    .accessibilityHint("Отваря кратък анализ от асистента")
+                    .accessibilityHint("Отваря кратък анализ от Агрент")
                     .accessibilityAddTraits(.isButton)
                 } else {
                     riskReading(reading, freshness)
@@ -464,7 +464,7 @@ struct ParcelHistoryView: View {
                     Button { analysing = RiskQuestion(text: question(reading, freshness)) } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles")
-                            Text("Кратък анализ от асистента")
+                            Text("Кратък анализ от Агрент")
                             Image(systemName: "chevron.right").font(.caption2)
                         }
                         .font(.footnote.weight(.medium))

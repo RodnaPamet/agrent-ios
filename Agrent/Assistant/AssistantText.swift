@@ -4,10 +4,10 @@ import Foundation
 /// Bulgarian only (owner, 2026-10-13): the stream carries CODES for its
 /// refusals and stops, never prose, so each has its sentence here.
 enum AssistantText {
-    static let title = "Асистент"
+    static let title = "Агрент"
     static let prompt = "Попитайте за стопанството…"
     static let intro = "Питайте за задачите, Дневника, разходите, Калкулатора, Риска, Борсата и цените. "
-        + "Асистентът чете данните на стопанството и не променя нищо."
+        + "Агрент чете данните на стопанството и не променя нищо."
 
     // MARK: - While a turn runs
 
@@ -77,7 +77,7 @@ enum AssistantText {
         case "ASSISTANT_INPUT_REJECTED":
             "Не можах да прочета въпроса безопасно. Опитайте да го формулирате иначе."
         default:
-            "Асистентът не отговори на този въпрос."
+            "Агрент не отговори на този въпрос."
         }
     }
 
@@ -88,7 +88,7 @@ enum AssistantText {
         case "ASSISTANT_TOOL_BUDGET":
             "Отговорът по-горе е верен, но непълен — достигнах ограничението колко мога да проверя за един въпрос."
         case "ASSISTANT_SPEND_CEILING":
-            "Отговорът по-горе е непълен, защото стопанството достигна месечния си лимит за асистента."
+            "Отговорът по-горе е непълен, защото стопанството достигна месечния си лимит за Агрент."
         case "ASSISTANT_TIME_BUDGET":
             "Отговорът по-горе е непълен — отнемаше твърде дълго и спрях, вместо да Ви карам да чакате."
         case "ASSISTANT_PROVIDER_UNAVAILABLE":
@@ -123,18 +123,18 @@ enum AssistantText {
     // ── A prepared entry ──
 
     static let openEntry = "Отвори в «Нов запис»"
-    static let preparedNote = "Асистентът попълни записа. Проверете го, изберете парцелите и мерната единица и го запазете."
+    static let preparedNote = "Агрент попълни записа. Проверете го, изберете парцелите и мерната единица и го запазете."
 
     /// `done` with no answer before it.
-    static let noAnswer = "Асистентът няма отговор на този въпрос."
+    static let noAnswer = "Агрент няма отговор на този въпрос."
 
     /// The connection closed with no `refusal`, `halt` or `done`: the server
     /// never says "error", so this is the transport and nothing else.
-    static let interrupted = "Връзката прекъсна, преди асистентът да довърши. Опитайте отново."
+    static let interrupted = "Връзката прекъсна, преди Агрент да довърши. Опитайте отново."
 
     /// 204: the route is off for this person.
-    static let switchedOff = "Асистентът не е включен за това стопанство."
+    static let switchedOff = "Агрент не е включен за това стопанство."
 
     /// The turn, as VoiceOver hears the answer arrive.
-    static func answered(_ text: String) -> String { "Асистентът отговори: \(text)" }
+    static func answered(_ text: String) -> String { "Агрент отговори: \(text)" }
 }

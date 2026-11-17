@@ -28,7 +28,7 @@ final class AssistantKeepAlive {
 
     func begin() {
         guard task == .invalid, let application else { return }
-        task = application.beginBackgroundTask(withName: "Асистент") { [weak self] in
+        task = application.beginBackgroundTask(withName: "Агрент") { [weak self] in
             // iOS's grace is over: give the task back, or the app is killed.
             MainActor.assumeIsolated { self?.end() }
         }

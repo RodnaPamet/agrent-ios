@@ -35,7 +35,7 @@ struct AssistantLauncher: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(AssistantText.title)
-            .accessibilityInputLabels(A11y.spokenNames("Асистент", "Assistant"))
+            .accessibilityInputLabels(A11y.spokenNames("Агрент", "Асистент", "Assistant"))
             .accessibilityShowsLargeContentViewer {
                 Label(AssistantText.title, systemImage: "sparkles")
             }
