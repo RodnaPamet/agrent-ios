@@ -76,7 +76,7 @@ struct AgroCalendarView: View {
             if let calendar = store.state.value, let crop = calendar.crops.first(where: { $0.key == page.key }) {
                 AgroCropView(calendar: calendar, crop: crop, region: page.region,
                              benchmarks: benchmarks.state.value,
-                             thresholds: thresholds.state.value?.for(crop.commodityCanonical) ?? [])
+                             thresholds: thresholds.state.value?.for(crop) ?? [])
             }
         }
     }

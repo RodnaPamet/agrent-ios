@@ -54,6 +54,9 @@ struct AgroThresholds: Decodable, Equatable, Sendable {
         thresholds = (try? c.decodeIfPresent(AgroCalendar.Lenient<Threshold>.self, forKey: .thresholds))?.values ?? []
     }
 
+    /// A calendar crop's thresholds, by the commodity it joins.
+    func `for`(_ crop: AgroCalendar.Crop) -> [Threshold] { self.for(crop.commodityCanonical) }
+
     /// A crop's thresholds, pests first then diseases, each in the guide's order.
     func `for`(_ commodity: String?) -> [Threshold] {
         guard let commodity else { return [] }
