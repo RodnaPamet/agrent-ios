@@ -53,6 +53,7 @@ struct AppMenuButton<Extra: View>: View {
     @State private var showingChannels = false
     @State private var showingLibrary = false
     @State private var showingLunar = false
+    @State private var showingSupport = false
     @State private var flags = FeatureFlags.shared
     @State private var farms = FarmStore.shared
     @State private var people = CurrentUserStore.shared
@@ -122,6 +123,13 @@ struct AppMenuButton<Extra: View>: View {
                 Label(AgroWords.calendars, systemImage: "calendar")
             }
             .accessibilityInputLabels(A11y.spokenNames("Календари", "Календар", "Calendars"))
+            // «Подпомагане» (#638): the coupled-support rates, every role.
+            Button {
+                showingSupport = true
+            } label: {
+                Label(BenchmarkWords.supportTitle, systemImage: "eurosign.circle")
+            }
+            .accessibilityInputLabels(A11y.spokenNames("Подпомагане", "Субсидии", "Support"))
             // «Вдъхновение» (#580): every role, mechanisators included
             // (owner, 2026-11-12), once the server switches it on.
             if flags.isOn(LibraryAPI.flag) {
@@ -231,6 +239,10 @@ struct AppMenuButton<Extra: View>: View {
             ChannelsView().environment(\.routedSurface, nil)
         }
         .sheet(isPresented: $showingLibrary) { InspirationView() }
+        .sheet(isPresented: $showingSupport) {
+            // Its own path (`RoutedStack`), not the tab's this menu sits on.
+            SupportRatesView().environment(\.routedSurface, nil)
+        }
         .sheet(isPresented: $showingLunar) {
             // Its own path (`RoutedStack`), not the tab's this menu sits on.
             CalendarsView().environment(\.routedSurface, nil)

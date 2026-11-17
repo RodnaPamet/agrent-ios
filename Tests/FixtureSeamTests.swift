@@ -152,6 +152,7 @@ final class FixtureSeamTests: XCTestCase {
             (RiskTrendAPI.path("par_holes", days: 14), "risk-history-holes"),
             (AgroCalendarAPI.path(region: .north), "agro-calendar-north"),
             (AgroCalendarAPI.path(region: .south), "agro-calendar-south"),
+            (AgroBenchmarksAPI.path, "agro-benchmarks"),
             (MachinesAPI.listPath, "machines-list"),
             (MachinesAPI.trackersPath, "machine-trackers"),
             (MachinesAPI.assetsPath, "assets-list"),
@@ -564,6 +565,10 @@ final class FixtureSeamTests: XCTestCase {
         ("risk-history-holes", { _ = try await RiskTrendAPI.decode($0) }),
         ("agro-calendar-north", { _ = try await AgroCalendarAPI.decode($0) }),
         ("agro-calendar-south", { _ = try await AgroCalendarAPI.decode($0) }),
+        ("agro-benchmarks", {
+            let figures = try await AgroBenchmarksAPI.decode($0)
+            if figures.shownRates.isEmpty { throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "no rates")) }
+        }),
         ("machines-list", {
             struct Strict: Decodable { let machines: [Machine] }
             let rows = try await APIClient.shared.decode($0, as: Strict.self).machines

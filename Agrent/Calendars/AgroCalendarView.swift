@@ -9,6 +9,7 @@ struct AgroCalendarView: View {
     @AppStorage("agroCalendar.regionChosen") private var regionChosen = false
     @State private var store = AgroCalendarStore()
     @State private var locations = LocationsStore()
+    @State private var benchmarks = AgroBenchmarksStore()
 
     private var region: AgroRegion { AgroRegion(rawValue: regionKey) ?? .north }
 
@@ -68,9 +69,11 @@ struct AgroCalendarView: View {
             }
         }
         .task(id: region) { await store.load(region) }
+        .task { await benchmarks.load() }
         .navigationDestination(for: AgroCropPage.self) { page in
             if let calendar = store.state.value, let crop = calendar.crops.first(where: { $0.key == page.key }) {
-                AgroCropView(calendar: calendar, crop: crop, region: page.region)
+                AgroCropView(calendar: calendar, crop: crop, region: page.region,
+                             benchmarks: benchmarks.state.value)
             }
         }
     }
@@ -97,12 +100,15 @@ struct AgroCropView: View {
     let calendar: AgroCalendar
     let crop: AgroCalendar.Crop
     let region: AgroRegion
+    /// The national yield and support rate (#638); nil until they load.
+    var benchmarks: AgroBenchmarks?
 
     var body: some View {
         List {
             section(AgroWords.sowing, crop.windows(.sowing, in: region))
             section(AgroWords.works, crop.windows(.fieldwork, in: region))
             section(AgroWords.harvest, crop.windows(.harvest, in: region))
+            nationalSection
             costsSection
             Section {
                 EmptyView()
@@ -190,6 +196,43 @@ struct AgroCropView: View {
             Text(label).font(bold ? .body.weight(.semibold) : .body)
             Spacer(minLength: 8)
             Text(AgroWords.perDa(cents)).font(bold ? .body.weight(.semibold) : .body).monospacedDigit()
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The country's average yield and the coupled support, where the crop
+    /// joins a commodity that has them (#638). The support is euro the server
+    /// converted, so it carries the vine card's marker.
+    @ViewBuilder
+    private var nationalSection: some View {
+        let national = benchmarks?.yield(for: crop.commodityCanonical)
+        let rates = benchmarks?.rates(for: crop.commodityCanonical) ?? []
+        if national != nil || !rates.isEmpty {
+            Section {
+                if let national {
+                    figureRow(BenchmarkWords.yieldLabel(national), BenchmarkWords.yieldValue(national))
+                }
+                ForEach(rates) { rate in
+                    if let cents = rate.perDaEurCents {
+                        figureRow(BenchmarkWords.rateLabel(rate), BenchmarkWords.perDa(cents))
+                    }
+                }
+            } header: {
+                SectionHeader(BenchmarkWords.nationalTitle)
+            } footer: {
+                if let rate = rates.first {
+                    SectionFooter { Text(AgroWords.costsNote(year: String(rate.campaign))) }
+                }
+            }
+            .pageRow()
+        }
+    }
+
+    private func figureRow(_ label: String, _ value: String) -> some View {
+        AdaptiveRow(spacing: 8) {
+            Text(label)
+            Spacer(minLength: 8)
+            Text(value).monospacedDigit()
         }
         .accessibilityElement(children: .combine)
     }

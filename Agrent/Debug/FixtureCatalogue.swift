@@ -169,6 +169,9 @@ enum FixtureCatalogue {
         // the API's shape (public sources, nothing personal).
         (AgroCalendarAPI.path(region: .north), "agro-calendar-north"),
         (AgroCalendarAPI.path(region: .south), "agro-calendar-south"),
+        // #638: national yields and support rates, the server's own answer
+        // (public МЗХ figures, nothing personal).
+        (AgroBenchmarksAPI.path, "agro-benchmarks"),
         // #574: the synthetic tractor's day, as «Машини» opens it: today.
         (MachinesAPI.trackPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-track"),
         (MachinesAPI.workedPath(fixtureTractorID, day: BgDate.isoDay(Date())), "machine-worked"),
