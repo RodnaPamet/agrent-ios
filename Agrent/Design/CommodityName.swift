@@ -113,6 +113,27 @@ enum CommodityName {
         return isServerEnum(trimmed) ? titleCased(trimmed.lowercased()) : trimmed
     }
 
+    /// The CANONICAL slug a parcel's free-text crop stands for, or nil.
+    ///
+    /// For joining a field to reference data keyed by commodity (#636).
+    /// The parcel catalogue's word first (`Canola` is `rapeseed`), then a
+    /// canonical slug typed as-is, then the Bulgarian name either table
+    /// shows («Пшеница»). Anything else is the farm's own word and joins
+    /// nothing — never a guess.
+    static func slug(freeText value: String?) -> String? {
+        guard let value else { return nil }
+        let key = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return nil }
+        if key == "canola" { return "rapeseed" }
+        if table[key] != nil { return key }
+        if cropTable[key] != nil { return key }
+        if let hit = table.first(where: { $0.value.lowercased() == key }) { return hit.key }
+        if let hit = cropTable.first(where: { $0.value.lowercased() == key }) {
+            return hit.key == "canola" ? "rapeseed" : hit.key
+        }
+        return nil
+    }
+
     /// `SUGAR_BEET` — uppercase ASCII with underscores and no spaces.
     /// Anything with a lowercase letter or a Cyrillic character is
     /// somebody's own words. No value of this shape has been observed in

@@ -15,6 +15,7 @@
 /api/account/deletion
 /api/agro-benchmarks
 /api/agro-calendar
+/api/agro-thresholds
 /api/auth/accept-terms
 /api/auth/me
 /api/auth/native/apple

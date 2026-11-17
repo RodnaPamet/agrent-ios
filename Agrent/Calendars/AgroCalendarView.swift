@@ -10,6 +10,7 @@ struct AgroCalendarView: View {
     @State private var store = AgroCalendarStore()
     @State private var locations = LocationsStore()
     @State private var benchmarks = AgroBenchmarksStore()
+    @State private var thresholds = AgroThresholdsStore()
 
     private var region: AgroRegion { AgroRegion(rawValue: regionKey) ?? .north }
 
@@ -70,10 +71,12 @@ struct AgroCalendarView: View {
         }
         .task(id: region) { await store.load(region) }
         .task { await benchmarks.load() }
+        .task { await thresholds.load() }
         .navigationDestination(for: AgroCropPage.self) { page in
             if let calendar = store.state.value, let crop = calendar.crops.first(where: { $0.key == page.key }) {
                 AgroCropView(calendar: calendar, crop: crop, region: page.region,
-                             benchmarks: benchmarks.state.value)
+                             benchmarks: benchmarks.state.value,
+                             thresholds: thresholds.state.value?.for(crop.commodityCanonical) ?? [])
             }
         }
     }
@@ -102,6 +105,8 @@ struct AgroCropView: View {
     let region: AgroRegion
     /// The national yield and support rate (#638); nil until they load.
     var benchmarks: AgroBenchmarks?
+    /// The crop's pests and diseases with their thresholds (#636).
+    var thresholds: [AgroThresholds.Threshold] = []
 
     var body: some View {
         List {
@@ -109,6 +114,7 @@ struct AgroCropView: View {
             section(AgroWords.works, crop.windows(.fieldwork, in: region))
             section(AgroWords.harvest, crop.windows(.harvest, in: region))
             nationalSection
+            thresholdsSection
             costsSection
             Section {
                 EmptyView()
@@ -226,6 +232,22 @@ struct AgroCropView: View {
                         Text(AgroWords.costsNote(year: String(rate.campaign)))
                     }
                 }
+            }
+            .pageRow()
+        }
+    }
+
+    /// What to watch for on this crop and when treating pays (#636): the
+    /// guide's threshold per stage, shown, never judged.
+    @ViewBuilder
+    private var thresholdsSection: some View {
+        if !thresholds.isEmpty {
+            Section {
+                ForEach(thresholds) { ThresholdRow(threshold: $0) }
+            } header: {
+                SectionHeader(ThresholdWords.title)
+            } footer: {
+                SectionFooter { Text(ThresholdWords.note) }
             }
             .pageRow()
         }
