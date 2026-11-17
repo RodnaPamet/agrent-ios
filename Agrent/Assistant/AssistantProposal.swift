@@ -34,6 +34,58 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
         let pppRegistrationNo: String?
         let quarantinePeriodDays: Int?
         let applicationTechnique: String?
+        /// The field the server resolved from the chat (agri-saas#3162):
+        /// parcels the person can read, all one crop.
+        let chosenParcels: [ChosenParcel]?
+        /// The dose unit as said («л/дка»), matched in the form.
+        let doseUnitLabel: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case kind, occurredOn, productName, fertilizerName, doseValue, targetNote, phenophase,
+                 pppRegistrationNo, quarantinePeriodDays, applicationTechnique, chosenParcels, doseUnitLabel
+        }
+
+        init(kind: String? = nil, occurredOn: String? = nil, productName: String? = nil, fertilizerName: String? = nil,
+             doseValue: WireDecimal? = nil, targetNote: String? = nil, phenophase: String? = nil,
+             pppRegistrationNo: String? = nil, quarantinePeriodDays: Int? = nil, applicationTechnique: String? = nil,
+             chosenParcels: [ChosenParcel]? = nil, doseUnitLabel: String? = nil) {
+            self.kind = kind
+            self.occurredOn = occurredOn
+            self.productName = productName
+            self.fertilizerName = fertilizerName
+            self.doseValue = doseValue
+            self.targetNote = targetNote
+            self.phenophase = phenophase
+            self.pppRegistrationNo = pppRegistrationNo
+            self.quarantinePeriodDays = quarantinePeriodDays
+            self.applicationTechnique = applicationTechnique
+            self.chosenParcels = chosenParcels
+            self.doseUnitLabel = doseUnitLabel
+        }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try c.decodeIfPresent(String.self, forKey: .kind)
+            occurredOn = try c.decodeIfPresent(String.self, forKey: .occurredOn)
+            productName = try c.decodeIfPresent(String.self, forKey: .productName)
+            fertilizerName = try c.decodeIfPresent(String.self, forKey: .fertilizerName)
+            doseValue = try c.decodeIfPresent(WireDecimal.self, forKey: .doseValue)
+            targetNote = try c.decodeIfPresent(String.self, forKey: .targetNote)
+            phenophase = try c.decodeIfPresent(String.self, forKey: .phenophase)
+            pppRegistrationNo = try c.decodeIfPresent(String.self, forKey: .pppRegistrationNo)
+            quarantinePeriodDays = try c.decodeIfPresent(Int.self, forKey: .quarantinePeriodDays)
+            applicationTechnique = try c.decodeIfPresent(String.self, forKey: .applicationTechnique)
+            // The two new fields cost themselves, never the draft: an older
+            // or odd shape leaves the person to pick, as before.
+            chosenParcels = (try? c.decodeIfPresent([ChosenParcel].self, forKey: .chosenParcels)) ?? nil
+            doseUnitLabel = (try? c.decodeIfPresent(String.self, forKey: .doseUnitLabel)) ?? nil
+        }
+    }
+
+    struct ChosenParcel: Decodable, Equatable, Sendable {
+        let id: String
+        let label: String
+        let crop: String?
     }
 
     struct ActivityFields: Decodable, Equatable, Sendable {
@@ -82,6 +134,12 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
             if let technique = fields.applicationTechnique.flatMap({ ApplicationTechnique(rawValue: $0.lowercased()) }) {
                 entry.technique = technique
             }
+            // The field and unit from the chat (#663): ticked and chosen in
+            // the form, for the person to check. One crop per record.
+            let parcels = fields.chosenParcels ?? []
+            entry.saidParcels = Set(parcels.map(\.id))
+            entry.saidCrop = parcels.compactMap(\.crop).first
+            entry.saidUnit = fields.doseUnitLabel
         case .activity(let fields):
             guard let work = fields.kind.flatMap(ActivityKind.init(rawValue:)) else { return nil }
             entry.activity = work

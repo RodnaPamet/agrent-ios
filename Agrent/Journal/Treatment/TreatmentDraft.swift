@@ -125,7 +125,35 @@ struct TreatmentDraft: Equatable, Sendable {
     private(set) var prefilledQuarantine: String?
     private(set) var prefilledUnitID: String?
 
+    /// What the assistant resolved from the chat (#663, agri-saas#3162): the
+    /// parcels to tick, the crop to open on, and the dose unit as said. The
+    /// form still shows them for the person to check; nothing here is saved
+    /// until «Добави».
+    var saidParcels: Set<String> = []
+    var saidCrop: String?
+    var saidUnit: String?
+
     init(date: Date = Date()) { self.date = date }
+
+    /// The unit the farmer SAID, once the catalogue is in hand: matched on
+    /// its symbol, name or key, spaces and case ignored. It wins over a
+    /// product's default (it is what they said), and an unmatched word is
+    /// left for the person to pick — never guessed. Applied once.
+    mutating func applySaidUnit(units: [Unit]) {
+        guard let said = saidUnit, !units.isEmpty else { return }
+        let want = Self.unitKey(said)
+        if let unit = units.first(where: { candidate in
+            [candidate.symbol, candidate.name, candidate.key].compactMap { $0 }.contains { Self.unitKey($0) == want }
+        }) {
+            doseUnit = unit
+            prefilledUnitID = nil
+        }
+        saidUnit = nil
+    }
+
+    static func unitKey(_ text: String) -> String {
+        text.lowercased().replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "\u{00A0}", with: "")
+    }
 
     /// One thing still missing or wrong, in the order the form asks for it.
     enum Problem: Equatable, Sendable {

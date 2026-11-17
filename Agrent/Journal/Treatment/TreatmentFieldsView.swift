@@ -144,7 +144,11 @@ struct TreatmentFieldsView: View {
             }
         }
         .onChange(of: typed) { _, now in draft.prefill(from: now, units: units) }
-        .onChange(of: units) { _, now in draft.prefill(from: typed, units: now) }
+        .onChange(of: units) { _, now in
+            draft.prefill(from: typed, units: now)
+            // After the product's default, so the unit said in the chat wins.
+            draft.applySaidUnit(units: now)
+        }
         .task { await reference.load() }
     }
 
