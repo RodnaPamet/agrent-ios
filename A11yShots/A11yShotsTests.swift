@@ -2372,7 +2372,7 @@ final class A11yShotsTests: XCTestCase {
         // The assistant's sheet, answering: the question has scrolled above
         // the answer by now, so it is the sheet and its answer that are
         // looked for, not the question's row.
-        XCTAssertTrue(app.navigationBars["Асистент"].waitForExistence(timeout: 10),
+        XCTAssertTrue(app.navigationBars["Агрент"].waitForExistence(timeout: 10),
                       "«Риск» opened no assistant\n\(app.debugDescription)")
         XCTAssertTrue(app.textFields["Въпрос"].exists, "no composer to ask on")
         app.navigationBars.buttons["Затвори"].firstMatch.tap()
@@ -3249,7 +3249,7 @@ final class A11yShotsTests: XCTestCase {
         let calculator = labelled("Калкулатор", in: app.tabBars.buttons)
         XCTAssertTrue(calculator.waitForExistence(timeout: 10), "no «Калкулатор» tab")
         calculator.tap()
-        let button = app.buttons["Асистент"]
+        let button = app.buttons["Агрент"]
         XCTAssertTrue(button.waitForExistence(timeout: 15), "no assistant button\n\(app.debugDescription)")
         let newCost = app.buttons["Нов разход"]
         XCTAssertTrue(newCost.waitForExistence(timeout: 10), "no «Нов разход»")
@@ -3405,8 +3405,8 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(card.waitForExistence(timeout: 10), "no account card on Админ")
         card.tap()
         XCTAssertTrue(app.navigationBars["Профил"].waitForExistence(timeout: 10), "the card did not push Профил")
-        let memoryRow = app.buttons["Какво помни асистентът"]
-        guard reveal(memoryRow, in: app, what: "«Какво помни асистентът» on Профил") else { return }
+        let memoryRow = app.buttons["Какво помни Агрент"]
+        guard reveal(memoryRow, in: app, what: "«Какво помни Агрент» on Профил") else { return }
         Thread.sleep(forTimeInterval: 1)
         capture("25a-profile-memory-row", app: app)
         memoryRow.tap()
