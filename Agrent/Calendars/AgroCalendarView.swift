@@ -226,10 +226,13 @@ struct AgroCropView: View {
             } header: {
                 SectionHeader(BenchmarkWords.nationalTitle)
             } footer: {
-                // The marker says the euro was converted; only a rate has one.
                 SectionFooter {
-                    if let rate = rates.first {
-                        Text(AgroWords.costsNote(year: String(rate.campaign)))
+                    // One line per distinct source: a crop's schemes can mix
+                    // an order in euro and one converted from leva.
+                    if !rates.isEmpty {
+                        Text(rates.map(BenchmarkWords.rateNote)
+                            .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+                            .joined(separator: "\n"))
                     }
                 }
             }

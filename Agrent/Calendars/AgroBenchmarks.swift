@@ -34,6 +34,13 @@ struct AgroBenchmarks: Decodable, Equatable, Sendable {
         let scheme: String
         let label: AgroCalendar.Text?
         let campaign: Int
+        /// The order's own currency: «BGN» until Campaign 2024, «EUR» from
+        /// 2025 (agri-saas#3166). Absent on an older server, whose every rate
+        /// was in leva.
+        let currency: String?
+        /// A caveat the server puts beside the rate — «Ставката за Кампания
+        /// 2025 още не е обявена…».
+        let note: AgroCalendar.Text?
         /// Euro cents per дка, converted by the server. A rate without it is
         /// not shown: the phone never shows the lev figure (EUR only).
         let perDaEurCents: Int?
@@ -43,6 +50,9 @@ struct AgroBenchmarks: Decodable, Equatable, Sendable {
         let cite: AgroCalendar.Citation?
         var id: String { scheme }
         var title: String { label?.bg ?? scheme }
+        /// Whether the euro figure was converted from leva. An order in euro
+        /// is only divided per дка, and must not carry the converted marker.
+        var isConverted: Bool { currency != "EUR" }
     }
 
     private enum CodingKeys: String, CodingKey { case sources, yields, supportRates }
@@ -127,6 +137,16 @@ enum BenchmarkWords {
 
     /// «13,02 EUR на дка».
     static func perDa(_ cents: Int) -> String { AgroWords.perDa(cents) }
+
+    /// The rate's source line: «по МЗХ (2025)» for an order in euro, and the
+    /// converted marker (`AgroWords.sourceNote`) for one converted from leva —
+    /// per rate, since one list holds both (agri-saas#3166). The server's
+    /// note follows.
+    static func rateNote(_ r: AgroBenchmarks.Rate) -> String {
+        let source = AgroWords.sourceNote(year: String(r.campaign), converted: r.isConverted)
+        guard let note = r.note?.bg.recorded else { return source }
+        return "\(source). \(note)"
+    }
 
     /// «Над 300 дка: 62,59 EUR на дка».
     static func over300(_ cents: Int) -> String { "Над 300 дка: \(perDa(cents))" }
