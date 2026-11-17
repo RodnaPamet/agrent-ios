@@ -86,6 +86,18 @@ enum LocationsAPI {
         "\(parcelsPath(locationID))/\(URLEscape.segment(parcelID))"
     }
 
+    /// The farmer's own name for a parcel (#667). nil clears it, and the
+    /// parcel is called by its number again. The server sanitises and trims;
+    /// the field number the ДНЕВНИК prints is not touched.
+    static func setDisplayName(
+        locationID: String, parcelID: String, displayName: String?
+    ) async throws {
+        _ = try await APIClient.shared.patchReturningData(
+            parcelPath(locationID: locationID, parcelID: parcelID),
+            body: ["displayName": displayName]
+        )
+    }
+
     /// Inline crop edit from the parcel sheet.
     static func setCropType(
         locationID: String, parcelID: String, cropType: String?

@@ -674,6 +674,9 @@ struct ParcelHistory: Decodable, Equatable, Sendable {
     struct ParcelRef: Decodable, Equatable, Sendable {
         let id: String
         let name: String
+        /// The farmer's own name (#667); nil on an older server, and set in
+        /// place by a rename on this screen.
+        var displayName: String? = nil
 
         /// The CURRENT crop, and a single overwritten field.
         ///

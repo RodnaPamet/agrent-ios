@@ -508,7 +508,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
             view.removeAnnotations(view.annotations.filter { ($0 as? OrthoMapLabel)?.kind == .parcel })
             for parcel in parcels {
                 guard let point = parcel.geometry?.boundingMapPolygon?.coordinate else { continue }
-                view.addAnnotation(OrthoMapLabel(kind: .parcel, text: parcel.name, coordinate: point))
+                view.addAnnotation(OrthoMapLabel(kind: .parcel, text: parcel.title, coordinate: point))
             }
         }
 
@@ -520,7 +520,7 @@ struct SatelliteParcelMap: UIViewRepresentable {
             for parcel in parcels {
                 guard let count = badges[parcel.id], count > 0,
                       let point = parcel.geometry?.boundingMapPolygon?.coordinate else { continue }
-                view.addAnnotation(ParcelTaskBadge(parcelName: parcel.name, count: count, coordinate: point))
+                view.addAnnotation(ParcelTaskBadge(parcelName: parcel.title, count: count, coordinate: point))
             }
         }
 

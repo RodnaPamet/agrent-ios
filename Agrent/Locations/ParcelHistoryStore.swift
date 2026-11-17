@@ -120,6 +120,13 @@ final class ParcelHistoryStore {
     /// path because the cursor is in the query — so caching them would fill
     /// the response cache with pages that are only ever read once. The first
     /// page is the one worth caching and it is the one that is ETagged.
+    /// A rename on this screen shows at once (#667).
+    func applyNickname(_ displayName: String?) {
+        guard var archive = state.value, let freshness = state.freshness else { return }
+        archive.parcel.displayName = displayName
+        state = .loaded(archive, freshness)
+    }
+
     func loadOlder(_ part: Part) async {
         guard var archive = state.value, let freshness = state.freshness else { return }
         guard let cursor = cursor(for: part, in: archive) else { return }

@@ -36,7 +36,7 @@ enum StandingIn {
 
     /// What the label says, in the words a parcel's row uses.
     static func sentence(_ parcel: Parcel) -> String {
-        "Намирате се в «\(parcel.name)»"
+        "Намирате се в «\(parcel.title)»"
     }
 }
 
