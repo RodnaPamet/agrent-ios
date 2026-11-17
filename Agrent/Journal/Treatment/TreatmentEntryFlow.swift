@@ -36,8 +36,10 @@ struct TreatmentEntryFlow: View {
          cropValue: String? = nil, onSaved: @escaping () -> Void) {
         self.recorder = recorder
         self.onSaved = onSaved
-        self.preselect = preselect
-        self.cropValue = cropValue
+        // What the chat resolved (#663) joins what the caller asked for: a
+        // machine's route or the parcel the form was opened from.
+        self.preselect = preselect.union(prefill?.saidParcels ?? [])
+        self.cropValue = cropValue ?? prefill?.saidCrop
         _draft = State(initialValue: prefill ?? TreatmentDraft())
     }
 
