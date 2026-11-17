@@ -26,6 +26,8 @@ final class DashboardStore {
     private(set) var taskTrend: LoadState<FarmTaskTrend> = .loading
     private(set) var briefing: LoadState<FieldBriefingPayload> = .loading
     private(set) var prices: LoadState<PricesResponse> = .loading
+    /// «В страната» (#635): МЗХ's field-campaign progress.
+    private(set) var campaign: LoadState<CampaignProgressResponse> = .loading
 
     /// The commodity the price block last loaded, so a change of crop refetches
     /// and an unchanged one does not.
@@ -71,7 +73,9 @@ final class DashboardStore {
         async let pricesTask: Void = loadPrices(
             if: wanted, commodity: commodity, showCachedFirst: showCachedFirst)
 
-        _ = await (agTask, trendTask, briefingTask, pricesTask)
+        async let campaignTask: Void = loadCampaign(if: wanted, showCachedFirst: showCachedFirst)
+
+        _ = await (agTask, trendTask, briefingTask, pricesTask, campaignTask)
         loadedCommodity = wanted.contains(.grainPrice) ? commodity : nil
     }
 
@@ -130,6 +134,17 @@ final class DashboardStore {
         await CachedResource.loadShowingCacheFirst(path, showCachedFirst: showCachedFirst) { data in
             try await APIClient.shared.decode(data, as: PricesResponse.self)
         } publish: { [weak self] in self?.prices = $0 }
+    }
+
+    /// National figures, the same for every farm, so cached like any other.
+    private func loadCampaign(if wanted: Set<DashboardBlock>, showCachedFirst: Bool) async {
+        guard wanted.contains(.campaign) else { return }
+        if campaign.value == nil { campaign = .loading }
+        await CachedResource.loadShowingCacheFirst(
+            CampaignProgressAPI.path, showCachedFirst: showCachedFirst
+        ) { data in
+            try await CampaignProgressAPI.decode(data)
+        } publish: { [weak self] in self?.campaign = $0 }
     }
 
     /// The one series the price block shows: Тенденции's headline, by the

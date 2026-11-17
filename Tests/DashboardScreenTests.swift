@@ -7,12 +7,13 @@ final class DashboardScreenTests: XCTestCase {
 
     // MARK: - The owner's arrangement
 
-    /// The four the owner chose on 2026-09-25 when offered all seven.
-    func testTheDefaultBlocksAreTheOwnersFour() {
+    /// The four the owner chose on 2026-09-25 when offered all seven, and
+    /// «В страната» after the price since 2026-11-17 (#635).
+    func testTheDefaultBlocksAreTheOwnersFive() {
         XCTAssertEqual(DashboardBlock.defaultOrder,
-                       [.briefing, .grainPrice, .journal, .taskTrend])
+                       [.briefing, .grainPrice, .campaign, .journal, .taskTrend])
         // The other three exist so the picker can offer them without a build.
-        XCTAssertEqual(DashboardBlock.allCases.count, 7)
+        XCTAssertEqual(DashboardBlock.allCases.count, 8)
     }
 
     /// Turning a block on puts it at the END, where somebody expects a new

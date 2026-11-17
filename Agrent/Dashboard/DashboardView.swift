@@ -118,6 +118,9 @@ struct DashboardView: View {
         switch block {
         case .briefing: store.briefing.value != nil || store.briefing.isFailed
         case .grainPrice: store.leadPrice != nil || store.prices.isFailed
+        // Nothing to say until МЗХ's bulletin carries a progress table: a
+        // failed read hides too, since a national figure is not the farm's.
+        case .campaign: !(store.campaign.value?.progress?.isEmpty ?? true)
         case .journal: !(store.ag.value?.recentJournal.isEmpty ?? true)
         case .taskTrend: !(store.taskTrend.value?.trend.isEmpty ?? true)
         case .tasks: !(store.ag.value?.myTasks.isEmpty ?? true)
@@ -149,6 +152,7 @@ struct DashboardView: View {
         switch block {
         case .briefing: briefingSection
         case .grainPrice: priceSection
+        case .campaign: campaignSection
         case .journal: journalSection
         case .taskTrend: taskTrendSection
         case .tasks: tasksSection
@@ -284,6 +288,37 @@ struct DashboardView: View {
             Section(titled: preferences.priceCommodity.label) {
                 Text(store.prices.failureText ?? "Грешка.")
                     .font(.footnote).foregroundStyle(Palette.error).pageRow()
+            }
+        }
+    }
+
+    // MARK: - В страната
+
+    /// The field campaign's progress (#635), as the owner approved it: the
+    /// harvested shares on one line, one line per crop sown, the date the
+    /// figures are «към», and whose they are.
+    @ViewBuilder
+    private var campaignSection: some View {
+        if let progress = store.campaign.value?.progress, !progress.isEmpty {
+            Section(titled: CampaignWords.title) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let harvest = CampaignWords.harvest(progress) {
+                        Text(harvest)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(CampaignWords.sowing(progress), id: \.self) { line in
+                        Text(line)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Text([CampaignWords.asOf(progress.asOf), CampaignWords.source]
+                        .compactMap { $0 }.joined(separator: ". "))
+                        .font(.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                }
+                .accessibilityElement(children: .combine)
+                .pageRow()
             }
         }
     }

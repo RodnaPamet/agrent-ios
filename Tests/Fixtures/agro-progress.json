@@ -1,0 +1,78 @@
+{
+  "progress": {
+    "asOf": "2026-11-05",
+    "bulletinDate": "2026-11-11",
+    "sourceUrl": "https://www.mzh.government.bg/media/filer_public/2026/11/11/operativen_analiz_2026-11-11.pdf",
+    "harvest": [
+      {
+        "asOf": "2026-11-05",
+        "lastYear": 2025,
+        "title": "Реколта от слънчоглед и царевица за зърно",
+        "rows": [
+          {
+            "label": "слънчоглед",
+            "commodity": "sunflower",
+            "areaHa": 948911,
+            "harvestedHa": 943729,
+            "harvestedPct": 99,
+            "productionT": 2436796,
+            "yieldKgPerDa": 258
+          },
+          {
+            "label": "царевица за зърно",
+            "commodity": "maize",
+            "areaHa": 320521,
+            "harvestedHa": 296143,
+            "harvestedPct": 92,
+            "productionT": 1703856,
+            "yieldKgPerDa": 575
+          }
+        ]
+      }
+    ],
+    "sowing": [
+      {
+        "asOf": "2026-11-05",
+        "lastYear": 2025,
+        "title": "Засети площи с есенници",
+        "rows": [
+          {
+            "label": "пшеница",
+            "commodity": "wheat",
+            "sownHa": 767199,
+            "lastYearHa": 658208,
+            "changePct": "16.6"
+          },
+          {
+            "label": "ечемик",
+            "commodity": "barley",
+            "sownHa": 133368,
+            "lastYearHa": 116531,
+            "changePct": "14.4"
+          },
+          {
+            "label": "маслодайна рапица",
+            "commodity": "rapeseed",
+            "sownHa": 173485,
+            "lastYearHa": 137311,
+            "changePct": "26.3"
+          },
+          {
+            "label": "ръж",
+            "commodity": "rye",
+            "sownHa": 2747,
+            "lastYearHa": 3839,
+            "changePct": "-28.4"
+          },
+          {
+            "label": "тритикале",
+            "commodity": "triticale",
+            "sownHa": 7222,
+            "lastYearHa": 5980,
+            "changePct": "20.8"
+          }
+        ]
+      }
+    ]
+  }
+}

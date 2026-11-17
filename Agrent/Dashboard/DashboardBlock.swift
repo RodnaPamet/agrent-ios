@@ -24,6 +24,8 @@ import SwiftUI
 enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
     case briefing
     case grainPrice
+    /// «В страната» (#635): the field campaign's progress from МЗХ.
+    case campaign
     case journal
     case taskTrend
     case tasks
@@ -36,6 +38,7 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .briefing: "Сателитно обобщение"
         case .grainPrice: "Цена на избрана култура"
+        case .campaign: CampaignWords.title
         case .journal: "Последни записи"
         case .taskTrend: "Създадени и завършени задачи"
         case .tasks: "Моите задачи"
@@ -48,6 +51,7 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .briefing: "sparkles"
         case .grainPrice: "chart.line.uptrend.xyaxis"
+        case .campaign: "leaf"
         case .journal: "book.closed"
         case .taskTrend: "chart.bar"
         case .tasks: "checklist"
@@ -88,7 +92,7 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .journal: "JOURNAL"
         case .lowStock: "INVENTORY"
-        case .briefing, .grainPrice, .taskTrend, .tasks, .achievements: nil
+        case .briefing, .grainPrice, .campaign, .taskTrend, .tasks, .achievements: nil
         }
     }
 
@@ -98,7 +102,9 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
     /// created-against-completed chart. `tasks`, `lowStock` and `achievements`
     /// exist and are off: he was offered all seven and picked these. They stay
     /// in the enum so the picker can offer them rather than requiring a build.
-    static let defaultOrder: [DashboardBlock] = [.briefing, .grainPrice, .journal, .taskTrend]
+    ///
+    /// «В страната» joined them on 2026-11-17 (#635), after the price.
+    static let defaultOrder: [DashboardBlock] = [.briefing, .grainPrice, .campaign, .journal, .taskTrend]
 }
 
 /// Which blocks are on, and which crop the price block follows.
@@ -128,6 +134,7 @@ final class DashboardPreferences {
 
     private static let blocksKey = "dashboard.blocks"
     private static let priceCommodityKey = "dashboard.priceCommodity"
+    private static let campaignOfferedKey = "dashboard.campaignOffered"
 
     private(set) var blocks: [DashboardBlock]
     private(set) var priceCommodity: ChartableCommodity
@@ -145,7 +152,21 @@ final class DashboardPreferences {
         // later build must not strand a saved arrangement, the same rule
         // `AppSurface` applies to a bar order saved on the web.
         let restored = stored?.compactMap(DashboardBlock.init(rawValue:))
-        blocks = restored ?? DashboardBlock.defaultOrder
+        var arranged = restored ?? DashboardBlock.defaultOrder
+
+        // «В страната» (#635) is new, and a saved arrangement predates it: the
+        // owner wants it on Табло, so it is added ONCE, after the price. The
+        // flag is what stops a farmer who later switches it off from having
+        // it switched back on at the next launch.
+        if !defaults.bool(forKey: Self.campaignOfferedKey) {
+            if restored != nil, !arranged.contains(.campaign) {
+                let at = arranged.firstIndex(of: .grainPrice).map { $0 + 1 } ?? arranged.endIndex
+                arranged.insert(.campaign, at: at)
+                defaults.set(arranged.map(\.rawValue), forKey: Self.blocksKey)
+            }
+            defaults.set(true, forKey: Self.campaignOfferedKey)
+        }
+        blocks = arranged
 
         let commodity = defaults.string(forKey: Self.priceCommodityKey)
         priceCommodity = commodity.flatMap(ChartableCommodity.init(rawValue:)) ?? .wheat
