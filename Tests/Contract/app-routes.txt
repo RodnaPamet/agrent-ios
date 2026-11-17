@@ -13,6 +13,7 @@
 /api/account/bottom-tabs
 /api/account/channel-digest
 /api/account/deletion
+/api/agro-benchmarks
 /api/agro-calendar
 /api/auth/accept-terms
 /api/auth/me

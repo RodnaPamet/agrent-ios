@@ -80,9 +80,12 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
         /// МЗХ's direct costs, only where МЗХ prices a card (agri-saas #3127:
         /// wine grapes, 2026). ABSENT on every other crop: МЗХ prices none.
         let costs: Costs?
+        /// The commodity the crop joins to (`wheat`, `rapeseed`), where it has
+        /// one: what the national yield and support rate are looked up by (#638).
+        let commodityCanonical: String?
         var id: String { key }
 
-        private enum CodingKeys: String, CodingKey { case key, group, name, windows, costs }
+        private enum CodingKeys: String, CodingKey { case key, group, name, windows, costs, commodityCanonical }
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             key = try c.decode(String.self, forKey: .key)
@@ -91,9 +94,12 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
             windows = (try? c.decodeIfPresent(Lenient<Window>.self, forKey: .windows))?.values ?? []
             // A costs block that does not read is left out, never the crop.
             costs = try? c.decodeIfPresent(Costs.self, forKey: .costs)
+            commodityCanonical = try? c.decodeIfPresent(String.self, forKey: .commodityCanonical)
         }
 
-        var title: String { name.bg ?? key }
+        /// The Bulgarian name; for a crop the server names only in its key,
+        /// the commodity's own name, then the key.
+        var title: String { name.bg ?? CommodityName.canonical(commodityCanonical) ?? key }
 
         func windows(_ kind: Window.Kind, in region: AgroRegion) -> [Window] {
             windows.filter { $0.kind == kind && $0.applies(to: region) }
@@ -202,7 +208,7 @@ struct AgroCalendar: Decodable, Equatable, Sendable {
 
     /// Reads a list, keeping the entries that read: an uncited or
     /// unreadable window is left out, never the whole calendar.
-    private struct Lenient<T: Decodable>: Decodable {
+    struct Lenient<T: Decodable>: Decodable {
         let values: [T]
         init(from decoder: any Decoder) throws {
             var list = try decoder.unkeyedContainer()

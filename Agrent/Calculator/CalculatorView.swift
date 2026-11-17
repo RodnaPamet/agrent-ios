@@ -24,6 +24,8 @@ struct CalculatorView: View {
     @State private var openCrops: Set<String> = []
     /// The month graph's month (owner, 2026-11-01): nil is «Всички месеци».
     @State private var chartMonth: Date?
+    /// The national yield and support rate beside each crop (#638).
+    @State private var benchmarks = AgroBenchmarksStore()
 
     var body: some View {
         RoutedStack {
@@ -90,6 +92,7 @@ struct CalculatorView: View {
                     }
                 }
             }
+            .task { await benchmarks.load() }
             .task {
                 if store.state.value == nil { await store.load() }
                 if costs.state.value == nil { await costs.load() }
@@ -622,6 +625,7 @@ struct CalculatorView: View {
             ValueRow("Очаквана реколта") {
                 Text("\(Num.text(row.expectedTonnes)) т")
             }
+            nationalFacts(row.commodity)
 
             if let value = row.perArea.standingValuePerDca {
                 ValueRow("Стойност / дка") { Text(Num.text(value)) }
@@ -672,6 +676,30 @@ struct CalculatorView: View {
                 RefusalNote(text: "Валутата на рентата е неизвестна.",
                             icon: "questionmark.circle")
             }
+    }
+
+    /// The country's average yield for the crop and the coupled support it
+    /// earns, where there is one (#638). Under the yield the farm expects, so
+    /// the two read together. The support is euro the server converted, so it
+    /// carries the vine card's marker.
+    @ViewBuilder
+    private func nationalFacts(_ commodity: String) -> some View {
+        let figures = benchmarks.state.value
+        if let national = figures?.yield(for: commodity) {
+            ValueRow(BenchmarkWords.yieldLabel(national)) {
+                Text(BenchmarkWords.yieldValue(national))
+            }
+        }
+        ForEach(figures?.rates(for: commodity) ?? []) { rate in
+            if let cents = rate.perDaEurCents {
+                ValueRow(BenchmarkWords.rateLabel(rate)) {
+                    Text(BenchmarkWords.perDa(cents))
+                }
+                Text(AgroWords.costsNote(year: String(rate.campaign)))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.secondaryText)
+            }
+        }
     }
 
     // MARK: - What the figures leave out
