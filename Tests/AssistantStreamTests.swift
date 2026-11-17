@@ -115,7 +115,7 @@ final class AssistantStreamTests: XCTestCase {
                            .halt(outcome: "ASSISTANT_TIME_BUDGET", message: nil),
                            .done(truncatedAny: false)])
         await ask(store)
-        guard case .answered(let text, _, let note, _, _) = store.turns[0].phase else {
+        guard case .answered(let text, _, let note, _, _, _) = store.turns[0].phase else {
             return XCTFail("the streamed part was lost: \(store.turns[0].phase)")
         }
         XCTAssertEqual(text, "Първата част. ")

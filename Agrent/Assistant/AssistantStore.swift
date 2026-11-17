@@ -21,7 +21,7 @@ final class AssistantStore {
             /// The answer, the screens it points at, and what stopped it
             /// short, if anything did.
             case answered(String, links: [AssistantLink] = [], note: String?, proposal: AssistantProposal? = nil,
-                          promotions: [AssistantPromotion] = [])
+                          promotions: [AssistantPromotion] = [], document: AssistantDocument? = nil)
             /// Refused or failed: the sentence that says why.
             case unanswered(String)
         }
@@ -146,6 +146,7 @@ final class AssistantStore {
         var answerLinks: [AssistantLink] = []
         var answerProposal: AssistantProposal?
         var answerPromotions: [AssistantPromotion] = []
+        var answerDocument: AssistantDocument?
         // The halt that was said, if any: `done` follows it (agri-saas: answer,
         // then halt, then done) and may add what the halt did not say.
         var halted: (code: String, note: String)?
@@ -172,13 +173,14 @@ final class AssistantStore {
                     if !shown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         turns[index].phase = .streaming(shown)
                     }
-                case .answer(let text, let links, let proposal, let promotions):
+                case .answer(let text, let links, let proposal, let promotions, let document):
                     answer = text
                     answerLinks = links
                     answerProposal = proposal
                     answerPromotions = promotions
+                    answerDocument = document
                     turns[index].phase = .answered(text, links: links, note: nil, proposal: proposal,
-                                                   promotions: promotions)
+                                                   promotions: promotions, document: document)
                 case .refusal(let reason, let message):
                     // Any answer already shown goes: a refusal is "no answer",
                     // and an egress block discards it outright.
@@ -194,7 +196,7 @@ final class AssistantStore {
                     }
                     turns[index].phase = answer.map {
                         .answered($0, links: answerLinks, note: note, proposal: answerProposal,
-                                  promotions: answerPromotions)
+                                  promotions: answerPromotions, document: answerDocument)
                     } ?? .unanswered(note)
                 case .done(let truncatedAny, let partialAny):
                     // A turn that was partial AND ran out of time is halted
@@ -211,7 +213,7 @@ final class AssistantStore {
                     if let answer {
                         let note = notes.isEmpty ? nil : notes.joined(separator: " ")
                         turns[index].phase = .answered(answer, links: answerLinks, note: note, proposal: answerProposal,
-                                                       promotions: answerPromotions)
+                                                       promotions: answerPromotions, document: answerDocument)
                     } else if halted == nil {
                         turns[index].phase = .unanswered(AssistantText.noAnswer)
                     }

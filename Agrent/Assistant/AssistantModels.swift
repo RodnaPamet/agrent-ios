@@ -75,8 +75,10 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
     /// means a part was lost. `restarted`: the server began the answer again
     /// (a retry), and this part's text replaces everything before it.
     case answerDelta(text: String, seq: Int, restarted: Bool = false)
+    /// `document` (#661, agri-saas#3158): a ДНЕВНИК PDF offered as a
+    /// download. Absent, unknown or unreadable is none — never the answer.
     case answer(text: String, links: [AssistantLink], proposal: AssistantProposal?,
-                promotions: [AssistantPromotion] = [])
+                promotions: [AssistantPromotion] = [], document: AssistantDocument? = nil)
     /// No answer, and not a fault: the reason is a CODE, and `message` the
     /// server's sentence for it in the person's language, when it sends one.
     case refusal(reason: String, message: String?)
@@ -93,6 +95,7 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case type, name, ok, truncated, text, links, proposal, code, reason, outcome, truncatedAny, partialAny, message
         case promotions
+        case document
         case conversationId
         case seq, restarted
     }
@@ -131,7 +134,8 @@ enum AssistantEvent: Decodable, Equatable, Sendable {
                            links: (try? c.decodeIfPresent([AssistantLink].self, forKey: .links)) ?? [],
                            proposal: try? c.decodeIfPresent(AssistantProposal.self, forKey: .proposal),
                            promotions: ((try? c.decodeIfPresent([AssistantPromotion.Lossy].self, forKey: .promotions))
-                               ?? nil)?.compactMap(\.value) ?? [])
+                               ?? nil)?.compactMap(\.value) ?? [],
+                           document: try? c.decodeIfPresent(AssistantDocument.self, forKey: .document))
         case "refusal":
             // `code` (agri-saas #2595); `reason` was the draft's name for it.
             let code = (try? c.decode(String.self, forKey: .code)) ?? (try? c.decode(String.self, forKey: .reason))
