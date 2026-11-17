@@ -144,7 +144,7 @@ enum BenchmarkWords {
     /// note follows.
     static func rateNote(_ r: AgroBenchmarks.Rate) -> String {
         let source = AgroWords.sourceNote(year: String(r.campaign), converted: r.isConverted)
-        guard let note = r.note?.bg.recorded else { return source }
+        guard let note = r.note?.bg?.recorded else { return source }
         return "\(source). \(note)"
     }
 
