@@ -167,6 +167,7 @@
 /api/t/{tenantSlug}/push-subscriptions
 /api/t/{tenantSlug}/reports/campaign-diary
 /api/t/{tenantSlug}/reports/field-briefing
+/api/t/{tenantSlug}/security/mfa/challenge/verify
 /api/t/{tenantSlug}/tasks
 /api/t/{tenantSlug}/tasks/bulk/delete
 /api/t/{tenantSlug}/tasks/{id}

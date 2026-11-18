@@ -34,6 +34,15 @@ enum FarmPath {
     /// goes where it was made whichever farm is open when it is sent.
     static func root(for farm: String?) -> String { prefix + (farm ?? "") }
 
+    /// The farm a farm path names — `ferma` for `/api/t/ferma/journal?x=1` —
+    /// or nil for a path that is no farm's, or names none.
+    static func slug(in path: String) -> String? {
+        guard path.hasPrefix(prefix) else { return nil }
+        let rest = path.dropFirst(prefix.count)
+        let slug = rest.prefix { $0 != "/" && $0 != "?" }
+        return slug.isEmpty ? nil : String(slug)
+    }
+
     /// A farm path with no farm in it — what `root` builds when none is open:
     /// `/api/t//…`, or the bare root itself.
     static func isUnscoped(_ path: String) -> Bool {

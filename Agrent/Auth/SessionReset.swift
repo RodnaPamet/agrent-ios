@@ -178,6 +178,8 @@ enum SessionReset {
         PushRegistrar.shared.reset()
         PushInbox.shared.reset()
         PushPermission.shared.reset()
+        // A farm's pending code prompt was this person's (#689).
+        FarmSecondFactor.shared.reset()
         // Usage events not yet sent were this person's (#493).
         UsageEvents.shared.reset()
         // A half-made farm's name does not stay on a shared phone after its
@@ -319,6 +321,30 @@ enum SessionRevocation {
             } catch {
                 Log.auth.info("native revoke not sent: \(Log.summary(for: error), privacy: .public)")
             }
+        }
+    }
+
+    /// This phone's push removals on their own, for a session that ends
+    /// WITHOUT «Изход» (#678): the server refused the session, or the account
+    /// was asked to be deleted. There is no refresh token worth revoking then,
+    /// but the push rows are still there, and on a shared farm phone they keep
+    /// the previous person's notifications arriving after somebody else signs
+    /// in.
+    ///
+    /// Best effort, one attempt, detached — as `revokeThisDevice`. Where the
+    /// access token is already dead the removals answer 401 and change
+    /// nothing; the server then cleans up when the next person registers this
+    /// device token, because a token belongs to one person at a time
+    /// (agri-saas #3219). Sending anyway costs one refused request and covers
+    /// every case where the token still works, such as a deletion request.
+    @discardableResult
+    static func unregisterThisDevice(
+        _ farewell: PushFarewell?,
+        send: @escaping @Sendable (URLRequest) async throws -> Int = SessionRevocation.sendOnce
+    ) -> Task<Void, Never>? {
+        guard let farewell else { return nil }
+        return Task.detached(priority: .utility) {
+            await farewell.send(using: send)
         }
     }
 

@@ -222,6 +222,51 @@ final class PushRegistrationTests: XCTestCase {
         XCTAssertNil(push.farewell(accessToken: ""))
     }
 
+    /// A session that ends WITHOUT «Изход» — refused by the server, or
+    /// closed by a deletion request — still removes this phone's push rows
+    /// (#678), one request per farm and no revoke.
+    func testASessionEndedWithoutSignOutStillUnregisters() async {
+        final class Seen: @unchecked Sendable {
+            private let lock = NSLock()
+            private var lines: [String] = []
+            func add(_ line: String) { lock.withLock { lines.append(line) } }
+            var all: [String] { lock.withLock { lines } }
+        }
+        let seen = Seen()
+        let farewell = PushFarewell(deviceToken: hex, farms: ["ferma-1", "ferma-2"], accessToken: "access-A")
+        let task = SessionRevocation.unregisterThisDevice(farewell) { req in
+            seen.add("\(req.httpMethod ?? "") \(req.url?.path ?? "")")
+            return 401 // a refused session's token: answered, and ignored
+        }
+        await task?.value
+        XCTAssertEqual(Set(seen.all), ["DELETE /api/t/ferma-1/push-subscriptions",
+                                       "DELETE /api/t/ferma-2/push-subscriptions"])
+        XCTAssertNil(SessionRevocation.unregisterThisDevice(nil) { _ in 200 },
+                     "nothing registered, nothing sent")
+    }
+
+    /// And the local end calls it, reading the farewell BEFORE the clear.
+    func testTheLocalSessionEndSendsTheFarewell() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Agrent/Auth/AuthClient.swift")
+        let text = try String(contentsOf: url, encoding: .utf8)
+        guard let start = text.range(of: "private func endSessionLocally("),
+              let end = text.range(of: "\n    }\n", range: start.upperBound..<text.endIndex) else {
+            return XCTFail("endSessionLocally not found")
+        }
+        let body = String(text[start.lowerBound..<end.upperBound])
+        guard let read = body.range(of: "PushRegistrar.shared.farewell("),
+              let clear = body.range(of: "SessionReset.endSession()\n"),
+              let sent = body.range(of: "SessionRevocation.unregisterThisDevice(farewell)") else {
+            return XCTFail("the local session end does not send the farewell")
+        }
+        XCTAssertLessThan(read.lowerBound, clear.lowerBound, "read after the clear finds nothing")
+        XCTAssertLessThan(clear.lowerBound, sent.lowerBound, "local first, then the network")
+        // Positive control: `signOut` reads it the same way.
+        XCTAssertTrue(text.contains("let farewell = PushRegistrar.shared.farewell(accessToken: TokenStore.load()?.accessToken)"))
+    }
+
     /// The removals go BEFORE the revoke, and the revoke waits for them: a
     /// revoked session's access token is refused at once, so the other
     /// order would answer every removal 401.
