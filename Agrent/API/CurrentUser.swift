@@ -563,7 +563,7 @@ final class CurrentUserStore {
         answered = CurrentUser(id: held.id, name: held.name, email: held.email, role: held.role,
                                bottomTabOrder: held.bottomTabOrder, featureFlags: held.featureFlags,
                                avatarUrl: held.avatarUrl, tenant: held.tenant, deletion: nil,
-                               permissions: held.permissions)
+                               permissions: held.permissions, channelDigestOptIn: held.channelDigestOptIn)
         guard let scope = CacheScope.current(for: MeAPI.path, identity: identity) else { return }
         let key = ResponseCache.key(scope: scope, pathAndQuery: MeAPI.path)
         Task { await ResponseCache.shared.remove(key) }
@@ -582,7 +582,7 @@ final class CurrentUserStore {
         answered = CurrentUser(id: held.id, name: held.name, email: held.email, role: held.role,
                                bottomTabOrder: held.bottomTabOrder, featureFlags: held.featureFlags,
                                avatarUrl: avatarURL, tenant: held.tenant, deletion: held.deletion,
-                               permissions: held.permissions)
+                               permissions: held.permissions, channelDigestOptIn: held.channelDigestOptIn)
     }
 
     /// The one place a resolved `/me` is adopted, by both paths, and only
