@@ -20,6 +20,12 @@ final class ExchangeListingsStore {
     /// search, a map tap or a clear, not on every keystroke in the field.
     private(set) var lastAsked: ExchangeQuery?
 
+    /// The first-page query that produced the rows ON SCREEN and their
+    /// `nextCursor` (#673). Not `query`: that is bound live to the search
+    /// field and only asked on submit, so it can hold a term nobody has
+    /// searched for yet. Paging must continue the question that was answered.
+    private(set) var shownQuery: ExchangeQuery?
+
     func load() async {
         if state.value == nil { state = .loading }
         loadMoreError = nil
@@ -38,7 +44,7 @@ final class ExchangeListingsStore {
         } else {
             await CachedResource.loadShowingCacheFirst(ExchangeAPI.listingsPath(first)) { data in
                 try await ExchangeAPI.decodeListings(from: data)
-            } publish: { [weak self] in self?.apply($0) }
+            } publish: { [weak self] in self?.apply($0, for: first) }
         }
     }
 
@@ -46,37 +52,60 @@ final class ExchangeListingsStore {
         do {
             let data = try await APIClient.shared.data(for: ExchangeAPI.listingsPath(query))
             let page = try await ExchangeAPI.decodeListings(from: data)
-            apply(.loaded(page, .fresh))
+            apply(.loaded(page, .fresh), for: query)
         } catch {
-            apply(.failed(UserMessage.text(for: error)))
+            apply(.failed(UserMessage.text(for: error)), for: query)
         }
     }
 
-    private func apply(_ loaded: LoadState<ExchangeListingPage>) {
+    private func apply(_ loaded: LoadState<ExchangeListingPage>, for asked: ExchangeQuery) {
+        // An answer to a question that is no longer the latest one asked is
+        // dropped (#673): change a filter twice quickly and the slower first
+        // answer would otherwise land after the second and replace it.
+        guard Self.isCurrent(asked: asked, latest: lastAsked) else { return }
         state = loaded
         switch loaded {
         case .loaded(let page, _):
             rows = page.rows
             nextCursor = page.nextCursor
+            shownQuery = asked
         case .failed, .loading:
             rows = []
             nextCursor = nil
+            shownQuery = nil
         }
+    }
+
+    /// Whether an answer still belongs on screen: it answers the latest
+    /// first-page question asked.
+    nonisolated static func isCurrent(asked: ExchangeQuery, latest: ExchangeQuery?) -> Bool {
+        asked == latest
+    }
+
+    /// The request for the page after the one on screen: the question that
+    /// produced it, with its cursor — never the live, possibly unsubmitted,
+    /// `query` (#673). Nil when there is nothing to continue.
+    nonisolated static func nextPage(shown: ExchangeQuery?, cursor: String?) -> ExchangeQuery? {
+        guard var next = shown, let cursor else { return nil }
+        next.cursor = cursor
+        return next
     }
 
     /// PARITY GAP 2. Never cached — see `load`. A later page is a
     /// continuation of a question, not an answer worth keeping.
     func loadMore() async {
-        guard let cursor = nextCursor, !loadingMore else { return }
+        guard !loadingMore, let shown = shownQuery,
+              let next = Self.nextPage(shown: shown, cursor: nextCursor) else { return }
         loadingMore = true
         loadMoreError = nil
         defer { loadingMore = false }
 
-        var next = query
-        next.cursor = cursor
         do {
             let data = try await APIClient.shared.data(for: ExchangeAPI.listingsPath(next))
             let page = try await ExchangeAPI.decodeListings(from: data)
+            // A new search replaced the list while this page was in flight:
+            // its rows belong to a list that is no longer on screen.
+            guard shownQuery == shown, nextCursor == next.cursor else { return }
 
             // De-duplicated by id: a cursor is positional, and a listing
             // posted between two fetches shifts the window so a row can
@@ -86,6 +115,7 @@ final class ExchangeListingsStore {
             rows += page.rows.filter { seen.insert($0.id).inserted }
             nextCursor = page.nextCursor
         } catch {
+            guard shownQuery == shown else { return }
             loadMoreError = UserMessage.text(for: error)
         }
     }
