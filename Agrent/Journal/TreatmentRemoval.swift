@@ -170,10 +170,15 @@ final class TreatmentRemoval {
         stages[handle] = .waiting
         undoable = Undoable(handle: handle, title: entry.displayTitle, extent: Self.extent(of: entry.treatment))
         let window = override ?? window
-        timers[handle] = Task { [weak self] in
+        // STRONG `self`, not weak (agrent-ios #672). The store is owned by a
+        // view's `@State`; leaving the screen inside the undo window released
+        // it, `self` was nil when the sleep ended, and the delete the person
+        // had been told about («Изтрита») was never sent. Only «Отмени»
+        // cancels; the task ends after `commit`, so nothing is retained after.
+        timers[handle] = Task {
             try? await Task.sleep(for: window)
             guard !Task.isCancelled else { return }
-            await self?.commit(handle)
+            await self.commit(handle)
         }
     }
 
