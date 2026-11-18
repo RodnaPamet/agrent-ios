@@ -143,8 +143,33 @@ enum CachedResource {
             return .failed(UserMessage.text(for: APIClient.APIError.notModified))
         } catch {
             guard let key else { return .failed(UserMessage.text(for: error)) }
+            // ── A REFUSAL IS NOT "OFFLINE" (#684) ──
+            //
+            // Every failure used to fall back to the cache, labelled merely
+            // stale. That is right for a dead connection and wrong for an
+            // answer: a 403 says this person may no longer see it (removed
+            // from the farm, a restricted capability), a 404/410 says it no
+            // longer exists. Serving the last copy then shows a removed member
+            // the farm they lost and a deleted record as if it were current.
+            // So the entry goes and the failure is shown. Removing it here is
+            // also what lets `loadShowingCacheFirst` replace content it had
+            // already published from that entry: it publishes a failure
+            // exactly when the cache is empty afterwards.
+            if Self.refusesTheCachedCopy(error) {
+                await ResponseCache.shared.remove(key)
+                return .failed(UserMessage.text(for: error))
+            }
             return await fallback(key: key, error: error, decode: decode)
         }
+    }
+
+    /// Whether a failed fetch is the SERVER refusing the resource rather than
+    /// the network failing to reach it (#684). Only these discard the cached
+    /// copy; a transport error, a timeout, a 5xx or a 429 keep serving it,
+    /// which is what the cache is for.
+    static func refusesTheCachedCopy(_ error: Error) -> Bool {
+        guard case APIClient.APIError.http(let status, _, _, _, _) = error else { return false }
+        return status == 403 || status == 404 || status == 410
     }
 
     private static func fallback<T: Equatable & Sendable>(
