@@ -160,6 +160,12 @@ struct DirectConversation: ChatPage, Equatable, Sendable {
             let body: String?
             let createdAt: Date
             let deletedAt: Date?
+            /// Present when the message carries a photograph. Only its presence
+            /// is read here: the timeline shows that a photo exists, and the
+            /// picture itself is not rendered yet.
+            let attachment: Attachment?
+
+            struct Attachment: Decodable, Sendable {}
         }
 
         func resolved(me: String?) -> DirectConversation {
@@ -167,7 +173,8 @@ struct DirectConversation: ChatPage, Equatable, Sendable {
                 id: id, state: state, openedByMe: me != nil && initiatedByUserId == me,
                 messages: messages.compactMap(\.value).map {
                     DirectMessage(id: $0.id, mine: me != nil && $0.senderUserId == me,
-                                  body: $0.deletedAt == nil ? $0.body : nil, createdAt: $0.createdAt)
+                                  body: $0.deletedAt == nil ? DirectMessage.shownBody($0.body, hasPhoto: $0.attachment != nil) : nil,
+                                  createdAt: $0.createdAt, deleted: $0.deletedAt != nil)
                 },
                 olderCursor: olderCursor)
         }
@@ -186,13 +193,42 @@ struct DirectMessage: ChatMessage {
     let mine: Bool
     let body: String?
     let createdAt: Date
+    /// From the server's `deletedAt`, never from the emptiness of `body`.
+    ///
+    /// The server stores a photograph with no caption as `body: null`
+    /// (agri-saas P8.6), and a retracted message as `deletedAt` set — the two
+    /// are different facts. Reading "no body" as "removed" showed every
+    /// photo-only message as «Съобщението е премахнато» and hid the sender's
+    /// own retract control (#681).
+    let deleted: Bool
+
+    init(id: String, mine: Bool, body: String?, createdAt: Date, deleted: Bool = false) {
+        self.id = id
+        self.mine = mine
+        self.body = body
+        self.createdAt = createdAt
+        self.deleted = deleted
+    }
 
     /// Two people, so the other side is never a colleague.
     var speaker: MessageSpeaker { MessageSpeaker(mine: mine, fromMyFarm: false) }
     var senderName: String? { nil }
-    var isTombstone: Bool { body == nil }
+    var isTombstone: Bool { deleted }
 
-    func tombstoned() -> DirectMessage { DirectMessage(id: id, mine: mine, body: nil, createdAt: createdAt) }
+    func tombstoned() -> DirectMessage { DirectMessage(id: id, mine: mine, body: nil, createdAt: createdAt, deleted: true) }
+
+    /// Said where a photograph is: the app does not draw the picture yet, so a
+    /// photo-only message must still read as a message rather than as blank
+    /// or as removed.
+    static let photo = "Снимка"
+
+    /// What the bubble shows for a live message.
+    static func shownBody(_ body: String?, hasPhoto: Bool) -> String? {
+        let text = body.flatMap { $0.isEmpty ? nil : $0 }
+        guard hasPhoto else { return text }
+        guard let text else { return photo }
+        return photo + "\n" + text
+    }
 }
 
 // MARK: - Write bodies and answers

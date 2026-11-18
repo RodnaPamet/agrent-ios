@@ -78,6 +78,26 @@ final class DirectMessagesTests: XCTestCase {
         XCTAssertNil(page.messages.first?.body, "a removed message's text is never shown")
     }
 
+    /// #681: a photograph with no caption is `body: null` on the wire and is a
+    /// live message — the tombstone is `deletedAt`, never the empty body.
+    func testAPhotoWithNoCaptionIsAMessageNotATombstone() async throws {
+        let data = Data("""
+        {"id":"c","state":"ACCEPTED","initiatedByUserId":"u1","lastMessageAt":null,"olderCursor":null,"hasOlder":false,"lastReadAt":null,
+         "messages":[
+          {"id":"m1","senderUserId":"u1","body":null,"createdAt":"2026-11-13T09:00:00.000Z","editedAt":null,"deletedAt":null,"reactions":[],"attachment":{"mime":"image/jpeg","bytes":1200},"linkCard":null,"replyTo":null},
+          {"id":"m2","senderUserId":"u1","body":"нивата днес","createdAt":"2026-11-13T09:01:00.000Z","editedAt":null,"deletedAt":null,"reactions":[],"attachment":{"mime":"image/jpeg","bytes":1300},"linkCard":null,"replyTo":null},
+          {"id":"m3","senderUserId":"u1","body":"","createdAt":"2026-11-13T09:02:00.000Z","editedAt":null,"deletedAt":"2026-11-13T09:03:00.000Z","reactions":[],"attachment":null,"linkCard":null,"replyTo":null}
+         ]}
+        """.utf8)
+        let page = try await DirectMessagesAPI.decodeConversation(data, me: "u1")
+
+        XCTAssertEqual(page.messages.map(\.isTombstone), [false, false, true])
+        XCTAssertEqual(page.messages[0].body, DirectMessage.photo)
+        XCTAssertEqual(page.messages[1].body, DirectMessage.photo + "\n" + "нивата днес")
+        XCTAssertTrue(page.messages[0].mayRetract, "the sender can still retract their own photo")
+        XCTAssertNil(page.messages[2].body)
+    }
+
     func testTheInboxMergesBothKindsNewestFirst() throws {
         let earlier = try XCTUnwrap(BgDate.parseInstant("2026-11-12T10:00:00.000Z"))
         let later = try XCTUnwrap(BgDate.parseInstant("2026-11-13T10:00:00.000Z"))
