@@ -174,6 +174,23 @@ final class InsuranceParserTests: XCTestCase {
                        12.345, accuracy: 0.0000001)
     }
 
+    /// #682: a grouping space is never the decimal mark, even when it is the
+    /// LAST separator. «1 250» used to be read as 1.25 decares.
+    func testAreaReadsATrailingSpaceGroupAsThousands() throws {
+        XCTAssertEqual(try XCTUnwrap(InsurancePremium.areaDecares("1 250")), 1250, accuracy: 0.0000001)
+        XCTAssertEqual(try XCTUnwrap(InsurancePremium.areaDecares("1\u{00A0}250")), 1250, accuracy: 0.0000001)
+        XCTAssertEqual(try XCTUnwrap(InsurancePremium.areaDecares("12 345,5")), 12345.5, accuracy: 0.0000001)
+    }
+
+    /// #682: an absurdly long sum is refused, not an `Int` overflow trap.
+    func testAnOverlongSumIsRefusedRatherThanCrashing() {
+        XCTAssertNil(InsurancePremium.moneyCents("99999999999999999999"))
+        XCTAssertNil(InsurancePremium.moneyCents("999999999999999999"))
+        XCTAssertNil(InsurancePremium.moneyCents("1 000 000 001"), "above the server's ceiling")
+        XCTAssertEqual(InsurancePremium.moneyCents("1 000 000 000"), InsurancePremium.maxSumInsuredCents)
+        XCTAssertNil(InsurancePremium.quote(sumInsuredCents: Int.max / 2, tariffBp: 100, instalments: 1))
+    }
+
     func testNonsenseIsRefusedRatherThanReadAsZero() {
         for text in ["", "   ", "abc", "12a", "-5", "1,2,3,4"] {
             XCTAssertNil(InsurancePremium.moneyCents(text), "money accepted «\(text)»")
