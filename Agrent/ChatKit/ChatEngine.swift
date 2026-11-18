@@ -186,7 +186,7 @@ final class ChatEngine<Transport: ChatTransport> {
     private func markRead() async {
         let readAt: Date
         do {
-            readAt = try await transport.markRead()
+            readAt = try await transport.markRead(newestShown: conversation?.newest?.createdAt)
         } catch {
             return
         }

@@ -69,11 +69,7 @@ struct InvoiceReview: Equatable {
 
     /// The amount as typed: a comma or a full stop, spaces ignored.
     static func amount(_ text: String) -> Decimal? {
-        let cleaned = text.replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "\u{00A0}", with: "")
-            .replacingOccurrences(of: ",", with: ".")
-        guard !cleaned.isEmpty else { return nil }
-        return Decimal(string: cleaned, locale: WireDecimal.wireLocale)
+        WireDecimal.typed(text)
     }
 
     /// What stops «Запиши», first row first.

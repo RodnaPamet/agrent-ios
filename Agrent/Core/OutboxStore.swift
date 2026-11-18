@@ -398,6 +398,23 @@ final class OutboxStore {
         } while needsAnotherPass && !pause.isPaused && !isClientTooOld
     }
 
+    /// An answer about who is asking rather than about what was sent — see
+    /// `drain`. 401 is a session the refresh could not revive.
+    nonisolated static func isAboutTheSession(_ error: Error) -> Bool {
+        guard case APIClient.APIError.http(let status, let code, _, _, _) = error else { return false }
+        if status == 401 { return true }
+        guard status == 403, let code else { return false }
+        return sessionStateCodes.contains(code)
+    }
+
+    nonisolated static let sessionStateCodes: Set<String> = [
+        "MFA_REQUIRED",
+        "TERMS_ACCEPTANCE_REQUIRED",
+        "ACCOUNT_SUSPENDED",
+        "ACCOUNT_DELETION_PENDING",
+        "PAST_DUE_RESTRICTED",
+    ]
+
     private func drain() async {
         if currentOwner() == nil { await identify() }
         await refresh()
@@ -492,6 +509,19 @@ final class OutboxStore {
                 // stands. The web does the same in `sync.ts` (agri-saas#938).
                 if absorbClientTooOld(error) { break }
 
+                // ── NOR IS THE SESSION'S STATE (#679) ──
+                //
+                // These answers are about the PERSON or the FARM at this
+                // moment — a second factor owed, terms to accept again, an
+                // account suspended or awaiting deletion, a lapsed payment, a
+                // session the server no longer recognises — and every item
+                // behind this one would get the same answer. The retry policy
+                // calls them final, so before this stop each queued record was
+                // stamped REFUSED in one pass and never sent again, though the
+                // farmer could clear the condition a minute later. Same
+                // treatment as no session: stop, spend nothing, touch nothing.
+                if Self.isAboutTheSession(error) { break }
+
                 item.attempts += 1
                 item.lastAttemptAt = Date()
                 // A create's refusal in the sheet's own words: its 409 is the
@@ -527,8 +557,14 @@ final class OutboxStore {
                 // line, or «Използвай сървъра», may have removed it while its
                 // send was in flight, and writing it back would resurrect it.
                 await queue.updateIfPresent(item)
-                if item.awaitsSend {
-                    // Network is down; the rest will fail identically.
+                // Only an unreachable server stops the pass (#680). This broke
+                // on ANY failure that left the row sendable, so one treatment
+                // that kept coming back short, or one record the server
+                // answered 5xx for every time, sat at the head of the queue and
+                // held back every record behind it indefinitely — on a working
+                // connection. A transport failure is the case where "the rest
+                // will fail identically" is true.
+                if item.awaitsSend, error is URLError {
                     break
                 }
             }

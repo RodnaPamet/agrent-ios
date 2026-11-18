@@ -59,7 +59,27 @@ jobs:
     environment: testflight
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Full history, so the step below can ask whether this commit is on
+          # master; a depth-1 clone cannot answer that.
+          fetch-depth: 0
+
+      # Only a commit that is ON master is uploaded (#685). Both triggers can
+      # name anything: `workflow_dispatch` runs on whichever ref is picked in
+      # the UI, and a `v*` tag can be pushed on any branch. Without this, anyone
+      # with write access could archive an unreviewed branch and upload it to
+      # TestFlight under the production bundle identifier. Before the
+      # credentials check, so a refused ref never touches a secret.
+      - name: The commit is on master
+        run: |
+          git fetch --no-tags origin master
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "$GITHUB_SHA is on master — uploading."
+          else
+            echo "::error::$GITHUB_SHA ($GITHUB_REF) is not on master. TestFlight uploads only what has merged; merge first, then tag or dispatch from master."
+            exit 1
+          fi
 
       # Before anything slow. A missing secret otherwise surfaces twenty
       # minutes in, as an authentication error from deep inside xcodebuild
@@ -302,7 +322,7 @@ jobs:
       # and a workflow artifact on a public repo is downloadable by anyone.
       - name: Keep the logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: testflight-logs
           path: |

@@ -111,12 +111,16 @@ enum ChannelsAPI {
         let tenantSlug: String?
     }
 
-    static func post(_ channelID: String, _ post: NewPost) async throws {
-        _ = try await APIClient.shared.postReturningData(postPath(channelID), body: post, idempotencyKey: UUID().uuidString)
+    /// `idempotencyKey` belongs to the COMPOSED message, minted once by the
+    /// composer and reused on a retry (#676). Minting it here gave every
+    /// attempt a fresh key, so a send whose answer was lost and was tapped
+    /// again published the post twice once the server honours the key.
+    static func post(_ channelID: String, _ post: NewPost, idempotencyKey: String) async throws {
+        _ = try await APIClient.shared.postReturningData(postPath(channelID), body: post, idempotencyKey: idempotencyKey)
     }
 
-    static func reply(_ postID: String, _ reply: NewReply) async throws {
-        _ = try await APIClient.shared.postReturningData(replyPath(postID), body: reply, idempotencyKey: UUID().uuidString)
+    static func reply(_ postID: String, _ reply: NewReply, idempotencyKey: String) async throws {
+        _ = try await APIClient.shared.postReturningData(replyPath(postID), body: reply, idempotencyKey: idempotencyKey)
     }
 
     static func setResolved(_ postID: String, _ resolved: Bool) async throws {

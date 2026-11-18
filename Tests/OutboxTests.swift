@@ -680,6 +680,61 @@ final class OutboxLineMarkTests: XCTestCase {
         XCTAssertEqual(left.map(\.id), [first.id], "the second mark did not land, or the first vanished")
     }
 
+    /// #679: an answer about the SESSION — a second factor owed, terms to
+    /// accept, a suspended account, a lapsed payment — refuses nothing, spends
+    /// nothing and stops the pass. Each was stamped REFUSED, permanently, for
+    /// a condition the farmer could clear a minute later.
+    func testASessionStateRefusalRefusesNothingAndStops() async {
+        for code in ["MFA_REQUIRED", "TERMS_ACCEPTANCE_REQUIRED", "ACCOUNT_SUSPENDED",
+                     "ACCOUNT_DELETION_PENDING", "PAST_DUE_RESTRICTED"] {
+            let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+            wire.answer = { _ in throw APIClient.APIError.http(status: 403, code: code, message: nil) }
+            let first = create(), second = create()
+            await outbox.enqueue(first)
+            await outbox.enqueue(second)
+            await outbox.flush()
+
+            XCTAssertEqual(wire.sent.map(\.id), [first.id], "\(code): the pass went on into the same answer")
+            let left = await queue.all()
+            XCTAssertEqual(left.map(\.isRefused), [false, false], "\(code) stamped a record refused")
+            XCTAssertEqual(left.map(\.attempts), [0, 0], "\(code) spent an attempt")
+        }
+        // Control: an answer about the RECORD is still a refusal.
+        XCTAssertFalse(OutboxStore.isAboutTheSession(
+            APIClient.APIError.http(status: 403, code: "TASK_DELETE_NOT_PERMITTED", message: nil)))
+    }
+
+    /// #680: a record the server keeps failing does not hold back the ones
+    /// behind it — only an unreachable server stops the pass.
+    func testARetryableFailureOnOneRecordDoesNotBlockTheNext() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        let first = create(), second = create()
+        wire.answer = { item in
+            if item.id == first.id { throw APIClient.APIError.http(status: 500, code: nil, message: nil) }
+        }
+        await outbox.enqueue(first)
+        await outbox.enqueue(second)
+        await outbox.flush()
+
+        XCTAssertEqual(wire.sent.map(\.id), [first.id, second.id])
+        let left = await queue.all()
+        XCTAssertEqual(left.map(\.id), [first.id], "the second record was held back by the first")
+        XCTAssertEqual(left.first?.isRefused, false, "a 5xx is retried, not refused")
+    }
+
+    /// Control for the one above: with no network the rest WOULD fail the same
+    /// way, so the pass still stops.
+    func testATransportFailureStillStopsThePass() async {
+        let queue = makeQueue(), wire = Wire(), outbox = makeOutbox(queue, wire, Identity(owner))
+        wire.answer = { _ in throw URLError(.notConnectedToInternet) }
+        let first = create(), second = create()
+        await outbox.enqueue(first)
+        await outbox.enqueue(second)
+        await outbox.flush()
+
+        XCTAssertEqual(wire.sent.map(\.id), [first.id])
+    }
+
     /// A create that meets 409 is what it always was: refused. Only a MARK
     /// has a lock to be in conflict with.
     func testA409OnACreateIsStillARefusal() async {

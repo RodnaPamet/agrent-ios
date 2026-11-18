@@ -58,7 +58,14 @@ enum InsurancePremium {
         guard sumInsuredCents > 0, tariffBp > 0, (1...4).contains(instalments)
         else { return nil }
 
-        let premiumCents = (sumInsuredCents * tariffBp + 5_000) / 10_000
+        // Checked arithmetic (#682): a plain `*` TRAPS on overflow in Swift,
+        // so a long enough sum crashed the form while it previewed the
+        // premium. `moneyCents` caps the sum at the server's own ceiling,
+        // which keeps the product in range for any real tariff; this is the
+        // backstop for the tariff, which arrives from the server.
+        let (product, overflowed) = sumInsuredCents.multipliedReportingOverflow(by: tariffBp)
+        guard !overflowed, product <= Int.max - 5_000 else { return nil }
+        let premiumCents = (product + 5_000) / 10_000
         guard premiumCents > 0 else { return nil }
 
         let base = premiumCents / instalments
@@ -125,7 +132,17 @@ enum InsurancePremium {
     /// can express, and the alternative — making three digits sometimes
     /// decimal — would make «100 000» ambiguous, which is the case that
     /// actually occurs.
+    /// The server's ceiling on a sum insured (agri-saas `MAX_SUM_INSURED_CENTS`,
+    /// 1e11 — one billion in currency units). Above it the server refuses the
+    /// request anyway, and below it `cents * tariffBp` cannot overflow.
+    static let maxSumInsuredCents = 100_000_000_000
+
     static func moneyCents(_ text: String) -> Int? {
+        guard let cents = uncheckedMoneyCents(text), cents <= maxSumInsuredCents else { return nil }
+        return cents
+    }
+
+    private static func uncheckedMoneyCents(_ text: String) -> Int? {
         let groups = separatedGroups(text)
         guard let groups, let last = groups.last else { return nil }
 
@@ -133,7 +150,7 @@ enum InsurancePremium {
         // an integer amount and every separator was a thousands mark.
         if groups.count > 1, last.count == 3 {
             guard let whole = Int(groups.joined()) else { return nil }
-            return whole * 100
+            return cents(whole: whole, fraction: 0)
         }
 
         let wholeDigits = groups.count > 1 ? groups.dropLast().joined() : last
@@ -144,9 +161,18 @@ enum InsurancePremium {
         // that reaches an operator as a real number.
         guard fraction.count <= 2, let whole = Int(wholeDigits) else { return nil }
 
-        let cents = fraction.isEmpty ? 0 : Int(fraction.padding(
+        let fractionCents = fraction.isEmpty ? 0 : Int(fraction.padding(
             toLength: 2, withPad: "0", startingAt: 0)) ?? 0
-        return whole * 100 + cents
+        return cents(whole: whole, fraction: fractionCents)
+    }
+
+    /// `whole * 100 + fraction`, or nil where that does not fit in an `Int`
+    /// rather than the trap a plain `*` would be (#682).
+    private static func cents(whole: Int, fraction: Int) -> Int? {
+        let (hundreds, overflowed) = whole.multipliedReportingOverflow(by: 100)
+        guard !overflowed else { return nil }
+        let (total, overflowedAgain) = hundreds.addingReportingOverflow(fraction)
+        return overflowedAgain ? nil : total
     }
 
     /// Decares. Both separators are decimal here — see `moneyCents`.
@@ -154,7 +180,18 @@ enum InsurancePremium {
         let groups = separatedGroups(text)
         guard let groups, let last = groups.last else { return nil }
         if groups.count == 1 { return Double(last) }
-        return Double(groups.dropLast().joined() + "." + last)
+        // Only «,» or «.» opens a decimal tail; a SPACE is always grouping
+        // (#682). This treated every final separator as decimal, so «1 250»
+        // was read as 1.25 decares and sent on the wire a thousand times too
+        // small — `separatedGroups` already refuses a space anywhere but
+        // before a three-digit group, so all that was missing was which kind
+        // of separator came last.
+        let lastSeparator = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .last(where: { !$0.isNumber })
+        if let lastSeparator, lastSeparator == "," || lastSeparator == "." {
+            return Double(groups.dropLast().joined() + "." + last)
+        }
+        return Double(groups.joined())
     }
 
     /// Digits split on every separator a keyboard might produce, or nil when

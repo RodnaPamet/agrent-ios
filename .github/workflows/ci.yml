@@ -27,12 +27,18 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Least privilege (#685). Every job here reads the repository, builds and
+# uploads an artifact; none writes to GitHub, so the token needs nothing more.
+# Without this block the jobs ran with the repository's default token scope.
+permissions:
+  contents: read
+
 jobs:
   guards:
     name: Guards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # A GitHub PAT was pasted into ROADMAP.md during development. It was
       # caught before it was committed, but only because someone looked. This
@@ -752,7 +758,7 @@ jobs:
     name: Build and test
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Pinned to the newest Xcode the image carries, and NOT left to the
       # image default — GitHub's macOS runners ship several Xcodes under
@@ -982,7 +988,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: xcresult
           path: TestResults.xcresult

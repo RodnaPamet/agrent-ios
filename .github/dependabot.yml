@@ -1,0 +1,12 @@
+# Keeps the commit-SHA pins in .github/workflows current (#685). Every action
+# is referenced by full SHA with its version in a trailing comment, so a moved
+# tag upstream cannot change what runs here; Dependabot is what stops those
+# pins going stale. Monthly, and only this ecosystem — the app has no package
+# manager dependencies for it to track.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5

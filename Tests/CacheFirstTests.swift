@@ -64,4 +64,36 @@ final class CacheFirstTests: XCTestCase {
         XCTAssertTrue(s.contains(".stale(since: hit.fetchedAt)"),
                       "cached data must be published as stale, not as fresh")
     }
+
+    /// #684 — the server refusing a resource is not the network failing to
+    /// reach it. A 403/404/410 discards the cached copy; everything that means
+    /// "could not ask" keeps serving it.
+    func testOnlyARefusalDiscardsTheCachedCopy() {
+        func http(_ status: Int) -> Error {
+            APIClient.APIError.http(status: status, code: nil, message: nil)
+        }
+        for status in [403, 404, 410] {
+            XCTAssertTrue(CachedResource.refusesTheCachedCopy(http(status)), "\(status) must discard")
+        }
+        for status in [500, 502, 503, 504, 429, 409, 400] {
+            XCTAssertFalse(CachedResource.refusesTheCachedCopy(http(status)), "\(status) must keep the cache")
+        }
+        XCTAssertFalse(CachedResource.refusesTheCachedCopy(URLError(.notConnectedToInternet)))
+        XCTAssertFalse(CachedResource.refusesTheCachedCopy(URLError(.timedOut)))
+        XCTAssertFalse(CachedResource.refusesTheCachedCopy(APIClient.APIError.notModified))
+    }
+
+    /// And the predicate is consulted BEFORE the stale fallback, removing the
+    /// entry — which is also what makes `loadShowingCacheFirst` replace content
+    /// it already published (it shows a failure only over an empty cache).
+    func testARefusalRemovesTheEntryBeforeTheFallback() {
+        let s = source("Agrent/Core/CachedResource.swift")
+        guard let refusal = s.range(of: "if Self.refusesTheCachedCopy(error) {"),
+              let fallback = s.range(of: "return await fallback(key: key, error: error, decode: decode)")
+        else { return XCTFail("positive control: both sites must exist") }
+        XCTAssertLessThan(refusal.lowerBound, fallback.lowerBound)
+        let between = String(s[refusal.upperBound..<fallback.lowerBound])
+        XCTAssertTrue(between.contains("ResponseCache.shared.remove(key)"),
+                      "a refusal must evict the entry, or cache-first keeps showing it")
+    }
 }

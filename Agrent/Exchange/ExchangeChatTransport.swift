@@ -27,7 +27,9 @@ struct ExchangeChatTransport: ChatTransport {
         _ = try await ExchangeAPI.retractMessage(messageID: messageID)
     }
 
-    func markRead() async throws -> Date {
+    /// The exchange route stamps the server's own time, so there is nothing
+    /// to send.
+    func markRead(newestShown: Date?) async throws -> Date {
         try await ExchangeAPI.markRead(threadID: threadID).readAt
     }
 

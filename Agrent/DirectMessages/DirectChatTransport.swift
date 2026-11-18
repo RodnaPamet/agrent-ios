@@ -32,12 +32,19 @@ struct DirectChatTransport: ChatTransport {
     }
 
     /// The server answers 204 with no instant, so the instant sent is the one
-    /// returned: the cursor is forward only, so a phone clock a little ahead
-    /// costs nothing a later message does not correct.
-    func markRead() async throws -> Date {
-        let now = Date()
-        try await DirectMessagesAPI.markRead(conversationID, at: now)
-        return now
+    /// returned.
+    ///
+    /// It is the newest message SHOWN, by the server's clock — never the
+    /// phone's now (#675). The server keeps the cursor forward-only and
+    /// compares it with each message's server timestamp, so a phone clock
+    /// ahead stamped a cursor in the future: every later message read as
+    /// already read, on every device, with no later mark able to undo it. A
+    /// clock behind left the conversation unread right after it was read.
+    /// Marking up to what was on screen is also the honest claim.
+    func markRead(newestShown: Date?) async throws -> Date {
+        let at = newestShown ?? Date()
+        try await DirectMessagesAPI.markRead(conversationID, at: at)
+        return at
     }
 
     /// A 404 is the server's one answer for "not yours, blocked, declined or

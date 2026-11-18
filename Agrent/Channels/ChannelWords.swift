@@ -150,6 +150,29 @@ enum ChannelWords {
         return page + shown.filter { !fresh.contains($0.id) && $0.createdAt <= oldest }
     }
 
+    /// Whether laying a fresh newest page over what is shown would leave a
+    /// HOLE (#677): the page has more behind it, and its oldest post is still
+    /// newer than the newest post held — so the posts in between are in
+    /// neither list, and nothing would ever page into them (paging older
+    /// starts from the BOTTOM of the list). The caller replaces the list then,
+    /// and the older pages are read again from the page's own boundary.
+    static func newestLeavesGap(_ page: [ChannelPost], pageHasMore: Bool, over shown: [ChannelPost]) -> Bool {
+        guard pageHasMore, let heldNewest = shown.first, let pageOldest = page.last else { return false }
+        if page.contains(where: { $0.id == heldNewest.id }) { return false }
+        return pageOldest.createdAt > heldNewest.createdAt
+    }
+
+    /// A thread's first page of replies over the replies held (#677). Replies
+    /// read OLDEST first, so the first page is the head of the thread: it
+    /// replaces its own range (an edit or a removal shows), and the replies
+    /// the reader paged to beyond it stay. Replacing the list outright, which
+    /// a live frame used to do, threw those away mid-read.
+    static func repliesRefreshed(_ page: [ChannelPost], over held: [ChannelPost]) -> [ChannelPost] {
+        let fresh = Set(page.map(\.id))
+        let newest = page.last?.createdAt ?? .distantPast
+        return page + held.filter { !fresh.contains($0.id) && $0.createdAt >= newest }
+    }
+
     // MARK: - Search (#614)
 
     static let searchPrompt = "Търсене в каналите"

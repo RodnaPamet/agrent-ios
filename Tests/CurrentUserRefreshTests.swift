@@ -95,6 +95,18 @@ final class CurrentUserRefreshTests: XCTestCase {
         XCTAssertEqual(me.calls, 0, "a picture change asked /me again")
     }
 
+    /// #683: a rebuilt user keeps `channelDigestOptIn`. Both rebuilds listed
+    /// every field but this one, and the initialiser defaults it to nil — which
+    /// is what hides the digest switch on Профил until the next `/me`.
+    func testAPictureChangeKeepsTheDigestChoice() {
+        let held = CurrentUser(id: "u1", name: nil, email: nil, role: "OWNER", channelDigestOptIn: true)
+        store.adoptForTesting(held)
+
+        store.adoptAvatarURL("/api/account/avatar/u1")
+
+        XCTAssertEqual(store.user?.channelDigestOptIn, true)
+    }
+
     /// Nobody held, nobody invented: an answer that lands after Изход
     /// leaves the store empty.
     func testAPictureChangeWithNoUserHeldIsIgnored() {

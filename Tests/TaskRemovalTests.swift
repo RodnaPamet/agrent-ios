@@ -87,6 +87,22 @@ final class TaskRemovalTests: XCTestCase {
         XCTAssertEqual(store.hidden, [], "a fresh read no longer lists it")
     }
 
+    /// #672: the delete is sent even when the screen that owned the store is
+    /// gone. The timer held `self` weakly, so a store released inside the
+    /// window — the person navigated back after «Изтрий» — never sent the
+    /// DELETE it had announced.
+    func testTheDeleteIsSentAfterTheStoreIsReleased() async throws {
+        let calls = Calls()
+        let target = try row()
+        var store: TaskRemoval? = removal(calls, window: .milliseconds(20))
+        store?.remove(target)
+        store = nil
+
+        for _ in 0..<100 where calls.log.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+
+        XCTAssertEqual(calls.log.first, "send t1")
+    }
+
     /// A refusal brings the row back, with the server's sentence.
     func testARefusalBringsTheRowBack() async throws {
         let calls = Calls()

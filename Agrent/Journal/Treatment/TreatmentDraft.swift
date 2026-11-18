@@ -339,11 +339,7 @@ struct TreatmentDraft: Equatable, Sendable {
 
     /// Comma or point, spaces ignored — the parcel sheet's rule.
     static func decimal(_ text: String) -> Decimal? {
-        let cleaned = text
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: ",", with: ".")
-        guard !cleaned.isEmpty else { return nil }
-        return Decimal(string: cleaned, locale: WireDecimal.wireLocale)
+        WireDecimal.typed(text)
     }
 }
 

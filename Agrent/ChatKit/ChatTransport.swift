@@ -28,7 +28,11 @@ protocol ChatTransport: Sendable {
 
     /// Mark the conversation read; the server's `readAt`, for
     /// `ReadMarking.needsRefetch`.
-    func markRead() async throws -> Date
+    ///
+    /// `newestShown` is the newest message on screen, by the SERVER's clock. A
+    /// transport whose route takes an instant sends that rather than the
+    /// phone's now (#675); one whose route stamps its own time ignores it.
+    func markRead(newestShown: Date?) async throws -> Date
 
     /// Whether a failure means this conversation is NOT AVAILABLE to this
     /// person — final, not something a retry changes. Per server: on Борса

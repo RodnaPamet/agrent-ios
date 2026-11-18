@@ -178,6 +178,10 @@ struct ChannelFeedView: View {
     @State private var posts: [ChannelPost] = []
     @State private var hasMore = false
     @State private var loaded = false
+    /// Set by the first SUCCESSFUL page (#677). `loaded` is set after a
+    /// failure too, so keying `hasMore` on it meant a failed first load
+    /// followed by a good retry never offered «По-стари публикации».
+    @State private var pagedOnce = false
     @State private var failure: String?
     @State private var joined: Bool
     @State private var composing = false
@@ -312,8 +316,17 @@ struct ChannelFeedView: View {
     private func loadNewest() async {
         do {
             let page = try await ChannelsAPI.feed(channel.id)
-            posts = ChannelWords.newest(page.posts, over: posts)
-            if !loaded { hasMore = page.hasMore }
+            if ChannelWords.newestLeavesGap(page.posts, pageHasMore: page.hasMore, over: posts) {
+                // More than a page arrived since the last read: start again
+                // from the newest page, so «По-стари публикации» reads the
+                // posts in between instead of leaving a hole (#677).
+                posts = page.posts
+                hasMore = page.hasMore
+            } else {
+                posts = ChannelWords.newest(page.posts, over: posts)
+                if !pagedOnce { hasMore = page.hasMore }
+            }
+            pagedOnce = true
             failure = nil
             await markRead()
         } catch {
