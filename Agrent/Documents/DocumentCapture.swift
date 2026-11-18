@@ -198,6 +198,16 @@ struct PreviewFile: Identifiable, Equatable, Sendable {
         try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
     }
 
+    /// Every preview this phone holds, removed. For sign-out: `remove()` runs
+    /// when a preview closes, so a preview survives only if the app died under
+    /// it — and then it stayed in `tmp` across «Изход» and the next person's
+    /// sign-in until iOS cleared the folder (#684). A document can name a
+    /// third party, which is why `write` scopes it to one look.
+    static func removeAll() {
+        try? FileManager.default.removeItem(
+            at: FileManager.default.temporaryDirectory.appendingPathComponent("documents-preview", isDirectory: true))
+    }
+
     /// Quick Look picks its viewer by the extension, so the file gets one.
     /// The server's own name first; otherwise the title and an extension
     /// from the type. Never a path: only the last component is kept.

@@ -266,6 +266,21 @@ final class DocumentsTests: XCTestCase {
         XCTAssertEqual(PreviewFile.safeName(title: "a/b", fileName: nil, contentType: "application/pdf"), "a-b.pdf")
     }
 
+    /// #684: a preview that outlived its sheet (the app died under it) is
+    /// removed with the session, not left in `tmp` for the next person.
+    func testEveryPreviewIsRemovedOnSignOut() throws {
+        let first = try PreviewFile.write(Data("%PDF-1.4".utf8), title: "Договор", fileName: nil,
+                                          contentType: "application/pdf")
+        let second = try PreviewFile.write(Data("%PDF-1.4".utf8), title: "Фактура", fileName: nil,
+                                           contentType: "application/pdf")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: first.url.path), "positive control: it was written")
+
+        PreviewFile.removeAll()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.url.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: second.url.path))
+    }
+
     /// Every refusal the library has is said in Bulgarian, and the two scan
     /// answers differently (backend 1, 2026-10-31).
     func testTheLibrarysRefusalsAreBulgarian() {

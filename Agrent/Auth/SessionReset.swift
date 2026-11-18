@@ -186,6 +186,8 @@ enum SessionReset {
         // Nor a generated ДНЕВНИК, which names the farm's producer (#246) —
         // normally gone with its sheet, but not if the app died under it.
         FarmRecordAPI.removeGenerated()
+        // Nor a document preview, for the same reason (#684).
+        PreviewFile.removeAll()
     }
 }
 
