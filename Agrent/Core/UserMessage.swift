@@ -688,7 +688,7 @@ enum UserMessage {
         // Microsoft sign-in ask for the code inside their sheet (agri-saas
         // #1644), so signing in again is the step that clears it. Apple
         // sign-in's own refusal has its own words (`AppleSignIn.Text`).
-        "MFA_REQUIRED": "Стопанството изисква двуфакторно потвърждение. Излезте и влезте отново, за да въведете кода.",
+        "MFA_REQUIRED": "Стопанството изисква двуфакторно потвърждение. Опитайте отново и въведете кода от приложението си за кодове.",
         // A cross-site admin request. The app sends a bearer from no site,
         // so this should be unreachable; the server says a retry will not
         // help, and the sentence does not offer one.

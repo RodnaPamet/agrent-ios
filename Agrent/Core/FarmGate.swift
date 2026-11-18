@@ -30,6 +30,10 @@ struct FarmGate: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var foreground = ForegroundReturn()
 
+    /// A farm that owes its second factor (#689): the code is asked for over
+    /// the open farm, and the farm's tabs are rebuilt once it is accepted.
+    @State private var secondFactor = FarmSecondFactor.shared
+
     var body: some View {
         // A CONTAINER, not a `Group`. A `Group` hands each modifier below to
         // whichever child the `switch` resolves to (see `PageForm`), so the
@@ -46,7 +50,11 @@ struct FarmGate: View {
                 // leave each tab showing the previous farm's records until
                 // something reloaded it. Keyed on the slug: renaming a farm
                 // is not a reason to rebuild everything.
-                MainTabView().id(farm.slug)
+                //
+                // And a new one when the farm's second factor is accepted
+                // (#689): every screen the farm refused with MFA_REQUIRED
+                // loads again, without each needing its own retry.
+                MainTabView().id("\(farm.slug)#\(secondFactor.releases)")
             case .resolving:
                 ProgressView("Зареждане на стопанството…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -75,6 +83,9 @@ struct FarmGate: View {
                     }
                 }
             }
+        }
+        .sheet(item: $secondFactor.owed) { _ in
+            FarmSecondFactorView()
         }
         .task {
             // This phone's push token, on every signed-in launch (#272) —

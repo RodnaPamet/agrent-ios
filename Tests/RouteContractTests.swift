@@ -259,6 +259,8 @@ final class RouteContractTests: XCTestCase {
             // Changing or removing that picture from Профил (#333).
             ("AccountPicture.swift", [AccountPicture.path]),
             ("SessionReset.swift", [SessionRevocation.path]),
+            // A farm's second factor, asked for in the app (#689).
+            ("FarmSecondFactor.swift", [FarmSecondFactorAPI.verifyPath(in: "{tenantSlug}")]),
             // This phone's APNs token, per farm (#272).
             ("PushAPI.swift", [PushAPI.subscriptionsPath(in: "{tenantSlug}")]),
             // Who a farm's work can be given to (#371, #372).

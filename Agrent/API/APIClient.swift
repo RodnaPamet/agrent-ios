@@ -1046,6 +1046,16 @@ actor APIClient {
                               saysDeletion: path == MeAPI.path && cancelsBefore == deletionCancels,
                               erasesAt: env?.params?["erasesAt"].flatMap(BgDate.parseInstant))
             }
+            // A FARM owes its second factor (#689, agri-saas #3221): the
+            // session is held per farm, so this is one farm's state, not the
+            // session's. `FarmSecondFactor` asks for that farm's code when it
+            // is the open one. Never from the verify route itself, whose own
+            // refusals are the prompt's to show.
+            if http.statusCode == 403, env?.code == "MFA_REQUIRED",
+               let farm = FarmPath.slug(in: path), !path.hasSuffix("/security/mfa/challenge/verify") {
+                NotificationCenter.default.post(
+                    name: Self.farmSecondFactorNotification, object: nil, userInfo: ["farm": farm])
+            }
             // `http` is the FINAL response — after the 401 → refresh → retry
             // above — so the wait read here belongs to the answer being
             // reported, not to the request it replaced.
@@ -1356,6 +1366,10 @@ actor APIClient {
     /// were cleared; `AuthClient` takes a signed-in session to the sign-in
     /// screen.
     static let sessionRefusedNotification = Notification.Name("bg.agrent.app.sessionRefused")
+
+    /// Posted when a farm route answered `403 MFA_REQUIRED`, with the farm's
+    /// slug as `userInfo["farm"]`; `FarmSecondFactor` asks for its code (#689).
+    static let farmSecondFactorNotification = Notification.Name("bg.agrent.app.farmSecondFactor")
 
     /// Posted when a route answered `403 ACCOUNT_SUSPENDED`; `AuthClient`
     /// turns a signed-in session into the suspended screen.
