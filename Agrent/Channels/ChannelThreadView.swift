@@ -135,7 +135,10 @@ struct ChannelThreadView: View {
     private func loadFirst() async {
         do {
             let page = try await ChannelsAPI.replies(post.id)
-            replies = page.posts
+            // Merged, not replaced (#677): a live frame, a pull or a sent
+            // reply reloads the head of the thread, and the replies the
+            // reader paged to stay where they were.
+            replies = ChannelWords.repliesRefreshed(page.posts, over: replies)
             hasMore = page.hasMore
             failure = nil
         } catch {
