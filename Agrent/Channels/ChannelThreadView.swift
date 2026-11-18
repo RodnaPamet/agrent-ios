@@ -186,6 +186,10 @@ struct ChannelComposer: View {
     @State private var alsoToChannel = false
     @State private var sending = false
     @State private var failure: String?
+    /// One key per composed message, reused when a failed send is tapped
+    /// again (#676), and replaced when the text changes — an edited message
+    /// is a different message.
+    @State private var sendKey = UUID().uuidString
     @Environment(\.dismiss) private var dismiss
     // The display-name prompt (agri-saas #2989): nil until the server says.
     @State private var person: PersonName?
@@ -227,6 +231,7 @@ struct ChannelComposer: View {
                     TextField("Текст", text: $text, prompt: .fieldPrompt(isReply ? "Вашият отговор" : "Какво искате да споделите?"),
                               axis: .vertical)
                         .lineLimit(4...12)
+                        .onChange(of: text) { sendKey = UUID().uuidString }
                 } footer: {
                     SectionFooter {
                         if let failure {
@@ -457,10 +462,12 @@ struct ChannelComposer: View {
                 recorder.discard()
             case .post(let channelID):
                 try await ChannelsAPI.post(channelID, .init(body: trimmed, kind: asQuestion ? "QUESTION" : "POST",
-                                                            tenantSlug: FarmPath.openSlug))
+                                                            tenantSlug: FarmPath.openSlug),
+                                           idempotencyKey: sendKey)
             case .reply(let postID):
                 try await ChannelsAPI.reply(postID, .init(body: trimmed, alsoToChannel: alsoToChannel,
-                                                           tenantSlug: FarmPath.openSlug))
+                                                           tenantSlug: FarmPath.openSlug),
+                                            idempotencyKey: sendKey)
             }
             onSent()
             dismiss()
