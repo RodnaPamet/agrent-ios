@@ -86,6 +86,36 @@ struct WireDecimal: Decodable, Equatable, Sendable {
         self.raw = "\(value)"
     }
 
+    /// A figure as a person typed it — «12 000,50», «0.5», «12,» — or nil when
+    /// the text is not wholly a number.
+    ///
+    /// Spaces (including the no-break and narrow no-break space a pasted figure
+    /// carries) are grouping and are dropped; a comma is the decimal mark.
+    ///
+    /// The WHOLE string is checked before `Decimal(string:)` sees it, because
+    /// that initialiser parses the longest valid PREFIX and silently ignores the
+    /// rest (#674): «12,,5» became 12, «1.234,56» became 1.234 and «15кг» became
+    /// 15, each saved as a dose, a harvest weight, a cost or a price with nothing
+    /// telling the farmer. A figure with a thousands dot AND a decimal comma is
+    /// refused rather than guessed at.
+    static func typed(_ text: String) -> Decimal? {
+        let cleaned = text
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "\u{00A0}", with: "")
+            .replacingOccurrences(of: "\u{202F}", with: "")
+            .replacingOccurrences(of: ",", with: ".")
+        // An optional minus, then ASCII digits with at most one decimal point
+        // and at least one digit somewhere: «12», «12.», «.5», «-3.25».
+        let unsigned = cleaned.hasPrefix("-") ? cleaned.dropFirst() : Substring(cleaned)
+        let parts = unsigned.split(separator: ".", omittingEmptySubsequences: false)
+        let isDigit: (Character) -> Bool = { $0.isASCII && $0.isNumber }
+        guard parts.count <= 2,
+              parts.allSatisfy({ $0.allSatisfy(isDigit) }),
+              unsigned.contains(where: isDigit)
+        else { return nil }
+        return Decimal(string: cleaned, locale: wireLocale)
+    }
+
     /// JSON numbers and Prisma's strings both use `.` regardless of the
     /// device's locale. Parsing with `Locale.current` would read "1234.5" as
     /// 12345 on a machine that uses `.` for grouping — which is a real

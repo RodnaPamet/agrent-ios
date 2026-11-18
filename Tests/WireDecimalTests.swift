@@ -15,6 +15,22 @@ final class WireDecimalTests: XCTestCase {
 
     // MARK: - The measured shape
 
+    /// #674: a typed figure is read only when the WHOLE text is a number.
+    /// `Decimal(string:)` alone reads the longest valid prefix, which saved
+    /// «12,,5» as 12 and «1.234,56» as 1.234 with no warning.
+    func testATypedFigureIsReadWholeOrNotAtAll() {
+        XCTAssertEqual(WireDecimal.typed("12 000,50"), Decimal(string: "12000.50"))
+        XCTAssertEqual(WireDecimal.typed("12\u{00A0}000"), 12000)
+        XCTAssertEqual(WireDecimal.typed("0,5"), Decimal(string: "0.5"))
+        XCTAssertEqual(WireDecimal.typed("12,"), 12)
+        XCTAssertEqual(WireDecimal.typed(",5"), Decimal(string: "0.5"))
+        XCTAssertEqual(WireDecimal.typed("-3,25"), Decimal(string: "-3.25"))
+
+        for unreadable in ["12,,5", "1.234,56", "15кг", "1e5", "", "-", ",", "12 лв", "٣"] {
+            XCTAssertNil(WireDecimal.typed(unreadable), "\(unreadable) is not a number")
+        }
+    }
+
     func testAStringDecimalDecodes() throws {
         XCTAssertEqual(try decode(#""1234.5""#).value, Decimal(string: "1234.5"))
     }

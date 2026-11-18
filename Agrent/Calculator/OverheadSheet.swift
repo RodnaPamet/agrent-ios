@@ -44,12 +44,7 @@ struct OverheadSheet: Equatable {
     /// for nothing typed AND for something unreadable; `problems` tells them
     /// apart.
     static func amount(_ text: String) -> Decimal? {
-        let cleaned = text
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "\u{00A0}", with: "")
-            .replacingOccurrences(of: ",", with: ".")
-        guard !cleaned.isEmpty else { return nil }
-        return Decimal(string: cleaned, locale: WireDecimal.wireLocale)
+        WireDecimal.typed(text)
     }
 
     /// A figure as the farmer would type it — the comma, no grouping.

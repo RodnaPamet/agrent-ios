@@ -133,12 +133,7 @@ struct NewListingView: View {
     /// "12,5" and the wire wants 12.5; this device also reports en_BG, so
     /// neither separator can be assumed.
     private func decimal(_ text: String) -> Decimal? {
-        let cleaned = text
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "\u{00A0}", with: "")
-            .replacingOccurrences(of: ",", with: ".")
-        guard !cleaned.isEmpty else { return nil }
-        return Decimal(string: cleaned, locale: WireDecimal.wireLocale)
+        WireDecimal.typed(text)
     }
 
     private var draft: CreateExchangeListing? {
