@@ -34,6 +34,13 @@ struct AgrentApp: App {
         // Purges what older builds left in Cache.db and replaces
         // `URLCache.shared` with a zero-capacity one. See `NoURLCache` (#134).
         NoURLCache.install()
+        // A document preview and a generated ДНЕВНИК live in `tmp` only while
+        // they are open, so at a launch nothing can be reading them: whatever
+        // is there was left by an app that died under it, and can name a third
+        // party or the farm's producer (#684, #246). `SessionReset` clears
+        // them at a sign-out; this covers a phone that was never signed out.
+        PreviewFile.removeAll()
+        FarmRecordAPI.removeGenerated()
     }
 
     /// Which screen the app opens on.

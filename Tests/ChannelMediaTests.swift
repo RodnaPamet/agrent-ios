@@ -105,4 +105,31 @@ final class ChannelMediaTests: XCTestCase {
         XCTAssertEqual(VoiceNoteWords.spoken(ms: 61_000), "1 минута и 1 секунда")
         XCTAssertEqual(VoiceNoteWords.spoken(ms: 120_000), "2 минути")
     }
+
+    /// A photo or voice post carries the composed message's key (#676), so a
+    /// retried upload whose first answer was lost is published once
+    /// (agri-saas #3195). Read from the source: the send is the person's own
+    /// act and is never fired from a test.
+    func testAMediaPostCarriesTheComposedMessagesKey() throws {
+        let api = try source("Agrent/Channels/ChannelsAPI.swift")
+        XCTAssertTrue(api.contains("caption: String,\n                          idempotencyKey: String)"),
+                      "postMedia takes the key from its caller rather than minting one")
+        XCTAssertTrue(api.contains("fileField: media.field, idempotencyKey: idempotencyKey)"),
+                      "the upload drops the key")
+        let view = try source("Agrent/Channels/ChannelThreadView.swift")
+        XCTAssertTrue(view.contains("postMedia(channelID, media, caption: trimmed, idempotencyKey: sendKey)"))
+        // A different photo or recording is a different message.
+        XCTAssertTrue(view.contains(".onChange(of: photo) { sendKey = UUID().uuidString }"))
+        XCTAssertTrue(view.contains(".onChange(of: recorder.state) { sendKey = UUID().uuidString }"))
+        // Positive control: the text post already sends the same key, so the
+        // reads above are reading the file this send lives in.
+        XCTAssertTrue(view.contains("idempotencyKey: sendKey)"))
+    }
+
+    private func source(_ path: String) throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(path)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
 }

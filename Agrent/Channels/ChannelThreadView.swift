@@ -190,8 +190,8 @@ struct ChannelComposer: View {
     @State private var sending = false
     @State private var failure: String?
     /// One key per composed message, reused when a failed send is tapped
-    /// again (#676), and replaced when the text changes — an edited message
-    /// is a different message.
+    /// again (#676), and replaced when the text, the photo or the recording
+    /// changes — an edited message is a different message.
     @State private var sendKey = UUID().uuidString
     @Environment(\.dismiss) private var dismiss
     // The display-name prompt (agri-saas #2989): nil until the server says.
@@ -288,6 +288,10 @@ struct ChannelComposer: View {
                     }
                 }
             }
+            // A different photo or recording is a different message, so it
+            // gets a new key; re-sending the SAME one keeps it (#676).
+            .onChange(of: photo) { sendKey = UUID().uuidString }
+            .onChange(of: recorder.state) { sendKey = UUID().uuidString }
             .onDisappear {
                 preview.stop()
                 if !sending { recorder.discard() }
@@ -460,7 +464,7 @@ struct ChannelComposer: View {
                 } else {
                     return
                 }
-                try await ChannelsAPI.postMedia(channelID, media, caption: trimmed)
+                try await ChannelsAPI.postMedia(channelID, media, caption: trimmed, idempotencyKey: sendKey)
                 preview.stop()
                 recorder.discard()
             case .post(let channelID):

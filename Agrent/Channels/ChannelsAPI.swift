@@ -129,14 +129,18 @@ enum ChannelsAPI {
 
     /// One post carrying a photo or a voice note, with an optional caption.
     /// The field name says which; the server checks the type by its bytes.
+    /// `idempotencyKey` is the composed message's, as for `post` (#676): a
+    /// retried upload whose first answer was lost returns the first post
+    /// instead of publishing the photo or recording twice (agri-saas #3195).
     /// NOT FIRED from tests, CI or A11yShots.
-    static func postMedia(_ channelID: String, _ media: ChannelMedia, caption: String) async throws {
+    static func postMedia(_ channelID: String, _ media: ChannelMedia, caption: String,
+                          idempotencyKey: String) async throws {
         var fields: [String: String] = [:]
         if !caption.isEmpty { fields["body"] = caption }
         if let durationMs = media.durationMs { fields["durationMs"] = String(durationMs) }
         _ = try await APIClient.shared.postMultipart(
             mediaPath(channelID), file: media.data, fileName: media.fileName, mimeType: media.mimeType,
-            fields: fields, fileField: media.field)
+            fields: fields, fileField: media.field, idempotencyKey: idempotencyKey)
     }
 
     static func post(_ postID: String) async throws -> PostLookup {

@@ -281,6 +281,23 @@ final class DocumentsTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: second.url.path))
     }
 
+    /// #684: and at a LAUNCH, for a phone that was never signed out — at a
+    /// launch no preview can be open, so whatever is in `tmp` was left by an
+    /// app that died under it. Read from the source: the test host is the
+    /// app, and `init` has already run by the time a test does.
+    func testLeftoverPreviewsAreRemovedAtLaunch() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Agrent/AgrentApp.swift")
+        let app = try String(contentsOf: url, encoding: .utf8)
+        let initStart = try XCTUnwrap(app.range(of: "    init() {"))
+        let initEnd = try XCTUnwrap(app.range(of: "\n    }\n", range: initStart.upperBound..<app.endIndex))
+        let body = app[initStart.lowerBound..<initEnd.upperBound]
+        XCTAssertTrue(body.contains("PreviewFile.removeAll()"))
+        XCTAssertTrue(body.contains("FarmRecordAPI.removeGenerated()"))
+        XCTAssertTrue(body.contains("NoURLCache.install()"), "positive control: this is the app's init")
+    }
+
     /// Every refusal the library has is said in Bulgarian, and the two scan
     /// answers differently (backend 1, 2026-10-31).
     func testTheLibrarysRefusalsAreBulgarian() {

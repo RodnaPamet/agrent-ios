@@ -575,7 +575,12 @@ final class AuthClient: NSObject {
             return
         }
         #endif
+        // Read BEFORE the local clear, as `signOut` does: after it the farms
+        // and the bearer are gone. Every session end tries the push removals,
+        // not only «Изход» (#678) — see `SessionRevocation.unregisterThisDevice`.
+        let farewell = PushRegistrar.shared.farewell(accessToken: TokenStore.load()?.accessToken)
         SessionReset.endSession()
+        SessionRevocation.unregisterThisDevice(farewell)
         pendingCode = nil
         codeError = nil
         signInNotice = notice
