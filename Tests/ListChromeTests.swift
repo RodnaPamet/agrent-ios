@@ -120,7 +120,7 @@ final class ListChromeTests: XCTestCase {
     private static let headerTrait = #"\.accessibilityAddTraits\(\.isHeader\)"#
     private static let houseTitle = #"(?<![A-Za-z])SectionTitle\("#
     private static let screenTitles: Set<String> = [
-        "DeletionPendingView.swift", "FarmWizardView.swift", "SecondFactorView.swift",
+        "DeletionPendingView.swift", "FarmSecondFactor.swift", "FarmWizardView.swift", "SecondFactorView.swift",
         "SuspendedView.swift", "TreatmentSavedView.swift",
     ]
 

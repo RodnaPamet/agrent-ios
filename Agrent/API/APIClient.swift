@@ -1052,7 +1052,7 @@ actor APIClient {
             // is the open one. Never from the verify route itself, whose own
             // refusals are the prompt's to show.
             if http.statusCode == 403, env?.code == "MFA_REQUIRED",
-               let farm = FarmPath.slug(in: path), !path.hasSuffix("/security/mfa/challenge/verify") {
+               let farm = FarmPath.slug(in: path), path != FarmSecondFactorAPI.verifyPath(in: farm) {
                 NotificationCenter.default.post(
                     name: Self.farmSecondFactorNotification, object: nil, userInfo: ["farm": farm])
             }
