@@ -38,7 +38,7 @@ jobs:
     name: Guards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # A GitHub PAT was pasted into ROADMAP.md during development. It was
       # caught before it was committed, but only because someone looked. This
@@ -765,7 +765,7 @@ jobs:
     # into a `macos-27` image, move this label there.
     runs-on: xcode-27
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Pinned to the newest Xcode the image carries, and NOT left to the
       # image default — GitHub's macOS runners ship several Xcodes under
@@ -1011,7 +1011,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: xcresult
           path: TestResults.xcresult
