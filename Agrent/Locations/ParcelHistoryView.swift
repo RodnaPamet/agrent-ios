@@ -24,16 +24,16 @@ import SwiftUI
 /// AUDITOR. Putting the archive there would have buried it in a create form
 /// and hidden it from the operator who sprayed the field.
 ///
-/// ── And the parcel's risk, from Блокове (owner, 2026-10-29) ──
+/// ── And the parcel's risk, from Карта (owner, 2026-10-29) ──
 ///
-/// Opened from Блокове, the screen starts with «Риск»: the parcel's reading
+/// Opened from Карта, the screen starts with «Риск»: the parcel's reading
 /// as Риск shows it (`ParcelRiskReadings`). From Риск too since 2026-11-07
 /// (it was left out there at first, as Риск had just shown it), and a tap
 /// on it asks the assistant for a short analysis (`RiskAnalysisSheet`).
 ///
 /// Then «Задачи» (#462, same day): a card with the newest current task,
 /// opening the parcel's tasks, «Текущи» and «Архив» (`ParcelTasksView`).
-/// From Блокове too, as it was asked for there.
+/// From Карта too, as it was asked for there.
 ///
 /// And «Коментари» (#465, same day): the comments on the parcel's tasks and
 /// their closing notes, from wherever the screen is opened, as they are its
@@ -60,7 +60,7 @@ struct ParcelHistoryView: View {
     /// comes back.
     @State private var store: ParcelHistoryStore
 
-    /// The parcel in its block, from Блокове's map (#387) and, since
+    /// The parcel in its block, from Карта's map (#387) and, since
     /// 2026-11-06, from Риск's block (`RiskHistoryRoute`). Then «Ново
     /// мероприятие» and «Нова задача» are here, and the parcel's tasks.
     private let recordIn: ParcelInBlock?
@@ -86,7 +86,7 @@ struct ParcelHistoryView: View {
     /// Played here, because the sheet closes on success (`WriteFeedback`).
     @State private var feedback = WriteFeedback()
 
-    /// The parcel's risk reading, when opened from Блокове (owner,
+    /// The parcel's risk reading, when opened from Карта (owner,
     /// 2026-10-29), and from Риск since 2026-11-07: the same screen either way.
     @State private var risk: ParcelRiskStore?
     /// Its readings over the last 14, 30 or 60 days (#562), with the risk.
@@ -96,7 +96,7 @@ struct ParcelHistoryView: View {
     @State private var rain = RainSinceStore()
     /// Rain and temperature per day for the chart's menu (owner, 2026-11-16).
     @State private var weather = DailyWeatherStore()
-    /// The parcel's tasks, from Блокове (#462). One store for the card and
+    /// The parcel's tasks, from Карта (#462). One store for the card and
     /// the list it opens.
     @State private var tasks: ParcelTasksStore?
     /// The comments on the parcel's tasks and their closing notes (#465),
@@ -210,7 +210,7 @@ struct ParcelHistoryView: View {
     ///
     /// A season and an observation are the parcel's alone, so any writer
     /// may, from wherever the history was opened (`assertCanWrite`). An
-    /// operation and a task need the parcel's block, which only Блокове's
+    /// operation and a task need the parcel's block, which only Карта's
     /// map gives (`recordIn`): an operation is recorded IN a block, and a
     /// task's parcels are chosen by block. An operation for someone who may
     /// create one (`mayCreateOperations`, failing open, as the map's tap

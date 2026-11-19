@@ -4,7 +4,7 @@ import Observation
 /// Every block's parcels, for the mechanisator's whole-farm map (#465,
 /// owner 2026-10-29: the whole farm, not one block at a time).
 ///
-/// The reads Блокове makes, one per block, cache first, and warmed by
+/// The reads Карта makes, one per block, cache first, and warmed by
 /// `OfflinePrefetch`, so the map draws with no signal on a phone that has
 /// opened the app with signal once. The blocks are read in parallel; a block
 /// that fails leaves the others on the map, and says so.

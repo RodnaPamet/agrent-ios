@@ -42,7 +42,7 @@ enum AppRoute: Hashable, Sendable {
     /// loads — see `ParcelHistoryView.parcelName`.
     ///
     /// `recordIn` is the parcel in its block when the history was opened from
-    /// Блокове's map (#387): the history then offers «Ново мероприятие» for
+    /// Карта's map (#387): the history then offers «Ново мероприятие» for
     /// it, which used to be what a tap on the map opened. Nil from Риск,
     /// which has never offered it.
     case parcelHistory(parcelID: String, parcelName: String, recordIn: ParcelInBlock? = nil, outline: Parcel? = nil)

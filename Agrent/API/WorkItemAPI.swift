@@ -33,7 +33,7 @@ enum WorkItemAPI {
     /// a person. The rule bites on `?assignee=` and filters, not here.
     static func detailPath(_ id: String) -> String { "\(base)/\(URLEscape.segment(id))" }
 
-    /// One parcel's tasks, for its screen from Блокове (#462, owner
+    /// One parcel's tasks, for its screen from Карта (#462, owner
     /// 2026-10-29): every task that names the parcel, by a PARCEL link or a
     /// field operation's line, once each, every status, newest first. The
     /// list's `{rows, truncated}` and the list's row, so `decodeList` reads

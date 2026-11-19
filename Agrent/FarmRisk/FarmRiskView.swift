@@ -468,9 +468,9 @@ private struct RiskHistoryButton: View {
 }
 
 /// A Риск row's history: the parcel in the block Риск is showing, so its
-/// «+» can record an operation or a task there as from Блокове (owner,
+/// «+» can record an operation or a task there as from Карта (owner,
 /// 2026-11-06, "in each section"); with the risk card too, the same screen as
-/// from Блокове (owner, 2026-11-07).
+/// from Карта (owner, 2026-11-07).
 enum RiskHistoryRoute {
     static func to(_ parcel: Parcel, in locationID: String?) -> AppRoute {
         .parcelHistory(parcelID: parcel.id, parcelName: parcel.name,

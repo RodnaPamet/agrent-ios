@@ -631,13 +631,19 @@ Web `locations` (225) + `locations/[locationId]` (1342, with
 `apiPost`/`apiPatch`/`apiDelete`) · iOS `Locations/LocationsView.swift` (59)
 + `ParcelMapView.swift` + `SatelliteParcelMap.swift` (two modes, one map view)
 
-### «Блокове», fields only (owner, 2026-10-16)
+### «Карта» (was «Блокове»), fields only (owner, 2026-10-16, renamed 2026-11-19)
 
 The owner's words for a Location, one per `LocationKind` (agri-saas #1966):
 «блок» for a group of parcels (FIELD), «силоз» for a grain bin, «склад» for
 a warehouse. The web retired «Локация» and «Обект» for the entity in
 agri-saas #1985.
 
+- **Renamed «Карта» (owner, 2026-11-19):** the tab and the page's title
+  only, on the phone and on the web, because the screen is the farm on a
+  map. «блок» stays the word for the thing itself — the dashboard's section,
+  the journal's «Блок» / «Блокове» facts, pickers and refusals are unchanged.
+  The tab's `rawValue` (`/locations`) is a saved bar order shared with the
+  web, so it does not move.
 - **The tab:** asked directly, the owner chose «Блокове», fields only, as on
   the web, where silos and warehouses have a page of their own. The list
   asks for `kind=FIELD`. So do the journal's block filter, the farm record

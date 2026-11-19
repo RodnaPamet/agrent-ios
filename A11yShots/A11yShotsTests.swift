@@ -205,9 +205,9 @@ final class A11yShotsTests: XCTestCase {
         // Локации → a location's map: the one #97 calls "the one that matters
         // most", because Increase Contrast is what switches the near-solid
         // fill on and the label outline is the answer to it.
-        XCTAssertTrue(app.tabBars.buttons["Блокове"].waitForExistence(timeout: 10),
-                      "no «Блокове» button in the tab bar")
-        app.tabBars.buttons["Блокове"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Карта"].waitForExistence(timeout: 10),
+                      "no «Карта» button in the tab bar")
+        app.tabBars.buttons["Карта"].tap()
 
         // A fixture answers in milliseconds, so this wait is for the push and
         // the first layout rather than a network. Kept at 20s anyway: it
@@ -245,9 +245,9 @@ final class A11yShotsTests: XCTestCase {
     /// Локации → the fixture world's one location, for a capture run alone
     /// (`ONLY=18-operation-typed-product`); the full walk is already there.
     private func openTheLocation(_ app: XCUIApplication) {
-        XCTAssertTrue(app.tabBars.buttons["Блокове"].waitForExistence(timeout: 10),
-                      "no «Блокове» button in the tab bar")
-        app.tabBars.buttons["Блокове"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Карта"].waitForExistence(timeout: 10),
+                      "no «Карта» button in the tab bar")
+        app.tabBars.buttons["Карта"].tap()
         XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20),
                       "Локации showed no rows within 20s — locations-list.json did not load")
         app.cells.firstMatch.tap()
@@ -285,7 +285,7 @@ final class A11yShotsTests: XCTestCase {
         // Its risk, at the top (owner, 2026-10-29): the reading Риск shows.
         let risk = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Риск, зеленина")).firstMatch
-        XCTAssertTrue(risk.waitForExistence(timeout: 10), "the parcel from Блокове shows no «Риск»\n\(app.debugDescription)")
+        XCTAssertTrue(risk.waitForExistence(timeout: 10), "the parcel from Карта shows no «Риск»\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
         capture("18a-parcel-history-from-map", app: app)
 
@@ -294,7 +294,7 @@ final class A11yShotsTests: XCTestCase {
         let tasksCard = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Задачи, 2 текущи")).firstMatch
         XCTAssertTrue(tasksCard.waitForExistence(timeout: 10),
-                      "the parcel from Блокове shows no «Задачи» card\n\(app.debugDescription)")
+                      "the parcel from Карта shows no «Задачи» card\n\(app.debugDescription)")
         tasksCard.tap()
         XCTAssertTrue(app.navigationBars["Задачи"].waitForExistence(timeout: 10), "the «Задачи» card opened no list")
         let current = app.descendants(matching: .any)
@@ -1036,7 +1036,7 @@ final class A11yShotsTests: XCTestCase {
 
     /// Which group a menu row sits in (`MenuGroup`, `AppSurface.menuGroup`).
     private static let menuGroup: [String: String] = [
-        "Дневник": "Стопанство", "Задачи": "Стопанство", "Блокове": "Стопанство", "Риск": "Стопанство",
+        "Дневник": "Стопанство", "Задачи": "Стопанство", "Карта": "Стопанство", "Риск": "Стопанство",
         "Табло": "Стопанство", "Калкулатор": "Стопанство", "Документи": "Стопанство", "Машини": "Стопанство",
         "Борса": "Пазар", "Тенденции": "Пазар", "Промоции": "Пазар",
         "Новини": "Връзка", "Известия": "Връзка", "Канали": "Връзка",
@@ -2228,7 +2228,7 @@ final class A11yShotsTests: XCTestCase {
 
     // MARK: - «Времето» on a block's map (#551)
 
-    /// Блокове → the first block → «Времето»: the wind and its gusts, the
+    /// Карта → the first block → «Времето»: the wind and its gusts, the
     /// pressure and where it is heading, an alert, the 48-hour charts and ten
     /// days, from the seam's synthetic low. Nothing asks Apple.
     func testWeatherSheet() {
@@ -2236,8 +2236,8 @@ final class A11yShotsTests: XCTestCase {
         app.launchArguments.append(Self.seamArgument)
         app.launch()
         assertSeamActive(app)
-        app.tabBars.buttons["Блокове"].tap()
-        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.tabBars.buttons["Карта"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Карта showed no rows")
         app.cells.firstMatch.tap()
         let weather = app.navigationBars.buttons["Времето"]
         XCTAssertTrue(weather.waitForExistence(timeout: 20), "no «Времето» on the block's map\n\(app.debugDescription)")
@@ -2257,7 +2257,7 @@ final class A11yShotsTests: XCTestCase {
 
     // MARK: - The wind and clouds on a block's own map (owner, 2026-11-07)
 
-    /// Блокове → the first block → the wind disc above «Моето
+    /// Карта → the first block → the wind disc above «Моето
     /// местоположение»: streaks and clouds over the parcels, and «Вятър
     /// сега» with the sky at the block. Nothing calls Open-Meteo.
     func testWindOnTheBlockMap() {
@@ -2265,8 +2265,8 @@ final class A11yShotsTests: XCTestCase {
         app.launchArguments.append(Self.seamArgument)
         app.launch()
         assertSeamActive(app)
-        app.tabBars.buttons["Блокове"].tap()
-        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.tabBars.buttons["Карта"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Карта showed no rows")
         app.cells.firstMatch.tap()
         let toggle = app.buttons["Вятър на картата"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 20), "no wind disc on the block's map\n\(app.debugDescription)")
@@ -2304,7 +2304,7 @@ final class A11yShotsTests: XCTestCase {
 
     // MARK: - The assistant's analysis of a parcel's risk (owner, 2026-11-07)
 
-    /// Блокове → a block → SYNTH-1's history → its «Риск»: the assistant's
+    /// Карта → a block → SYNTH-1's history → its «Риск»: the assistant's
     /// sheet opens with the question already asked, and the seam's synthetic
     /// answer arrives. Nothing reaches the assistant.
     func testRiskAnalysisFromTheHistory() {
@@ -2312,8 +2312,8 @@ final class A11yShotsTests: XCTestCase {
         app.launchArguments += [Self.seamArgument, "AGRENT_UITEST_ASSISTANT"]
         app.launch()
         assertSeamActive(app)
-        app.tabBars.buttons["Блокове"].tap()
-        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Блокове showed no rows")
+        app.tabBars.buttons["Карта"].tap()
+        XCTAssertTrue(app.cells.firstMatch.waitForExistence(timeout: 20), "Карта showed no rows")
         app.cells.firstMatch.tap()
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "SYNTH-1")).firstMatch
         for _ in 0..<4 where !(row.exists && row.isHittable) {
@@ -2530,7 +2530,7 @@ final class A11yShotsTests: XCTestCase {
         capture("05b-risk-history", app: app)
         XCTAssertTrue(opened, "«История» did not open the parcel's history\n\(app.debugDescription)")
         XCTAssertFalse(app.navigationBars["Риск по парцели"].exists, "«История» opened behind Риск")
-        // Its «+», as from Блокове: Риск passes the block it shows (owner,
+        // Its «+», as from Карта: Риск passes the block it shows (owner,
         // 2026-11-06), and the risk card too: the same screen either way
         // (owner, 2026-11-07).
         XCTAssertTrue(app.navigationBars["История"].buttons["Добави"].waitForExistence(timeout: 5),
@@ -2949,7 +2949,7 @@ final class A11yShotsTests: XCTestCase {
     /// farm's map with the person's task count on SYNTH-1, their current
     /// tasks under it (the queue fixture's closed row left out), the
     /// parcels list, and a parcel opened from it onto its risk and tasks.
-    /// Then the menu: Риск and Админ, no Блокове or Задачи.
+    /// Then the menu: Риск and Админ, no Карта or Задачи.
     /// A mechanisator is told which machines are GPS-tracked and who sees
     /// them, and finds the machine on their own task (#574). They can't add
     /// or remove one.
@@ -3039,7 +3039,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(openMenu(app), "no «Меню» on the mechanisator's screen")
         XCTAssertTrue(labelled("Риск", in: app.buttons).waitForExistence(timeout: 5), "«Риск» is not in the menu")
         XCTAssertTrue(labelled("Админ", in: app.buttons).exists, "«Админ» is not in the menu")
-        XCTAssertFalse(labelled("Блокове", in: app.buttons).exists, "«Блокове» is in the menu")
+        XCTAssertFalse(labelled("Карта", in: app.buttons).exists, "«Карта» is in the menu")
         XCTAssertFalse(labelled("Известия", in: app.buttons).exists, "a mechanisator has «Известия» (#471: outside the operator allowlist)")
         XCTAssertFalse(labelled("Документи", in: app.buttons).exists, "a mechanisator has «Документи» (#468: no access)")
         Thread.sleep(forTimeInterval: 1)

@@ -1,6 +1,6 @@
 import Foundation
 
-/// A parcel's tasks as its screen from Блокове shows them (#462, owner
+/// A parcel's tasks as its screen from Карта shows them (#462, owner
 /// 2026-10-29): «Текущи», the work still to do, and «Архив», what was
 /// finished or called off.
 ///

@@ -1,7 +1,7 @@
 import XCTest
 @testable import Agrent
 
-/// A parcel's tasks from Блокове (#462): the route, the «Текущи» / «Архив»
+/// A parcel's tasks from Карта (#462): the route, the «Текущи» / «Архив»
 /// split, and what the card says.
 final class ParcelTasksTests: XCTestCase {
 

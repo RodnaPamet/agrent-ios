@@ -157,7 +157,7 @@ final class RouteContractTests: XCTestCase {
     /// `/api/health` carried it (2026-10-27).
     ///
     /// Empty again from agri-saas main 4743a68: a parcel's tasks from
-    /// Блокове (#462), built against the shape agreed with backend 1, came
+    /// Карта (#462), built against the shape agreed with backend 1, came
     /// off with the refresh from agri-saas #2462's merge. The PR (#463)
     /// merged only once `/api/health` carried it (2026-10-29).
     ///
@@ -364,7 +364,7 @@ final class RouteContractTests: XCTestCase {
                 WorkItemAPI.listPath, WorkItemAPI.detailPath(id), WorkItemAPI.statusPath(id),
                 // agrent-ios#625: several tasks at once.
                 WorkItemAPI.bulkDeletePath,
-                // agrent-ios#462: one parcel's tasks, from Блокове.
+                // agrent-ios#462: one parcel's tasks, from Карта.
                 WorkItemAPI.parcelTasksPath(parcel),
                 // agrent-ios#177: any task's parcels (agri-saas #1410).
                 WorkItemAPI.parcelsPath(id),

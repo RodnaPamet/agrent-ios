@@ -7,9 +7,9 @@ import Observation
 ///
 /// By BLOCK (owner, 2026-10-21; first by crop, then changed), so a task that
 /// isn't about a crop, such as clearing a canal along a block, still finds
-/// its fields. Both reads are the ones Блокове makes, and `OfflinePrefetch`
+/// its fields. Both reads are the ones Карта makes, and `OfflinePrefetch`
 /// warms both, so the step works with no signal on a phone that has opened
-/// the app with signal once. Cache first, like Блокове.
+/// the app with signal once. Cache first, like Карта.
 @Observable
 @MainActor
 final class TaskBlocksStore {

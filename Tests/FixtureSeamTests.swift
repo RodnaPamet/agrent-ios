@@ -120,7 +120,7 @@ final class FixtureSeamTests: XCTestCase {
             (AssistantMemoryAPI.conversationPath("conv_fixture_spray"), "assistant-conversation-spray"),
             (DocumentsAPI.listPath, "documents-list"),
             (DocumentsAPI.settingsPath, "documents-settings"),
-            // #462: SYNTH-1's tasks from Блокове.
+            // #462: SYNTH-1's tasks from Карта.
             (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
             (ParcelCommentsAPI.path("par_holes"), "parcel-comments"),
             (ParcelHistoryAPI.historyPath(parcelID: "par_holes", limit: 50), "parcel-history"),

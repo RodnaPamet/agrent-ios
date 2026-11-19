@@ -8,7 +8,7 @@ import SwiftUI
 ///
 /// ── Instead of the tabs ──
 ///
-/// The owner chose one screen over Блокове and Задачи as tabs: an operator
+/// The owner chose one screen over Карта and Задачи as tabs: an operator
 /// has one job, the work on the farm's fields, and it fits one place. The
 /// menu keeps Риск and Админ (Профил, Изход). Every other role keeps its
 /// tabs; `MainTabView` decides.
@@ -156,7 +156,7 @@ private struct MechanisatorHome: View {
         pushRoute(route(place))
     }
 
-    /// The parcel's screen as Блокове opens it: in its block, so it has its
+    /// The parcel's screen as Карта opens it: in its block, so it has its
     /// risk, its tasks, and «Ново мероприятие» for whoever may record.
     private func route(_ place: ParcelInBlock) -> AppRoute {
         .parcelHistory(parcelID: place.parcel.id, parcelName: place.parcel.name, recordIn: place)
