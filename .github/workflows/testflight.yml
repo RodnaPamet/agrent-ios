@@ -51,7 +51,10 @@ permissions:
 jobs:
   upload:
     name: Archive and upload
-    runs-on: macos-15
+    # The same image as ci.yml's `Build and test`, so a TestFlight build is
+    # made by the toolchain CI verified: Xcode 27, the iOS 27 SDK App Store
+    # Connect requires from April 2027 (agrent-ios#693, ITMS-90725).
+    runs-on: xcode-27
     # An environment, so the owner can add "required reviewers" in Settings →
     # Environments → testflight and make every upload wait for a click. It
     # works without that; GitHub creates the environment on first use, and
@@ -117,6 +120,20 @@ jobs:
           [ -n "$NEWEST" ] || NEWEST=/Applications/Xcode.app
           echo "DEVELOPER_DIR=$NEWEST/Contents/Developer" >> "$GITHUB_ENV"
           echo "Selected: $NEWEST"
+
+      # Refuses an upload App Store Connect would refuse (or, before April
+      # 2027, accept with ITMS-90725). Without it, a runner label that falls
+      # back to an older image would archive and upload a build on the old SDK
+      # with every step green — the warning arrives later, by email.
+      - name: The SDK is one App Store Connect accepts
+        run: |
+          SDK=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK: $SDK"
+          case "$SDK" in
+            2[7-9].*|[3-9][0-9].*) ;;
+            *) echo "::error::Built with the iOS $SDK SDK; App Store Connect requires iOS 27 or later (ITMS-90725)."
+               exit 1 ;;
+          esac
 
       - name: Install XcodeGen
         run: brew install xcodegen

@@ -756,7 +756,14 @@ jobs:
 
   test:
     name: Build and test
-    runs-on: macos-15
+    # `xcode-27`, GitHub's image carrying Xcode 27 (agrent-ios#693): App Store
+    # Connect refuses uploads built with an SDK older than iOS 27 from April
+    # 2027 (ITMS-90725, first seen on build 173.1), and no `macos-15` or
+    # `macos-26` image carries Xcode 27. It is a PREVIEW image on 2026-11-19.
+    # Measured that day: Xcode 27.0, 27.1 and 27.2 installed, 27.1 the default
+    # — so the newest-Xcode step below picks 27.2. When GitHub folds Xcode 27
+    # into a `macos-27` image, move this label there.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -772,7 +779,9 @@ jobs:
       # wrong locally is not a habit worth carrying into CI.
       #
       # Developer toolchain as of 2026-09-21: Xcode 26.6 (17F113),
-      # macOS 26.5.1, iOS Simulator SDK 26.5.
+      # macOS 26.5.1, iOS Simulator SDK 26.5. CI moved to Xcode 27 on
+      # 2026-11-19 (agrent-ios#693); the developer's Mac follows, and the
+      # major check below says so until it does.
       - name: Select Xcode
         run: |
           echo "Xcodes on this image:"
@@ -791,9 +800,9 @@ jobs:
           xcodegen --version
           xcrun simctl list runtimes | grep -i ios || true
           MAJOR=$(xcodebuild -version | head -1 | sed -E 's/Xcode ([0-9]+).*/\1/')
-          echo "Xcode major: $MAJOR (developer builds on 26)"
-          if [ "$MAJOR" != "26" ]; then
-            echo "::warning::CI is on Xcode $MAJOR; the developer builds on 26. \
+          echo "Xcode major: $MAJOR (developer builds on 27)"
+          if [ "$MAJOR" != "27" ]; then
+            echo "::warning::CI is on Xcode $MAJOR; the developer builds on 27. \
           Green here does not fully imply green there."
           fi
           {
