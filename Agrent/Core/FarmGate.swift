@@ -260,7 +260,7 @@ private struct OutsideAFarm<Content: View>: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         NavigationLink {
-                            ProfileView()
+                            ProfileView().floatingBack()
                         } label: {
                             Label("Профил", systemImage: "person.crop.circle")
                         }

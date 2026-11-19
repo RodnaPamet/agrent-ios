@@ -124,7 +124,7 @@ struct ParcelHistoryView: View {
             .inlineTitle(ParcelHistoryCopy.screenTitle)
             // Once, on the screen, outside the List: a destination declared
             // inside a lazy row would come and go with the row.
-            .navigationDestination(for: DrillIn.self) { list($0) }
+            .navigationDestination(for: DrillIn.self) { list($0).floatingBack() }
             // EAGERLY, HERE — and cache-first through the store, which is
             // what makes reopening this screen instant on a bad connection.
             //

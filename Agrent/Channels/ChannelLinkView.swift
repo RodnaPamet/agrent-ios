@@ -38,7 +38,7 @@ struct ChannelLinkView: View {
             }
         }
         // The feed's posts open their threads on whichever stack this is on.
-        .navigationDestination(for: ChannelPost.self) { ChannelThreadView(parent: $0) }
+        .navigationDestination(for: ChannelPost.self) { ChannelThreadView(parent: $0).floatingBack() }
         .task { if state.value == nil { await load() } }
     }
 

@@ -26,11 +26,12 @@ struct ChannelsView: View {
                 content
             }
                 .inlineTitle("Канали")
-                .navigationDestination(for: Channel.self) { ChannelFeedView(channel: $0) { Task { await load() } } }
-                .navigationDestination(for: ChannelPost.self) { ChannelThreadView(parent: $0) }
-                .navigationDestination(for: ForYouView.Destination.self) { _ in ForYouView() }
+                .navigationDestination(for: Channel.self) { ChannelFeedView(channel: $0) { Task { await load() } }.floatingBack() }
+                .navigationDestination(for: ChannelPost.self) { ChannelThreadView(parent: $0).floatingBack() }
+                .navigationDestination(for: ForYouView.Destination.self) { _ in ForYouView().floatingBack() }
                 .navigationDestination(for: ChannelsAPI.SearchHit.self) { hit in
                     ChannelLinkView(channelID: hit.channelId, postID: hit.post.id)
+                        .floatingBack()
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {

@@ -18,7 +18,7 @@ struct InspirationView: View {
         NavigationStack {
             content
                 .inlineTitle("Вдъхновение")
-                .navigationDestination(for: BookSummary.self) { BookView(summary: $0) }
+                .navigationDestination(for: BookSummary.self) { BookView(summary: $0).floatingBack() }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Затвори") { dismiss() }
@@ -92,6 +92,7 @@ struct BookView: View {
             .navigationDestination(for: ChapterRoute.self) { route in
                 if let book = state.value {
                     ChapterView(book: book, number: route.number)
+                        .floatingBack()
                 }
             }
             .task { if state.value == nil { await load() } }

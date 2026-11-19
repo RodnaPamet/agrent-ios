@@ -254,6 +254,8 @@ enum A11y {
         /// the top right of the second, and the parcel list's whole-crop
         /// choice.
         static let next = spokenNames("Напред", "Next")
+        /// A pushed screen's arrow, lower left (`FloatingBack`).
+        static let back = spokenNames("Назад", "Back")
         static let crop = spokenNames("Култура", "Crop")
         static let selectAll = spokenNames("Избери всички", "Select all")
         static let deselectAll = spokenNames("Премахни избора", "Deselect all")

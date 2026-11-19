@@ -50,9 +50,8 @@ struct TreatmentCorrectionCheckView: View {
                     .accessibilityInputLabels(A11y.Spoken.cancel)
             }
         }
-        // A save under way is not abandoned by a swipe back, and its refusal
-        // does not land on a screen that has gone.
-        .navigationBarBackButtonHidden(saving)
+        // Its way back is the flow's `floatingBack(disabled: saving)`, at
+        // the place that pushes it.
         // Said, not only drawn: the refusal replaces the spinner under the
         // cursor.
         .onChange(of: failure) { _, now in

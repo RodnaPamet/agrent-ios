@@ -27,10 +27,13 @@ struct CalendarsView: View {
             .pageBackground()
             .inlineTitle(AgroWords.calendars)
             .navigationDestination(for: Page.self) { page in
-                switch page {
-                case .agro: AgroCalendarView()
-                case .lunar: LunarCalendarView()
+                Group {
+                    switch page {
+                    case .agro: AgroCalendarView()
+                    case .lunar: LunarCalendarView()
+                    }
                 }
+                .floatingBack()
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

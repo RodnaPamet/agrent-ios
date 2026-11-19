@@ -24,6 +24,7 @@ struct ForYouView: View {
             .inlineTitle(ChannelWords.forYou)
             .navigationDestination(for: ChannelsAPI.ActivityItem.self) { item in
                 ChannelLinkView(channelID: item.channelId, postID: item.post.id)
+                    .floatingBack()
             }
             .task { if state.value == nil { await load() } }
             .onReceive(NotificationCenter.default.publisher(for: LiveUpdates.frameNotification)) { note in
