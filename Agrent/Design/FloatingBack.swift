@@ -42,6 +42,9 @@ import UIKit
 struct FloatingBack<Screen: View>: View {
     let screen: Screen
     var disabled = false
+    /// Extra height for a screen whose bottom-left corner something else
+    /// must keep (`FloatingCorner.mapAttributionLift`).
+    var lift: CGFloat = 0
 
     @Environment(\.dismiss) private var dismiss
     /// The stack's bottom bars — nil in a stack that is not a `RoutedStack`,
@@ -61,10 +64,9 @@ struct FloatingBack<Screen: View>: View {
             .navigationBarBackButtonHidden(true)
             .overlay(alignment: .bottomLeading) {
                 if !disabled {
-                    FloatingBackButton { dismiss() }
-                        .padding(.leading, 16)
-                        .padding(.bottom, chrome.height + 12)
-                        .ignoresSafeArea(.keyboard, edges: .bottom)
+                    FloatingCornerButton(title: FloatingCornerButton.back, systemImage: "arrow.left",
+                                         spoken: A11y.Spoken.back) { dismiss() }
+                        .floatingCorner(chrome: chrome, lift: lift)
                         .transition(.opacity)
                 }
             }
@@ -80,11 +82,16 @@ struct FloatingBack<Screen: View>: View {
     }
 }
 
-/// The arrow itself: one look everywhere, the assistant's size so the two
-/// lower corners match.
-struct FloatingBackButton: View {
-    static let title = "Назад"
+/// The bottom-left corner's control — the back arrow on a pushed screen,
+/// «Затвори» on a sheet's first page. One look for both, the assistant's
+/// size so the two lower corners match.
+struct FloatingCornerButton: View {
+    static let back = "Назад"
+    static let close = "Затвори"
 
+    let title: String
+    let systemImage: String
+    let spoken: [String]
     let action: () -> Void
 
     var body: some View {
@@ -92,31 +99,94 @@ struct FloatingBackButton: View {
             // THE FRAME IS INSIDE THE LABEL, and it is a MINIMUM: the glyph
             // scales with the text size, and a fixed box outside it would draw
             // the circle where the hit test is not (`ParcelTargetButton`).
-            Image(systemName: "arrow.left")
+            Image(systemName: systemImage)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
                 .frame(minWidth: 52, minHeight: 52)
-                // See-through, as asked: a thin material lets the page show
-                // through while keeping the arrow legible on it, and the ring
-                // separates the disc from a page of the same colour.
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay { Circle().strokeBorder(Palette.Surface.edge, lineWidth: 1) }
+                // A LIGHT frosted disc (owner 2026-11-19: «more transparent»,
+                // then «lighter frosted disc» over a bare arrow): the page
+                // shows through, the material at half strength still lifts
+                // the glyph off a busy background, and the glyph itself keeps
+                // full contrast — it is the part that has to be read.
+                .background {
+                    Circle().fill(.ultraThinMaterial).opacity(FloatingCorner.discOpacity)
+                }
+                .overlay {
+                    Circle().strokeBorder(Palette.Surface.edge.opacity(FloatingCorner.ringOpacity), lineWidth: 1)
+                }
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Self.title)
-        .accessibilityInputLabels(A11y.Spoken.back)
+        .accessibilityLabel(title)
+        .accessibilityInputLabels(spoken)
         .accessibilityShowsLargeContentViewer {
-            Label(Self.title, systemImage: "arrow.left")
+            Label(title, systemImage: systemImage)
         }
+    }
+}
+
+/// Where the corner control sits, and how see-through it is.
+enum FloatingCorner {
+    /// The frosted disc's strength: half of `.ultraThinMaterial`.
+    static let discOpacity = 0.5
+    static let ringOpacity = 0.6
+    /// How far up a screen whose bottom-left corner is a map's Apple
+    /// attribution puts the control: the logo sits 8 pt in and about 20 pt
+    /// tall, and it must stay visible (`ParcelTargetButton`).
+    static let mapAttributionLift: CGFloat = 28
+}
+
+extension View {
+    /// Lower left, 16 pt in, above the stack's bottom bars, staying put while
+    /// the keyboard is up — the assistant's placement, mirrored.
+    func floatingCorner(chrome: BottomChrome, lift: CGFloat = 0) -> some View {
+        padding(.leading, 16)
+            .padding(.bottom, chrome.height + 12 + lift)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+}
+
+/// «Затвори» on a sheet's first page, lower left (owner 2026-11-19, «move
+/// the close button also to bottom … left»).
+///
+/// The same corner as the back arrow, and they never meet: «Затвори» is on a
+/// sheet's ROOT, the arrow on what is pushed over it, and only one of those
+/// is on screen at a time. `action` is the site's own — the `dismiss` it
+/// already called — so which presentation closes is exactly what it was.
+struct FloatingClose<Screen: View>: View {
+    let screen: Screen
+    var shown = true
+    var lift: CGFloat = 0
+    let action: () -> Void
+
+    @Environment(BottomChrome.self) private var stackChrome: BottomChrome?
+    @State private var ownChrome = BottomChrome()
+
+    var body: some View {
+        let chrome = stackChrome ?? ownChrome
+        screen
+            .environment(chrome)
+            .overlay(alignment: .bottomLeading) {
+                if shown {
+                    FloatingCornerButton(title: FloatingCornerButton.close, systemImage: "xmark",
+                                         spoken: A11y.Spoken.close, action: action)
+                        .floatingCorner(chrome: chrome, lift: lift)
+                }
+            }
     }
 }
 
 extension View {
     /// A pushed screen's way back, lower left. Apply it where the screen is
     /// pushed, not inside it (see `FloatingBack`).
-    func floatingBack(disabled: Bool = false) -> some View {
-        FloatingBack(screen: self, disabled: disabled)
+    func floatingBack(disabled: Bool = false, lift: CGFloat = 0) -> some View {
+        FloatingBack(screen: self, disabled: disabled, lift: lift)
+    }
+
+    /// A sheet's way out, lower left. Apply it to the sheet's first page,
+    /// with the `dismiss` that page already used (see `FloatingClose`).
+    func floatingClose(shown: Bool = true, lift: CGFloat = 0, action: @escaping () -> Void) -> some View {
+        FloatingClose(screen: self, shown: shown, lift: lift, action: action)
     }
 }
 

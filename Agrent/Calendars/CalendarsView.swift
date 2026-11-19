@@ -35,12 +35,7 @@ struct CalendarsView: View {
                 }
                 .floatingBack()
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                }
-            }
+            .floatingClose { dismiss() }
         }
     }
 }

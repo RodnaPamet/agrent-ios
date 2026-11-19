@@ -33,12 +33,7 @@ struct ChannelsView: View {
                     ChannelLinkView(channelID: hit.channelId, postID: hit.post.id)
                         .floatingBack()
                 }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Затвори") { dismiss() }
-                            .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                }
+                .floatingClose { dismiss() }
                 .task { if state.value == nil { await load() } }
         }
     }

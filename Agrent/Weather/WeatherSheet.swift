@@ -32,12 +32,7 @@ struct WeatherSheet: View {
         NavigationStack {
             content
                 .inlineTitle("Времето")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Затвори") { dismiss() }
-                            .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                }
+                .floatingClose { dismiss() }
                 .task { await load() }
         }
     }

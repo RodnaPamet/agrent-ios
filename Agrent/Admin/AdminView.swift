@@ -51,12 +51,7 @@ struct AdminView: View {
         NavigationStack {
             content
                 .inlineTitle("Админ")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                }
+                .floatingClose { dismiss() }
                 .task { await store.load() }
         }
     }

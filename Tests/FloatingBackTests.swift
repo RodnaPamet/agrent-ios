@@ -108,4 +108,46 @@ final class FloatingBackTests: XCTestCase {
             .map(\.name)
         XCTAssertEqual(hiding, ["FloatingBack.swift"])
     }
+
+    // MARK: - «Затвори» and the corner
+
+    /// Every sheet's «Затвори» is the floating one, lower left — none is
+    /// left in a toolbar (owner 2026-11-19). An alert's «Затвори» is a
+    /// different control and stays.
+    func testEverySheetClosesFromTheLowerLeft() throws {
+        let sources = try appSources()
+        let floating = sources.reduce(0) {
+            $0 + SignOutHygieneTests.code($1.text).components(separatedBy: ".floatingClose").count - 1
+        }
+        // 12 sheets and the menu's shared modifier when this landed.
+        XCTAssertGreaterThanOrEqual(floating, 12, "positive control: the floating closes were not found")
+        let inToolbar = sources
+            .filter { SignOutHygieneTests.code($0.text).contains(#"Button("Затвори") { dismiss() }"#) }
+            .map(\.name)
+        XCTAssertEqual(inToolbar, [], "a sheet still closes from its toolbar")
+    }
+
+    /// A block opens on its parcel map, whose bottom-left corner is Apple's
+    /// attribution: the arrow rises clear of it there, and nowhere else.
+    func testTheArrowRisesOnlyOverTheMap() throws {
+        let block = try JSONDecoder().decode(Location.self, from: Data(#"{"id":"b1","name":"Блок","status":"ACTIVE"}"#.utf8))
+        XCTAssertEqual(AppRoute.location(block).cornerLift, FloatingCorner.mapAttributionLift)
+        XCTAssertEqual(AppRoute.locationID("b1").cornerLift, FloatingCorner.mapAttributionLift)
+        XCTAssertEqual(AppRoute.taskID("t1").cornerLift, 0, "positive control: an ordinary screen")
+        XCTAssertGreaterThan(FloatingCorner.mapAttributionLift, 20, "the logo is about 20 pt tall")
+        let routed = SignOutHygieneTests.code(try String(contentsOf: Self.appRoot.appendingPathComponent("Tabs/RoutedStack.swift"),
+                                                         encoding: .utf8))
+        XCTAssertTrue(routed.contains("$0.destination.floatingBack(lift: $0.cornerLift)"))
+    }
+
+    /// See-through, as asked: a light disc, never a solid one.
+    func testTheDiscIsLight() {
+        XCTAssertLessThan(FloatingCorner.discOpacity, 1)
+        XCTAssertGreaterThan(FloatingCorner.discOpacity, 0, "positive control: there is still a disc")
+    }
+
+    private static var appRoot: URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Agrent")
+    }
 }

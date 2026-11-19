@@ -57,12 +57,7 @@ struct PastConversationSheet: View {
             content()
                 .pageBackground()
                 .inlineTitle(AssistantText.title)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Затвори") { dismiss() }
-                            .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                }
+                .floatingClose { dismiss() }
         }
         .presentationDetents([.medium, .large])
     }

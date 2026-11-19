@@ -67,8 +67,7 @@ struct FarmRiskView: View {
                 .inlineTitle("Риск по парцели")
                 // «Затвори» only when the app menu presented this — see
                 // `closeWhenPresentedFromMenu`. As a tab root it had one that did nothing.
-                // Leading, as nothing is there, so «Застраховай» has the right.
-                .closeWhenPresentedFromMenuLeading()
+                .closeWhenPresentedFromMenu()
                 .task {
                     await store.loadWho()
                     if store.locations.value == nil { await store.loadLocations() }

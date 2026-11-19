@@ -19,12 +19,7 @@ struct InspirationView: View {
             content
                 .inlineTitle("Вдъхновение")
                 .navigationDestination(for: BookSummary.self) { BookView(summary: $0).floatingBack() }
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Затвори") { dismiss() }
-                            .accessibilityInputLabels(A11y.Spoken.close)
-                    }
-                }
+                .floatingClose { dismiss() }
                 .task { if state.value == nil { await load() } }
         }
     }

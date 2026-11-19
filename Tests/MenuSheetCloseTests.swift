@@ -54,21 +54,21 @@ final class MenuSheetCloseTests: XCTestCase {
                       "a menu sheet would push onto the router's path for its tab")
     }
 
-    /// The button itself: in the cancellation slot, named aloud, and behind
-    /// the flag — so a surface on the TAB BAR draws none.
+    /// The button itself: the floating «Затвори» lower left (owner
+    /// 2026-11-19), shown only behind the flag — so a surface on the TAB BAR
+    /// draws none — and closing with the root's own `dismiss`.
     func testTheWayOutIsDrawnOnlyForTheMenu() throws {
         let menu = try source("Agrent/Design/AppMenu.swift")
         guard let start = menu.range(of: "private struct MenuSheetClose: ViewModifier") else {
             return XCTFail("MenuSheetClose moved — this test no longer sees the button")
         }
         let modifier = String(menu[start.lowerBound...])
-        XCTAssertTrue(modifier.contains("if presentedFromMenu {"))
-        // Trailing, unless the surface asks for the leading edge (Риск,
-        // whose «Застраховай» has the right since 2026-11-06).
-        XCTAssertTrue(modifier.contains("ToolbarItem(placement: placement)"))
-        XCTAssertTrue(menu.contains("modifier(MenuSheetClose(placement: .topBarTrailing))"))
-        XCTAssertTrue(modifier.contains(#"Button("Затвори") { dismiss() }"#))
-        XCTAssertTrue(modifier.contains(".accessibilityInputLabels(A11y.Spoken.close)"))
+        XCTAssertTrue(modifier.contains("content.floatingClose(shown: presentedFromMenu) { dismiss() }"))
+        XCTAssertTrue(menu.contains("modifier(MenuSheetClose())"))
+        // Its words and its spoken names, now on the shared corner control.
+        let corner = try source("Agrent/Design/FloatingBack.swift")
+        XCTAssertTrue(corner.contains(#"static let close = "Затвори""#))
+        XCTAssertTrue(corner.contains("spoken: A11y.Spoken.close, action: action)"))
         // Both `appMenu` overloads carry it, so a screen with a menu has it.
         XCTAssertEqual(menu.components(separatedBy: ".closeWhenPresentedFromMenu()").count - 1, 2,
                        "each appMenu overload applies the way out exactly once")
@@ -91,8 +91,7 @@ final class MenuSheetCloseTests: XCTestCase {
             let text = try source(path)
             XCTAssertTrue(text.contains("struct \(String(describing: rootType(surface)))"),
                           "positive control: \(path) is not \(surface)'s screen")
-            XCTAssertTrue(text.contains(".appMenu()") || text.contains(".closeWhenPresentedFromMenu()")
-                          || text.contains(".closeWhenPresentedFromMenuLeading()"),
+            XCTAssertTrue(text.contains(".appMenu()") || text.contains(".closeWhenPresentedFromMenu()"),
                           "\(surface.label) has no way out when the menu presents it")
             XCTAssertFalse(text.contains("placement: .cancellationAction"),
                            "\(surface.label) draws its own «Затвори» — dead on the tab bar")

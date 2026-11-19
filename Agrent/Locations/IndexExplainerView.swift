@@ -33,12 +33,7 @@ struct IndexExplainerView: View {
             }
             .navigationTitle(index.name)
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                }
-            }
+            .floatingClose { dismiss() }
         }
     }
 

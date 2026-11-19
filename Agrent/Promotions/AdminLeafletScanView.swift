@@ -47,12 +47,7 @@ struct AdminLeafletScanView: View {
                 }
             }
             .inlineTitle(AdminPromotionsText.fromLeaflet)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                }
-            }
+            .floatingClose { dismiss() }
             .fullScreenCover(isPresented: $photographing) {
                 CameraPicker { image in
                     photographing = false

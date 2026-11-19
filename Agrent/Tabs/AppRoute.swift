@@ -117,6 +117,16 @@ enum AppRoute: Hashable, Sendable {
 
     /// The screen. The ONE place a route becomes a view: `RoutedStack`
     /// registers it once, at the root of every stack that can hold a route.
+    /// How far the bottom-left back arrow rises on this screen. A block opens
+    /// on its parcel map, which runs to the bottom edge with Apple's logo in
+    /// that corner — and the attribution must stay visible.
+    var cornerLift: CGFloat {
+        switch self {
+        case .location, .locationID: FloatingCorner.mapAttributionLift
+        default: 0
+        }
+    }
+
     @MainActor @ViewBuilder
     var destination: some View {
         switch self {
