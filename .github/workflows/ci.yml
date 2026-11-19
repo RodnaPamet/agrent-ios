@@ -786,7 +786,10 @@ jobs:
         run: |
           echo "Xcodes on this image:"
           ls -d /Applications/Xcode*.app
-          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          # Released Xcodes only. The xcode-27 image also carries a beta
+          # (`Xcode_27.3_beta.app`, 2026-11-19), which `sort -V` puts last; a
+          # beta SDK is one App Store Connect refuses (ITMS-90111).
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE 'beta|_rc' | sort -V | tail -1)
           [ -n "$NEWEST" ] || NEWEST=/Applications/Xcode.app
           echo "DEVELOPER_DIR=$NEWEST/Contents/Developer" >> "$GITHUB_ENV"
           echo "Selected: $NEWEST"

@@ -116,7 +116,10 @@ jobs:
       # the newest Xcode and DEVELOPER_DIR is set explicitly.
       - name: Select Xcode
         run: |
-          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          # Released Xcodes only. The xcode-27 image also carries a beta
+          # (`Xcode_27.3_beta.app`, 2026-11-19), which `sort -V` puts last; a
+          # beta SDK is one App Store Connect refuses (ITMS-90111).
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -viE 'beta|_rc' | sort -V | tail -1)
           [ -n "$NEWEST" ] || NEWEST=/Applications/Xcode.app
           echo "DEVELOPER_DIR=$NEWEST/Contents/Developer" >> "$GITHUB_ENV"
           echo "Selected: $NEWEST"
@@ -129,6 +132,10 @@ jobs:
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-version)
           echo "iOS SDK: $SDK"
+          case "$DEVELOPER_DIR" in
+            *[Bb]eta*|*_[Rr][Cc]*) echo "::error::$DEVELOPER_DIR is a pre-release Xcode; App Store Connect refuses its builds (ITMS-90111)."
+               exit 1 ;;
+          esac
           case "$SDK" in
             2[7-9].*|[3-9][0-9].*) ;;
             *) echo "::error::Built with the iOS $SDK SDK; App Store Connect requires iOS 27 or later (ITMS-90725)."
