@@ -55,12 +55,7 @@ struct ThresholdsSheet: View {
             }
             .pageBackground()
             .inlineTitle("\(ThresholdWords.title): \(cropName)")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                }
-            }
+            .floatingClose { dismiss() }
         }
     }
 }

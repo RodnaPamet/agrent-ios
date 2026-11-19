@@ -301,24 +301,15 @@ extension View {
         .closeWhenPresentedFromMenu()
     }
 
-    /// «Затвори» in the leading slot, when — and only when — the app menu
-    /// presented this screen as a sheet.
+    /// «Затвори», lower left, when — and only when — the app menu presented
+    /// this screen as a sheet.
     ///
-    /// Apply it INSIDE the screen's `NavigationStack`: a toolbar item
-    /// outside the stack has no bar to go in, which is why the presentation
-    /// site sets a flag rather than adding the button itself. `.appMenu()`
-    /// already applies it; the surfaces with no menu (Тенденции, Новини,
-    /// Риск) call it directly.
+    /// Apply it INSIDE the screen's `NavigationStack`, on the stack's root:
+    /// that is where `dismiss` closes the sheet, and where the control goes
+    /// when something is pushed over it. `.appMenu()` already applies it; the
+    /// surfaces with no menu (Тенденции, Новини, Риск) call it directly.
     func closeWhenPresentedFromMenu() -> some View {
-        modifier(MenuSheetClose(placement: .topBarTrailing))
-    }
-
-    /// «Затвори» on the LEADING edge, for a surface with no menu glyph there
-    /// and its own action at the top right (Риск's «Застраховай», owner
-    /// 2026-11-06): both on the trailing edge left «Риск по парц…» as the
-    /// title.
-    func closeWhenPresentedFromMenuLeading() -> some View {
-        modifier(MenuSheetClose(placement: .topBarLeading))
+        modifier(MenuSheetClose())
     }
 }
 
@@ -341,24 +332,17 @@ extension EnvironmentValues {
 ///
 /// `dismiss` is read at the root the modifier is applied to, so it closes
 /// the sheet rather than popping a pushed screen.
+///
+/// Lower left since 2026-11-19 (owner), as on every sheet — `floatingClose`.
+/// It used to be a toolbar item at the TOP RIGHT, kept away from the menu
+/// glyph at the top left (and on the left for Риск, whose «Застраховай» has
+/// the right). Off the bar it competes with neither.
 private struct MenuSheetClose: ViewModifier {
-    let placement: ToolbarItemPlacement
     @Environment(\.presentedFromMenu) private var presentedFromMenu
     @Environment(\.dismiss) private var dismiss
 
     func body(content: Content) -> some View {
-        content.toolbar {
-            if presentedFromMenu {
-                // TRAILING, not `.cancellationAction`. In a sheet the system
-                // puts a cancellation action on the LEADING edge — where the
-                // menu glyph now sits — and two controls stacked in one corner
-                // read as one. The opposite corner keeps them apart.
-                ToolbarItem(placement: placement) {
-                    Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                }
-            }
-        }
+        content.floatingClose(shown: presentedFromMenu) { dismiss() }
     }
 }
 

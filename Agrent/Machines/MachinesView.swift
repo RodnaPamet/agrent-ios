@@ -22,11 +22,8 @@ struct MachinesView: View {
             content
                 .inlineTitle("Машини")
                 .navigationDestination(for: MachineDay.self) { MachineDayView(day: $0).floatingBack() }
+                .floatingClose { dismiss() }
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Затвори") { dismiss() }
-                            .accessibilityInputLabels(A11y.Spoken.close)
-                    }
                     if store.registerAvailable {
                         ScreenAction(title: "Нов тракер", spoken: A11y.Spoken.newTracker) { adding = true }
                     }

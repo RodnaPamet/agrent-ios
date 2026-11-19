@@ -53,11 +53,8 @@ struct AssistantSheet: View {
             .pageBackground()
             .safeAreaInset(edge: .bottom, spacing: 0) { composer }
             .inlineTitle(AssistantText.title)
+            .floatingClose { dismiss() }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Затвори") { dismiss() }
-                        .accessibilityInputLabels(A11y.Spoken.close)
-                }
                 // A fresh conversation: the next question no longer follows
                 // the ones on screen (#507). The server keeps them all.
                 if !store.turns.isEmpty {
