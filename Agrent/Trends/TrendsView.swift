@@ -10,6 +10,8 @@ import SwiftUI
 /// an enum rather than the server's string. See `TrendsStore.commodity`.
 struct TrendsView: View {
     @State private var store = TrendsStore()
+    /// The day under the finger while it is held on the chart; nil otherwise.
+    @State private var picked: Date?
 
     var body: some View {
         RoutedStack {
@@ -168,6 +170,7 @@ struct TrendsView: View {
 
     private func chart(_ lead: PriceSeries) -> some View {
         let points = store.leadPoints
+        let shown = picked.flatMap { Self.nearest(to: $0, in: points) }
         return Chart {
             ForEach(points.indices, id: \.self) { index in
                 LineMark(
@@ -187,6 +190,24 @@ struct TrendsView: View {
                     )
                     .foregroundStyle(Palette.accent)
                 }
+            }
+            // The held day (owner, 2026-11-19): a rule down to the axis, the
+            // point itself, and its price and date above the plot, where the
+            // finger does not cover them.
+            if let shown {
+                RuleMark(x: .value("Дата", shown.day))
+                    .foregroundStyle(Palette.secondaryText.opacity(0.6))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    .annotation(position: .top, spacing: 4,
+                                overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        callout(shown)
+                    }
+                PointMark(
+                    x: .value("Дата", shown.day),
+                    y: .value("Цена", shown.price)
+                )
+                .foregroundStyle(Palette.accent)
+                .symbolSize(90)
             }
         }
         .chartXScale(domain: Self.xDomain(points.map(\.day)))
@@ -230,11 +251,85 @@ struct TrendsView: View {
                 }
             }
         }
+        // Hold, then slide (owner, 2026-11-19): a press held on the chart
+        // shows the day under the finger, and moving left or right moves the
+        // day with it; lifting the finger puts the chart back.
+        //
+        // HELD, not a plain drag. The chart sits in the page's ScrollView,
+        // and a drag that started selecting at once would take every scroll
+        // that began on the chart. A long press fails as soon as the finger
+        // travels, so a scroll still scrolls; only a finger that stays put
+        // for a moment starts reading prices. The drag after it has no
+        // minimum distance, so the next movement — a held finger always
+        // moves a little — shows the first day.
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        LongPressGesture(minimumDuration: 0.25)
+                            .sequenced(before: DragGesture(minimumDistance: 0))
+                            .onChanged { value in
+                                guard case .second(true, let drag?) = value else { return }
+                                picked = day(at: drag.location, proxy: proxy, geometry: geometry)
+                            }
+                            .onEnded { _ in picked = nil }
+                    )
+            }
+        }
+        .onChange(of: store.range) { picked = nil }
         .frame(height: 220)
         // A chart is invisible to VoiceOver. The headline above says the
         // price and its change in words, so the chart says what it is and
-        // where it starts and ends.
+        // where it starts and ends — and swiping up or down on it steps
+        // through the days, the held finger's reading for VoiceOver.
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(chartSummary(points))
+        .accessibilityValue(shown.map { "\(BgDate.rowDay($0.day)): \(Num.text($0.price))" } ?? "")
+        .accessibilityAdjustableAction { direction in
+            let by = direction == .increment ? 1 : (direction == .decrement ? -1 : 0)
+            picked = Self.step(from: picked, by: by, in: points)
+        }
+    }
+
+    /// The held day's price and date, in a small card above the plot.
+    private func callout(_ point: (day: Date, price: Double)) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(Num.text(point.price))
+                .font(.headline)
+                .monospacedDigit()
+            Text(BgDate.rowDay(point.day))
+                .font(.caption)
+                .foregroundStyle(Palette.secondaryText)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Palette.Surface.bar, in: RoundedRectangle(cornerRadius: 8))
+        .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Palette.Surface.edge, lineWidth: 1) }
+    }
+
+    /// The date under a point of the overlay, measured from the plot's own
+    /// origin — the axes take room the overlay's coordinates include.
+    private func day(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) -> Date? {
+        guard let plot = proxy.plotFrame else { return nil }
+        return proxy.value(atX: location.x - geometry[plot].origin.x, as: Date.self)
+    }
+
+    /// The point whose day is closest to `day`: the finger lands between two
+    /// prices far more often than on one, and the card shows a real price.
+    static func nearest(to day: Date, in points: [(day: Date, price: Double)]) -> (day: Date, price: Double)? {
+        points.min { abs($0.day.timeIntervalSince(day)) < abs($1.day.timeIntervalSince(day)) }
+    }
+
+    /// One point on from `from`, for VoiceOver's swipe: the first swipe lands
+    /// on the latest day, and the ends hold rather than wrap.
+    static func step(from: Date?, by offset: Int, in points: [(day: Date, price: Double)]) -> Date? {
+        guard !points.isEmpty else { return nil }
+        guard let from, let here = points.firstIndex(where: { $0.day == from }) else {
+            return points.last?.day
+        }
+        return points[min(max(here + offset, 0), points.count - 1)].day
     }
 
     /// «Графика на цената за 1 година, от 176 до 184,29».
