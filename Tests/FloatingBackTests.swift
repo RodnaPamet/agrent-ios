@@ -23,7 +23,7 @@ final class FloatingBackTests: XCTestCase {
 
     // MARK: - Every push site
 
-    private struct Site {
+    struct Site {
         let file: String
         let destination: String
     }
