@@ -68,6 +68,9 @@ struct TreatmentCorrectionFlow: View {
                         onSave: { Task { await save() } },
                         onReload: { Task { await reload() } },
                         onCancel: { dismiss() })
+                    // A save under way is not abandoned by going back, and
+                    // its refusal does not land on a screen that has gone.
+                    .floatingBack(disabled: saving)
                 }
             }
         }

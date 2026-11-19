@@ -104,8 +104,10 @@ struct TreatmentEntryFlow: View {
                                        failure: failure, retryCrops: { await loadPlace() }) { fields in
                         proceed(fields)
                     }
+                    .floatingBack()
                 case .map(let fields, let title):
                     TreatmentMapView(fields: fields, title: title)
+                        .floatingBack()
                 case .check(let checking):
                     TreatmentCheckView(
                         record: checking.record, fields: checking.fields, cropLabel: cropLabel,
@@ -118,6 +120,7 @@ struct TreatmentEntryFlow: View {
                         },
                         onAdd: { Task { await save(checking.fields) } },
                         onCancel: { dismiss() })
+                    .floatingBack(disabled: saving)
                 }
             }
         }

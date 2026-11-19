@@ -74,7 +74,7 @@ struct NewTaskView: View {
                     onDone: created == nil ? nil : { finish(created ?? nil) })
                 // Once the task exists there is no going back to edit it:
                 // what step one says is already on the server.
-                .navigationBarBackButtonHidden(saving || created != nil)
+                .floatingBack(disabled: saving || created != nil)
                 .toolbar {
                     if created == nil {
                         ToolbarItem(placement: .cancellationAction) {

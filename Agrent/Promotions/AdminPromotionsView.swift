@@ -110,7 +110,7 @@ struct AdminPromotionsView: View {
                 .pageRow()
                 Section {
                     NavigationLink {
-                        AdminCompaniesView()
+                        AdminCompaniesView().floatingBack()
                     } label: {
                         Label(AdminPromotionsText.companies, systemImage: "building.2")
                     }

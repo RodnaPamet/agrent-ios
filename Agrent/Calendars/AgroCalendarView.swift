@@ -77,6 +77,7 @@ struct AgroCalendarView: View {
                 AgroCropView(calendar: calendar, crop: crop, region: page.region,
                              benchmarks: benchmarks.state.value,
                              thresholds: thresholds.state.value?.for(crop) ?? [])
+                    .floatingBack()
             }
         }
     }

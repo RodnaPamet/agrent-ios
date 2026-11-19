@@ -468,7 +468,7 @@ struct PagePicker<Selection: Hashable>: View {
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
 
         NavigationLink {
-            PagePickerList(title: title, selection: $selection, sections: sections)
+            PagePickerList(title: title, selection: $selection, sections: sections).floatingBack()
         } label: {
             layout {
                 Text(title).layoutPriority(1)

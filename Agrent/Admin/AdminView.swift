@@ -125,7 +125,7 @@ struct AdminView: View {
     /// gives the back button.
     private var accountRow: some View {
         NavigationLink {
-            ProfileView()
+            ProfileView().floatingBack()
         } label: {
             if let user = me.user {
                 AccountCard(user: user)
@@ -160,7 +160,7 @@ struct AdminView: View {
     /// that knows how to show them.
     private var farmRow: some View {
         NavigationLink {
-            FarmProfileView(store: store)
+            FarmProfileView(store: store).floatingBack()
         } label: {
             ValueRow {
                 switch store.profile {
@@ -186,7 +186,7 @@ struct AdminView: View {
     /// of Админ a request this row doesn't need.
     private var publicProfileRow: some View {
         NavigationLink {
-            PublicProfileView()
+            PublicProfileView().floatingBack()
         } label: {
             Label(PublicProfileView.title, systemImage: "globe")
         }
@@ -199,7 +199,7 @@ struct AdminView: View {
     /// people than the row promised.
     private var membersRow: some View {
         NavigationLink {
-            MembersView(store: store)
+            MembersView(store: store).floatingBack()
         } label: {
             ValueRow {
                 if let all = store.members.value {
@@ -217,7 +217,7 @@ struct AdminView: View {
     /// because «Цени» alone reads like this farm's own.
     private var pricesRow: some View {
         NavigationLink {
-            AdminPricesView()
+            AdminPricesView().floatingBack()
         } label: {
             Label("Цени", systemImage: "eurosign.circle")
         }
@@ -228,7 +228,7 @@ struct AdminView: View {
     /// The catalogue of supplier offers, for every farm.
     private var promotionsRow: some View {
         NavigationLink {
-            AdminPromotionsView()
+            AdminPromotionsView().floatingBack()
         } label: {
             Label(AdminPromotionsText.title, systemImage: "tag")
         }
@@ -241,7 +241,7 @@ struct AdminView: View {
     /// because «Диагностика» alone does not.
     private var diagnosticsRow: some View {
         NavigationLink {
-            DiagnosticsView()
+            DiagnosticsView().floatingBack()
         } label: {
             Label("Диагностика", systemImage: "stethoscope")
         }

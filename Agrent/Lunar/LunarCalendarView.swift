@@ -16,6 +16,7 @@ struct LunarCalendarView: View {
             .inlineTitle(LunarWords.title)
             .navigationDestination(for: LunarDay.self) { day in
                 LunarDayView(day: day, warnings: LunarWords.warnings(warnings, on: day.date))
+                    .floatingBack()
             }
             .task(id: month) { await load() }
     }

@@ -177,7 +177,7 @@ struct ProfileView: View {
             if flags.isOn(AssistantAPI.flag), flags.isOn(AssistantMemoryAPI.flag) {
                 Section {
                     NavigationLink {
-                        AssistantMemoryView()
+                        AssistantMemoryView().floatingBack()
                     } label: {
                         Label(AssistantMemoryText.title, systemImage: "brain")
                     }
@@ -212,7 +212,7 @@ struct ProfileView: View {
             // does is said before the one question is asked.
             Section {
                 NavigationLink {
-                    DeleteAccountView()
+                    DeleteAccountView().floatingBack()
                 } label: {
                     Label(AccountDeletionText.action, systemImage: "trash")
                         .foregroundStyle(Palette.destructive)

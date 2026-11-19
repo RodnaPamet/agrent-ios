@@ -2,7 +2,7 @@ import XCTest
 @testable import Agrent
 
 /// A parcel's history opens Дневник's own «Нов запис» (#608), on that parcel,
-/// and every step has «Назад» (#609). Nothing here records anything.
+/// and every step has a way back (#609, lower left since 2026-11-19). Nothing here records anything.
 final class HistoryEntryFlowTests: XCTestCase {
 
     private let crops = [
@@ -32,9 +32,16 @@ final class HistoryEntryFlowTests: XCTestCase {
         XCTAssertTrue(journal.contains("TreatmentEntryFlow(recorder: LiveTreatmentRecorder())"), "positive control")
     }
 
-    func testEveryStepHasNazad() throws {
+    /// Each step is pushed with its way back, lower left (`floatingBack`),
+    /// and the check step's is withdrawn while it saves.
+    func testEveryStepHasAWayBack() throws {
+        let flow = SignOutHygieneTests.code(try source("Agrent/Journal/Treatment/TreatmentEntryFlow.swift"))
+        XCTAssertTrue(flow.contains("proceed(fields)\n                    }\n                    .floatingBack()"),
+                      "«Къде» has no way back")
+        XCTAssertTrue(flow.contains(".floatingBack(disabled: saving)"), "«Проверка» has no way back, or keeps it while saving")
         for step in ["Agrent/Journal/Treatment/TreatmentPlaceView.swift", "Agrent/Journal/Treatment/TreatmentCheckView.swift"] {
-            XCTAssertTrue(try source(step).contains(".stepBack("), "\(step) has no «Назад»")
+            XCTAssertFalse(SignOutHygieneTests.code(try source(step)).contains("floatingBack("),
+                           "\(step) applies its own: the flow that pushes it does (`FloatingBack`)")
         }
         let check = try source("Agrent/Journal/Treatment/TreatmentCheckView.swift")
         XCTAssertFalse(check.contains("placement: .cancellationAction"),

@@ -21,7 +21,7 @@ struct MachinesView: View {
         NavigationStack {
             content
                 .inlineTitle("Машини")
-                .navigationDestination(for: MachineDay.self) { MachineDayView(day: $0) }
+                .navigationDestination(for: MachineDay.self) { MachineDayView(day: $0).floatingBack() }
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Затвори") { dismiss() }
