@@ -34,7 +34,7 @@ final class HistoryEntryFlowTests: XCTestCase {
 
     /// Each step is pushed with its way back, lower left (`floatingBack`),
     /// and the check step's is withdrawn while it saves.
-    func testEveryStepHasAWayBack() throws {
+    @MainActor func testEveryStepHasAWayBack() throws {
         let flow = SignOutHygieneTests.code(try source("Agrent/Journal/Treatment/TreatmentEntryFlow.swift"))
         XCTAssertTrue(flow.contains("proceed(fields)\n                    }\n                    .floatingBack()"),
                       "«Къде» has no way back")

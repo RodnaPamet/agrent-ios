@@ -3,6 +3,7 @@ import XCTest
 
 /// The way back from a pushed screen is the arrow lower left (`FloatingBack`,
 /// owner 2026-11-19), on every screen that is pushed.
+@MainActor
 final class FloatingBackTests: XCTestCase {
 
     // MARK: - The swipe back
@@ -10,7 +11,7 @@ final class FloatingBackTests: XCTestCase {
     /// The edge swipe stays on with the system's button hidden: allowed with
     /// a screen to go back to, refused at a stack's root and while a save
     /// holds it off.
-    @MainActor func testTheSwipeBackFollowsTheStackAndTheHolds() {
+    func testTheSwipeBackFollowsTheStackAndTheHolds() {
         let before = SwipeBack.holds
         defer { SwipeBack.holds = before }
         SwipeBack.holds = 0
