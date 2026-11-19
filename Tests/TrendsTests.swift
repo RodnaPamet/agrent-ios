@@ -538,3 +538,40 @@ final class SparseTrendsChartTests: XCTestCase {
         XCTAssertEqual(domain.upperBound, days.last)
     }
 }
+
+/// Holding a finger on the price chart reads the price of the day under it
+/// (owner, 2026-11-19). The gesture needs a device; what it shows is decided
+/// here, and is tested here.
+@MainActor
+final class TrendsChartReadoutTests: XCTestCase {
+    private let day: TimeInterval = 86_400
+    private lazy var points: [(day: Date, price: Double)] = [
+        (Date(timeIntervalSince1970: 1_763_078_400), 188.7),
+        (Date(timeIntervalSince1970: 1_763_078_400 + 2 * day), 189.4),
+        (Date(timeIntervalSince1970: 1_763_078_400 + 4 * day), 190.1),
+    ]
+
+    /// The finger lands between prices far more often than on one: the card
+    /// shows the nearest real price, never an interpolated one.
+    func testTheNearestDayIsShown() {
+        let start = points[0].day
+        XCTAssertEqual(TrendsView.nearest(to: start, in: points)?.price, 188.7, "on a point")
+        XCTAssertEqual(TrendsView.nearest(to: start.addingTimeInterval(0.9 * day), in: points)?.price, 188.7)
+        XCTAssertEqual(TrendsView.nearest(to: start.addingTimeInterval(1.1 * day), in: points)?.price, 189.4)
+        XCTAssertEqual(TrendsView.nearest(to: start.addingTimeInterval(-10 * day), in: points)?.price, 188.7,
+                       "left of the line: the first day")
+        XCTAssertEqual(TrendsView.nearest(to: start.addingTimeInterval(10 * day), in: points)?.price, 190.1,
+                       "right of the line: the last day")
+        XCTAssertNil(TrendsView.nearest(to: start, in: []), "no prices, no card")
+    }
+
+    /// VoiceOver's swipe through the days: it starts on the latest, and holds
+    /// at the ends rather than wrapping.
+    func testVoiceOverStepsThroughTheDays() {
+        XCTAssertEqual(TrendsView.step(from: nil, by: -1, in: points), points[2].day, "first swipe: the latest day")
+        XCTAssertEqual(TrendsView.step(from: points[2].day, by: -1, in: points), points[1].day)
+        XCTAssertEqual(TrendsView.step(from: points[0].day, by: -1, in: points), points[0].day, "holds at the start")
+        XCTAssertEqual(TrendsView.step(from: points[2].day, by: 1, in: points), points[2].day, "holds at the end")
+        XCTAssertNil(TrendsView.step(from: nil, by: 1, in: []))
+    }
+}
