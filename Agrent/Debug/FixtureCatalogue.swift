@@ -241,7 +241,7 @@ enum FixtureCatalogue {
         // the field operation's parcels, for the numbers on its map.
         (FarmTasksAPI.queuePath, "farm-tasks-mine"),
         (WorkItemAPI.parcelsPath(fixtureFieldOperationTaskID), "task-parcels-fieldop"),
-        // #462: SYNTH-1's tasks, for its «Задачи» card from Блокове: two
+        // #462: SYNTH-1's tasks, for its «Задачи» card from Карта: two
         // current, two in the archive. Synthetic.
         (WorkItemAPI.parcelTasksPath("par_holes"), "parcel-tasks"),
         // #465: SYNTH-1's comments, a comment and a closing note. Synthetic.

@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A block named only by id, from a notification's link (#475): found in the
-/// farm's list of blocks, the read Блокове makes and caches, so it opens with
-/// no signal on a phone that has opened Блокове before. Then its map.
+/// farm's list of blocks, the read Карта makes and caches, so it opens with
+/// no signal on a phone that has opened Карта before. Then its map.
 struct LocationLinkView: View {
     let id: String
 

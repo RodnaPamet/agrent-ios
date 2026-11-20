@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A parcel's risk reading: vegetation and moisture, their averages, and
 /// when the satellite looked. One view for Риск's rows and for the parcel's
-/// own screen (owner, 2026-10-29: the risk reachable from Блокове → a
+/// own screen (owner, 2026-10-29: the risk reachable from Карта → a
 /// parcel), so the two can't say different things about one field.
 struct ParcelRiskReadings: View {
     let risk: ParcelRisk

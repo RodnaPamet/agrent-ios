@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A parcel's tasks, «Текущи» and «Архив» (#462, owner 2026-10-29): what its
-/// «Задачи» card opens, from the parcel's screen in Блокове. A row opens the
+/// «Задачи» card opens, from the parcel's screen in Карта. A row opens the
 /// task, as on Задачи.
 ///
 /// And a row is deleted as on Задачи (owner, 2026-10-30): swipe «Изтрий»,

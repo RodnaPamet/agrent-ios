@@ -18,7 +18,7 @@ import SwiftUI
 ///
 /// ── Except the target button (#398) ──
 ///
-/// `ParcelTargetButton`, as on Блокове: each press frames the next drawn
+/// `ParcelTargetButton`, as on Карта: each press frames the next drawn
 /// parcel, said aloud, since the camera move itself is silent to VoiceOver. It
 /// sits outside the hidden map, so it is a control like any other.
 ///
@@ -99,7 +99,7 @@ struct TreatmentParcelMap: View {
     /// that framed it would move the camera to nothing.
     private var drawable: [Parcel] { fields.map(\.parcel).filter(\.isDrawable) }
 
-    /// Camera only, as on Блокове: no toggle. Said in the words the list's
+    /// Camera only, as on Карта: no toggle. Said in the words the list's
     /// row uses, so the two don't describe one field differently.
     private func focusNext() {
         let parcels = drawable

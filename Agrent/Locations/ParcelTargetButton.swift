@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Jumps the map to the next parcel, one press at a time: the web's «Намери
-/// моето поле». It's ONE control on every map that has it: Блокове, both
+/// моето поле». It's ONE control on every map that has it: Карта, both
 /// parcel steps (#398), and a recorded treatment's map (#399). So it looks
 /// and speaks the same everywhere, and each map supplies only what a press
 /// does to its own camera.

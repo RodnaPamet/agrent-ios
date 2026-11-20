@@ -438,7 +438,7 @@ titles (owner, 2026-10-29), and two months and several types for «Разход�
 type and its graphs (#500). Its POST, a write, stays `501 WRITE_REFUSED`.
 
 
-## A parcel's tasks from Блокове
+## A parcel's tasks from Карта
 
 `parcel-tasks.json`: `GET /agro/parcels/par_holes/tasks` (#462), SYNTH-1's
 tasks newest first: two current rows reused from `tasks-list.json` (the

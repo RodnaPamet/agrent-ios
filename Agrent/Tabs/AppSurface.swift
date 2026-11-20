@@ -55,7 +55,7 @@ enum AppSurface: String, CaseIterable, Identifiable, Sendable {
         case .journal: "Дневник"
         case .calculator: "Калкулатор"
         case .exchange: "Борса"
-        case .locations: "Блокове"
+        case .locations: "Карта"
         case .tasks: "Задачи"
         case .trends: "Тенденции"
         case .news: "Новини"

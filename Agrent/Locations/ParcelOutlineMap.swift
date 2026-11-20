@@ -8,7 +8,7 @@ import SwiftUI
 ///
 /// Still, like the task's map (`TaskParcelMap`): in a scrolling page a map
 /// that took the drag would steal the scroll, and the camera already frames
-/// the one parcel this page is about. Блокове is where a farm is explored.
+/// the one parcel this page is about. Карта is where a farm is explored.
 struct ParcelOutlineMap: View {
     let parcel: Parcel
 
