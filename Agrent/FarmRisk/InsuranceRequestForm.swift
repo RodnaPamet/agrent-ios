@@ -410,6 +410,21 @@ struct InsuranceRequestForm: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+
+                    // Where the enquiry goes (owner, 2026-11-20): to Agrent
+                    // first, as a registered insurance agent, and from there
+                    // to the partner insurer. The form never said, so a farmer
+                    // could only guess who was about to read their figures.
+                    // Worded as the web's `ag.risk.ask.description`.
+                    Section {
+                        EmptyView()
+                    } footer: {
+                        SectionFooter {
+                            Text("Запитването отива първо при Agrent като регистриран "
+                                 + "застрахователен агент, а оттам при нашия партньор "
+                                 + "agrozastrahovane.bg, който ще се свърже с Вас.")
+                        }
+                    }
                 }
             }
             // «Запитване», not «Запитване за оферта».
