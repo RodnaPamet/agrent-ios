@@ -30,7 +30,10 @@ struct InvoiceReview: Equatable {
         var attribution: Attribution
     }
 
-    let invoiceFileId: String
+    /// The invoice the lines were read from — nil for an expense the
+    /// assistant prepared from what the person said (agri-saas propose
+    /// `cost`, owner 2026-11-20), which has no file behind it.
+    let invoiceFileId: String?
     var rows: [Row]
     let warnings: [InvoiceWarning]
 
@@ -59,6 +62,37 @@ struct InvoiceReview: Equatable {
             )
         }
     }
+
+    /// One expense the assistant PREPARED (owner, 2026-11-20: «the assistant
+    /// should also be able to add expenses»), as the same review the person
+    /// checks before «Запиши». The assistant never saves: this is the filled
+    /// form, and the save is the person's, through the same batch.
+    ///
+    /// A total, like an invoice line — the person said what they paid. Booked
+    /// on the crop they named when the farm grows it, otherwise over the whole
+    /// farm, exactly as an invoice line with no crop starts. A future day
+    /// starts as today: a cost is money already spent.
+    init(proposed fields: AssistantProposal.CostFields, crops: [CropChoice], today: Date = Date()) {
+        invoiceFileId = nil
+        warnings = []
+        let offered: Set<String>? = crops.isEmpty ? nil : Set(crops.map(\.id))
+        let crop = fields.crop.flatMap { offered == nil || offered!.contains($0) ? $0 : nil }
+        let day = fields.incurredOn.flatMap { BgDate.parseISODay($0) }.map { min($0, today) } ?? today
+        rows = [Row(
+            category: fields.category.flatMap(CostCategory.init(rawValue:)) ?? .unknown,
+            amountText: fields.amount.map { NewListingView.fieldText($0.value) } ?? "",
+            incurredOn: day,
+            supplier: fields.supplier ?? "",
+            note: fields.description ?? "",
+            attribution: crop.map(Attribution.crop) ?? .farm
+        )]
+    }
+
+    /// The screen's title: where the lines came from.
+    var title: String { invoiceFileId == nil ? "Разход" : "От фактура" }
+
+    /// The sentence over the list, for this review's source.
+    var checkFirstText: String { invoiceFileId == nil ? Self.checkProposed : Self.checkFirst }
 
     enum Problem: Equatable {
         case noLines
@@ -168,4 +202,5 @@ struct InvoiceReview: Equatable {
 
     /// The sentence over the list: what to check before «Запиши».
     static let checkFirst = "Проверете всеки ред спрямо фактурата, преди да запишете."
+    static let checkProposed = "Агрент попълни разхода по думите Ви. Проверете го и запишете."
 }

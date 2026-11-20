@@ -21,6 +21,7 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
     enum Draft: Equatable, Sendable {
         case treatment(TreatmentFields)
         case activity(ActivityFields)
+        case cost(CostFields)
     }
 
     struct TreatmentFields: Decodable, Equatable, Sendable {
@@ -94,6 +95,37 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
         let harvestKg: WireDecimal?
     }
 
+    /// An expense (agri-saas propose `cost`, owner 2026-11-20): the fields of
+    /// `POST /grain/costs` a conversation can state. The crop arrives already
+    /// canonical («wheat»); no id, no currency — the review books in euros,
+    /// as every line from the phone does.
+    struct CostFields: Decodable, Equatable, Sendable {
+        let category: String?
+        let amount: WireDecimal?
+        let incurredOn: String?
+        let supplier: String?
+        let description: String?
+        /// The crop's canonical slug, the wire's `commodityCanonical`. Named
+        /// `crop` here because it is data, never shown as is: the review
+        /// renders it through `CommodityName`.
+        let crop: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case category, amount, incurredOn, supplier, description
+            case crop = "commodityCanonical"
+        }
+
+        init(category: String? = nil, amount: WireDecimal? = nil, incurredOn: String? = nil,
+             supplier: String? = nil, description: String? = nil, crop: String? = nil) {
+            self.category = category
+            self.amount = amount
+            self.incurredOn = incurredOn
+            self.supplier = supplier
+            self.description = description
+            self.crop = crop
+        }
+    }
+
     private enum CodingKeys: String, CodingKey { case kind, draft }
 
     init(kind: String, draft: Draft?) {
@@ -110,6 +142,8 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
             draft = (try? c.decode(TreatmentFields.self, forKey: .draft)).map(Draft.treatment)
         case "activity":
             draft = (try? c.decode(ActivityFields.self, forKey: .draft)).map(Draft.activity)
+        case "cost":
+            draft = (try? c.decode(CostFields.self, forKey: .draft)).map(Draft.cost)
         default:
             draft = nil
         }
@@ -145,8 +179,18 @@ struct AssistantProposal: Decodable, Equatable, Sendable {
             entry.activity = work
             entry.date = Self.day(fields.occurredOn, today: today)
             entry.harvestText = fields.harvestKg.map { NewListingView.fieldText($0.value) } ?? ""
+        case .cost:
+            // An expense is not a journal record: it opens `costReview`.
+            return nil
         }
         return entry
+    }
+
+    /// An expense draft as the review the person checks before «Запиши»,
+    /// or nil when this proposal is not one.
+    func costReview(crops: [CropChoice] = [], today: Date = Date()) -> InvoiceReview? {
+        guard case .cost(let fields)? = draft else { return nil }
+        return InvoiceReview(proposed: fields, crops: crops, today: today)
     }
 
     /// The draft's day, never in the future: the form records done work, and

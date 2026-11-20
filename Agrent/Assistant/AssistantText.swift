@@ -123,6 +123,9 @@ enum AssistantText {
     // ── A prepared entry ──
 
     static let openEntry = "Отвори в «Нов запис»"
+    /// An expense the assistant prepared (owner, 2026-11-20).
+    static let openCost = "Отвори разхода"
+    static let preparedCostNote = "Агрент попълни разхода. Проверете сумата и вида и го запишете."
     static let preparedNote = "Агрент попълни записа. Проверете го, изберете парцелите и мерната единица и го запазете."
 
     /// `done` with no answer before it.
