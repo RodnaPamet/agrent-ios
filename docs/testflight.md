@@ -1,8 +1,10 @@
 # TestFlight
 
 `.github/workflows/testflight.yml` archives a Release build, checks it, and
-uploads it to App Store Connect. It runs only when asked (Actions → TestFlight →
-Run workflow) or when a `v*` tag is pushed — never on a PR or a merge.
+uploads it to App Store Connect. It runs after every merge to `master` that
+changes the app (`Agrent/**` or `project.yml`; owner, 2026-11-20), when asked
+(Actions → TestFlight → Run workflow), and when a `v*` tag is pushed. A merge
+that changes only docs, tests or CI does not upload.
 
 ## One-time setup (owner)
 
@@ -47,6 +49,7 @@ every upload wait for your approval. The environment appears after the first run
 
 ## Uploading a build
 
+- **After a merge:** automatic, when the PR changed `Agrent/**` or `project.yml`.
 - **Any time:** Actions → TestFlight → Run workflow → branch `master`.
 - **For a release:** bump `MARKETING_VERSION` in `project.yml`, merge, then
   `git tag v0.2.0 && git push origin v0.2.0`. The run fails if the tag and

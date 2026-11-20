@@ -50,5 +50,6 @@ DESTINATION="platform=iOS Simulator,name=iPhone 17 Pro" scripts/check.sh
 ## Workflow
 
 - Branch → PR → squash-merge yourself once every CI check reads `pass` (standing approval). "No failures yet" is not green.
+- Every merge that changes the app uploads to TestFlight on its own (owner, 2026-11-20: «always upload to test flight after a pr»). `testflight.yml` runs on a push to `master` touching `Agrent/**` or `project.yml`; check that run went green after merging, and dispatch it by hand for a merge the filter skipped if the owner wants that build too.
 - Record decisions and unverified items in `PARITY.md` / `ROADMAP.md`; file new work as GitHub issues.
 - After writing Swift, review it with `swiftui-pro`, `swift-concurrency-pro` and `ios-accessibility`.

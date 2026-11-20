@@ -4,12 +4,20 @@ name: TestFlight
 # it to App Store Connect, where it appears under TestFlight. Setup the owner
 # does once — app record, API key, the secrets below — is in docs/testflight.md.
 #
-# ── Never on a PR or a push to master ──
+# ── After every merge that changes the app (owner, 2026-11-20) ──
 #
-# An upload is outward-facing and cannot be taken back: a build number, once
-# used, is spent for that version. So it runs when someone asks — the Actions
-# tab's "Run workflow" — or when a `v*` tag is pushed, which is also somebody
-# asking, in a way that leaves a name in the history.
+# «Always upload to test flight after a pr.» So a push to master runs it —
+# which is a merged PR, since master takes no direct pushes — whenever the
+# merge touched the app itself (`Agrent/**`, `project.yml`). A merge that
+# changes only docs, tests or CI builds a byte-identical app, and an upload is
+# not free: a build number, once used, is spent for that version, and each
+# build waits in App Store Connect's processing queue. It still runs on demand
+# (the Actions tab's "Run workflow") and for a `v*` tag; path filters are not
+# evaluated for tag pushes, so a release tag always uploads.
+#
+# This reverses the earlier rule, "never on a PR or a push to master", which
+# kept every upload a deliberate act. The owner chose the opposite: every app
+# change on a phone without anyone having to remember.
 #
 # ── Signing: automatic, through the App Store Connect API key ──
 #
@@ -37,6 +45,8 @@ name: TestFlight
 on:
   workflow_dispatch:
   push:
+    branches: [master]
+    paths: ['Agrent/**', 'project.yml']
     tags: ['v*']
 
 # One upload at a time, and never cancelled halfway: a cancelled run can leave
