@@ -62,11 +62,14 @@ final class AssistantTests: XCTestCase {
         XCTAssertTrue(try event(#"{"type":"halt","outcome":"ASSISTANT_SPEND_CEILING"}"#).ends)
     }
 
-    /// Phase 2's proposal decodes on a phase-1 phone rather than failing the
-    /// answer it rides on.
+    /// A proposal of a kind this build does not know decodes with no draft
+    /// rather than failing the answer it rides on. The example kind was
+    /// `cost` until this phone learned it (owner, 2026-11-20), so it is now
+    /// one no build knows.
     func testAProposalDoesNotBreakTheAnswer() throws {
-        let answer = try event(#"{"type":"answer","text":"Готово.","proposal":{"kind":"cost","draft":{"amount":12}}}"#)
-        XCTAssertEqual(answer, .answer(text: "Готово.", links: [], proposal: AssistantProposal(kind: "cost", draft: nil)))
+        let answer = try event(#"{"type":"answer","text":"Готово.","proposal":{"kind":"not-a-kind-yet","draft":{"amount":12}}}"#)
+        XCTAssertEqual(answer, .answer(text: "Готово.", links: [],
+                                       proposal: AssistantProposal(kind: "not-a-kind-yet", draft: nil)))
     }
 
     /// Links are a field of their own, never Markdown in the text; a link
