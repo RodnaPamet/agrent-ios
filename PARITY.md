@@ -1639,6 +1639,7 @@ caller of `.sensoryFeedback`.
 - **«Застрахователна сума»** is the sum's visible title. It showed only «0 €».
 - **«Вноски»** is written above the 1–4 segmented picker, which shows no title of its own.
 - **No «Запитването не може да бъде оттеглено.»** The owner dropped the sentence, on the web as well; they confirm that to agri-saas themselves. A repeat ask on the same parcel still says «За този парцел вече има запитване. Това ще изпрати ново.»
+- **Where the enquiry goes (owner, 2026-11-20, the web too):** the form's last footer says «Запитването отива първо при Agrent като регистриран застрахователен агент, а оттам при нашия партньор agrozastrahovane.bg, който ще се свърже с Вас.» The server mails only the operator's address, so the hand-over to the partner is Agrent's. The web says the same in `ag.risk.ask.description` and the privacy notice (agri-saas).
 
 ### «Ортофотокарта» replaces «Схема» (#458, owner 2026-10-27)
 
