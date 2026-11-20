@@ -85,4 +85,60 @@ final class AssistantProposalTests: XCTestCase {
         XCTAssertTrue(UserMessage.isBulgarianSentence(AssistantText.preparedNote))
         XCTAssertTrue(AssistantText.openEntry.contains("Нов запис"))
     }
+
+    // MARK: - An expense (owner, 2026-11-20: «the assistant should also be able to add expenses»)
+
+    /// A cost draft opens the invoice review, one line filled, and never
+    /// «Нов запис»: an expense is not a journal record.
+    func testACostDraftFillsTheExpenseReview() throws {
+        let p = try proposal(#"""
+        {"kind":"cost","draft":{"category":"FUEL","amount":300.5,"incurredOn":"2026-10-30",
+          "supplier":"Синтетичен доставчик","description":"Нафта за сеитбата","commodityCanonical":"wheat"}}
+        """#)
+        XCTAssertNil(p.entry(today: today), "an expense does not open «Нов запис»")
+        let review = try XCTUnwrap(p.costReview(crops: [CropChoice(commodity: "wheat", areaDca: 1000)], today: today))
+        XCTAssertNil(review.invoiceFileId, "no invoice behind a prepared expense")
+        XCTAssertEqual(review.title, "Разход")
+        XCTAssertEqual(review.checkFirstText, InvoiceReview.checkProposed)
+        let row = try XCTUnwrap(review.rows.first)
+        XCTAssertEqual(review.rows.count, 1)
+        XCTAssertEqual(row.category, .fuel)
+        XCTAssertEqual(row.amountText, "300,5")
+        XCTAssertEqual(BgDate.isoDay(row.incurredOn), "2026-10-30")
+        XCTAssertEqual(row.supplier, "Синтетичен доставчик")
+        XCTAssertEqual(row.note, "Нафта за сеитбата")
+        XCTAssertEqual(row.attribution, .crop("wheat"))
+    }
+
+    /// Booked as the review saves it: a total in euros, on the crop, and no
+    /// invoice id — the same batch line an invoice row becomes, minus the file.
+    func testACostDraftSavesAsOneBatchLine() throws {
+        let review = try XCTUnwrap(proposal(#"""
+        {"kind":"cost","draft":{"category":"FUEL","amount":300,"incurredOn":"2026-10-30"}}
+        """#).costReview(crops: [], today: today))
+        let sheet = try XCTUnwrap(review.sheet)
+        let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(sheet)) as? [String: Any]
+        let line = try XCTUnwrap((body?["lines"] as? [[String: Any]])?.first)
+        XCTAssertEqual(line["category"] as? String, "FUEL")
+        XCTAssertEqual(line["currency"] as? String, "EUR")
+        XCTAssertEqual(line["allocationBasis"] as? String, "HOLDING", "no crop said: the whole farm")
+        XCTAssertNil(line["invoiceFileId"])
+        XCTAssertNil(line["commodityCanonical"])
+    }
+
+    /// What the farm does not grow starts as the whole farm, a future day as
+    /// today, and a category this build does not know must be chosen — so the
+    /// person sees each before «Запиши», never a guess.
+    func testACostDraftNeverGuesses() throws {
+        let review = try XCTUnwrap(proposal(#"""
+        {"kind":"cost","draft":{"category":"SOMETHING_NEW","amount":10,"incurredOn":"2026-12-24","commodityCanonical":"rice"}}
+        """#).costReview(crops: [CropChoice(commodity: "wheat", areaDca: 1000)], today: today))
+        let row = try XCTUnwrap(review.rows.first)
+        XCTAssertEqual(row.attribution, .farm)
+        XCTAssertEqual(BgDate.isoDay(row.incurredOn), "2026-11-01")
+        XCTAssertEqual(row.category, .unknown)
+        XCTAssertNil(review.sheet, "an unknown category stops «Запиши» until the person picks one")
+        // And a treatment is not an expense.
+        XCTAssertNil(try proposal(#"{"kind":"treatment","draft":{"kind":"SPRAY"}}"#).costReview(today: today))
+    }
 }

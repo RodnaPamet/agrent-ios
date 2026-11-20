@@ -130,6 +130,10 @@ private struct AssistantTurnView: View {
     let open: (TreatmentDraft) -> Void
     @State private var people = CurrentUserStore.shared
     @Environment(AppRouter.self) private var router: AppRouter?
+    /// A prepared expense the person chose to open. Over the conversation,
+    /// not instead of it: unlike «Нов запис» it belongs to no tab, and the
+    /// person may want to ask the next thing once it is saved.
+    @State private var costReview: InvoiceReview?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -195,6 +199,24 @@ private struct AssistantTurnView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                // A prepared expense (owner, 2026-11-20): the review the
+                // invoice scan uses, one line filled, for the person to check
+                // and «Запиши». Only for someone who may write.
+                if let review = proposal?.costReview(), people.user?.mayWrite ?? false {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button {
+                            costReview = review
+                        } label: {
+                            Label(AssistantText.openCost, systemImage: "eurosign.circle")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .accessibilityInputLabels(A11y.spokenNames(AssistantText.openCost, "Разход"))
+                        Text(AssistantText.preparedCostNote)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
                 // A ДНЕВНИК offered as a download (#661, owner 2026-11-17):
                 // made when tapped, from what is recorded. Reading it needs
                 // no write right.
@@ -219,6 +241,12 @@ private struct AssistantTurnView: View {
                     .foregroundStyle(Palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+        // The review saves through the ordinary batch with its own
+        // idempotency key, so a retry after a lost answer is not a second
+        // cost. With no crops passed it reads them itself, as from «Документи».
+        .sheet(item: $costReview) { review in
+            InvoiceReviewView(review: review, crops: []) {}
         }
     }
 }

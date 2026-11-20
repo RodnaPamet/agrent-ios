@@ -28,7 +28,7 @@ struct InvoiceReviewView: View {
         NavigationStack {
             PageForm {
                 Section {
-                    Text(InvoiceReview.checkFirst)
+                    Text(review.checkFirstText)
                         .font(.subheadline)
                         .fixedSize(horizontal: false, vertical: true)
                     ForEach(review.warnings, id: \.code) { warning in
@@ -49,7 +49,7 @@ struct InvoiceReviewView: View {
                     rowSection(index)
                 }
             }
-            .inlineTitle("От фактура")
+            .inlineTitle(review.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Отказ") { dismiss() }
@@ -145,5 +145,7 @@ struct InvoiceReviewView: View {
 }
 
 extension InvoiceReview: Identifiable {
-    var id: String { invoiceFileId }
+    /// The invoice's file, or for a prepared expense its one row's id —
+    /// stable for as long as the review is on screen.
+    var id: String { invoiceFileId ?? "proposed-\(rows.first?.id.uuidString ?? "")" }
 }
