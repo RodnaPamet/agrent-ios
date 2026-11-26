@@ -44,7 +44,11 @@ struct RoutedStack<Root: View>: View {
     /// Registered ONCE, at the root. A second registration for `AppRoute`
     /// further up the stack would be ignored, with a runtime warning.
     private var routed: some View {
-        root.navigationDestination(for: AppRoute.self) { $0.destination.floatingBack(lift: $0.cornerLift) }
+        // The root screen reports its scrolling too, for the assistant's
+        // button (owner, 2026-11-26); a pushed screen reports through
+        // `floatingBack`.
+        root.reportsScrollDirection()
+            .navigationDestination(for: AppRoute.self) { $0.destination.floatingBack(lift: $0.cornerLift) }
     }
 }
 

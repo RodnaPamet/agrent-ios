@@ -85,6 +85,41 @@ final class A11yShotsTests: XCTestCase {
     /// install and launch — 29 to 41 seconds across the eight runs measured on
     /// 2026-09-26 — and the matrix in `scripts/a11y-shots.sh` already pays that
     /// once per SETTING. Three test methods would pay it per screen as well.
+    /// The corner buttons step aside while a page scrolls down and come back
+    /// on the way up (owner, 2026-11-26). On the agronomic calendar, a list
+    /// long enough to scroll on every phone: two flicks down must take
+    /// «Назад» away, and a short drag back up, which stops well short of
+    /// the top where the buttons always show, must bring it back.
+    func testCornerButtonsStepAsideWhileScrollingDown() {
+        let app = XCUIApplication()
+        app.launchArguments.append(Self.seamArgument)
+        app.launch()
+        XCTAssertFalse(app.buttons["Вход с Google"].waitForExistence(timeout: 3),
+                       "the app is on SignInView, so the UI test seam is OFF")
+        XCTAssertTrue(openMenu(app), "no «Меню»")
+        XCTAssertTrue(tapMenuRow("Календари", in: app), "no «Календари» in the menu")
+        let row = app.staticTexts["Агрономически календар"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "no agronomic calendar row")
+        row.tap()
+
+        let back = app.buttons["Назад"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "no «Назад» on the calendar")
+        let list = app.collectionViews.firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 10), "the calendar is not a list")
+
+        list.swipeUp()
+        list.swipeUp()
+        Thread.sleep(forTimeInterval: 1)
+        capture("autohide-1-down", app: app)
+        XCTAssertTrue(back.waitForNonExistence(timeout: 3), "«Назад» stayed while scrolling down")
+
+        let from = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+        let to = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        from.press(forDuration: 0.05, thenDragTo: to)
+        XCTAssertTrue(back.waitForExistence(timeout: 3), "«Назад» did not come back on the way up")
+        capture("autohide-2-up", app: app)
+    }
+
     func testCaptureTheScreensThatCarryTheChecklist() {
         let app = XCUIApplication()
         app.launchArguments.append(Self.seamArgument)

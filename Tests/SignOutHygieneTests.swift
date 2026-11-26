@@ -587,6 +587,7 @@ final class SignOutHygieneTests: XCTestCase {
         "JournalChanges.shared": "a counter that cues the journal to read again; holds no user data",
         "DeviceLocation.shared": "the phone's own position, in memory while a map is open and forgotten when it closes; never stored or sent (#492)",
         "OpenMeteoCache.shared": "the same public weather grid over Bulgaria for every farm and person, in memory for 30 minutes; no user data",
+        "ScrollChrome.shared": "whether the corner buttons are tucked away while a page scrolls down; no user data, and reset on every screen",
     ]
 
     /// A type's instance of ITSELF held in a static — `static let messages =

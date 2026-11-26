@@ -39,6 +39,11 @@ struct AssistantLauncher: View {
             .accessibilityShowsLargeContentViewer {
                 Label(AssistantText.title, systemImage: "sparkles")
             }
+            // Out of the way while the page scrolls down (owner,
+            // 2026-11-26), back on the way up. On the BUTTON, not the
+            // launcher: hiding removes the view, and the launcher holds the
+            // conversation and both sheets, which must outlive a scroll.
+            .hidesWhileScrollingDown()
             .sheet(isPresented: $open, onDismiss: {
                 if let pending {
                     entry = PreparedEntry(draft: pending)
