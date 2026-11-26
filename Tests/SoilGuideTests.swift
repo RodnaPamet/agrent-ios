@@ -53,6 +53,7 @@ final class SoilGuideTests: XCTestCase {
 
     /// The assistant's soil answers link the web page; the phone opens its
     /// own «Почва» for that, with or without the farm in front of the route.
+    @MainActor
     func testAnAnswerFromTheGuideOffersTheGuide() {
         let soil = AssistantLink(route: "/knowledge/soil", label: "Азотни торове: кога и колко")
         let withFarm = AssistantLink(route: "/t/synthetic-farm/knowledge/soil", label: "Почва")
