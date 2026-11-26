@@ -218,6 +218,10 @@ final class RouteContractTests: XCTestCase {
         // An assistant link (#483) read as a web page link, the way a
         // notification's is (`PushLink`). Never requested.
         "AssistantModels.swift": "a web page link for PushLink, not an API path",
+        // «Почва»: the web page an assistant soil answer links to, which the
+        // phone matches to open its own screen (agri-saas #3251). Never
+        // requested; the guide's API path in the same file is still checked.
+        "SoilGuide.swift": "the web's /knowledge/soil page, not an API path",
         // The assistant's page context for a parcel (owner, 2026-11-07):
         // agri-saas's page TEMPLATE, never requested.
         "RiskAnalysisSheet.swift": "the web page template /t/[tenantSlug]/parcels/[parcelId], not an API path",
@@ -452,6 +456,8 @@ final class RouteContractTests: XCTestCase {
             // #636: pest and disease thresholds, agri-saas #3157.
             ("AgroThresholds.swift", [AgroThresholdsAPI.path]),
             ("AgroSignals.swift", [AgroSignalsAPI.path(from: Date(), to: Date())]),
+            // «Почва», the soil guide, agri-saas #3251.
+            ("SoilGuide.swift", [SoilGuideAPI.path]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
             // #605: the person's live updates (agri-saas P7.6).

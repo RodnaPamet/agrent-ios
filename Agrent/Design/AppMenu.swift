@@ -54,6 +54,7 @@ struct AppMenuButton<Extra: View>: View {
     @State private var showingLibrary = false
     @State private var showingLunar = false
     @State private var showingSupport = false
+    @State private var showingSoil = false
     @State private var flags = FeatureFlags.shared
     @State private var farms = FarmStore.shared
     @State private var people = CurrentUserStore.shared
@@ -130,6 +131,13 @@ struct AppMenuButton<Extra: View>: View {
                 Label(BenchmarkWords.supportTitle, systemImage: "eurosign.circle")
             }
             .accessibilityInputLabels(A11y.spokenNames("Подпомагане", "Субсидии", "Support"))
+            // «Почва» (owner, 2026-11-26): the soil guide, every role.
+            Button {
+                showingSoil = true
+            } label: {
+                Label(SoilWords.title, systemImage: "leaf")
+            }
+            .accessibilityInputLabels(A11y.spokenNames(SoilWords.title, "Почви", "Soil"))
             // «Вдъхновение» (#580): every role, mechanisators included
             // (owner, 2026-11-12), once the server switches it on.
             if flags.isOn(LibraryAPI.flag) {
@@ -242,6 +250,10 @@ struct AppMenuButton<Extra: View>: View {
         .sheet(isPresented: $showingSupport) {
             // Its own path (`RoutedStack`), not the tab's this menu sits on.
             SupportRatesView().environment(\.routedSurface, nil)
+        }
+        .sheet(isPresented: $showingSoil) {
+            // Its own path (`RoutedStack`), not the tab's this menu sits on.
+            SoilGuideView().environment(\.routedSurface, nil)
         }
         .sheet(isPresented: $showingLunar) {
             // Its own path (`RoutedStack`), not the tab's this menu sits on.

@@ -18,6 +18,7 @@ struct AssistantSheet: View {
     /// The sheet's own bars: the composer's must not lift the button on the
     /// screen behind it.
     @State private var ownChrome = BottomChrome()
+    @State private var showingSoilGuide = false
     @Environment(AppRouter.self) private var router: AppRouter?
 
     var body: some View {
@@ -68,6 +69,9 @@ struct AssistantSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .sheet(isPresented: $showingSoilGuide) {
+            SoilGuideView().environment(\.routedSurface, nil)
+        }
         .environment(ownChrome)
         .onDisappear { store.stop() }
     }
@@ -75,6 +79,12 @@ struct AssistantSheet: View {
     /// A link the person tapped, with the sheet closed: its bar tab, or
     /// the one record it names, opened as a notification's link opens it.
     private func follow(_ link: AssistantLink) {
+        if Self.opensSoilGuide(link) {
+            // Over the conversation, like a prepared expense: the person
+            // reads the topic and comes back to the answer. No router needed.
+            showingSoilGuide = true
+            return
+        }
         guard let router else { return }
         if let surface = link.surface, router.bar.contains(surface) {
             dismiss()
@@ -85,12 +95,19 @@ struct AssistantSheet: View {
         }
     }
 
+    /// «Почва» — an answer drawn from the soil guide links its web page; the
+    /// phone has the same guide under «Знания» and opens that instead.
+    static func opensSoilGuide(_ link: AssistantLink) -> Bool {
+        link.page == SoilGuideAPI.webPage
+    }
+
     /// The links this phone can follow from here: a bar tab, or a record
-    /// it has a screen for. A menu-only page is not offered yet.
+    /// it has a screen for, or the soil guide (opened over the sheet). Any
+    /// other menu-only page is not offered yet.
     static func followable(_ links: [AssistantLink], bar: [AppSurface], farm: String?) -> [AssistantLink] {
         links.filter { link in
             if let surface = link.surface { return bar.contains(surface) }
-            return link.screen(inFarm: farm) != nil
+            return link.screen(inFarm: farm) != nil || opensSoilGuide(link)
         }
     }
 
