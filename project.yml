@@ -210,7 +210,7 @@ targets:
         # asked from a map's location button. Says that it stays on the
         # phone, which is the owner's choice and why App Privacy has no
         # Location entry.
-        NSLocationWhenInUseUsageDescription: Местоположението се показва само на картата, за да виждате в кой парцел се намирате. То остава в телефона и не се изпраща никъде.
+        NSLocationWhenInUseUsageDescription: Местоположението се показва на картата, за да виждате в кой парцел се намирате. За времето на «Табло» се изпраща само закръглено, с точност около 5 км.
 
   # The app shipped with NO tests at all. Two bugs this week were decode
   # failures that a decode test would have caught before a device did:

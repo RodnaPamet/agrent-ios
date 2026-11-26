@@ -7,13 +7,11 @@ final class DashboardScreenTests: XCTestCase {
 
     // MARK: - The owner's arrangement
 
-    /// The four the owner chose on 2026-09-25 when offered all seven, and
-    /// «В страната» after the price since 2026-11-17 (#635).
-    func testTheDefaultBlocksAreTheOwnersFive() {
-        XCTAssertEqual(DashboardBlock.defaultOrder,
-                       [.briefing, .grainPrice, .campaign, .journal, .taskTrend])
-        // The other three exist so the picker can offer them without a build.
-        XCTAssertEqual(DashboardBlock.allCases.count, 8)
+    /// The revamp (#671, owner 2026-11-17): weather, rainfall and the farm's
+    /// crop prices; every other block is off by default and still offered.
+    func testTheDefaultBlocksAreWeatherRainfallAndPrices() {
+        XCTAssertEqual(DashboardBlock.defaultOrder, [.weather, .rainfall, .grainPrice])
+        XCTAssertEqual(DashboardBlock.allCases.count, 10)
     }
 
     /// Turning a block on puts it at the END, where somebody expects a new

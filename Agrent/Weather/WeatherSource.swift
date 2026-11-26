@@ -46,7 +46,8 @@ struct AppleWeatherSource: WeatherSource {
                 windFromDegrees: current.wind.direction.converted(to: .degrees).value,
                 pressureHPa: current.pressure.converted(to: .hectopascals).value,
                 pressureTrend: Self.trend(current.pressureTrend),
-                humidity: current.humidity),
+                humidity: current.humidity,
+                symbolName: current.symbolName),
             hours: hourly.forecast.map {
                 .init(date: $0.date,
                       windMS: $0.wind.speed.converted(to: .metersPerSecond).value,
@@ -61,7 +62,8 @@ struct AppleWeatherSource: WeatherSource {
                       lowC: $0.lowTemperature.converted(to: .celsius).value,
                       windMS: $0.wind.speed.converted(to: .metersPerSecond).value,
                       windFromDegrees: $0.wind.direction.converted(to: .degrees).value,
-                      precipitationChance: $0.precipitationChance)
+                      precipitationChance: $0.precipitationChance,
+                      symbolName: $0.symbolName)
             },
             alerts: (alerts ?? []).map {
                 .init(summary: $0.summary, severity: Self.severity($0.severity),
@@ -117,11 +119,12 @@ struct FixtureWeatherSource: WeatherSource {
             let low: Double = 4 + Double(i % 2)
             let wind: Double = 4 + Double(i % 4)
             days.append(.init(date: start.addingTimeInterval(Double(i) * 86_400), highC: high, lowC: low,
-                              windMS: wind, windFromDegrees: 225, precipitationChance: i == 1 ? 0.8 : 0.2))
+                              windMS: wind, windFromDegrees: 225, precipitationChance: i == 1 ? 0.8 : 0.2,
+                              symbolName: i == 1 ? "cloud.rain" : (i % 3 == 0 ? "sun.max" : "cloud.sun")))
         }
         return WeatherReport(
             now: .init(temperatureC: 12, windMS: 3, gustMS: 6, windFromDegrees: 200,
-                       pressureHPa: 1016, pressureTrend: .falling, humidity: 0.72),
+                       pressureHPa: 1016, pressureTrend: .falling, humidity: 0.72, symbolName: "cloud.sun"),
             hours: hours, days: days,
             alerts: [.init(summary: "Силен вятър", severity: "Умерено", source: "Синтетичен източник",
                            detailsURL: nil)],

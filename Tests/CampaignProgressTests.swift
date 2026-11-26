@@ -51,27 +51,31 @@ final class CampaignProgressTests: XCTestCase {
         XCTAssertNil(response.progress)
     }
 
+    /// The revamp (#671) resets a saved arrangement once to the new default;
+    /// «В страната» is then off by default and a farmer's own later choice is
+    /// kept across launches.
     @MainActor
-    func testASavedTabloGetsTheBlockOnceAfterThePrice() throws {
+    func testASavedTabloIsResetOnceToTheRevampedDefault() throws {
         let suite = "campaign-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         defaults.set(["briefing", "grainPrice", "journal"], forKey: "dashboard.blocks")
 
         let first = DashboardPreferences(defaults: defaults)
-        XCTAssertEqual(first.blocks, [.briefing, .grainPrice, .campaign, .journal])
+        XCTAssertEqual(first.blocks, [.weather, .rainfall, .grainPrice])
 
-        // Switched off by the farmer: it must not come back at the next launch.
         first.toggle(.campaign)
-        XCTAssertEqual(DashboardPreferences(defaults: defaults).blocks, [.briefing, .grainPrice, .journal])
+        XCTAssertEqual(DashboardPreferences(defaults: defaults).blocks, [.weather, .rainfall, .grainPrice, .campaign])
     }
 
     @MainActor
-    func testANewTabloHasItInTheDefaultOrder() throws {
+    func testANewTabloStartsFromTheRevampedDefault() throws {
         let suite = "campaign-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         XCTAssertEqual(DashboardPreferences(defaults: defaults).blocks, DashboardBlock.defaultOrder)
-        XCTAssertTrue(DashboardBlock.defaultOrder.contains(.campaign))
+        // Off by default since the revamp, still in the picker.
+        XCTAssertFalse(DashboardBlock.defaultOrder.contains(.campaign))
+        XCTAssertTrue(DashboardBlock.allCases.contains(.campaign))
     }
 }

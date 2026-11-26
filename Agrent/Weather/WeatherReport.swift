@@ -22,6 +22,10 @@ struct WeatherReport: Equatable, Sendable {
         let pressureTrend: PressureTrend
         /// 0…1.
         let humidity: Double
+        /// WeatherKit's SF Symbol for the conditions («cloud.rain»), for
+        /// Табло's card (#671). A `var` with a default so older call sites
+        /// and fixtures need not name it.
+        var symbolName: String? = nil
     }
 
     struct Hour: Equatable, Sendable, Identifiable {
@@ -43,6 +47,8 @@ struct WeatherReport: Equatable, Sendable {
         let windFromDegrees: Double
         /// 0…1.
         let precipitationChance: Double
+        /// The day's conditions as an SF Symbol (#671).
+        var symbolName: String? = nil
         var id: Date { date }
     }
 
