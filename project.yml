@@ -52,7 +52,7 @@ settings:
     # purpose: `APIClient` decodes off the main actor, and a main-actor
     # default would move that work onto it.
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     # The Sentry DSN, EMPTY here and in every build but TestFlight's, which
     # passes the repository secret on the archive's command line. Empty means
