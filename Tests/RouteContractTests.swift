@@ -452,6 +452,8 @@ final class RouteContractTests: XCTestCase {
             // #636: pest and disease thresholds, agri-saas #3157.
             ("AgroThresholds.swift", [AgroThresholdsAPI.path]),
             ("AgroSignals.swift", [AgroSignalsAPI.path(from: Date(), to: Date())]),
+            // «Почва», the soil guide, agri-saas #3251.
+            ("SoilGuide.swift", [SoilGuideAPI.path]),
             // #580: «Вдъхновение», agri-saas #2980.
             ("LibraryAPI.swift", [LibraryAPI.listPath, LibraryAPI.bookPath("{slug}")]),
             // #605: the person's live updates (agri-saas P7.6).

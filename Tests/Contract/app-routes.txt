@@ -144,6 +144,7 @@
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/definition
 /api/t/{tenantSlug}/journal/treatments/{treatmentGroupId}/farm-record
 /api/t/{tenantSlug}/journal/{id}
+/api/t/{tenantSlug}/knowledge/soil-guide
 /api/t/{tenantSlug}/locations
 /api/t/{tenantSlug}/locations/{locationId}/farm-record
 /api/t/{tenantSlug}/locations/{locationId}/operations
