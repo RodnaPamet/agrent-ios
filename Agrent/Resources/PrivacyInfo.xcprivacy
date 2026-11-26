@@ -58,12 +58,15 @@
                      exceptions) and the device model and iOS version each
                      report carries.
 
-  The device location is read but NOT collected (#492, owner 2026-11-01):
-  the «you are here» dot on the farm's maps and the parcel «Нов запис»
-  ticks are worked out on the phone, and the position is never sent,
-  stored or logged (DeviceLocation). Apple counts data as collected only
-  once it leaves the device, so there is no Location entry here or in App
-  Store Connect. PrivacyManifestTests keeps the readers to the map files.
+  Location (#671, owner 2026-11-17): Табло's weather and rainfall are for
+  where the phone is, ROUNDED TO ABOUT 5 KM (0.05°, at most two decimals)
+  before it leaves the device, and sent to Apple Weather and Open-Meteo.
+  App Functionality, not linked, not tracking. DECLARED AS PRECISE by the
+  owner's choice (2026-11-26), matching App Store Connect's answer: what is
+  sent is coarse, and declaring more than is sent is the safe direction. The precise position still never leaves the phone:
+  the map dot and the parcel «Нов запис» ticks are worked out on the device
+  (#492). PrivacyManifestTests keeps the readers to the map files and to
+  WeatherPlace.swift, the one file that rounds and hands the value on.
 
   This must agree with the "App Privacy" answers in App Store Connect,
   which the owner keeps. A new kind of data leaving the phone needs an
@@ -77,6 +80,18 @@
 	<array/>
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeUserID</string>

@@ -22,6 +22,9 @@ import SwiftUI
 /// so the picker says how many are available rather than only listing what is
 /// on.
 enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
+    /// The revamped Табло (#671): weather now and ahead, and rainfall.
+    case weather
+    case rainfall
     case briefing
     case grainPrice
     /// «В страната» (#635): the field campaign's progress from МЗХ.
@@ -36,8 +39,10 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
+        case .weather: "Времето"
+        case .rainfall: "Валежи"
         case .briefing: "Сателитно обобщение"
-        case .grainPrice: "Цена на избрана култура"
+        case .grainPrice: "Цени на моите култури"
         case .campaign: CampaignWords.title
         case .journal: "Последни записи"
         case .taskTrend: "Създадени и завършени задачи"
@@ -49,6 +54,8 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
 
     var icon: String {
         switch self {
+        case .weather: "cloud.sun"
+        case .rainfall: "cloud.rain"
         case .briefing: "sparkles"
         case .grainPrice: "chart.line.uptrend.xyaxis"
         case .campaign: "leaf"
@@ -92,7 +99,7 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .journal: "JOURNAL"
         case .lowStock: "INVENTORY"
-        case .briefing, .grainPrice, .campaign, .taskTrend, .tasks, .achievements: nil
+        case .weather, .rainfall, .briefing, .grainPrice, .campaign, .taskTrend, .tasks, .achievements: nil
         }
     }
 
@@ -104,7 +111,12 @@ enum DashboardBlock: String, CaseIterable, Identifiable, Sendable {
     /// in the enum so the picker can offer them rather than requiring a build.
     ///
     /// «В страната» joined them on 2026-11-17 (#635), after the price.
-    static let defaultOrder: [DashboardBlock] = [.briefing, .grainPrice, .campaign, .journal, .taskTrend]
+    ///
+    /// REPLACED on 2026-11-17 (#671): the owner asked for Табло "entirely"
+    /// revamped — minimum text, more graphs, weather and rainfall. Weather,
+    /// rainfall and the farm's crop prices are on; every other block is off by
+    /// default and still offered in the picker.
+    static let defaultOrder: [DashboardBlock] = [.weather, .rainfall, .grainPrice]
 }
 
 /// Which blocks are on, and which crop the price block follows.
@@ -135,6 +147,7 @@ final class DashboardPreferences {
     private static let blocksKey = "dashboard.blocks"
     private static let priceCommodityKey = "dashboard.priceCommodity"
     private static let campaignOfferedKey = "dashboard.campaignOffered"
+    private static let revampedKey = "dashboard.revamped2026"
 
     private(set) var blocks: [DashboardBlock]
     private(set) var priceCommodity: ChartableCommodity
@@ -158,6 +171,20 @@ final class DashboardPreferences {
         // owner wants it on Табло, so it is added ONCE, after the price. The
         // flag is what stops a farmer who later switches it off from having
         // it switched back on at the next launch.
+        // THE REVAMP (#671) resets a saved arrangement ONCE to the new
+        // default: the owner replaced the screen, and an arrangement of the
+        // old blocks would hide the weather and the rainfall from everyone who
+        // ever customised Табло. The other blocks stay in the picker.
+        if !defaults.bool(forKey: Self.revampedKey) {
+            if restored != nil {
+                arranged = DashboardBlock.defaultOrder
+                defaults.set(arranged.map(\.rawValue), forKey: Self.blocksKey)
+            }
+            defaults.set(true, forKey: Self.revampedKey)
+            // The «В страната» insertion below belongs to the old screen.
+            defaults.set(true, forKey: Self.campaignOfferedKey)
+        }
+
         if !defaults.bool(forKey: Self.campaignOfferedKey) {
             if restored != nil, !arranged.contains(.campaign) {
                 let at = arranged.firstIndex(of: .grainPrice).map { $0 + 1 } ?? arranged.endIndex

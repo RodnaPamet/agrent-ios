@@ -25,13 +25,20 @@ final class DashboardStore {
     private(set) var ag: LoadState<AgDashboard> = .loading
     private(set) var taskTrend: LoadState<FarmTaskTrend> = .loading
     private(set) var briefing: LoadState<FieldBriefingPayload> = .loading
-    private(set) var prices: LoadState<PricesResponse> = .loading
     /// «В страната» (#635): МЗХ's field-campaign progress.
     private(set) var campaign: LoadState<CampaignProgressResponse> = .loading
 
-    /// The commodity the price block last loaded, so a change of crop refetches
-    /// and an unchanged one does not.
-    private var loadedCommodity: ChartableCommodity?
+    // ── The revamped Табло (#671, owner 2026-11-17) ──
+
+    /// Now and the coming days, from WeatherKit.
+    private(set) var weather: LoadState<WeatherReport> = .loading
+    /// 30 days measured and 7 ahead, mm a day, from Open-Meteo.
+    private(set) var rainfall: LoadState<Rainfall> = .loading
+    /// Where the two above are for: the phone rounded to ~5 km, or the farm.
+    private(set) var place: WeatherPlace.Point?
+    /// One tile per crop the farm grows, up to four (wheat when none).
+    private(set) var cropTiles: [CropPriceTile] = []
+    private var blocks: [Location] = []
 
     private let preferences: DashboardPreferences
 
@@ -65,18 +72,17 @@ final class DashboardStore {
 
     private func load(showCachedFirst: Bool) async {
         let wanted = Set(preferences.blocks)
-        let commodity = preferences.priceCommodity
 
         async let agTask: Void = loadAg(if: wanted, showCachedFirst: showCachedFirst)
         async let trendTask: Void = loadTaskTrend(if: wanted, showCachedFirst: showCachedFirst)
         async let briefingTask: Void = loadBriefing(if: wanted, showCachedFirst: showCachedFirst)
-        async let pricesTask: Void = loadPrices(
-            if: wanted, commodity: commodity, showCachedFirst: showCachedFirst)
 
         async let campaignTask: Void = loadCampaign(if: wanted, showCachedFirst: showCachedFirst)
 
-        _ = await (agTask, trendTask, briefingTask, pricesTask, campaignTask)
-        loadedCommodity = wanted.contains(.grainPrice) ? commodity : nil
+        async let weatherTask: Void = loadWeather(if: wanted)
+        async let tilesTask: Void = loadCropTiles(if: wanted)
+
+        _ = await (agTask, trendTask, briefingTask, campaignTask, weatherTask, tilesTask)
     }
 
     /// The ag payload feeds FOUR blocks, so it is fetched when any of them is
@@ -117,23 +123,92 @@ final class DashboardStore {
         } publish: { [weak self] in self?.briefing = $0 }
     }
 
-    /// THREE MONTHS of history for one number.
-    ///
-    /// The block shows the latest price, so a shorter range would do — but the
-    /// range also decides which series look current, and `lead()` falls back to
-    /// ranking on `lastObservedAt`. A one-week window on a monthly feed returns a
-    /// series with no points and a null observation date, which would rank last
-    /// and hand the block a stale line while a fresher one existed. The range
-    /// that answers "what is it worth today" is not the shortest one.
-    private func loadPrices(if wanted: Set<DashboardBlock>,
-                            commodity: ChartableCommodity,
-                            showCachedFirst: Bool) async {
+    /// Weather and rainfall share one place. The blocks are read only for
+    /// the fallback; the phone's rounded position wins when there is one.
+    private func loadWeather(if wanted: Set<DashboardBlock>) async {
+        guard !wanted.isDisjoint(with: [.weather, .rainfall]) else { return }
+        if blocks.isEmpty, let data = try? await APIClient.shared.data(for: LocationsAPI.listPath) {
+            blocks = (try? await LocationsAPI.decodeList(from: data)) ?? []
+        }
+        guard let point = WeatherPlace.current(blocks: blocks) else {
+            // No permission and no outlined block: nothing honest to show.
+            if weather.value == nil { weather = .failed(DashboardWords.noPlace) }
+            if rainfall.value == nil { rainfall = .failed(DashboardWords.noPlace) }
+            return
+        }
+        await loadWeather(at: point, wanted: wanted)
+    }
+
+    private func loadWeather(at point: WeatherPlace.Point, wanted: Set<DashboardBlock>) async {
+        place = point
+        // Fetched side by side, published here on the main actor: the
+        // sources are `Sendable` and return values, never touch this store.
+        let weatherSource = WeatherSources.current
+        let rainSource = RainfallSources.current
+        async let report: Result<WeatherReport, Error>? = wanted.contains(.weather)
+            ? await Self.capture { try await weatherSource.report(latitude: point.latitude, longitude: point.longitude) }
+            : nil
+        async let rain: Result<Rainfall, Error>? = wanted.contains(.rainfall)
+            ? await Self.capture { try await rainSource.rainfall(latitude: point.latitude, longitude: point.longitude) }
+            : nil
+        switch await report {
+        case .success(let r): weather = .loaded(r, .fresh)
+        case .failure(let error): if weather.value == nil { weather = .failed(UserMessage.text(for: error)) }
+        case nil: break
+        }
+        switch await rain {
+        case .success(let r): rainfall = .loaded(r, .fresh)
+        case .failure(let error): if rainfall.value == nil { rainfall = .failed(UserMessage.text(for: error)) }
+        case nil: break
+        }
+    }
+
+    /// `Result(catching:)` for an async call.
+    private nonisolated static func capture<T: Sendable>(
+        _ operation: @Sendable () async throws -> T
+    ) async -> Result<T, Error> {
+        do { return .success(try await operation()) } catch { return .failure(error) }
+    }
+
+    /// The phone's fix arrived (or moved a grid square) after the farm's
+    /// weather was shown: show the phone's.
+    func placeMayHaveChanged() async {
+        let wanted = Set(preferences.blocks)
+        guard !wanted.isDisjoint(with: [.weather, .rainfall]),
+              let point = WeatherPlace.current(blocks: blocks), point != place else { return }
+        await loadWeather(at: point, wanted: wanted)
+    }
+
+    /// The farm's own crops, by area, up to four — the ones Тенденции can
+    /// chart. Wheat when the farm records none, so the block is never empty.
+    private func loadCropTiles(if wanted: Set<DashboardBlock>) async {
         guard wanted.contains(.grainPrice) else { return }
-        if prices.value == nil || loadedCommodity != commodity { prices = .loading }
-        let path = TrendsAPI.pricesPath(commodity, range: .month3)
-        await CachedResource.loadShowingCacheFirst(path, showCachedFirst: showCachedFirst) { data in
-            try await APIClient.shared.decode(data, as: PricesResponse.self)
-        } publish: { [weak self] in self?.prices = $0 }
+        var commodities: [ChartableCommodity] = []
+        if let data = try? await APIClient.shared.data(for: ParcelsByCropAPI.path),
+           let totals = try? await ParcelsByCropAPI.decodeTotals(from: data) {
+            let ranked = totals.crops.sorted { ($0.areaHaTotal ?? 0) > ($1.areaHaTotal ?? 0) }
+            for crop in ranked {
+                guard let slug = CommodityName.slug(freeText: crop.cropType),
+                      let commodity = ChartableCommodity(rawValue: slug),
+                      !commodities.contains(commodity) else { continue }
+                commodities.append(commodity)
+                if commodities.count == 4 { break }
+            }
+        }
+        if commodities.isEmpty { commodities = [.wheat] }
+        if cropTiles.map(\.commodity) != commodities {
+            cropTiles = commodities.map { CropPriceTile(commodity: $0, state: .loading) }
+        }
+        for (index, commodity) in commodities.enumerated() {
+            let path = TrendsAPI.pricesPath(commodity, range: .month3)
+            await CachedResource.loadShowingCacheFirst(path, showCachedFirst: true) { data in
+                try await APIClient.shared.decode(data, as: PricesResponse.self)
+            } publish: { [weak self] state in
+                guard let self, self.cropTiles.indices.contains(index),
+                      self.cropTiles[index].commodity == commodity else { return }
+                self.cropTiles[index].state = state
+            }
+        }
     }
 
     /// National figures, the same for every farm, so cached like any other.
@@ -146,10 +221,11 @@ final class DashboardStore {
             try await CampaignProgressAPI.decode(data)
         } publish: { [weak self] in self?.campaign = $0 }
     }
+}
 
-    /// The one series the price block shows: Тенденции's headline, by the
-    /// same rule (`Array.lead()`, #409), so the two screens quote one number.
-    var leadPrice: PriceSeries? {
-        prices.value?.lead
-    }
+/// One price tile: a crop and its 3-month series (#671).
+struct CropPriceTile: Equatable, Identifiable {
+    let commodity: ChartableCommodity
+    var state: LoadState<PricesResponse>
+    var id: String { commodity.rawValue }
 }

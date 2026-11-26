@@ -22,11 +22,17 @@ final class PrivacyManifestTests: XCTestCase {
         for entry in entries {
             let type = entry["NSPrivacyCollectedDataType"] as? String ?? "?"
             XCTAssertEqual(entry["NSPrivacyCollectedDataTypeTracking"] as? Bool, false, "\(type) is declared as tracking")
-            // Linked, except Sentry's diagnostics, which carry no user (#494).
-            XCTAssertEqual(entry["NSPrivacyCollectedDataTypeLinked"] as? Bool, !Self.diagnostics.contains(type), type)
+            // Linked, except Sentry's diagnostics, which carry no user (#494),
+            // and Табло's rounded position, which carries none either (#671).
+            XCTAssertEqual(entry["NSPrivacyCollectedDataTypeLinked"] as? Bool, !Self.notLinked.contains(type), type)
         }
         return entries.compactMap { $0["NSPrivacyCollectedDataType"] as? String }
     }
+
+    /// Not linked to the account: Sentry's diagnostics, and the weather's
+    /// rounded position, which goes to Apple Weather and Open-Meteo with no
+    /// account attached (#671).
+    private static let notLinked = diagnostics.union(["NSPrivacyCollectedDataTypePreciseLocation"])
 
     /// What Sentry receives (#494): not linked to the account.
     private static let diagnostics: Set = [
@@ -45,6 +51,7 @@ final class PrivacyManifestTests: XCTestCase {
             "NSPrivacyCollectedDataTypeOtherUserContent",
             "NSPrivacyCollectedDataTypePerformanceData",
             "NSPrivacyCollectedDataTypePhotosorVideos",
+            "NSPrivacyCollectedDataTypePreciseLocation",
             "NSPrivacyCollectedDataTypeProductInteraction",
             "NSPrivacyCollectedDataTypeUserID",
         ], "a change here needs the same change in App Store Connect's App Privacy answers")
@@ -116,6 +123,10 @@ final class PrivacyManifestTests: XCTestCase {
         let maps: Set = ["SatelliteParcelMap.swift", "ParcelMapView.swift", "MechanisatorHomeView.swift",
                          "TaskParcelMap.swift", "TreatmentParcelMap.swift", "TreatmentPlaceView.swift",
                          "ParcelOutlineMap.swift"]
+        // Табло's weather (#671, owner 2026-11-17): the ONE reader that hands
+        // a coordinate on, and only after rounding it to ~5 km. Starting and
+        // stopping the updates from the screen is not a read.
+        let rounding: Set = ["WeatherPlace.swift", "DashboardView.swift"]
         let ways = ["APIClient", "URLRequest", "URLSession", "ResponseCache", "UserDefaults", "Log.",
                     "FileManager", "PendingOperations", "Outbox", "print("]
 
@@ -130,7 +141,7 @@ final class PrivacyManifestTests: XCTestCase {
             let reads = readers.filter { text.contains($0) }
             guard !reads.isEmpty else { continue }
             readersSeen.insert(name)
-            XCTAssertTrue(core.contains(name) || maps.contains(name),
+            XCTAssertTrue(core.contains(name) || maps.contains(name) || rounding.contains(name),
                           "\(name) reads the device's location (\(reads)); only the maps may, and only to draw it")
             for way in ways + (core.contains(name) ? ["AppStorage"] : []) {
                 XCTAssertFalse(text.contains(way), "\(name) holds the position and has a way out: \(way)")
@@ -139,12 +150,25 @@ final class PrivacyManifestTests: XCTestCase {
         XCTAssertGreaterThan(files, 50, "positive control: the sources were found")
         XCTAssertTrue(readersSeen.isSuperset(of: core), "positive control: the location's own files moved")
 
-        // Not collected, so not declared: App Store Connect has no Location
-        // entry either.
+        // The weather's reader rounds BEFORE it returns a value, and is the
+        // only place a position becomes a coordinate that leaves the phone.
+        let place = try read("Agrent/Dashboard/WeatherPlace.swift")
+        XCTAssertTrue(place.contains("static let grid = 0.05"), "the weather's position must be rounded to ~5 km")
+        XCTAssertTrue(place.contains("latitude: rounded(position.coordinate.latitude)")
+                      && place.contains("longitude: rounded(position.coordinate.longitude)"),
+                      "the phone's coordinate leaves WeatherPlace only rounded")
+        // The rounding itself is executed in TabloRevampTests.
+
+        // Declared as PRECISE (owner, 2026-11-26), matching App Store
+        // Connect: more than the rounded point that is sent, which is the safe
+        // direction. One location entry, not both.
         let declared = try collectedTypes()
-        XCTAssertFalse(declared.contains { $0.contains("Location") }, "a declared location means it now leaves the phone")
+        XCTAssertTrue(declared.contains("NSPrivacyCollectedDataTypePreciseLocation"))
+        XCTAssertFalse(declared.contains("NSPrivacyCollectedDataTypeCoarseLocation"))
         XCTAssertTrue(try read("project.yml").contains("NSLocationWhenInUseUsageDescription: Местоположението"),
                       "the system's question needs the Bulgarian reason")
+        XCTAssertTrue(try read("project.yml").contains("около 5 км"),
+                      "the system's question says the weather gets a rounded position")
         XCTAssertFalse(try read("project.yml").contains("NSLocationAlwaysAndWhenInUseUsageDescription"),
                        "When In Use only: never in the background")
     }

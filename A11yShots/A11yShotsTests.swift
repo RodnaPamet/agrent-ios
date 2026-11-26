@@ -120,6 +120,56 @@ final class A11yShotsTests: XCTestCase {
         capture("autohide-2-up", app: app)
     }
 
+    /// App Store screenshots (owner, 2026-11-26): the screens a listing
+    /// shows, each from a FRESH launch on synthetic data, opened from the bar
+    /// or the menu — so no screen depends on finding a way back from the one
+    /// before it, which is where the long walk keeps breaking. Attachments are
+    /// named `AS-<n>-<screen>`; export them from the result bundle.
+    func testAppStoreScreens() {
+        // `deeper`: a row to open first, where the screen itself is only a
+        // list leading to the thing worth showing (the block's map, the
+        // agronomic calendar).
+        let screens: [(name: String, label: String, deeper: String?)] = [
+            ("AS-1-tablo", "Табло", nil),
+            ("AS-2-karta", "Карта", "Synthetic Land"),
+            ("AS-3-dnevnik", "Дневник", nil),
+            ("AS-4-zadachi", "Задачи", nil),
+            ("AS-5-kalendari", "Календари", "Агрономически календар"),
+            ("AS-6-borsa", "Борса", nil),
+        ]
+        for screen in screens {
+            let app = XCUIApplication()
+            app.launchArguments.append(Self.seamArgument)
+            app.launchArguments += ["-dashboard.blocks", "(weather, rainfall, grainPrice)"]
+            app.launch()
+            // Not `assertSeamActive`: on iPad the tabs are iPadOS's floating
+            // bar at the top, which XCUITest does not report as a tab bar.
+            // The sign-in screen's absence is what rules out the live app.
+            XCTAssertFalse(app.buttons["Вход с Google"].waitForExistence(timeout: 3),
+                           "the app is on SignInView, so the UI test seam is OFF")
+            let barTab = labelled(screen.label, in: app.tabBars.buttons)
+            let topTab = labelled(screen.label, in: app.buttons)
+            if barTab.waitForExistence(timeout: 8) {
+                barTab.tap()
+            } else if topTab.exists, topTab.isHittable {
+                topTab.tap()
+            } else {
+                XCTAssertTrue(openMenu(app), "no «Меню» for \(screen.label)")
+                XCTAssertTrue(tapMenuRow(screen.label, in: app), "«\(screen.label)» is in neither the bar nor the menu")
+            }
+            XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 20), "«\(screen.label)» showed nothing")
+            if let deeper = screen.deeper {
+                let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", deeper)).firstMatch
+                let cell = app.staticTexts[deeper].firstMatch
+                if row.waitForExistence(timeout: 10) { row.tap() } else if cell.waitForExistence(timeout: 5) { cell.tap() }
+                Thread.sleep(forTimeInterval: 3)
+            }
+            Thread.sleep(forTimeInterval: 5)
+            capture(screen.name, app: app)
+            app.terminate()
+        }
+    }
+
     func testCaptureTheScreensThatCarryTheChecklist() {
         let app = XCUIApplication()
         app.launchArguments.append(Self.seamArgument)
@@ -135,7 +185,7 @@ final class A11yShotsTests: XCTestCase {
         // app's defaults, and the next manual launch sees the owner's choice.
         // Spelled as `DashboardBlock.defaultOrder`'s raw values, copied for
         // the same can-not-link reason as `seamArgument`.
-        app.launchArguments += ["-dashboard.blocks", "(briefing, grainPrice, journal, taskTrend)"]
+        app.launchArguments += ["-dashboard.blocks", "(weather, rainfall, grainPrice)"]
         app.launch()
 
         assertSeamActive(app)
@@ -152,6 +202,8 @@ final class A11yShotsTests: XCTestCase {
             assertFixtureWorld(app)
             switch only {
             case "08-tasks": captureTabOrMenu("08-tasks", label: "Задачи", app: app)
+            // The revamped Табло (#671): weather, rainfall and price tiles.
+            case "07-dashboard": captureFromMenu("07-dashboard", label: "Табло", app: app)
             case "09-overhead-costs": captureOverheadCosts(app)
             case "09a-crop-costs": captureCropCosts(app)
             case "01b-farm-record": captureFarmRecordSheet(app)
@@ -850,7 +902,7 @@ final class A11yShotsTests: XCTestCase {
 
         // Back to the form, to its foot: the block's parcels ticked, its third
         // offered (agri-saas #2304), then each ticked one's treated area.
-        app.buttons["BackButton"].firstMatch.tap()
+        app.buttons["Назад"].firstMatch.tap()
         // The stage field kept its keyboard; a return closes it, as a
         // single-line field's does, so the areas aren't under it.
         if app.keyboards.firstMatch.waitForExistence(timeout: 2) {
@@ -1555,8 +1607,8 @@ final class A11yShotsTests: XCTestCase {
         capture("17c-new-activity-check", app: app)
         // Back to the form by the way back, not «Отказ», which would close
         // the sheet under the caller.
-        app.buttons["BackButton"].firstMatch.tap()
-        app.buttons["BackButton"].firstMatch.tap()
+        app.buttons["Назад"].firstMatch.tap()
+        app.buttons["Назад"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Вид"].waitForExistence(timeout: 5), "not back on the form")
 
         // «Сеитба» (agri-saas #2368): the seed and its rate, none of a

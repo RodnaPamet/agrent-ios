@@ -74,6 +74,14 @@ struct DashboardView: View {
             }
             .refreshable { await PullToRefresh.bounded { await store.refresh() } }
             .task { await store.load() }
+            // The weather is for where the phone is, rounded to ~5 km
+            // (#671): locate while Табло is open, and redraw when the first
+            // fix arrives after the farm's weather was shown.
+            .onAppear { WeatherPlace.startLocating() }
+            .onDisappear { WeatherPlace.stopLocating() }
+            .onChange(of: DeviceLocation.shared.position) {
+                Task { await store.placeMayHaveChanged() }
+            }
         }
     }
 
@@ -117,7 +125,9 @@ struct DashboardView: View {
     private func hasData(_ block: DashboardBlock) -> Bool {
         switch block {
         case .briefing: store.briefing.value != nil || store.briefing.isFailed
-        case .grainPrice: store.leadPrice != nil || store.prices.isFailed
+        case .weather: store.weather.value != nil || store.weather.isFailed
+        case .rainfall: store.rainfall.value != nil || store.rainfall.isFailed
+        case .grainPrice: !store.cropTiles.isEmpty
         // Nothing to say until МЗХ's bulletin carries a progress table: a
         // failed read hides too, since a national figure is not the farm's.
         case .campaign: !(store.campaign.value?.progress?.isEmpty ?? true)
@@ -151,6 +161,8 @@ struct DashboardView: View {
     private func body(for block: DashboardBlock) -> some View {
         switch block {
         case .briefing: briefingSection
+        case .weather: weatherSection
+        case .rainfall: rainfallSection
         case .grainPrice: priceSection
         case .campaign: campaignSection
         case .journal: journalSection
@@ -243,51 +255,43 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Цена на избрана култура
+    // MARK: - Времето, Валежи, Цени (#671)
 
-    /// ONE series, named — Тенденции's headline (#409), never "the price"
-    /// without saying whose.
+    @ViewBuilder
+    private var weatherSection: some View {
+        if let report = store.weather.value {
+            Section(titled: DashboardBlock.weather.label) {
+                WeatherCard(report: report, place: store.place).pageRow()
+            }
+        } else if store.weather.isFailed {
+            Section(titled: DashboardBlock.weather.label) {
+                Text(store.weather.failureText ?? DashboardWords.noPlace)
+                    .font(.footnote).foregroundStyle(Palette.secondaryText).pageRow()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var rainfallSection: some View {
+        if let rainfall = store.rainfall.value {
+            Section(titled: DashboardBlock.rainfall.label) {
+                RainfallCard(rainfall: rainfall).pageRow()
+            }
+        } else if store.rainfall.isFailed {
+            Section(titled: DashboardBlock.rainfall.label) {
+                Text(store.rainfall.failureText ?? DashboardWords.noPlace)
+                    .font(.footnote).foregroundStyle(Palette.secondaryText).pageRow()
+            }
+        }
+    }
+
+    /// The farm's crops, two to a row (#671): each a 3-month line and the
+    /// latest price, the series Тенденции leads with (#409).
     @ViewBuilder
     private var priceSection: some View {
-        if let lead = store.leadPrice, let latest = lead.points.last {
-            Section(titled: preferences.priceCommodity.label) {
-                VStack(alignment: .leading, spacing: 4) {
-                    // Тенденции's unit wording, not a `currency/unit` of our
-                    // own: every input's unit already carries its currency,
-                    // and interpolating read «1216,62 EUR/EUR/1000l» (#121).
-                    Text(lead.headline(latest.price))
-                        .font(.title3.weight(.semibold))
-
-                    // Whose number, in Bulgarian (`SeriesSource`): two
-                    // Bulgarian diesel series differ by over fifty per cent,
-                    // and this line used to print the region code and the EC
-                    // feed's English stage.
-                    Text(SeriesSource.name(of: lead))
-                        .font(.caption)
-                        .foregroundStyle(Palette.secondaryText)
-                        .accessibilityLabel(A11y.sentence(SeriesSource.parts(of: lead)))
-                    if let url = lead.attributionURL {
-                        // Its terms allow the reuse with a link (#627).
-                        Link(SeriesSource.zarnoborsaLink, destination: url)
-                            .font(.caption)
-                            .accessibilityInputLabels(A11y.spokenNames("ZarnoBorsa", "Източник"))
-                    }
-
-                    if let age = Staleness.days(
-                        generatedAt: store.prices.value?.generatedAt ?? Date(),
-                        lastObservedAt: lead.lastObservedAt) {
-                        // Typed, not observed: the platform's price says so.
-                        Text("\(lead.isPlatformPrice ? "Въведена" : "Отчетена") преди \(Plural.bg(age, "ден", "дни"))")
-                            .font(.caption)
-                            .foregroundStyle(age >= Staleness.concerning ? Palette.warning : Palette.secondaryText)
-                    }
-                }
-                .pageRow()
-            }
-        } else if store.prices.isFailed {
-            Section(titled: preferences.priceCommodity.label) {
-                Text(store.prices.failureText ?? "Грешка.")
-                    .font(.footnote).foregroundStyle(Palette.error).pageRow()
+        if !store.cropTiles.isEmpty {
+            Section(titled: "Цени") {
+                CropPriceTiles(tiles: store.cropTiles).pageRow()
             }
         }
     }
@@ -528,25 +532,6 @@ struct DashboardBlockPicker: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    // A MENU, where this was `.navigationLink` — which pushed
-                    // a page the system draws on its grouped grey, out of
-                    // reach of `pageRow()` (#164). Four crops fit a menu.
-                    MenuPicker("Култура", english: "Crop",
-                               selection: Binding(get: { preferences.priceCommodity },
-                                                  set: { preferences.select($0); onChange() }),
-                               value: preferences.priceCommodity.label) {
-                        ForEach(ChartableCommodity.allCases.filter { !$0.isInput }) { item in
-                            Text(item.label).tag(item)
-                        }
-                    }
-                } header: {
-                    SectionHeader("Цена")
-                } footer: {
-                    SectionFooter("Показва се само ако блокът «\(DashboardBlock.grainPrice.label)» е включен.")
-                }
-                .pageRow()
-
                 Section {
                     // Shown in the STORED order, with the off ones after, so
                     // dragging arranges what you actually see.

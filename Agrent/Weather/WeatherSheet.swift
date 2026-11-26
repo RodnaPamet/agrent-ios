@@ -26,7 +26,6 @@ struct WeatherSheet: View {
 
     @State private var state: LoadState<WeatherReport> = .loading
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         NavigationStack {
@@ -280,29 +279,10 @@ struct WeatherSheet: View {
 
     // MARK: - Attribution
 
-    /// Apple Weather's mark and the link to its sources: required by the
-    /// service beside anything shown from it.
-    @ViewBuilder
+    /// Apple Weather's mark and the link to its sources (`WeatherAttribution`).
     private func attribution(_ attribution: WeatherReport.Attribution?) -> some View {
-        if let attribution {
-            VStack(alignment: .leading, spacing: 6) {
-                if let mark = scheme == .dark ? attribution.markDarkURL : attribution.markLightURL {
-                    AsyncImage(url: mark) { image in
-                        image.resizable().scaledToFit()
-                    } placeholder: {
-                        Text(attribution.serviceName).font(.footnote)
-                    }
-                    .frame(height: 14)
-                    .accessibilityLabel(attribution.serviceName)
-                }
-                if let legal = attribution.legalPageURL {
-                    Link("Източници на данните", destination: legal)
-                        .font(.footnote)
-                        .accessibilityInputLabels(A11y.spokenNames("Източници на данните", "Data sources"))
-                }
-            }
+        WeatherAttribution(attribution: attribution)
             .padding(.vertical, 8)
             .listRowSeparator(.hidden)
-        }
     }
 }

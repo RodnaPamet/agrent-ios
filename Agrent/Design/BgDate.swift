@@ -93,6 +93,14 @@ enum BgDate {
         return names.indices.contains(month - 1) ? names[month - 1] : String(month)
     }
 
+    /// «пн» — a day's column on Табло's week of weather (#671).
+    static func weekdayShort(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.dateFormat = "EEEEEE"
+        return formatter.string(from: date)
+    }
+
     /// «14 ч» — an hour mark on a forecast chart's axis (#551).
     static func hourMark(_ date: Date) -> String {
         "\(Calendar.current.component(.hour, from: date)) ч"

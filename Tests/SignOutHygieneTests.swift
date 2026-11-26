@@ -585,7 +585,7 @@ final class SignOutHygieneTests: XCTestCase {
         "SessionIdentity.shared": "cleared by endSession and TokenStore.clear",
         "ActiveFarm.shared": "a mirror only FarmStore writes, and FarmStore.reset() clears it",
         "JournalChanges.shared": "a counter that cues the journal to read again; holds no user data",
-        "DeviceLocation.shared": "the phone's own position, in memory while a map is open and forgotten when it closes; never stored or sent (#492)",
+        "DeviceLocation.shared": "the phone's own position, in memory while a map or «Табло» is open and forgotten when it closes; never stored, and sent only rounded to about 5 km for «Табло»'s weather (#492, #671)",
         "OpenMeteoCache.shared": "the same public weather grid over Bulgaria for every farm and person, in memory for 30 minutes; no user data",
         "ScrollChrome.shared": "whether the corner buttons are tucked away while a page scrolls down; no user data, and reset on every screen",
     ]
