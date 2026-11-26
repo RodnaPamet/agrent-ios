@@ -62,6 +62,7 @@ struct FloatingBack<Screen: View>: View {
         screen
             .environment(chrome)
             .navigationBarBackButtonHidden(true)
+            .reportsScrollDirection()
             .overlay(alignment: .bottomLeading) {
                 if !disabled {
                     FloatingCornerButton(title: FloatingCornerButton.back, systemImage: "arrow.left",
@@ -143,6 +144,8 @@ extension View {
         padding(.leading, 16)
             .padding(.bottom, chrome.height + 12 + lift)
             .ignoresSafeArea(.keyboard, edges: .bottom)
+            // Out of the way while the page scrolls down (owner, 2026-11-26).
+            .hidesWhileScrollingDown()
     }
 }
 
@@ -166,6 +169,7 @@ struct FloatingClose<Screen: View>: View {
         let chrome = stackChrome ?? ownChrome
         screen
             .environment(chrome)
+            .reportsScrollDirection()
             .overlay(alignment: .bottomLeading) {
                 if shown {
                     FloatingCornerButton(title: FloatingCornerButton.close, systemImage: "xmark",
