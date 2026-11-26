@@ -92,6 +92,9 @@ struct AdminView: View {
                     // The supplier offers every farm sees (#529, owner
                     // 2026-11-02): the same farm and people as the prices.
                     Section { promotionsRow }.pageRow()
+                    // The agronomic calendar's corrections (agri-saas#3095),
+                    // for every farm: the same farm and people again.
+                    Section { calendarOverridesRow }.pageRow()
                 }
                 // The bottom-row editor, moved off every screen's toolbar
                 // and into the one place that holds settings.
@@ -218,6 +221,17 @@ struct AdminView: View {
         }
         .accessibilityHint("Дневните цени, които заменят цените от външния източник за всички стопанства")
         .accessibilityInputLabels(A11y.spokenNames("Цени", "Prices"))
+    }
+
+    /// Corrections to the agronomic calendar, for every farm.
+    private var calendarOverridesRow: some View {
+        NavigationLink {
+            CalendarOverridesView().floatingBack()
+        } label: {
+            Label(CalendarOverridesText.title, systemImage: "calendar.badge.exclamationmark")
+        }
+        .accessibilityHint("Поправки и нови срокове в агрономическия календар за всички стопанства")
+        .accessibilityInputLabels(A11y.spokenNames(CalendarOverridesText.title, "Calendar corrections"))
     }
 
     /// The catalogue of supplier offers, for every farm.

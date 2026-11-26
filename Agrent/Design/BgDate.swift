@@ -84,6 +84,15 @@ enum BgDate {
         return formatter.string(from: date)
     }
 
+    /// «януари» … «декември», standalone — a month picker's rows (#3095's
+    /// calendar corrections pick `MM-DD` with no year).
+    static func monthName(_ month: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        let names = formatter.standaloneMonthSymbols ?? []
+        return names.indices.contains(month - 1) ? names[month - 1] : String(month)
+    }
+
     /// «14 ч» — an hour mark on a forecast chart's axis (#551).
     static func hourMark(_ date: Date) -> String {
         "\(Calendar.current.component(.hour, from: date)) ч"
