@@ -2121,6 +2121,13 @@ be read outdoors fails before any parity gap matters.
   - a push on a reply to my post or an answer to my question.
 - **Not built, because the server can't support them yet (#2987):** a mentions inbox, a mute, a members list.
 
+### Matched — «Почва», the soil guide (owner, 2026-11-26)
+
+- A menu row under «Знания» for every role. Seven topics (nitrogen rules, slopes and water, manure, soil analysis, erosion and cover, organic matter and rotation, earthworms), each with the documents it summarises, each document opening in Safari's sheet.
+- **One source of truth:** the server's `src/lib/knowledge/soil-guide.ts`, read by the web page `/knowledge/soil`, `GET …/knowledge/soil-guide` and the assistant's `soil_guide` tool. The phone renders the server's words; it adds only the screen chrome.
+- **The assistant:** a soil answer carries a link to `/knowledge/soil`; the phone has no web page for it, so it opens this screen over the conversation instead (`AssistantSheet.opensSoilGuide`).
+- **Offline:** the same for every farm and naming nobody, so it goes through `ResponseCache` like «Подпомагане».
+
 ### Built, held for the server — «Вдъхновение» (owner, 2026-11-12, #580; agri-saas #2980)
 
 - A menu row for every role, mechanisators included, shown when the server's `library.enabled` is on.

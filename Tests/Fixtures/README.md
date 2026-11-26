@@ -541,3 +541,11 @@ the owner and the mechanisator. `machines-tracked.json` is the mechanisator's no
 `library-books.json` and `library-book.json`, shaped from agri-saas #2980: an invented two-chapter book on the
 «Стратегия» shelf (its chapters deliberately out of order, to check the phone sorts them), and a second book with no
 use case, which lands under «Други». Never a real book's text: those are uploaded to the server, not committed.
+
+## «Почва» (soil guide)
+
+`soil-guide.json` is the real output of agri-saas's `soilGuide('bg')`
+(`src/lib/knowledge/soil-guide.ts`), wrapped as `GET …/knowledge/soil-guide`
+returns it: seven topics, each with its sources. It is Agrent's own wording
+summarising public documents, not a source's text, and it holds no personal
+data. Regenerate it from the server module when the topics change.
