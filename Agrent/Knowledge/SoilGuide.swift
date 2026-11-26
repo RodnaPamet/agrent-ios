@@ -165,7 +165,7 @@ struct SoilSectionView: View {
                         .pageRow()
                 }
             }
-            Section(SoilWords.sources) {
+            Section(titled: SoilWords.sources) {
                 ForEach(section.sources, id: \.self) { source in
                     sourceRow(source).pageRow()
                 }
