@@ -27,7 +27,7 @@ LOCATION
 The app asks for location "While Using". It is used to (1) show the user's position on the farm map and the parcel they are standing in, which is never sent anywhere, and (2) show the weather and rainfall on the Dashboard. For (2) the position is rounded to about 5 km (at most two decimal places) before it is sent to Apple Weather (WeatherKit) and Open-Meteo. Without permission, the weather is for the centre of the farm's blocks.
 
 ACCOUNT DELETION
-Профил (top-left menu → the account row) → «Изтриване на профила» → «Изтрий профила». The account is frozen at once and deleted after a 30-day grace period, during which the user can restore it.
+Menu (top left) → «Админ» → the account row at the top (Профил) → «Изтриване на профила» → «Изтрий профила». The account is frozen at once and deleted after a 30-day grace period, during which the user can restore it.
 
 PAYMENTS
 None. The app has no in-app purchases and no paid features, and shows no links to pay outside the app.
