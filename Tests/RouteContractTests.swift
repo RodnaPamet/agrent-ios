@@ -451,6 +451,8 @@ final class RouteContractTests: XCTestCase {
             ("AgroCalendarAPI.swift", [AgroCalendarAPI.path(region: .north)]),
             // #638: national yields and support rates, agri-saas #3157.
             ("AgroBenchmarks.swift", [AgroBenchmarksAPI.path]),
+            // agri-saas#3095 stage 2: the calendar's corrections, #3176.
+            ("CalendarOverridesAPI.swift", [CalendarOverridesAPI.listPath, CalendarOverridesAPI.windowPath("{windowId}")]),
             // #635: МЗХ's field-campaign progress, agri-saas #3174.
             ("CampaignProgress.swift", [CampaignProgressAPI.path]),
             // #636: pest and disease thresholds, agri-saas #3157.
