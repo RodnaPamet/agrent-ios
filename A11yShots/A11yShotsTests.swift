@@ -380,6 +380,8 @@ final class A11yShotsTests: XCTestCase {
         // «Текущи» and «Архив», then back for «Ново мероприятие».
         let tasksCard = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Задачи, 2 текущи")).firstMatch
+        // «Риск» above it is taller than half a Pro Max screen (#707).
+        reveal(tasksCard, in: app)
         XCTAssertTrue(tasksCard.waitForExistence(timeout: 10),
                       "the parcel from Карта shows no «Задачи» card\n\(app.debugDescription)")
         tasksCard.tap()
@@ -433,7 +435,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(archived.waitForExistence(timeout: 10), "«Архив» shows no finished task")
         Thread.sleep(forTimeInterval: 1)
         capture("18d-parcel-tasks-archive", app: app)
-        app.navigationBars["Задачи"].buttons.firstMatch.tap()
+        goBack(app)
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
 
         // Its comments (#465): a comment and a closing note, newest first.
@@ -460,7 +462,7 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("18e2-parcel-new-note", app: app)
         app.navigationBars["Нов коментар"].buttons["Отказ"].tap()
-        app.navigationBars["Коментари"].buttons.firstMatch.tap()
+        goBack(app)
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
         // Each section's «+», the bar's rightmost (owner, 2026-11-06).
         // РЕКОЛТИ's and ПЛЕВЕЛИ's forms are opened, filled and cancelled:
@@ -525,7 +527,7 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("18m-parcel-yield", app: app)
         app.navigationBars["Запиши добив"].buttons["Отказ"].tap()
-        app.navigationBars["Реколти"].buttons.firstMatch.tap()
+        goBack(app)
 
         openSection("Плевели,", list: "Плевели", in: app)
         assertRightmostInBar("Запиши плевели", app: app)
@@ -537,12 +539,12 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("18i-parcel-new-weeds", app: app)
         app.navigationBars["Запиши плевели"].buttons["Отказ"].tap()
-        app.navigationBars["Плевели"].buttons.firstMatch.tap()
+        goBack(app)
 
         openSection("Дейности,", list: "Дейности", in: app)
         assertRightmostInBar("Ново мероприятие", app: app)
         capture("18g-parcel-operations-plus", app: app)
-        app.navigationBars["Дейности"].buttons.firstMatch.tap()
+        goBack(app)
 
         // The screen's own «+»: a menu of all four, in the sections' order.
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "no way back to the parcel")
@@ -567,24 +569,15 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         capture("18-operation-typed-product", app: app)
 
-        // The «Нов продукт» section, under the suggestions — below the fold
-        // at the accessibility sizes, where a Form builds no row it has not
-        // shown, so it is scrolled to rather than waited for.
-        let registration = app.staticTexts["Нов продукт"]
-        for _ in 0..<5 where !registration.exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
-                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45)))
-        }
-        XCTAssertTrue(registration.waitForExistence(timeout: 5), "a new name asked for no registration")
-        Thread.sleep(forTimeInterval: 1)
-        capture("18b-operation-new-product", app: app)
+        // The «Нов продукт» registration section went with
+        // ParcelOperationSheet (#617), so there is no 18b capture any more.
 
         let cancel = app.navigationBars.buttons["Отказ"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "the sheet has no «Отказ»")
         cancel.tap()
         // Back from the history to the map, where the next capture starts.
         let history = app.navigationBars["История"]
-        if history.waitForExistence(timeout: 5) { history.buttons.element(boundBy: 0).tap() }
+        if history.waitForExistence(timeout: 5) { goBack(app) }
     }
 
     /// «Ортофотокарта» (#458), which replaced the schematic and is up to two
@@ -707,7 +700,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(diesel.exists, "«Цени» has no «Нафта» row — admin-price-overrides.json lost its inputs")
         Thread.sleep(forTimeInterval: 1)
         capture("19b-admin-prices-inputs", app: app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack(app)
         let close = app.navigationBars.buttons["Затвори"]
         XCTAssertTrue(close.waitForExistence(timeout: 10), "«Цени» did not go back to Админ")
         close.tap()
@@ -736,7 +729,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(card.exists, "no «Карта за печат» — farm-brand.json is not a published page")
         Thread.sleep(forTimeInterval: 1)
         capture("19d-public-profile-publication", app: app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack(app)
         let close = app.navigationBars.buttons["Затвори"]
         XCTAssertTrue(close.waitForExistence(timeout: 10), "«Публичен профил» did not go back to Админ")
         close.tap()
@@ -1715,14 +1708,53 @@ final class A11yShotsTests: XCTestCase {
     /// holds «Действия», and on this screen the only thing a mis-tap could
     /// open is a menu of writes. «Back» is the fallback the system uses when
     /// the title does not fit.
+    ///
+    /// Since #691 a pushed screen's way back is the FLOATING «Назад», lower
+    /// left and outside the navigation bar, so the bar alone found nothing
+    /// (#707). And since #704 that button steps aside while the page is
+    /// scrolled down, so when neither is there a short drag up brings it back
+    /// — the same gesture a person uses.
     private func goBack(_ app: XCUIApplication, to title: String) {
-        let back = app.navigationBars.buttons
-            .matching(NSPredicate(format: "label == %@ OR label == %@ OR label == %@",
-                                  title, "Back", "Назад"))
+        let floating = app.buttons.matching(NSPredicate(format: "label == %@", "Назад")).firstMatch
+        let bar = app.navigationBars.buttons
+            .matching(NSPredicate(format: "label == %@ OR label == %@", title, "Back"))
             .firstMatch
-        XCTAssertTrue(back.waitForExistence(timeout: 5), "no back button to «\(title)»")
+        if !floating.waitForExistence(timeout: 2) && !bar.exists {
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.45))
+                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)))
+        }
+        let back = floating.waitForExistence(timeout: 3) ? floating : bar
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "no way back to «\(title)»")
         back.tap()
         Thread.sleep(forTimeInterval: 1)
+    }
+
+    /// Back one screen when no title matters: the floating «Назад» is found
+    /// by its own label. These sites tapped a navigation bar's FIRST button,
+    /// which since #691 is whatever the screen puts top left of its actions —
+    /// on a list that can be «+», opening a form instead of going back.
+    /// A sheet's first page has no «Назад» but «Затвори», which these old
+    /// first-button taps also reached, so it is the fallback.
+    private func goBack(_ app: XCUIApplication) {
+        let floating = app.buttons.matching(NSPredicate(format: "label == %@", "Назад")).firstMatch
+        let close = app.buttons["Затвори"].firstMatch
+        if !floating.waitForExistence(timeout: 2), close.exists {
+            close.tap()
+            Thread.sleep(forTimeInterval: 1)
+            return
+        }
+        goBack(app, to: "Back")
+    }
+
+    /// A card a List may not have built yet because it is below the fold:
+    /// drags the page up from near the bottom, never on a map, until it is
+    /// on screen.
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<3 where !(element.waitForExistence(timeout: 2) && element.isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55)))
+        }
     }
 
     /// «Затвори» when there is one, a drag when there is not.
@@ -2503,7 +2535,7 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Ново мероприятие"].waitForExistence(timeout: 10), "the entry form did not open")
         app.navigationBars["Ново мероприятие"].buttons["Отказ"].tap()
         XCTAssertTrue(app.navigationBars["Синтетичен трактор"].waitForExistence(timeout: 5), "the form did not close")
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack(app)
 
         let add = app.navigationBars["Машини"].buttons["Нов тракер"]
         XCTAssertTrue(add.waitForExistence(timeout: 5), "no «Нов тракер» in the bar")
@@ -2628,7 +2660,7 @@ final class A11yShotsTests: XCTestCase {
         // The parcel on the map at the top (owner, 2026-11-06).
         XCTAssertTrue(app.descendants(matching: .any)["\(parcelName) на картата"].waitForExistence(timeout: 5),
                       "no map of the parcel on its history\n\(app.debugDescription)")
-        app.navigationBars["История"].buttons.firstMatch.tap()
+        goBack(app)
 
         // The row itself opens the history too (owner, 2026-11-06).
         let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", parcelName)).firstMatch
@@ -2642,7 +2674,7 @@ final class A11yShotsTests: XCTestCase {
         Thread.sleep(forTimeInterval: 2)
         capture("05b2-risk-row-history", app: app)
         // «Застраховай», the bar's rightmost (owner, 2026-11-06).
-        app.navigationBars["История"].buttons.firstMatch.tap()
+        goBack(app)
         assertRightmostInBar("Застраховай", app: app)
         capture("05c-risk-insure", app: app)
     }
@@ -2970,7 +3002,7 @@ final class A11yShotsTests: XCTestCase {
                       "the task notification opened no task\n\(app.debugDescription)")
 
         // A Борса message opens its conversation (#473).
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        goBack(app)
         let message = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Ново съобщение в Борса'")).firstMatch
         XCTAssertTrue(message.waitForExistence(timeout: 10), "no Борса notification\n\(app.debugDescription)")
         message.tap()
@@ -3115,13 +3147,15 @@ final class A11yShotsTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["История"].waitForExistence(timeout: 10), "the parcel row opened no screen")
         let tasksCard = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Задачи, 2 текущи")).firstMatch
+        // «Риск» above it is taller than half a Pro Max screen (#707).
+        reveal(tasksCard, in: app)
         XCTAssertTrue(tasksCard.waitForExistence(timeout: 10), "the parcel's screen has no «Задачи»")
         XCTAssertTrue(app.descendants(matching: .any)
             .matching(NSPredicate(format: "label BEGINSWITH %@", "Коментари, 2 коментара")).firstMatch
             .waitForExistence(timeout: 10), "the parcel's screen has no «Коментари»")
         Thread.sleep(forTimeInterval: 1)
         capture("20c-mechanisator-parcel", app: app)
-        app.navigationBars["История"].buttons.firstMatch.tap()
+        goBack(app)
 
         XCTAssertTrue(openMenu(app), "no «Меню» on the mechanisator's screen")
         XCTAssertTrue(labelled("Риск", in: app.buttons).waitForExistence(timeout: 5), "«Риск» is not in the menu")
@@ -3438,7 +3472,7 @@ final class A11yShotsTests: XCTestCase {
                       "the farm's page shows nothing of the farm\n\(app.debugDescription)")
         Thread.sleep(forTimeInterval: 1)
         capture("28a-public-farm", app: app)
-        app.navigationBars["Стопанство"].buttons.firstMatch.tap()
+        goBack(app)
     }
 
     /// «Промоции» (#528): from «Меню», three synthetic offers (one asked
