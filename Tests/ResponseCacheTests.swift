@@ -23,6 +23,74 @@ final class ResponseCacheTests: XCTestCase {
         await cache.removeAll()
     }
 
+    /// #708: a farm that left this person's list takes its cached responses
+    /// with it — and nothing else does. The person's own data, their other
+    /// farm, another person's entry for the same farm, and an untagged entry
+    /// all stay; a farm still on the list stays.
+    func testRetainFarmsDropsOnlyThisPersonsLostFarms() async {
+        let (cache, _) = makeCache(budget: 100_000)
+        let kept = CacheScope(userID: "u-a", tenant: "still-mine")
+        let lost = CacheScope(userID: "u-a", tenant: "gone")
+        let person = CacheScope(userID: "u-a", tenant: "")
+        let other = CacheScope(userID: "u-b", tenant: "gone")
+        await cache.write("kept", payload(10), scope: kept)
+        await cache.write("lost", payload(10), scope: lost)
+        await cache.write("person", payload(10), scope: person)
+        await cache.write("other", payload(10), scope: other)
+        await cache.write("untagged", payload(10))
+
+        await cache.retainFarms(userID: "u-a", slugs: ["still-mine"])
+
+        let lostHit = await cache.read("lost")
+        XCTAssertNil(lostHit, "the lost farm's entry")
+        for key in ["kept", "person", "other", "untagged"] {
+            let hit = await cache.read(key)
+            XCTAssertNotNil(hit, key)
+        }
+        await cache.removeAll()
+    }
+
+    /// An empty list from the server means the person has no farm left:
+    /// every farm entry of theirs goes, their own data stays.
+    func testAnEmptyListDropsEveryFarmButNotThePerson() async {
+        let (cache, _) = makeCache(budget: 100_000)
+        await cache.write("farm", payload(10), scope: CacheScope(userID: "u-a", tenant: "f"))
+        await cache.write("person", payload(10), scope: CacheScope(userID: "u-a", tenant: ""))
+        await cache.retainFarms(userID: "u-a", slugs: [])
+        let farm = await cache.read("farm")
+        let person = await cache.read("person")
+        XCTAssertNil(farm)
+        XCTAssertNotNil(person)
+        await cache.removeAll()
+    }
+
+    /// The tags are hashes: neither the user id nor the farm's slug is
+    /// readable on the file, as with the filename.
+    func testTheTagsCarryNoNameInTheClear() async throws {
+        let (cache, name) = makeCache(budget: 100_000)
+        await cache.write("e", payload(10), scope: CacheScope(userID: "u-secret", tenant: "farm-secret"))
+        let url = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(name).appendingPathComponent("e")
+        let listed = url.withUnsafeFileSystemRepresentation { path -> String in
+            guard let path else { return "" }
+            var buffer = [CChar](repeating: 0, count: 4096)
+            let n = listxattr(path, &buffer, buffer.count, 0)
+            return n > 0 ? String(decoding: buffer[..<n].map { UInt8(bitPattern: $0) }, as: UTF8.self) : ""
+        }
+        XCTAssertTrue(listed.contains("bg.agrent.farm"), "positive control: the tag was written")
+        for attr in ["bg.agrent.owner", "bg.agrent.farm"] {
+            let value = url.withUnsafeFileSystemRepresentation { path -> String in
+                guard let path else { return "" }
+                var bytes = [UInt8](repeating: 0, count: 512)
+                let n = getxattr(path, attr, &bytes, bytes.count, 0, 0)
+                return n > 0 ? String(decoding: bytes[..<n], as: UTF8.self) : ""
+            }
+            XCTAssertEqual(value.count, 64, attr)
+            XCTAssertFalse(value.contains("secret"), attr)
+        }
+        await cache.removeAll()
+    }
+
     func testMissReturnsNil() async {
         let (cache, _) = makeCache(budget: 10_000)
         let hit = await cache.read("absent")
@@ -185,7 +253,7 @@ final class ResponseCacheTests: XCTestCase {
         XCTAssertTrue(resource.contains("enum CachedResource"), "positive control")
         XCTAssertTrue(resource.contains("ResponseCache.shared.etag(key)"))
         XCTAssertTrue(resource.contains("conditionalData(for: pathAndQuery, ifNoneMatch: tag)"))
-        XCTAssertTrue(resource.contains("write(key, data, etag: etag)"))
+        XCTAssertTrue(resource.contains("write(key, data, etag: etag, scope: scope)"))
         XCTAssertTrue(resource.contains("load(pathAndQuery, conditional: false, decode: decode)"))
         let client = try source("Agrent/API/APIClient.swift")
         XCTAssertTrue(client.contains(#"forHTTPHeaderField: "If-None-Match")"#))

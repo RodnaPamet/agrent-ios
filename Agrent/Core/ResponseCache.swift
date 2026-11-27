@@ -112,7 +112,12 @@ actor ResponseCache {
 
     /// `etag` is the response's own: kept with this body and replaced with it,
     /// so it can never vouch for bytes it didn't come with.
-    func write(_ key: String, _ data: Data, etag: String? = nil) {
+    ///
+    /// `scope` tags the entry with whose and which farm's it is (#708), so
+    /// `retainFarms` can find a lost farm's entries although the filename is
+    /// a hash. An entry written without one is never purged that way; the
+    /// first 403 on it and the sign-out purge still remove it.
+    func write(_ key: String, _ data: Data, etag: String? = nil, scope: CacheScope? = nil) {
         do {
             try fileManager.createDirectory(
                 at: directory,
@@ -124,12 +129,36 @@ actor ResponseCache {
                 options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
             )
             Self.setEtag(etag, at: fileURL(key))
+            Self.setScope(scope, at: fileURL(key))
             Log.cache.debug("wrote \(data.count, privacy: .public)B")
             evictIfOverBudget(keeping: key)
         } catch {
             // A cache that cannot write is a slow app, not a broken one.
             Log.cache.error("write failed: \(Log.summary(for: error), privacy: .public)")
         }
+    }
+
+    /// Drop this person's entries for every farm that is no longer theirs
+    /// (#708): removed from it, or the farm deleted. Called with the farm
+    /// list as the server has it NOW, so a list that could not be read
+    /// purges nothing. Other people's entries and the person's own
+    /// (farm-less) data are left alone; entries from before the tags existed
+    /// carry none and age out under the byte budget.
+    ///
+    /// Not a safety net the app leans on — no screen serves a lost farm's
+    /// entries, and the first 403 on one deletes it — but bytes of a farm a
+    /// person may no longer see should not sit on the phone until then.
+    func retainFarms(userID: String, slugs: Set<String>) {
+        guard let entries = try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        let owner = Self.tag("owner", userID)
+        let kept = Set(slugs.map { Self.tag("farm", userID, $0) })
+        var dropped = 0
+        for url in entries where Self.attribute(Self.ownerAttribute, at: url) == owner {
+            guard let farm = Self.attribute(Self.farmAttribute, at: url), !kept.contains(farm) else { continue }
+            try? fileManager.removeItem(at: url)
+            dropped += 1
+        }
+        if dropped > 0 { Log.cache.debug("dropped \(dropped, privacy: .public) entries of farms no longer listed") }
     }
 
     func remove(_ key: String) {
@@ -213,14 +242,7 @@ actor ResponseCache {
     private static let etagLimit = 512
 
     private static func etag(at url: URL) -> String? {
-        url.withUnsafeFileSystemRepresentation { path -> String? in
-            guard let path else { return nil }
-            let size = getxattr(path, etagAttribute, nil, 0, 0, 0)
-            guard size > 0, size <= etagLimit else { return nil }
-            var bytes = [UInt8](repeating: 0, count: size)
-            guard getxattr(path, etagAttribute, &bytes, size, 0, 0) == size else { return nil }
-            return String(bytes: bytes, encoding: .utf8)
-        }
+        attribute(etagAttribute, at: url)
     }
 
     /// Set, or removed when the response carried none. Removed explicitly
@@ -228,13 +250,51 @@ actor ResponseCache {
     /// old tag left on a new body would earn a 304 for bytes the server
     /// never sent.
     private static func setEtag(_ etag: String?, at url: URL) {
+        setAttribute(etagAttribute, etag, at: url)
+    }
+
+    // MARK: - Whose entry (#708)
+    //
+    // Hashes, like the filename: the attributes say neither the person nor
+    // the farm in the clear, only enough for `retainFarms` to match them.
+    // The person's own data (no farm) carries the owner tag alone and is
+    // never dropped for a farm.
+
+    private static let ownerAttribute = "bg.agrent.owner"
+    private static let farmAttribute = "bg.agrent.farm"
+
+    private static func setScope(_ scope: CacheScope?, at url: URL) {
+        setAttribute(ownerAttribute, scope.map { tag("owner", $0.userID) }, at: url)
+        let farm = scope.flatMap { $0.tenant.isEmpty ? nil : tag("farm", $0.userID, $0.tenant) }
+        setAttribute(farmAttribute, farm, at: url)
+    }
+
+    /// The NUL separators keep `("ab", "c")` from colliding with `("a", "bc")`.
+    private static func tag(_ parts: String...) -> String {
+        SHA256.hash(data: Data(parts.joined(separator: "\u{0}").utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private static func attribute(_ name: String, at url: URL) -> String? {
+        url.withUnsafeFileSystemRepresentation { path -> String? in
+            guard let path else { return nil }
+            let size = getxattr(path, name, nil, 0, 0, 0)
+            guard size > 0, size <= etagLimit else { return nil }
+            var bytes = [UInt8](repeating: 0, count: size)
+            guard getxattr(path, name, &bytes, size, 0, 0) == size else { return nil }
+            return String(bytes: bytes, encoding: .utf8)
+        }
+    }
+
+    private static func setAttribute(_ name: String, _ value: String?, at url: URL) {
         url.withUnsafeFileSystemRepresentation { path in
             guard let path else { return }
-            if let etag, !etag.isEmpty, etag.utf8.count <= etagLimit {
-                let bytes = Array(etag.utf8)
-                _ = setxattr(path, etagAttribute, bytes, bytes.count, 0, 0)
+            if let value, !value.isEmpty, value.utf8.count <= etagLimit {
+                let bytes = Array(value.utf8)
+                _ = setxattr(path, name, bytes, bytes.count, 0, 0)
             } else {
-                _ = removexattr(path, etagAttribute, 0)
+                _ = removexattr(path, name, 0)
             }
         }
     }

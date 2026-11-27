@@ -60,7 +60,8 @@ final class FarmStoreTests: XCTestCase {
     private func store(
         identity: SessionIdentity, memory: FarmMemory? = nil, mirror: ActiveFarm = ActiveFarm(),
         answer: CurrentUser?, asked: (() -> Void)? = nil, changed: (() -> Void)? = nil,
-        list: FarmList? = nil, roles: ((String?) -> Void)? = nil
+        list: FarmList? = nil, roles: ((String?) -> Void)? = nil,
+        dropped: (@Sendable (String, Set<String>) async -> Void)? = nil
     ) -> FarmStore {
         let list = list ?? FarmList([nil])
         return FarmStore(
@@ -73,8 +74,43 @@ final class FarmStoreTests: XCTestCase {
                 return answer
             },
             loadFarms: { try list.load() },
+            // Never the app's real cache from a test.
+            dropLostFarms: dropped ?? { _, _ in },
             onFarmChange: { changed?() },
             adoptRole: { roles?($0?.role) })
+    }
+
+    /// #708: the farm list the server sent is what the cache keeps; a farm
+    /// missing from it loses its cached responses.
+    func testAReadListDropsTheCacheOfFarmsNoLongerListed() async {
+        let list = FarmList([[member("ferma-1", "Ферма 1", "OWNER")]])
+        let asked = expectation(description: "the cache was told which farms remain")
+        let seen = Recorded()
+        let farms = store(identity: identity("usr_a"), answer: nil, list: list, dropped: { user, slugs in
+            await seen.set(user, slugs)
+            asked.fulfill()
+        })
+        await farms.refreshFarms()
+        await fulfillment(of: [asked], timeout: 2)
+        let call = await seen.value
+        XCTAssertEqual(call?.0, "usr_a")
+        XCTAssertEqual(call?.1, ["ferma-1"])
+    }
+
+    /// A list that cannot be read says nothing about which farms are gone,
+    /// so nothing is dropped: offline must not empty the cache.
+    func testAnUnreadableListDropsNothing() async {
+        let none = expectation(description: "no drop")
+        none.isInverted = true
+        let farms = store(identity: identity("usr_a"), answer: nil, list: FarmList([nil]),
+                          dropped: { _, _ in none.fulfill() })
+        await farms.refreshFarms()
+        await fulfillment(of: [none], timeout: 0.5)
+    }
+
+    private actor Recorded {
+        var value: (String, Set<String>)?
+        func set(_ user: String, _ slugs: Set<String>) { value = (user, slugs) }
     }
 
     private func member(_ slug: String, _ name: String, _ role: String) -> FarmsAPI.Membership {
