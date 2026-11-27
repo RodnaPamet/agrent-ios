@@ -191,6 +191,15 @@ final class FarmStore {
     @ObservationIgnored private let mirror: ActiveFarm
     @ObservationIgnored private let loadMe: @MainActor () async -> CurrentUser?
     @ObservationIgnored private let loadFarms: @MainActor () async throws -> [FarmsAPI.Membership]
+    /// The person's id and the farms they still have: drops the cached
+    /// responses of every other farm of theirs (#708).
+    @ObservationIgnored private let dropLostFarms: @Sendable (String, Set<String>) async -> Void
+
+    /// The app's `dropLostFarms`: the response cache keeps this person's
+    /// listed farms and drops the rest.
+    @Sendable static func dropCachedFarms(_ userID: String, _ slugs: Set<String>) async {
+        await ResponseCache.shared.retainFarms(userID: userID, slugs: slugs)
+    }
     @ObservationIgnored private let onFarmChange: @MainActor () -> Void
     @ObservationIgnored private let adoptRole: @MainActor (Farm?) -> Void
 
@@ -214,6 +223,7 @@ final class FarmStore {
         mirror: ActiveFarm = .shared,
         loadMe: @escaping @MainActor () async -> CurrentUser? = { await CurrentUserStore.shared.load() },
         loadFarms: @escaping @MainActor () async throws -> [FarmsAPI.Membership] = { try await FarmsAPI.farms() },
+        dropLostFarms: @escaping @Sendable (String, Set<String>) async -> Void = FarmStore.dropCachedFarms,
         onFarmChange: @escaping @MainActor () -> Void = { FarmStore.resetFarmState() },
         adoptRole: @escaping @MainActor (Farm?) -> Void = {
             CurrentUserStore.shared.adoptRoleHere($0?.role, permissions: $0?.permissions)
@@ -224,6 +234,7 @@ final class FarmStore {
         self.mirror = mirror
         self.loadMe = loadMe
         self.loadFarms = loadFarms
+        self.dropLostFarms = dropLostFarms
         self.onFarmChange = onFarmChange
         self.adoptRole = adoptRole
         #if DEBUG
@@ -370,6 +381,13 @@ final class FarmStore {
     /// wizard on that screen, create a second farm instead.
     private func adopt(_ list: [Farm]) {
         farms = list
+        // The list as the server has it NOW, so a farm missing from it is
+        // one this person lost: its cached responses go too (#708).
+        if let user = identity.userID {
+            let slugs = Set(list.map(\.slug))
+            let drop = dropLostFarms
+            Task { await drop(user, slugs) }
+        }
         let open: Farm
         switch state {
         case .active(let farm):

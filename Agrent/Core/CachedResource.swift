@@ -116,7 +116,7 @@ enum CachedResource {
             // read them, but they would be A's data at rest on a phone A has
             // signed out of, which is what the purge is for.
             if let key, CacheScope.current(for: pathAndQuery) == scope {
-                await ResponseCache.shared.write(key, data, etag: etag)
+                await ResponseCache.shared.write(key, data, etag: etag, scope: scope)
             }
             return .loaded(value, .fresh)
         } catch APIClient.APIError.notModified {
